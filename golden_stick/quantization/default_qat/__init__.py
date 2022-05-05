@@ -12,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""FakeQuantizer."""
-from mindspore.nn.cell import Cell
+"""
+MindSpore golden stick default-qat-quantization.
+"""
 
-"""FakeQuantizer should be a Cell for automatic-differentiation"""
-FakeQuantizer = Cell
+from .default_fake_quantizer import LearnedFakeQuantizerPerLayer
+from .default_layer_policy import DefaultLayerPolicy
+from .default_net_policy import DefaultNetworkPolicy
+from .default_quant_aware_training import DefaultQuantAwareTraining
+
+__all__ = ["LearnedFakeQuantizerPerLayer", "DefaultLayerPolicy", "DefaultNetworkPolicy", "DefaultQuantAwareTraining"]

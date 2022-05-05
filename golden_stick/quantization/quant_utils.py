@@ -1,4 +1,4 @@
-# Copyright 2020 Huawei Technologies Co., Ltd
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@
 
 import numpy as np
 from mindspore._checkparam import Validator
-from mindspore.nn.layer.quant import *
+from mindspore.nn.layer.quant import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
+    Conv2dQuant, DenseQuant
 from mindspore.nn import Cell, FakeQuantWithMinMaxObserver
 
 __all__ = ["load_nonquant_param_into_quant_net", "query_quant_layers", "compute_kl_threshold"]

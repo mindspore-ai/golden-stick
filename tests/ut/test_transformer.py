@@ -1,4 +1,4 @@
-# Copyright 2021 Huawei Technologies Co., Ltd
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,14 +16,12 @@
 
 import unittest
 from test_common import TestCommon
-from mindspore.golden_stick import Transformer, LayerPolicy
-from mindspore.golden_stick.quantization import DefaultLayerPolicy
-from mindspore.golden_stick.quantization.layer_policy import layer_policy_key
-from mindspore.rewrite import Node, Graph
-from mindspore.nn import Cell, Conv2d, BatchNorm2d, MaxPool2d
+from mindspore.golden_stick import Transformer
+from mindspore.rewrite import Graph
+from mindspore.nn import Cell, Conv2d, BatchNorm2d
 
 
-class QuantizeTestCase(unittest.TestCase):
+class TransformerTestCase(unittest.TestCase):
     @staticmethod
     def network():
         placeholder = TestCommon.create_placeholder_layer()

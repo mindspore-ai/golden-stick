@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""test_resnet"""
 
-from mindspore import nn
-from golden_stick import DefaultQuantAwareTraining
 import math
 import numpy as np
 from scipy.stats import truncnorm
+from golden_stick import DefaultQuantAwareTraining
+from mindspore import nn
 import mindspore.ops as ops
 import mindspore.common.dtype as mstype
 from mindspore.common.tensor import Tensor
@@ -168,6 +169,7 @@ def _fc(in_channel, out_channel, use_se=False):
 
 
 class ResidualBlock(nn.Cell):
+    """define network of residual block"""
     expansion = 4
 
     def __init__(self,
@@ -384,4 +386,3 @@ def test_resnet():
     net = resnet50(10)
     qat = DefaultQuantAwareTraining()
     qat.apply(net)
-

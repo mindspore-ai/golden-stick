@@ -1,4 +1,4 @@
-# Copyright 2021 Huawei Technologies Co., Ltd
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 """LayerQConfig."""
 import abc
 from typing import Optional
-from .fake_quantizer import FakeQuantizer
 from mindspore.nn import Cell
+from .fake_quantizer import FakeQuantizer
 layer_policy_key = "layer_quant_policy"
 
 
@@ -96,6 +96,5 @@ class LayerPolicy(abc.ABC):
         return []
 
     # only support one-output-quantizer pre layer because we can not get how many outputs a cell would has
-    def set_output_not_insert_fq(self):
+    def set_output_not_insert_fq(self, index: Optional[int] = None):
         pass
-

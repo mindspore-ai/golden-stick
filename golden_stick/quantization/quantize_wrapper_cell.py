@@ -1,4 +1,4 @@
-# Copyright 2021 Huawei Technologies Co., Ltd
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
 """QuantizeWrapperCell."""
 
 from mindspore.nn import Cell
-from .fake_quantizer import FakeQuantizer
 from .layer_policy import LayerPolicy
-from .quantize_wrapper_act import QuantizeWrapperActivation
 
 
 class QuantizeWrapperCell(Cell):
@@ -55,35 +53,16 @@ class QuantizeWrapperCell(Cell):
         Returns:
             Tensor, returns the computed result.
         """
-
-        # fake-quant input
-        fq_inputs = inputs
-        # if self._input_quantizer is None:
-        #     fq_inputs = inputs
-        # else:
-        #     fq_inputs = []
-        #     input_len = len(inputs)
-        #     for i in range(0, input_len):
-        #         ori_input = inputs[i]
-        #         if self._input_insert_quantizer[i]:
-        #             fq_inputs.append(self._input_quantizer(ori_input))
-        #         else:
-        #             fq_inputs.append(ori_input)
-
         # forward handler
-        outputs = self._handler(*fq_inputs, **kwargs)
+        outputs = self._handler(*inputs, **kwargs)
 
         # fake-quant output
         if self._output_quantizer is None:
             return outputs
         if not isinstance(outputs, list):
             return self._output_quantizer(outputs)
-        output_len = len(outputs)
-        if output_len == 0:
-            return outputs
-        else:
-            fq_outputs = []
-            for i in range(0, output_len):
-                ori_output = outputs[i]
-                fq_outputs.append(self._output_quantizer(ori_output))
-            return fq_outputs
+        fq_outputs = []
+        for i in range(0, output_len):
+            ori_output = outputs[i]
+            fq_outputs.append(self._output_quantizer(ori_output))
+        return fq_outputs

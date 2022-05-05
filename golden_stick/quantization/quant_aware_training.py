@@ -1,4 +1,4 @@
-# Copyright 2021 Huawei Technologies Co., Ltd
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
 # limitations under the License.
 # ============================================================================
 """Quantize."""
-from mindspore.rewrite import Node, NodeType
-from mindspore.nn import Cell
 import copy
 from typing import Optional
+from mindspore.rewrite import Node, NodeType
+from mindspore.nn import Cell
 from .net_policy import NetPolicy
 from .layer_policy import LayerPolicy, layer_policy_key
 from .transformer import Transformer
@@ -118,7 +118,7 @@ class QuantAwareTraining(CompAlgo):
                                               # todo we should decouple graph with net_transformer
         """
 
-        transformers = self._qat_policy.get_transformers()
+        transformers: [Transformer] = self._qat_policy.get_transformers()
         if isinstance(self._custom_transforms, list):
             for transform in self._custom_transforms:
                 if isinstance(transform, Transformer):
@@ -154,12 +154,12 @@ class QuantAwareTraining(CompAlgo):
                 wrapped_cell.update_parameters_name(node.get_name() + '.')
                 QuantAwareTraining._replace_node(net_transformer, node, wrapped_cell)
 
-    def apply(self, net: Cell) -> Cell:
+    def apply(self, network: Cell) -> Cell:
         """
         Apply QAT-Algorithm on `graph`
 
         Args:
-            net (Cell): Network to be quantized.
+            network (Cell): Network to be quantized.
 
         Returns:
             Quantized network.
