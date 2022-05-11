@@ -15,49 +15,61 @@
 """DefaultTrasforms."""
 from collections import OrderedDict
 from mindspore.rewrite import Replacement, PatternNode, Node
-from mindspore.nn import BatchNorm2d, Conv2dBnAct, DenseBnAct
 from mindspore import nn
-
-act_list = [nn.ReLU, nn.ReLU6, nn.Sigmoid, nn.LeakyReLU, nn.HSigmoid, nn.HSwish]
 
 
 class Conv2dBnActFuse(Replacement):
     """
-    Derived class of Replacement. Define the fuse function of conv2d+bn+act.
+    Derived class of Replacement. Define how to build a replacement from a Conv2d-BatchNorm-Activation pattern match.
     """
-
     def build(self, pattern: PatternNode, is_chain_pattern: bool, matched: OrderedDict) -> [Node]:
         """
         Derived from Replacement. Define how to fuse dense+bn+act.
         """
+
         act_pattern = None
         bn_pattern = None
-        if pattern.type() in act_list:
-            act_pattern = pattern
-            bn_pattern = act_pattern.get_inputs()[0]
-        elif pattern.type() == BatchNorm2d:
-            bn_pattern = pattern
-        conv_pattern = bn_pattern.get_inputs()[0]
-        bn_node: Node = matched.get(bn_pattern.name())
+        conv_pattern = None
+
+        cur_pattern = pattern
+        while cur_pattern:
+            if cur_pattern.type() == nn.ReLU:
+                if act_pattern:
+                    raise RuntimeError("Error match, multi-act!")
+                act_pattern = cur_pattern
+            if cur_pattern.type() == nn.BatchNorm2d:
+                if bn_pattern:
+                    raise RuntimeError("Error match, multi-bn!")
+                bn_pattern = cur_pattern
+            if cur_pattern.type() == nn.Conv2d:
+                if conv_pattern:
+                    raise RuntimeError("Error match, multi-conv!")
+                conv_pattern = cur_pattern
+            cur_pattern = cur_pattern.get_inputs()[0] if cur_pattern.get_inputs() else None
+        if conv_pattern is None:
+            raise RuntimeError("Error match, no-conv!")
+
+        bn_node: Node = matched.get(bn_pattern.name()) if bn_pattern else None
         conv_node: Node = matched.get(conv_pattern.name())
-        conv2dbnact_cell = Conv2dBnAct(conv_node.get_attribute("in_channels"),
-                                       conv_node.get_attribute("out_channels"),
-                                       conv_node.get_attribute("kernel_size"),
-                                       conv_node.get_attribute("stride"),
-                                       conv_node.get_attribute("pad_mode"),
-                                       conv_node.get_attribute("padding"),
-                                       conv_node.get_attribute("dilation"),
-                                       conv_node.get_attribute("group"),
-                                       conv_node.get_attribute("has_bias"),
-                                       conv_node.get_attribute("weight_init"),
-                                       conv_node.get_attribute("bias_init"),
-                                       True,
-                                       bn_node.get_attribute("momentum"),
-                                       bn_node.get_attribute("eps"),
-                                       "relu" if act_pattern is not None else None
-                                       )
-        conv2d_bn_act_node = Node.create_call_cell(conv2dbnact_cell, conv_node.get_targets(), conv_node.get_args(),
-                                                   conv_node.get_kwargs(), conv_node.get_name())
+        kwargs = {'in_channels': conv_node.get_attribute("in_channels"),
+                  'out_channels': conv_node.get_attribute("out_channels"),
+                  'kernel_size': conv_node.get_attribute("kernel_size"),
+                  'stride': conv_node.get_attribute("stride"),
+                  'pad_mode': conv_node.get_attribute("pad_mode"),
+                  'padding': conv_node.get_attribute("padding"),
+                  'dilation': conv_node.get_attribute("dilation"),
+                  'group': conv_node.get_attribute("group"),
+                  'weight_init': conv_node.get_attribute("weight_init"),
+                  'has_bias': conv_node.get_attribute("has_bias"),
+                  'bias_init': conv_node.get_attribute("bias_init"),
+                  }
+        if bn_node:
+            kwargs['eps'] = bn_node.get_attribute("eps")
+            kwargs['momentum'] = bn_node.get_attribute("momentum")
+        if act_pattern:
+            kwargs['activation'] = "relu"
+        conv2d_bn_act_node = Node.create_call_cell(nn.Conv2dBnAct(**kwargs), conv_node.get_targets(),
+                                                   conv_node.get_args(), conv_node.get_kwargs(), "Conv2dBnAct")
         return [conv2d_bn_act_node]
 
 
@@ -72,15 +84,15 @@ class DenseBnActFuse(Replacement):
         """
         act_pattern = None
         bn_pattern = None
-        if pattern.type() in act_list:
+        if pattern.type() == nn.ReLU:
             act_pattern = pattern
             bn_pattern = act_pattern.get_inputs()[0]
-        elif pattern.type() == BatchNorm2d:
+        elif pattern.type() == nn.BatchNorm2d:
             bn_pattern = pattern
         dense_pattern = bn_pattern.get_inputs()[0]
         bn_node: Node = matched.get(bn_pattern.name())
         dense_node: Node = matched.get(dense_pattern.name())
-        dense_bn_act_cell = DenseBnAct(
+        dense_bn_act_cell = nn.DenseBnAct(
             dense_node.get_attribute("in_channels"),
             dense_node.get_attribute("out_channels"),
             dense_node.get_attribute("weight_init"),
@@ -92,5 +104,5 @@ class DenseBnActFuse(Replacement):
             "relu" if act_pattern is not None else None
         )
         dense_bn_act_node = Node.create_call_cell(dense_bn_act_cell, dense_node.get_targets(), dense_node.get_args(),
-                                                  dense_node.get_kwargs(), dense_node.get_name())
+                                                  dense_node.get_kwargs(), "DenseBnAct")
         return [dense_bn_act_node]

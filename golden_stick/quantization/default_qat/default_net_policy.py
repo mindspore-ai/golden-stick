@@ -19,6 +19,7 @@ from mindspore.rewrite import PatternEngine
 from ..net_policy import NetPolicy
 from .default_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
 from .default_transforms import Conv2dBnActFuse, DenseBnActFuse
+from .quant_config import QuantConfig
 
 
 class DefaultNetworkPolicy(NetPolicy):
@@ -29,19 +30,23 @@ class DefaultNetworkPolicy(NetPolicy):
         ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` ``one_conv_fold``.
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config=QuantConfig()):
         super().__init__(config)
-        if config is None:
-            config = {}
+        self._config: QuantConfig = config
+        self._build = False
         self._net_layer_policy = None
-        self._pattern_engines: [PatternEngine] = [
-            PatternEngine([Conv2d, BatchNorm2d], Conv2dBnActFuse()),
-            PatternEngine([Dense, BatchNorm2d], DenseBnActFuse()),
-            PatternEngine([Conv2d, BatchNorm2d, ReLU], Conv2dBnActFuse()),
-            PatternEngine([Dense, BatchNorm2d, ReLU], DenseBnActFuse()),
-        ]
-        self._layer_policy_map: dict = {
-            Conv2d: ConvLayerPolicy([], [], config),
-            Dense: DenseLayerPolicy([], [], config),
-            Conv2dBnAct: ConvBnLayerPolicy([], [], config)
-        }
+        self._pattern_engines: [PatternEngine] = []
+        self._layer_policy_map: dict = {}
+
+    def build(self):
+        """Initialize `DefaultNetworkPolicy`. A `DefaultNetworkPolicy` can only be built once."""
+        if self._build:
+            return
+        self._pattern_engines.append(PatternEngine([Conv2d, BatchNorm2d, ReLU], Conv2dBnActFuse()))
+        self._pattern_engines.append(PatternEngine([Dense, BatchNorm2d, ReLU], DenseBnActFuse()))
+        self._pattern_engines.append(PatternEngine([Conv2d, BatchNorm2d], Conv2dBnActFuse()))
+        self._pattern_engines.append(PatternEngine([Dense, BatchNorm2d], DenseBnActFuse()))
+        self._layer_policy_map[Conv2d] = ConvLayerPolicy([], [], self._config)
+        self._layer_policy_map[Dense] = DenseLayerPolicy([], [], self._config)
+        self._layer_policy_map[Conv2dBnAct] = ConvBnLayerPolicy([], [], self._config)
+        self._build = True
