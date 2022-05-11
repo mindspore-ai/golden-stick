@@ -20,13 +20,14 @@ from mindspore.nn import Cell
 from .net_policy import NetPolicy
 from .layer_policy import LayerPolicy, layer_policy_key
 from .transformer import Transformer
+from .quantize_wrapper_cell import QuantizeWrapperCell
 from ..comp_algo import CompAlgo
 from ..net_transform import NetTransformer
 
 
 class QuantAwareTraining(CompAlgo):
     """
-    Derived class of GoldenStick. Base class of QAT-algorithm.
+    Derived class of `CompAlgo`. Base class of QAT-algorithm.
     """
 
     def __init__(self, config=None):
@@ -129,8 +130,12 @@ class QuantAwareTraining(CompAlgo):
 
     @staticmethod
     def _replace_node(net_transformer: NetTransformer, target_node: Node, result_cell: Cell):
+        if isinstance(result_cell, QuantizeWrapperCell):
+            node_name = type(getattr(result_cell, '_handler')).__name__
+        else:
+            node_name = target_node.get_name()
         node = NetTransformer.create_node(result_cell, target_node.get_targets(), target_node.get_args(),
-                                          target_node.get_kwargs(), target_node.get_name())
+                                          target_node.get_kwargs(), node_name)
         net_transformer.replace(target_node, [node])
 
     @staticmethod
@@ -167,7 +172,7 @@ class QuantAwareTraining(CompAlgo):
 
         if not isinstance(self._qat_policy, NetPolicy):
             raise RuntimeError("Derived class should provide net policy")
-        net_transformer = NetTransformer(net)
+        net_transformer = NetTransformer(network)
         print("=" * 100, "before")
         print(net_transformer.get_code())
         print("=" * 100)

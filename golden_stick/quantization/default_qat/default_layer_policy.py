@@ -13,15 +13,20 @@
 # limitations under the License.
 # ============================================================================
 """DefaultLayerPolicy."""
+
 from typing import Optional
 from functools import partial
+
 from mindspore.nn import Cell
-from mindspore.nn.layer.quant import QuantConfig, Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv
+from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv
+from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
 from ..layer_policy import LayerPolicy
 from ..quantize_wrapper_cell import QuantizeWrapperCell
 from ..fake_quantizer import FakeQuantizer
 from .default_fake_quantizer import DefaultFakeQuantizerPerChannel, DefaultFakeQuantizerPerLayer, \
     LearnedFakeQuantizerPerLayer
+from .quant_config import QuantConfig
+from .constant import QuantDtype
 
 
 class DefaultLayerPolicy(LayerPolicy):
@@ -33,20 +38,37 @@ class DefaultLayerPolicy(LayerPolicy):
         ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` ``one_conv_fold``.
     """
 
-    def __init__(self, weight_names: [], act_names: [], config=None):
-        if config is None:
-            config = {}
-        self._weight_quantizer = partial(DefaultFakeQuantizerPerChannel, num_bits=8)
-        self._act_quantizer = DefaultFakeQuantizerPerLayer()
-        self._input_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer()
-        self._output_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer()
+    def __init__(self, weight_names: [], act_names: [], config: QuantConfig = QuantConfig()):
+        if config.weight_quant_dtype == QuantDtype.INT8:
+            num_bits = 8
+        else:
+            raise NotImplementedError("Only support int8 weight quant now!")
+        if config.weight_per_channel:
+            self._weight_quantizer_partial = partial(DefaultFakeQuantizerPerChannel, symmetric=config.weight_symmetric,
+                                                     quant_delay=config.weight_quant_delay, num_bits=num_bits,
+                                                     narrow_range=config.weight_narrow_range)
+        else:
+            self._weight_quantizer_partial = partial(DefaultFakeQuantizerPerLayer, symmetric=config.weight_symmetric,
+                                                     quant_delay=config.weight_quant_delay, num_bits=num_bits,
+                                                     narrow_range=config.weight_narrow_range)
+        if config.act_per_channel:
+            raise NotImplementedError("act quant only support perlayer now!")
+        self._act_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer(
+            symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=num_bits,
+            narrow_range=config.act_narrow_range)
+        self._input_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer(
+            symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=num_bits,
+            narrow_range=config.act_narrow_range)
+        self._output_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer(
+            symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=num_bits,
+            narrow_range=config.act_narrow_range)
         self._weight_names = weight_names
         self._act_names = act_names
         self._input_num = 0
         self._inputs_insert_fq = []
 
     def get_weight_name_and_quantizers(self):
-        return [(name, self._weight_quantizer) for name in self._weight_names]
+        return [(name, self._weight_quantizer_partial) for name in self._weight_names]
 
     def get_act_name_and_quantizers(self):
         return [(name, self._act_quantizer) for name in self._act_names]
@@ -78,7 +100,7 @@ class DefaultLayerPolicy(LayerPolicy):
         self._output_quantizer = None
 
     def get_quant_config(self):
-        return QuantConfig(self._weight_quantizer, self._act_quantizer)
+        return OpQuantConfig(self._weight_quantizer_partial, self._act_quantizer)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         return QuantizeWrapperCell(handler, self)

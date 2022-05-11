@@ -12,14 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick module.
-"""
+"""Config for aware-training-quantization."""
 
-from .comp_algo import CompAlgo
-from .net_transform import NetTransformer
-from .quantization import LayerPolicy, NetPolicy, QuantAwareTraining, FakeQuantizer, \
-    Transformer, DefaultLayerPolicy, DefaultNetworkPolicy, DefaultQuantAwareTraining
+from .constant import QuantDtype
 
-__all__ = ["CompAlgo", "NetTransformer", "LayerPolicy", "NetPolicy", "QuantAwareTraining", "FakeQuantizer",
-           "Transformer", "DefaultLayerPolicy", "DefaultNetworkPolicy", "DefaultQuantAwareTraining"]
+
+class QuantConfig:
+    """Config for aware-training-quantization."""
+    def __init__(self):
+        self.bn_fold = True
+        self.freeze_bn = 10000000
+        self.act_quant_delay = 0
+        self.weight_quant_delay = 0
+        self.act_quant_dtype = QuantDtype.INT8
+        self.weight_quant_dtype = QuantDtype.INT8
+        self.act_per_channel = False
+        self.weight_per_channel = False
+        self.act_symmetric = False
+        self.weight_symmetric = False
+        self.act_narrow_range = False
+        self.weight_narrow_range = False
+        self.one_conv_fold = True
