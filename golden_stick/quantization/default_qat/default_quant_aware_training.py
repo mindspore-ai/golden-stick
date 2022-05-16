@@ -79,7 +79,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         quant_dtype = config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8])
         self._config.act_quant_dtype = quant_dtype[0]
         self._config.weight_quant_dtype = quant_dtype[1]
-        per_channel = config.get("per_channel", [False, False])
+        per_channel = config.get("per_channel", [False, True])
         self._config.act_per_channel = per_channel[0]
         self._config.weight_per_channel = per_channel[1]
         symmetric = config.get("symmetric", [False, False])

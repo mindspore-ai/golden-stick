@@ -18,7 +18,7 @@ from mindspore.nn.layer import Conv2d, Dense, BatchNorm2d, ReLU, Conv2dBnAct
 from mindspore.rewrite import PatternEngine
 from ..net_policy import NetPolicy
 from .default_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
-from .default_transforms import Conv2dBnActFuse, DenseBnActFuse
+from .default_transforms import Conv2dBnActFuse, DenseBnActFuse, DenseActFuse
 from .quant_config import QuantConfig
 
 
@@ -43,9 +43,11 @@ class DefaultNetworkPolicy(NetPolicy):
         if self._build:
             return
         self._pattern_engines.append(PatternEngine([Conv2d, BatchNorm2d, ReLU], Conv2dBnActFuse()))
-        self._pattern_engines.append(PatternEngine([Dense, BatchNorm2d, ReLU], DenseBnActFuse()))
         self._pattern_engines.append(PatternEngine([Conv2d, BatchNorm2d], Conv2dBnActFuse()))
+        self._pattern_engines.append(PatternEngine([Conv2d, ReLU], Conv2dBnActFuse()))
+        self._pattern_engines.append(PatternEngine([Dense, BatchNorm2d, ReLU], DenseBnActFuse()))
         self._pattern_engines.append(PatternEngine([Dense, BatchNorm2d], DenseBnActFuse()))
+        self._pattern_engines.append(PatternEngine([Dense, ReLU], DenseActFuse()))
         self._layer_policy_map[Conv2d] = ConvLayerPolicy([], [], self._config)
         self._layer_policy_map[Dense] = DenseLayerPolicy([], [], self._config)
         self._layer_policy_map[Conv2dBnAct] = ConvBnLayerPolicy([], [], self._config)

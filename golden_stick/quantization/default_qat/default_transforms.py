@@ -22,6 +22,7 @@ class Conv2dBnActFuse(Replacement):
     """
     Derived class of Replacement. Define how to build a replacement from a Conv2d-BatchNorm-Activation pattern match.
     """
+
     def build(self, pattern: PatternNode, is_chain_pattern: bool, matched: OrderedDict) -> [Node]:
         """
         Derived from Replacement. Define how to fuse dense+bn+act.
@@ -59,10 +60,12 @@ class Conv2dBnActFuse(Replacement):
                   'padding': conv_node.get_attribute("padding"),
                   'dilation': conv_node.get_attribute("dilation"),
                   'group': conv_node.get_attribute("group"),
-                  'weight_init': conv_node.get_attribute("weight_init"),
                   'has_bias': conv_node.get_attribute("has_bias"),
-                  'bias_init': conv_node.get_attribute("bias_init"),
                   }
+        if hasattr(conv_node, "weight_init"):
+            kwargs["weight_init"] = conv_node.get_attribute("weight_init")
+        if hasattr(conv_node, "bias_init"):
+            kwargs["bias_init"] = conv_node.get_attribute("bias_init")
         if bn_node:
             kwargs['eps'] = bn_node.get_attribute("eps")
             kwargs['momentum'] = bn_node.get_attribute("momentum")
@@ -71,6 +74,48 @@ class Conv2dBnActFuse(Replacement):
         conv2d_bn_act_node = Node.create_call_cell(nn.Conv2dBnAct(**kwargs), conv_node.get_targets(),
                                                    conv_node.get_args(), conv_node.get_kwargs(), "Conv2dBnAct")
         return [conv2d_bn_act_node]
+
+
+class DenseActFuse(Replacement):
+    """
+    Derived class of Replacement. Define how to build a replacement from a Conv2d-Activation pattern match.
+    """
+
+    def build(self, pattern: PatternNode, is_chain_pattern: bool, matched: OrderedDict) -> [Node]:
+        """
+        Derived from Replacement. Define how to fuse dense+act.
+        """
+        act_pattern = None
+        dense_pattern = None
+
+        cur_pattern = pattern
+        while cur_pattern:
+            if cur_pattern.type() == nn.ReLU:
+                if act_pattern:
+                    raise RuntimeError("Error match, multi-act!")
+                act_pattern = cur_pattern
+            if cur_pattern.type() == nn.Dense:
+                if dense_pattern:
+                    raise RuntimeError("Error match, multi-dense!")
+                dense_pattern = cur_pattern
+            cur_pattern = cur_pattern.get_inputs()[0] if cur_pattern.get_inputs() else None
+        if dense_pattern is None:
+            raise RuntimeError("Error match, no-dense!")
+
+        dense_node: Node = matched.get(dense_pattern.name())
+        kwargs = {'in_channels': dense_node.get_attribute("in_channels"),
+                  'out_channels': dense_node.get_attribute("out_channels"),
+                  'has_bias': dense_node.get_attribute("has_bias"),
+                  }
+        if hasattr(dense_node, "weight_init"):
+            kwargs["weight_init"] = dense_node.get_attribute("weight_init")
+        if hasattr(dense_node, "bias_init"):
+            kwargs["bias_init"] = dense_node.get_attribute("bias_init")
+        if act_pattern:
+            kwargs['activation'] = "relu"
+        dense_act_node = Node.create_call_cell(nn.Dense(**kwargs), dense_node.get_targets(), dense_node.get_args(),
+                                               dense_node.get_kwargs(), "DenseAct")
+        return [dense_act_node]
 
 
 class DenseBnActFuse(Replacement):
