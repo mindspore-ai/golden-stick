@@ -1,0 +1,3 @@
+[submodule "tests/models"]
+	path = tests/models
+	url = https://gitee.com/mindspore/models.git
