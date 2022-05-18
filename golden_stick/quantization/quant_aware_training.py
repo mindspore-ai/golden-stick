@@ -67,6 +67,11 @@ class QuantAwareTraining(CompAlgo):
                 new_layer_policy.set_input_number(len(node.get_inputs()))
                 node.set_attribute(layer_policy_key, new_layer_policy)
 
+        for node in net_transformer.nodes():
+            if node.get_node_type() == NodeType.Tree:
+                sub_net_trans = NetTransformer.create_from_tree_node(node)
+                self._propagate_layer_policy(sub_net_trans)
+
     @staticmethod
     def _reduce_redundant_fake_quant(net_transformer: NetTransformer):
         """
@@ -80,6 +85,9 @@ class QuantAwareTraining(CompAlgo):
         for node in net_transformer.nodes():
             if not isinstance(node, Node):
                 continue
+            if node.get_node_type() == NodeType.Tree:
+                sub_net_trans = NetTransformer.create_from_tree_node(node)
+                QuantAwareTraining._reduce_redundant_fake_quant(sub_net_trans)
             cur_policy: LayerPolicy = node.get_attribute(layer_policy_key)
             # cur-node has no quant policy, so no fq will insert into its inputs
             if cur_policy is None:
