@@ -62,7 +62,7 @@ class QuantizeWrapperCell(Cell):
         if not isinstance(outputs, list):
             return self._output_quantizer(outputs)
         fq_outputs = []
-        for i in range(0, output_len):
+        for i in range(0, len(outputs)):
             ori_output = outputs[i]
             fq_outputs.append(self._output_quantizer(ori_output))
         return fq_outputs
