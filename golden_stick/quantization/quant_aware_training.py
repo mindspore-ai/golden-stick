@@ -169,7 +169,7 @@ class QuantAwareTraining(CompAlgo):
 
     def apply(self, network: Cell) -> Cell:
         """
-        Apply QAT-Algorithm on `graph`
+        Apply QAT-Algorithm on `network`
 
         Args:
             network (Cell): Network to be quantized.
@@ -181,14 +181,8 @@ class QuantAwareTraining(CompAlgo):
         if not isinstance(self._qat_policy, NetPolicy):
             raise RuntimeError("Derived class should provide net policy")
         net_transformer = NetTransformer(network)
-        print("=" * 100, "before")
-        print(net_transformer.get_code())
-        print("=" * 100)
         self._apply_fuse_patterns(net_transformer)
         self._propagate_layer_policy(net_transformer)
         QuantAwareTraining._reduce_redundant_fake_quant(net_transformer)
         QuantAwareTraining._apply_layer_policy(net_transformer)
-        print("=" * 100, "after")
-        print(net_transformer.get_code())
-        print("=" * 100)
         return net_transformer.get_network()

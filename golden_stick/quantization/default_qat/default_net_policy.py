@@ -27,7 +27,7 @@ class DefaultNetworkPolicy(NetPolicy):
     Derived class of NetworkQConfig. Default network-quant-config.
 
     Supported Config:
-        ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` ``one_conv_fold``.
+        ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` .
     """
 
     def __init__(self, config=QuantConfig()):
