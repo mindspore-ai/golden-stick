@@ -1,16 +1,13 @@
-# Goldenstick
-"golden-stick/golden_stick/net_transform.py"                                                            "bad-whitespace"
-"golden-stick/tests/"                                                                                   "missing-docstring"
-
 # Quantization
 "golden-stick/golden_stick/quantization/default_qat/default_transforms.py"                              "unused-argument"
-"golden-stick/golden_stick/quantization/fake_quantizer.py"                                              "invalid-name"
 "golden-stick/golden_stick/quantization/fake_quantizer.py"                                              "pointless-string-statement"
 "golden-stick/golden_stick/quantization/net_policy.py"                                                  "unused-argument"
 "golden-stick/golden_stick/quantization/quant_utils.py"                                                 "invalid-name"
 "golden-stick/golden_stick/quantization/quant_aware_training.py"                                        "not-an-iterable"
 
-# st
+# tests
 "golden-stick/tests/st/quantization/test_qat.py"                                                        "protected-access"
+"golden-stick/tests/st/quantization/test_lenet.py"                                                      "protected-access"
+"golden-stick/tests/"                                                                                   "missing-docstring"
 
 
