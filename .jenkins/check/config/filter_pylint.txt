@@ -10,4 +10,7 @@
 "golden-stick/golden_stick/quantization/quant_utils.py"                                                 "invalid-name"
 "golden-stick/golden_stick/quantization/quant_aware_training.py"                                        "not-an-iterable"
 
+# st
+"golden-stick/tests/st/quantization/test_qat.py"                                                        "protected-access"
+
 

@@ -33,3 +33,4 @@ class QuantConfig:
         self.act_narrow_range = False
         self.weight_narrow_range = False
         self.one_conv_fold = True
+        self.enable_fusion = False
