@@ -91,10 +91,10 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         Set value of bn_fold of `_config`
 
         Args:
-            bn_fold (bool): Whether use bn_fold or not.
+            bn_fold (bool): Whether quantization algorithm use bn_fold or not.
 
         Raises:
-            RuntimeError: Not support for bn fold yet.
+            NotImplementedError: Not support for bn fold yet.
         """
         raise NotImplementedError(f"Not support for bn fold yet.")
 
@@ -164,7 +164,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         Set value of act_symmetric of `_config`
 
         Args:
-            act_symmetric (bool): Whether the quantization algorithm is symmetric or not. If `True` then base on
+            act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. If `True` then base on
                 symmetric, otherwise base on asymmetric.
 
         Raises:
@@ -178,14 +178,42 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         Set value of weight_symmetric of `_config`
 
         Args:
-            weight_symmetric (bool): Whether the quantization algorithm is symmetric or not. If `True` then base on
-                symmetric, otherwise base on asymmetric.
+            weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. If `True` then
+                base on symmetric, otherwise base on asymmetric.
 
         Raises:
             TypeError: If `weight_symmetric` is not bool.
         """
         Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
         self._config.weight_symmetric = weight_symmetric
+
+    def set_act_narrow_range(self, act_narrow_range):
+        """
+        Set value of act_narrow_range of `_config`
+
+        Args:
+            act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. If `True` then
+                base on narrow_range, otherwise base on not narrow_range.
+
+        Raises:
+            TypeError: If `act_narrow_range` is not bool.
+        """
+        Validator.check_bool(act_narrow_range, "act_narrow_range", self.__class__.__name__)
+        self._config.act_narrow_range = act_narrow_range
+
+    def set_weight_narrow_range(self, weight_narrow_range):
+        """
+        Set value of weight_symmetric of `_config`
+
+        Args:
+            weight_narrow_range (bool): Whether the quantization algorithm use weight narrow_range or not. If
+                `True` then base on narrow_range, otherwise base on not narrow_range.
+
+        Raises:
+            TypeError: If `weight_narrow_range` is not bool.
+        """
+        Validator.check_bool(weight_narrow_range, "weight_narrow_range", self.__class__.__name__)
+        self._config.weight_narrow_range = weight_narrow_range
 
     def set_enable_fusion(self, enable_fusion):
         """
@@ -212,7 +240,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         quant_delay_list = convert2list("quant delay", config.get("quant_delay", [0, 0]))
         quant_dtype_list = convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
         per_channel_list = convert2list("per channel", config.get("per_channel", [False, True]))
-        symmetric_list = convert2list("symmetric", config.get("symmetric", [False, False]))
+        symmetric_list = convert2list("symmetric", config.get("symmetric", [False, True]))
         narrow_range_list = convert2list("narrow range", config.get("narrow_range", [False, False]))
 
         self._config.act_quant_delay = Validator.check_non_negative_int(quant_delay_list[0], "quant delay")

@@ -88,6 +88,13 @@ class DefaultFakeQuantizerPerLayer(FakeQuantizer):
             self._fake_quant_train = quant_func(training=True)
             self._fake_quant_infer = quant_func(training=False)
 
+    def extend_repr(self):
+        """Display instance object as string."""
+        s = 'bit_num={}, symmetric={}, narrow_range={}, ema={}({}), per_channel={}, ' \
+            'quant_delay={}'.format(self._num_bits, self._symmetric, self._narrow_range,
+                                    self._ema, self._ema_decay, False, self._quant_delay)
+        return s
+
     def construct(self, x):
         if self.training:
             self._float_min, self._float_max = \
@@ -115,6 +122,14 @@ class DefaultFakeQuantizerPerChannel(DefaultFakeQuantizerPerLayer):
         quant_func = partial(Q.FakeQuantPerChannel, channel_axis=channel_axis)
         self._init_fake_quant_func(quant_func)
         self._min_max_update_func = Q.MinMaxUpdatePerChannel(channel_axis=channel_axis, ema=ema, ema_decay=ema_decay)
+
+    def extend_repr(self):
+        """Display instance object as string."""
+        s = 'bit_num={}, symmetric={}, narrow_range={}, ema={}({}), per_channel={}({}, {}), ' \
+            'quant_delay={}'.format(self._num_bits, self._symmetric, self._narrow_range,
+                                    self._ema, self._ema_decay, True,
+                                    self._channel_axis, self._num_channels, self._quant_delay)
+        return s
 
 
 class LearnedFakeQuantizerPerLayer(FakeQuantizer):
