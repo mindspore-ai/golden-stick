@@ -47,6 +47,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
             - narrow_range (Union[bool, list, tuple]): Whether the quantization algorithm uses narrow range or not.
               The first element represents data flow and the second element represents weights.
               Default: (False, False).
+            - enable_fusion (bool): Whether apply fusion before applying quantization.
 
     Supported Platforms:
          ``Ascend`` ``GPU``
@@ -139,7 +140,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
             TypeError: If `act_per_channel` is not bool.
             ValueError: act_per_channel is True.
         """
-        Validator.check_bool("act_per_channel", act_per_channel, self.__class__.__name__)
+        Validator.check_bool(act_per_channel, "act_per_channel", self.__class__.__name__)
         if act_per_channel:
             raise ValueError(f'act_per_channel only support False now')
         self._config.act_per_channel = act_per_channel
@@ -155,7 +156,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         Raises:
             TypeError: If `weight_per_channel` is not bool.
         """
-        Validator.check_bool("weight_per_channel", weight_per_channel, self.__class__.__name__)
+        Validator.check_bool(weight_per_channel, "weight_per_channel", self.__class__.__name__)
         self._config.weight_per_channel = weight_per_channel
 
     def set_act_symmetric(self, act_symmetric):
@@ -169,7 +170,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         Raises:
             TypeError: If `act_symmetric` is not bool.
         """
-        Validator.check_bool("act_symmetric", act_symmetric, self.__class__.__name__)
+        Validator.check_bool(act_symmetric, "act_symmetric", self.__class__.__name__)
         self._config.act_symmetric = act_symmetric
 
     def set_weight_symmetric(self, weight_symmetric):
@@ -183,8 +184,21 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         Raises:
             TypeError: If `weight_symmetric` is not bool.
         """
-        Validator.check_bool("weight_symmetric", weight_symmetric, self.__class__.__name__)
+        Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
         self._config.weight_symmetric = weight_symmetric
+
+    def set_enable_fusion(self, enable_fusion):
+        """
+        Set value of enable_fusion of `_config`
+
+        Args:
+            enable_fusion (bool): Whether apply fusion before applying quantization, default is False.
+
+        Raises:
+            TypeError: If `enable_fusion` is not bool.
+        """
+        Validator.check_bool(enable_fusion, "enable_fusion", self.__class__.__name__)
+        self._config.enable_fusion = enable_fusion
 
     def _update_qconfig_by_dict(self, config: dict):
         """Update `_config` from a dict"""
@@ -212,6 +226,7 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         self._config.act_narrow_range = Validator.check_bool(narrow_range_list[0], "narrow range")
         self._config.weight_narrow_range = Validator.check_bool(narrow_range_list[-1], "narrow range")
         self._config.one_conv_fold = Validator.check_bool(config.get("one_conv_fold", True), "one conv fold")
+        self._config.enable_fusion = Validator.check_bool(config.get("enable_fusion", False), "enable fusion")
 
     def apply(self, network: Cell) -> Cell:
         """

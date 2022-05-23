@@ -37,6 +37,7 @@ class QuantAwareTraining(CompAlgo):
         self._qat_policy = None
         self._custom_transforms = None
         self._custom_layer_policy_map = None
+        self.net_transformer = None
 
     def _propagate_layer_policy(self, net_transformer: NetTransformer):
         """
@@ -180,9 +181,9 @@ class QuantAwareTraining(CompAlgo):
 
         if not isinstance(self._qat_policy, NetPolicy):
             raise RuntimeError("Derived class should provide net policy")
-        net_transformer = NetTransformer(network)
-        self._apply_fuse_patterns(net_transformer)
-        self._propagate_layer_policy(net_transformer)
-        QuantAwareTraining._reduce_redundant_fake_quant(net_transformer)
-        QuantAwareTraining._apply_layer_policy(net_transformer)
-        return net_transformer.get_network()
+        self.net_transformer = NetTransformer(network)
+        self._apply_fuse_patterns(self.net_transformer)
+        self._propagate_layer_policy(self.net_transformer)
+        QuantAwareTraining._reduce_redundant_fake_quant(self.net_transformer)
+        QuantAwareTraining._apply_layer_policy(self.net_transformer)
+        return self.net_transformer.get_network()

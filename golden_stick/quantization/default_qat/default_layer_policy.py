@@ -18,7 +18,8 @@ from typing import Optional
 from functools import partial
 
 from mindspore.nn import Cell
-from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv
+from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
+    Conv2dBnFoldQuant
 from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
 from ..layer_policy import LayerPolicy
 from ..quantize_wrapper_cell import QuantizeWrapperCell
@@ -39,6 +40,7 @@ class DefaultLayerPolicy(LayerPolicy):
     """
 
     def __init__(self, weight_names: [], act_names: [], config: QuantConfig = QuantConfig()):
+        self._config = config
         if config.weight_quant_dtype == QuantDtype.INT8:
             num_bits = 8
         else:
@@ -129,5 +131,11 @@ class DenseLayerPolicy(DefaultLayerPolicy):
 
 class ConvBnLayerPolicy(DefaultLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
-        conv_bn_quant = Conv2dBnFoldQuantOneConv.from_float(handler, self.get_quant_config())
+        if self._config.bn_fold:
+            if self._config.one_conv_fold:
+                conv_bn_quant = Conv2dBnFoldQuantOneConv.from_float(handler, self.get_quant_config())
+            else:
+                conv_bn_quant = Conv2dBnFoldQuant.from_float(handler, self.get_quant_config())
+        else:
+            conv_bn_quant = Conv2dBnWithoutFoldQuant.from_float(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_bn_quant, self)

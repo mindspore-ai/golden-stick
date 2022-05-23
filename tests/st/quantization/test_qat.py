@@ -14,6 +14,9 @@
 # ============================================================================
 """test qat."""
 from collections import OrderedDict
+
+import pytest
+
 from golden_stick.quantization.default_qat import DefaultQuantAwareTraining
 from golden_stick.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 from mindspore.nn import Conv2dBnAct
@@ -23,6 +26,7 @@ from mindspore.common.initializer import Normal
 
 class LeNet5(nn.Cell):
     """define LeNet5"""
+
     def __init__(self, num_class=10, num_channel=1):
         super(LeNet5, self).__init__()
         self.conv1 = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
@@ -73,3 +77,18 @@ def test_lenet():
 
     assert cells.get("fc1_1", None) is not None
     assert isinstance(cells.get("fc1_1"), QuantizeWrapperCell)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_config_enable_fusion():
+    """
+    Feature: set_enable_fusion api of DefaultQuantAwareTraining.
+    Description: Check default value of enable_fusion and value after called set_enable_fusion.
+    Expectation: Config success.
+    """
+    qat = DefaultQuantAwareTraining()
+    assert not qat._config.enable_fusion
+    qat.set_enable_fusion(True)
+    assert qat._config.enable_fusion
