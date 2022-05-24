@@ -1,9 +1,7 @@
 # Quantization
-"golden-stick/golden_stick/quantization/default_qat/default_transforms.py"                              "unused-argument"
-"golden-stick/golden_stick/quantization/fake_quantizer.py"                                              "pointless-string-statement"
+"golden-stick/golden_stick/quantization/simulated_quantization/simulated_quantization_transforms.py"    "unused-argument"
 "golden-stick/golden_stick/quantization/net_policy.py"                                                  "unused-argument"
-"golden-stick/golden_stick/quantization/quant_utils.py"                                                 "invalid-name"
-"golden-stick/golden_stick/quantization/quant_aware_training.py"                                        "not-an-iterable"
+"golden-stick/golden_stick/quantization/quantization_aware_training.py"                                 "not-an-iterable"
 
 # tests
 "golden-stick/tests/st/quantization/test_qat.py"                                                        "protected-access"

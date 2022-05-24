@@ -25,13 +25,13 @@ from ..comp_algo import CompAlgo
 from ..net_transform import NetTransformer
 
 
-class QuantAwareTraining(CompAlgo):
+class QuantizationAwareTraining(CompAlgo):
     """
     Derived class of `CompAlgo`. Base class of QAT-algorithm.
     """
 
     def __init__(self, config=None):
-        super(QuantAwareTraining, self).__init__(config)
+        super(QuantizationAwareTraining, self).__init__(config)
         if config is None:
             config = {}
         self._qat_policy = None
@@ -54,7 +54,6 @@ class QuantAwareTraining(CompAlgo):
         if net_layer_policy:
             for node in net_transformer.nodes():
                 node.set_attribute(layer_policy_key, copy.copy(net_layer_policy))
-                # todo subgraph
         # step2 then apply layer-policy map, override policy if need
         layer_policy_map = self._qat_policy.get_layer_policy_map()
         for node in net_transformer.nodes():
@@ -88,7 +87,7 @@ class QuantAwareTraining(CompAlgo):
                 continue
             if node.get_node_type() == NodeType.Tree:
                 sub_net_trans = NetTransformer.create_from_tree_node(node)
-                QuantAwareTraining._reduce_redundant_fake_quant(sub_net_trans)
+                QuantizationAwareTraining._reduce_redundant_fake_quant(sub_net_trans)
             cur_policy: LayerPolicy = node.get_attribute(layer_policy_key)
             # cur-node has no quant policy, so no fq will insert into its inputs
             if cur_policy is None:
@@ -125,7 +124,6 @@ class QuantAwareTraining(CompAlgo):
 
         Args:
             net_transformer (NetTransformer): net_transformer is used to apply transforms to graph.
-                                              # todo we should decouple graph with net_transformer
         """
 
         transformers: [Transformer] = self._qat_policy.get_transformers()
@@ -160,13 +158,13 @@ class QuantAwareTraining(CompAlgo):
         for node in nodes:
             if node.get_node_type() == NodeType.Tree:
                 sub_net_transformer = NetTransformer.create_from_tree_node(node)
-                QuantAwareTraining._apply_layer_policy(sub_net_transformer)
+                QuantizationAwareTraining._apply_layer_policy(sub_net_transformer)
                 continue
             layer_policy = node.get_attribute(layer_policy_key)
             if isinstance(layer_policy, LayerPolicy):
                 wrapped_cell = layer_policy.wrap_cell(node.get_instance())
                 wrapped_cell.update_parameters_name(node.get_name() + '.')
-                QuantAwareTraining._replace_node(net_transformer, node, wrapped_cell)
+                QuantizationAwareTraining._replace_node(net_transformer, node, wrapped_cell)
 
     def apply(self, network: Cell) -> Cell:
         """
@@ -184,6 +182,6 @@ class QuantAwareTraining(CompAlgo):
         self.net_transformer = NetTransformer(network)
         self._apply_fuse_patterns(self.net_transformer)
         self._propagate_layer_policy(self.net_transformer)
-        QuantAwareTraining._reduce_redundant_fake_quant(self.net_transformer)
-        QuantAwareTraining._apply_layer_policy(self.net_transformer)
+        QuantizationAwareTraining._reduce_redundant_fake_quant(self.net_transformer)
+        QuantizationAwareTraining._apply_layer_policy(self.net_transformer)
         return self.net_transformer.get_network()

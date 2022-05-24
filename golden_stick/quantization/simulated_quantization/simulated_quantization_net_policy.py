@@ -17,22 +17,22 @@
 from mindspore.nn.layer import Conv2d, Dense, BatchNorm2d, ReLU, Conv2dBnAct
 from mindspore.rewrite import PatternEngine
 from ..net_policy import NetPolicy
-from .default_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
-from .default_transforms import Conv2dBnActFuse, DenseBnActFuse, DenseActFuse
-from .quant_config import QuantConfig
+from .simulated_quantization_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
+from .simulated_quantization_transforms import Conv2dBnActFuse, DenseBnActFuse, DenseActFuse
+from .simulated_quantization_config import SimulatedQuantizationConfig
 
 
-class DefaultNetworkPolicy(NetPolicy):
+class SimulatedNetPolicy(NetPolicy):
     """
-    Derived class of NetworkQConfig. Default network-quant-config.
+    Derived class of NetworkQConfig. Sim-QAT quant config.
 
     Supported Config:
         ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` .
     """
 
-    def __init__(self, config=QuantConfig()):
+    def __init__(self, config=SimulatedQuantizationConfig()):
         super().__init__(config)
-        self._config: QuantConfig = config
+        self._config: SimulatedQuantizationConfig = config
         self._build = False
         self._net_layer_policy = None
         self._pattern_engines: [PatternEngine] = []

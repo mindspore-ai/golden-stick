@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""DefaultQuantizeOp."""
+"""learned scale fake quantizers."""
 
 from functools import partial
 import numpy as np
@@ -20,7 +20,6 @@ import mindspore
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
-import mindspore.context as context
 from ..fake_quantizer import FakeQuantizer
 from ..quant_utils import compute_kl_threshold
 
@@ -43,102 +42,13 @@ def _calculate_quant_max(num_bits, neg_trunc=False):
     return quant_max
 
 
-class DefaultFakeQuantizerPerLayer(FakeQuantizer):
-    """
-    Default implement of MinMaxFakeQuantizer.
-    1. statistic the min max value passing through this op
-    2. run fake quant execution to simulate the quantize loss
-    """
-
-    def __init__(self, ema=False, ema_decay=0.999, symmetric=False, narrow_range=False, num_bits=8, quant_delay=0):
-        super(DefaultFakeQuantizerPerLayer, self).__init__()
-        self._ema = ema
-        self._ema_decay = ema_decay
-        self._symmetric = symmetric
-        self._num_bits = num_bits
-        self._quant_delay = quant_delay
-        self._narrow_range = narrow_range
-        self._min_max_update_func = Q.MinMaxUpdatePerLayer(ema=self._ema, ema_decay=self._ema_decay)
-        self._is_ascend = context.get_context("device_target") == "Ascend"
-        quant_func = Q.FakeQuantPerLayer
-        self._init_fake_quant_func(quant_func)
-        self._float_min = Parameter(Tensor(np.array([-6]).astype(np.float32), mindspore.float32),
-                                    name="float_min", requires_grad=False)
-        self._float_max = Parameter(Tensor(np.array([6]).astype(np.float32), mindspore.float32),
-                                    name="float_max", requires_grad=False)
-
-    def _init_fake_quant_func(self, quant_func):
-        """
-        Define fake quant function according to device
-        """
-        if self._is_ascend:
-            self._fake_quant_train = quant_func(num_bits=self._num_bits,
-                                                symmetric=self._symmetric,
-                                                narrow_range=self._narrow_range,
-                                                quant_delay=self._quant_delay)
-            self._fake_quant_infer = self.fake_quant_train
-        else:
-            quant_func = partial(quant_func,
-                                 ema=self._ema,
-                                 ema_decay=self._ema_decay,
-                                 num_bits=self._num_bits,
-                                 symmetric=self._symmetric,
-                                 narrow_range=self._narrow_range,
-                                 quant_delay=self._quant_delay)
-            self._fake_quant_train = quant_func(training=True)
-            self._fake_quant_infer = quant_func(training=False)
-
-    def extend_repr(self):
-        """Display instance object as string."""
-        s = 'bit_num={}, symmetric={}, narrow_range={}, ema={}({}), per_channel={}, ' \
-            'quant_delay={}'.format(self._num_bits, self._symmetric, self._narrow_range,
-                                    self._ema, self._ema_decay, False, self._quant_delay)
-        return s
-
-    def construct(self, x):
-        if self.training:
-            self._float_min, self._float_max = \
-                self._min_max_update_func(x, self._float_min, self._float_max)
-            out = self._fake_quant_train(x, self._float_min, self._float_max)
-        else:
-            out = self._fake_quant_infer(x, self._float_min, self._float_max)
-        return out
-
-
-class DefaultFakeQuantizerPerChannel(DefaultFakeQuantizerPerLayer):
-    """
-    Derived from DefaultFakeQuantizerPerLayer, perchannel version of default fake quantizer
-    """
-
-    def __init__(self, num_channels=1, channel_axis=1, ema=False, ema_decay=0.999, symmetric=False, narrow_range=False,
-                 num_bits=8, quant_delay=0):
-        super(DefaultFakeQuantizerPerChannel, self).__init__(ema=ema, ema_decay=ema_decay, symmetric=symmetric,
-                                                             narrow_range=narrow_range, num_bits=num_bits,
-                                                             quant_delay=quant_delay)
-        self._float_min = Parameter(Tensor(np.array([-6] * num_channels).astype(np.float32), mindspore.float32),
-                                    name="float_min", requires_grad=False)
-        self._float_max = Parameter(Tensor(np.array([6] * num_channels).astype(np.float32), mindspore.float32),
-                                    name="float_max", requires_grad=False)
-        quant_func = partial(Q.FakeQuantPerChannel, channel_axis=channel_axis)
-        self._init_fake_quant_func(quant_func)
-        self._min_max_update_func = Q.MinMaxUpdatePerChannel(channel_axis=channel_axis, ema=ema, ema_decay=ema_decay)
-
-    def extend_repr(self):
-        """Display instance object as string."""
-        s = 'bit_num={}, symmetric={}, narrow_range={}, ema={}({}), per_channel={}({}, {}), ' \
-            'quant_delay={}'.format(self._num_bits, self._symmetric, self._narrow_range,
-                                    self._ema, self._ema_decay, True,
-                                    self._channel_axis, self._num_channels, self._quant_delay)
-        return s
-
-
-class LearnedFakeQuantizerPerLayer(FakeQuantizer):
+class LearnedScaleFakeQuantizerPerLayer(FakeQuantizer):
     """
     Derived class of FakeQuantizer. Use learning-rate from each epoch to compute scale and zero-point.
     """
 
     def __init__(self, num_bits=8, quant_delay=0, min_init=-6, max_init=6, neg_trunc=False):
-        super(LearnedFakeQuantizerPerLayer, self).__init__()
+        super(LearnedScaleFakeQuantizerPerLayer, self).__init__()
         self._num_bits = num_bits
         self.neg_trunc = neg_trunc
         self._quant_max = _calculate_quant_max(self._num_bits, self.neg_trunc)
@@ -163,14 +73,14 @@ class LearnedFakeQuantizerPerLayer(FakeQuantizer):
         return out
 
 
-class LearnedFakeQuantizePerChannel(FakeQuantizer):
+class LearnedScaleFakeQuantizePerChannel(FakeQuantizer):
     """
     Derived class of FakeQuantizer. perchannel version of LearnedFakeQuantizerPerLayer.
     """
 
     def __init__(self, num_bits=8, num_channels=1, channel_axis=1, quant_delay=0,
                  float_min=-6, float_max=6, neg_trunc=False):
-        super(LearnedFakeQuantizePerChannel, self).__init__()
+        super(LearnedScaleFakeQuantizePerChannel, self).__init__()
         self._num_bits = num_bits
         self._quant_max = _calculate_quant_max(self._num_bits, neg_trunc)
         self.quant_max = Parameter(Tensor(np.array([self._quant_max]).astype(np.float32)))
