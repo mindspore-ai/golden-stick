@@ -17,9 +17,6 @@ MindSpore golden stick module.
 """
 
 from .comp_algo import CompAlgo
-from .net_transform import NetTransformer
-from .quantization import LayerPolicy, NetPolicy, QuantAwareTraining, FakeQuantizer, \
-    Transformer, DefaultLayerPolicy, DefaultNetworkPolicy, DefaultQuantAwareTraining
+from .quantization import QuantizationAwareTraining, SimulatedQuantizationAwareTraining
 
-__all__ = ["CompAlgo", "NetTransformer", "LayerPolicy", "NetPolicy", "QuantAwareTraining", "FakeQuantizer",
-           "Transformer", "DefaultLayerPolicy", "DefaultNetworkPolicy", "DefaultQuantAwareTraining"]
+__all__ = ["CompAlgo", "QuantizationAwareTraining", "SimulatedQuantizationAwareTraining"]

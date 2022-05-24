@@ -16,52 +16,53 @@
 
 from typing import Optional
 from functools import partial
-
 from mindspore.nn import Cell
 from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
 from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
 from ..layer_policy import LayerPolicy
 from ..quantize_wrapper_cell import QuantizeWrapperCell
+from ..constant import QuantDtype
 from ..fake_quantizer import FakeQuantizer
-from .default_fake_quantizer import DefaultFakeQuantizerPerChannel, DefaultFakeQuantizerPerLayer, \
-    LearnedFakeQuantizerPerLayer
-from .quant_config import QuantConfig
-from .constant import QuantDtype
+from .simulated_fake_quantizers import SimulatedFakeQuantizerPerChannel, SimulatedFakeQuantizerPerLayer
+from .simulated_quantization_config import SimulatedQuantizationConfig
 
 
-class DefaultLayerPolicy(LayerPolicy):
+class SimulatedLayerPolicy(LayerPolicy):
     """
-    Derived class of LayerPolicy. Default layer policy.
+    Derived class of LayerPolicy. Sim-QAT layer policy.
     Use linear perchannel fake quantizer as weight fake quantizer, linear perlayer fake quantizer as act fake quantizer.
 
     Supported Config:
         ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` ``one_conv_fold``.
     """
 
-    def __init__(self, weight_names: [], act_names: [], config: QuantConfig = QuantConfig()):
+    def __init__(self, weight_names: [], act_names: [],
+                 config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()):
         self._config = config
         if config.weight_quant_dtype == QuantDtype.INT8:
             num_bits = 8
         else:
             raise NotImplementedError("Only support int8 weight quant now!")
         if config.weight_per_channel:
-            self._weight_quantizer_partial = partial(DefaultFakeQuantizerPerChannel, symmetric=config.weight_symmetric,
-                                                     quant_delay=config.weight_quant_delay, num_bits=num_bits,
+            self._weight_quantizer_partial = partial(SimulatedFakeQuantizerPerChannel,
+                                                     symmetric=config.weight_symmetric,
+                                                     quant_delay=config.weight_quant_delay,
+                                                     num_bits=num_bits,
                                                      narrow_range=config.weight_narrow_range)
         else:
-            self._weight_quantizer_partial = partial(DefaultFakeQuantizerPerLayer, symmetric=config.weight_symmetric,
+            self._weight_quantizer_partial = partial(SimulatedFakeQuantizerPerLayer, symmetric=config.weight_symmetric,
                                                      quant_delay=config.weight_quant_delay, num_bits=num_bits,
                                                      narrow_range=config.weight_narrow_range)
         if config.act_per_channel:
             raise NotImplementedError("act quant only support perlayer now!")
-        self._act_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer(
+        self._act_quantizer: Optional[FakeQuantizer] = SimulatedFakeQuantizerPerLayer(
             symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=num_bits,
             narrow_range=config.act_narrow_range)
-        self._input_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer(
+        self._input_quantizer: Optional[FakeQuantizer] = SimulatedFakeQuantizerPerLayer(
             symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=num_bits,
             narrow_range=config.act_narrow_range)
-        self._output_quantizer: Optional[FakeQuantizer] = DefaultFakeQuantizerPerLayer(
+        self._output_quantizer: Optional[FakeQuantizer] = SimulatedFakeQuantizerPerLayer(
             symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=num_bits,
             narrow_range=config.act_narrow_range)
         self._weight_names = weight_names
@@ -108,28 +109,19 @@ class DefaultLayerPolicy(LayerPolicy):
         return QuantizeWrapperCell(handler, self)
 
 
-class ActivationLayerPolicy(DefaultLayerPolicy):
-    def __init__(self, insert_before_input=False, insert_after_output=True):
-        super().__init__([], [])
-        self._input_quantizer: Optional[FakeQuantizer] = LearnedFakeQuantizerPerLayer()
-        self._output_quantizer: Optional[FakeQuantizer] = LearnedFakeQuantizerPerLayer()
-        self._insert_before_input = insert_before_input
-        self._insert_after_output = insert_after_output
-
-
-class ConvLayerPolicy(DefaultLayerPolicy):
+class ConvLayerPolicy(SimulatedLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
         conv_quant = Conv2dQuant.from_float(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_quant, self)
 
 
-class DenseLayerPolicy(DefaultLayerPolicy):
+class DenseLayerPolicy(SimulatedLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
         dense_quant = DenseQuant.from_float(handler, self.get_quant_config())
         return QuantizeWrapperCell(dense_quant, self)
 
 
-class ConvBnLayerPolicy(DefaultLayerPolicy):
+class ConvBnLayerPolicy(SimulatedLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
         if self._config.bn_fold:
             if self._config.one_conv_fold:

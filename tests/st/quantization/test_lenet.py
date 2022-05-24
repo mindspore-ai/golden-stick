@@ -16,9 +16,9 @@
 
 from collections import OrderedDict
 import pytest
-from golden_stick.quantization.default_qat import DefaultQuantAwareTraining
-from golden_stick.quantization.default_qat.default_fake_quantizer import DefaultFakeQuantizerPerLayer, \
-    DefaultFakeQuantizerPerChannel
+from golden_stick.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
+from golden_stick.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
+    SimulatedFakeQuantizerPerChannel
 from golden_stick.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 from mindspore import nn
 from mindspore.common.initializer import Normal
@@ -75,20 +75,20 @@ def test_lenet():
     """
 
     network = LeNet5(10)
-    qat = DefaultQuantAwareTraining({"per_channel": [False, True], "symmetric": [False, True],
-                                     "quant_delay": [900, 900]})
+    qat = SimulatedQuantizationAwareTraining({"per_channel": [False, True], "symmetric": [False, True],
+                                              "quant_delay": [900, 900]})
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
     assert cells.get("Conv2dQuant", None) is not None
     conv_quant: QuantizeWrapperCell = cells.get("Conv2dQuant")
     assert isinstance(conv_quant, QuantizeWrapperCell)
     conv_handler = conv_quant._handler
-    weight_fake_quant: DefaultFakeQuantizerPerChannel = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, DefaultFakeQuantizerPerChannel)
+    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
     assert weight_fake_quant._symmetric
     assert weight_fake_quant._quant_delay == 900
     act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, DefaultFakeQuantizerPerLayer)
+    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not act_fake_quant._symmetric
     assert act_fake_quant._quant_delay == 900
 
@@ -96,11 +96,11 @@ def test_lenet():
     dense_quant: QuantizeWrapperCell = cells.get("DenseQuant")
     assert isinstance(dense_quant, QuantizeWrapperCell)
     dense_handler = dense_quant._handler
-    weight_fake_quant: DefaultFakeQuantizerPerChannel = dense_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, DefaultFakeQuantizerPerChannel)
+    weight_fake_quant: SimulatedFakeQuantizerPerChannel = dense_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
     assert weight_fake_quant._symmetric
     assert weight_fake_quant._quant_delay == 900
     act_fake_quant = dense_quant._output_quantizer
-    assert isinstance(act_fake_quant, DefaultFakeQuantizerPerLayer)
+    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not act_fake_quant._symmetric
     assert act_fake_quant._quant_delay == 900

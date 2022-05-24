@@ -12,19 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""DefaultQuantAwareTraining."""
+"""Basic implementation of simulated quantization aware training, this algorithm adopts fake quantizer to simulate
+quantization, statistic min max of ops to be quantized through training procession, then calculates quantization
+factors after training. See more details in `A White Paper on Neural Network Quantization
+<https://arxiv.org/pdf/2106.08295.pdf>`. """
 
 from mindspore.nn import Cell
 from mindspore._checkparam import Validator, Rel
-from ..quant_aware_training import QuantAwareTraining
-from .default_net_policy import DefaultNetworkPolicy
-from .constant import QuantDtype
-from .quant_config import QuantConfig
+from ..quantization_aware_training import QuantizationAwareTraining
+from ..constant import QuantDtype
+from .simulated_quantization_net_policy import SimulatedNetPolicy
+from .simulated_quantization_config import SimulatedQuantizationConfig
 
 
-class DefaultQuantAwareTraining(QuantAwareTraining):
+class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
     """
-    Derived class of GoldenStick. Default QAT-algorithm.
+    Derived class of GoldenStick. Simulated QAT-algorithm.
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. supported attribute are listed below:
@@ -62,23 +65,48 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
         ValueError: If the first element of `per_channel` is `True`
 
     Examples:
-        >>> from golden_stick.quantization.default_qat import DefaultQuantAwareTraining
+        >>> from golden_stick.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
         >>> from mindspore import nn
-        >>> from models.official.cv.lenet.src.lenet import LeNet5
+        >>> from mindspore.common.initializer import Normal
+        >>> class LeNet5(nn.Cell):
+        ...     def __init__(self, num_class=10, num_channel=1):
+        ...         super(LeNet5, self).__init__()
+        ...         self.conv1 = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
+        ...         self.conv2 = nn.Conv2d(6, 16, 5, pad_mode='valid')
+        ...         self.fc1 = nn.Dense(16 * 5 * 5, 120, weight_init=Normal(0.02))
+        ...         self.fc2 = nn.Dense(120, 84, weight_init=Normal(0.02))
+        ...         self.fc3 = nn.Dense(84, num_class, weight_init=Normal(0.02))
+        ...         self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
+        ...         self.flatten = nn.Flatten()
+        ...         self.relu = nn.ReLU()
+        ...
+        ...     def construct(self, x):
+        ...         x = self.conv1(x)
+        ...         x = self.relu(x)
+        ...         x = self.max_pool2d(x)
+        ...         x = self.conv2(x)
+        ...         x = self.relu(x)
+        ...         x = self.max_pool2d(x)
+        ...         x = self.flatten(x)
+        ...         x = self.relu(self.fc1(x))
+        ...         x = self.relu(self.fc2(x))
+        ...         x = self.fc3(x)
+        ...         return x
+        ...
         >>> net = LeNet5()
-        >>> default_qat = DefaultQuantAwareTraining()
-        >>> net_qat = default_qat.apply(net)
+        >>> simulated_quantization = SimulatedQuantizationAwareTraining()
+        >>> net_qat = simulated_quantization.apply(net)
     """
 
     def __init__(self, config=None):
-        super(DefaultQuantAwareTraining, self).__init__(config)
+        super(SimulatedQuantizationAwareTraining, self).__init__(config)
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._config: QuantConfig = QuantConfig()
+        self._config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()
         self._update_qconfig_by_dict(config)
 
-        self._qat_policy = DefaultNetworkPolicy(self._config)
+        self._qat_policy = SimulatedNetPolicy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
         if "custom_transforms" in config.keys():
@@ -267,4 +295,4 @@ class DefaultQuantAwareTraining(QuantAwareTraining):
             Quantized network.
         """
         self._qat_policy.build()
-        return super(DefaultQuantAwareTraining, self).apply(network)
+        return super(SimulatedQuantizationAwareTraining, self).apply(network)

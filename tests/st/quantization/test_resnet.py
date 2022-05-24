@@ -17,7 +17,7 @@
 import math
 import numpy as np
 from scipy.stats import truncnorm
-from golden_stick import DefaultQuantAwareTraining
+from golden_stick import SimulatedQuantizationAwareTraining
 from mindspore import nn
 import mindspore.ops as ops
 import mindspore.common.dtype as mstype
@@ -384,5 +384,5 @@ def test_resnet():
     """
 
     net = resnet50(10)
-    qat = DefaultQuantAwareTraining()
+    qat = SimulatedQuantizationAwareTraining()
     qat.apply(net)

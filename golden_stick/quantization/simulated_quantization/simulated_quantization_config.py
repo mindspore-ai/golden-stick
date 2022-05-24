@@ -14,10 +14,10 @@
 # ============================================================================
 """Config for aware-training-quantization."""
 
-from .constant import QuantDtype
+from ..constant import QuantDtype
 
 
-class QuantConfig:
+class SimulatedQuantizationConfig:
     """Config for aware-training-quantization."""
     def __init__(self):
         self.bn_fold = True
