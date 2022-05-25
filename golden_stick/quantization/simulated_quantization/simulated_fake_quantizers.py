@@ -103,6 +103,8 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
         quant_func = partial(Q.FakeQuantPerChannel, channel_axis=channel_axis)
         self._init_fake_quant_func(quant_func)
         self._min_max_update_func = Q.MinMaxUpdatePerChannel(channel_axis=channel_axis, ema=ema, ema_decay=ema_decay)
+        self._channel_axis = channel_axis
+        self._num_channels = num_channels
 
     def extend_repr(self):
         """Display instance object as string."""
