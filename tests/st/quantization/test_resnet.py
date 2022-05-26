@@ -15,13 +15,15 @@
 """test_resnet"""
 
 import math
+
 import numpy as np
 from scipy.stats import truncnorm
-from golden_stick import SimulatedQuantizationAwareTraining
-from mindspore import nn
+import mindspore
+import mindspore.nn as nn
 import mindspore.ops as ops
 import mindspore.common.dtype as mstype
 from mindspore.common.tensor import Tensor
+from mindspore_gs import SimulatedQuantizationAwareTraining
 
 
 def conv_variance_scaling_initializer(in_channel, out_channel, kernel_size):
@@ -169,7 +171,6 @@ def _fc(in_channel, out_channel, use_se=False):
 
 
 class ResidualBlock(nn.Cell):
-    """define network of residual block"""
     expansion = 4
 
     def __init__(self,
@@ -185,8 +186,7 @@ class ResidualBlock(nn.Cell):
         self.conv1 = _conv1x1(in_channel, channel, stride=1, use_se=self.use_se)
         self.bn1 = _bn(channel)
         if self.use_se and self.stride != 1:
-            self.e2 = nn.SequentialCell([_conv3x3(channel, channel, stride=1, use_se=True), _bn(channel),
-                                         nn.ReLU(), nn.MaxPool2d(kernel_size=2, stride=2, pad_mode='same')])
+            assert False
         else:
             self.conv2 = _conv3x3(channel, channel, stride=stride, use_se=self.use_se)
             self.bn2 = _bn(channel)
@@ -203,22 +203,17 @@ class ResidualBlock(nn.Cell):
 
         self.down_sample = False
 
-        if self.stride != 1 or in_channel != out_channel:
+        if stride != 1 or in_channel != out_channel:
             self.down_sample = True
-        self.down_sample_layer = None
+        self.down_sample_layer_conv = None
+        self.down_sample_layer_bn = None
 
         if self.down_sample:
             if self.use_se:
-                if stride == 1:
-                    self.down_sample_layer = nn.SequentialCell([_conv1x1(in_channel, out_channel,
-                                                                         stride, use_se=self.use_se), _bn(out_channel)])
-                else:
-                    self.down_sample_layer = nn.SequentialCell([nn.MaxPool2d(kernel_size=2, stride=2, pad_mode='same'),
-                                                                _conv1x1(in_channel, out_channel, 1,
-                                                                         use_se=self.use_se), _bn(out_channel)])
+                assert False
             else:
-                self.down_sample_layer = nn.SequentialCell([_conv1x1(in_channel, out_channel, stride,
-                                                                     use_se=self.use_se), _bn(out_channel)])
+                self.down_sample_layer_conv = _conv1x1(in_channel, out_channel, stride, use_se=self.use_se)
+                self.down_sample_layer_bn = _bn(out_channel)
 
     def construct(self, x):
         identity = x
@@ -245,12 +240,101 @@ class ResidualBlock(nn.Cell):
             out = self.se_mul(out, out_se)
 
         if self.down_sample:
-            identity = self.down_sample_layer(identity)
+            identity = self.down_sample_layer_conv(identity)
+            identity = self.down_sample_layer_bn(identity)
 
         out = out + identity
         out = self.relu(out)
 
         return out
+
+
+class Block1(nn.Cell):
+    def __init__(self, use_se):
+        super().__init__()
+        self.use_se = use_se
+        self.ic = 64
+        self.oc = 256
+        self.stride = 1
+        self.begin = ResidualBlock(self.ic, self.oc, self.stride, self.use_se)
+        self.b1 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b2 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b3 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+
+    def construct(self, x):
+        x = self.begin(x)
+        x = self.b1(x)
+        x = self.b2(x)
+        x = self.b3(x)
+        return x
+
+
+class Block2(nn.Cell):
+    def __init__(self, use_se):
+        super().__init__()
+        self.use_se = use_se
+        self.ic = 256
+        self.oc = 512
+        self.stride = 2
+        self.begin = ResidualBlock(self.ic, self.oc, self.stride, self.use_se)
+        self.b1 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b2 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b3 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b4 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+
+    def construct(self, x):
+        x = self.begin(x)
+        x = self.b1(x)
+        x = self.b2(x)
+        x = self.b3(x)
+        x = self.b4(x)
+        return x
+
+
+class Block3(nn.Cell):
+    def __init__(self, use_se):
+        super().__init__()
+        self.use_se = use_se
+        self.ic = 512
+        self.oc = 1024
+        self.stride = 2
+        self.begin = ResidualBlock(self.ic, self.oc, self.stride, self.use_se)
+        self.b1 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b2 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b3 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b4 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b5 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b6 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+
+    def construct(self, x):
+        x = self.begin(x)
+        x = self.b1(x)
+        x = self.b2(x)
+        x = self.b3(x)
+        x = self.b4(x)
+        x = self.b5(x)
+        x = self.b6(x)
+        return x
+
+
+class Block4(nn.Cell):
+    def __init__(self, use_se):
+        super().__init__()
+        self.use_se = use_se
+        self.ic = 1024
+        self.oc = 2048
+        self.stride = 2
+        self.begin = ResidualBlock(self.ic, self.oc, self.stride, self.use_se)
+        self.b1 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b2 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+        self.b3 = ResidualBlock(self.oc, self.oc, 1, self.use_se)
+
+    def construct(self, x):
+        x = self.begin(x)
+        x = self.b1(x)
+        x = self.b2(x)
+        x = self.b3(x)
+        return x
 
 
 class ResNet(nn.Cell):
@@ -290,53 +374,14 @@ class ResNet(nn.Cell):
         else:
             self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, pad_mode="same")
 
-        self.layer1 = self._make_layer(block,
-                                       layer_nums[0],
-                                       in_channel=in_channels[0],
-                                       out_channel=out_channels[0],
-                                       stride=strides[0],
-                                       use_se=self.use_se)
-        self.layer2 = self._make_layer(block,
-                                       layer_nums[1],
-                                       in_channel=in_channels[1],
-                                       out_channel=out_channels[1],
-                                       stride=strides[1],
-                                       use_se=self.use_se)
-        self.layer3 = self._make_layer(block,
-                                       layer_nums[2],
-                                       in_channel=in_channels[2],
-                                       out_channel=out_channels[2],
-                                       stride=strides[2],
-                                       use_se=self.use_se,
-                                       se_block=self.se_block)
-        self.layer4 = self._make_layer(block,
-                                       layer_nums[3],
-                                       in_channel=in_channels[3],
-                                       out_channel=out_channels[3],
-                                       stride=strides[3],
-                                       use_se=self.use_se,
-                                       se_block=self.se_block)
+        self.layer1 = Block1(self.use_se)
+        self.layer2 = Block2(self.use_se)
+        self.layer3 = Block3(self.use_se)
+        self.layer4 = Block4(self.use_se)
 
         self.mean = ops.ReduceMean(keep_dims=True)
         self.flatten = nn.Flatten()
         self.end_point = _fc(out_channels[3], num_classes, use_se=self.use_se)
-
-    def _make_layer(self, block, layer_num, in_channel, out_channel, stride, use_se=False, se_block=False):
-        layers = []
-
-        resnet_block = block(in_channel, out_channel, stride=stride, use_se=use_se)
-        layers.append(resnet_block)
-        if se_block:
-            for _ in range(1, layer_num - 1):
-                resnet_block = block(out_channel, out_channel, stride=1, use_se=use_se)
-                layers.append(resnet_block)
-            resnet_block = block(out_channel, out_channel, stride=1, use_se=use_se, se_block=se_block)
-            layers.append(resnet_block)
-        else:
-            for _ in range(1, layer_num):
-                resnet_block = block(out_channel, out_channel, stride=1, use_se=use_se)
-                layers.append(resnet_block)
-        return nn.SequentialCell(layers)
 
     def construct(self, x):
         if self.use_se:
@@ -385,4 +430,13 @@ def test_resnet():
 
     net = resnet50(10)
     qat = SimulatedQuantizationAwareTraining()
-    qat.apply(net)
+    qat.set_act_quant_delay(900)
+    qat.set_weight_quant_delay(900)
+    qat.set_act_symmetric(False)
+    qat.set_weight_symmetric(True)
+    qat.set_act_per_channel(False)
+    qat.set_weight_per_channel(True)
+    qat.set_enable_fusion(False)
+    net_opt = qat.apply(net)
+    data_in = Tensor(np.ones([1, 1, 224, 224]), mindspore.float32)
+    mindspore.common.api._cell_graph_executor.compile(net_opt, data_in)

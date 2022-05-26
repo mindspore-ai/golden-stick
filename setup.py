@@ -18,13 +18,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='golden-stick',
-    version='0.7',
+    name='golden_stick',
+    version='0.2',
     author='The MindSpore Authors',
     author_email='contact@mindspore.cn',
     description='A MindSpore model optimization algorithm set..',
     url='https://www.mindspore.cn',
-    packages=find_packages(include=['golden_stick*']),
+    packages=find_packages(include=['mindspore_gs*']),
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',

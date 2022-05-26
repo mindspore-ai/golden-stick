@@ -170,17 +170,17 @@ def fold_batchnorm(weight, cell_quant):
     if gamma.shape[0] == weight.shape[0]:
         # `Conv2d` or `Dense` op weight
         shape_list = [-1] + [1] * len(weight.shape[1:])
-        _gamma = gamma.reshape(shape_list)
-        _sigma = sigma.reshape(shape_list)
+        gamma_ = gamma.reshape(shape_list)
+        sigma_ = sigma.reshape(shape_list)
     elif gamma.shape[0] == weight.shape[1]:
         # `DepthwiseConv2d` op weight
         shape_list = [1, -1] + [1] * len(weight.shape[2:])
-        _gamma = gamma.reshape(shape_list)
-        _sigma = sigma.reshape(shape_list)
+        gamma_ = gamma.reshape(shape_list)
+        sigma_ = sigma.reshape(shape_list)
     else:
         raise ValueError("Unsupported weight shape({})".format(weight.shape))
 
-    weight = weight * _gamma / _sigma
+    weight = weight * gamma_ / sigma_
     bias = beta - gamma * mean / sigma
     return weight, bias
 
@@ -209,17 +209,17 @@ def without_fold_batchnorm(weight, cell_quant):
     if gamma.shape[0] == weight.shape[0]:
         # `Conv2d` or `Dense` op weight
         shape_list = [-1] + [1] * len(weight.shape[1:])
-        _gamma = gamma.reshape(shape_list)
-        _sigma = sigma.reshape(shape_list)
+        gamma_ = gamma.reshape(shape_list)
+        sigma_ = sigma.reshape(shape_list)
     elif gamma.shape[0] == weight.shape[1]:
         # `DepthwiseConv2d` op weight
         shape_list = [1, -1] + [1] * len(weight.shape[2:])
-        _gamma = gamma.reshape(shape_list)
-        _sigma = sigma.reshape(shape_list)
+        gamma_ = gamma.reshape(shape_list)
+        sigma_ = sigma.reshape(shape_list)
     else:
         raise ValueError("Unsupported weight shape({})".format(weight.shape))
 
-    weight = weight * _gamma / _sigma
+    weight = weight * gamma_ / sigma_
     bias = beta - gamma * mean / sigma
     return weight, bias
 

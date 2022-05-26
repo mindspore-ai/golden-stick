@@ -15,10 +15,10 @@
 """test qat."""
 from collections import OrderedDict
 import pytest
-from golden_stick.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
-from golden_stick.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
+from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
+from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
-from golden_stick.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 from mindspore import nn
 
 
@@ -86,3 +86,18 @@ def test_config_enable_fusion():
     assert not qat._config.enable_fusion
     qat.set_enable_fusion(True)
     assert qat._config.enable_fusion
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_config_one_conv_fold():
+    """
+    Feature: set_one_conv_fold api of DefaultQuantAwareTraining.
+    Description: Check default value of one_conv_fold and value after called set_one_conv_fold.
+    Expectation: Config success.
+    """
+    qat = SimulatedQuantizationAwareTraining()
+    assert qat._config.one_conv_fold
+    qat.set_one_conv_fold(False)
+    assert not qat._config.one_conv_fold
