@@ -124,7 +124,25 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Raises:
             NotImplementedError: Not support for bn fold yet.
         """
-        raise NotImplementedError(f"Not support for bn fold yet.")
+        Validator.check_bool(bn_fold, "bn_fold", self.__class__.__name__)
+        if bn_fold:
+            raise NotImplementedError(f"Not support for bn fold yet.")
+        self._config.bn_fold = bn_fold
+
+    def set_one_conv_fold(self, one_conv_fold):
+        """
+        Set value of bn_fold of `_config`
+
+        Args:
+            one_conv_fold (bool): Whether quantization algorithm use one_conv_fold or not.
+
+        Raises:
+            NotImplementedError: Only support for one_conv_fold yet.
+        """
+        Validator.check_bool(one_conv_fold, "bn_fold", self.__class__.__name__)
+        if not one_conv_fold:
+            raise NotImplementedError(f"Only support for one_conv_fold yet.")
+        self._config.one_conv_fold = one_conv_fold
 
     def set_act_quant_delay(self, act_quant_delay):
         """
@@ -186,6 +204,38 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         """
         Validator.check_bool(weight_per_channel, "weight_per_channel", self.__class__.__name__)
         self._config.weight_per_channel = weight_per_channel
+
+    def set_act_quant_dtype(self, act_quant_dtype):
+        """
+        Set value of act_quant_dtype of `_config`
+
+        Args:
+            act_quant_dtype (QuantDtype): Datatype used to quantize activations.
+
+        Raises:
+            TypeError: If `act_quant_dtype` is not QuantDtype.
+            NotImplementedError: act_quant_delay is not INT8.
+        """
+        Validator.check_isinstance("act quant dtype", act_quant_dtype, QuantDtype)
+        if act_quant_dtype != QuantDtype.INT8:
+            raise NotImplementedError("act_quant_dtype only support int8 yet.")
+        self._config.act_quant_dtype = act_quant_dtype
+
+    def set_weight_quant_dtype(self, weight_quant_dtype):
+        """
+        Set value of weight_quant_dtype of `_config`
+
+        Args:
+            weight_quant_dtype (QuantDtype): Datatype used to quantize activations.
+
+        Raises:
+            TypeError: If `weight_quant_dtype` is not QuantDtype.
+            NotImplementedError: weight_quant_dtype is not INT8.
+        """
+        Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
+        if weight_quant_dtype != QuantDtype.INT8:
+            raise NotImplementedError("weight_quant_dtype only support int8 yet.")
+        self._config.weight_quant_dtype = weight_quant_dtype
 
     def set_act_symmetric(self, act_symmetric):
         """
@@ -258,6 +308,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def _update_qconfig_by_dict(self, config: dict):
         """Update `_config` from a dict"""
+
         def convert2list(name, value):
             if not isinstance(value, list) and not isinstance(value, tuple):
                 value = [value]
@@ -271,18 +322,24 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         symmetric_list = convert2list("symmetric", config.get("symmetric", [False, True]))
         narrow_range_list = convert2list("narrow range", config.get("narrow_range", [False, False]))
 
-        self._config.act_quant_delay = Validator.check_non_negative_int(quant_delay_list[0], "quant delay")
-        self._config.weight_quant_delay = Validator.check_non_negative_int(quant_delay_list[-1], "quant delay")
-        self._config.act_quant_dtype = Validator.check_isinstance("weights dtype", quant_dtype_list[0], QuantDtype)
-        self._config.weight_quant_dtype = Validator.check_isinstance("weights dtype", quant_dtype_list[-1], QuantDtype)
-        self._config.act_per_channel = Validator.check_bool(per_channel_list[0], "per channel")
-        self._config.weight_per_channel = Validator.check_bool(per_channel_list[-1], "per channel")
-        self._config.act_symmetric = Validator.check_bool(symmetric_list[0], "symmetric")
-        self._config.weight_symmetric = Validator.check_bool(symmetric_list[-1], "symmetric")
-        self._config.act_narrow_range = Validator.check_bool(narrow_range_list[0], "narrow range")
-        self._config.weight_narrow_range = Validator.check_bool(narrow_range_list[-1], "narrow range")
-        self._config.one_conv_fold = Validator.check_bool(config.get("one_conv_fold", True), "one conv fold")
-        self._config.enable_fusion = Validator.check_bool(config.get("enable_fusion", False), "enable fusion")
+        self.set_act_quant_delay(quant_delay_list[0])
+        self.set_weight_quant_delay(quant_delay_list[-1])
+
+        self.set_act_quant_dtype(quant_dtype_list[0])
+        self.set_weight_quant_dtype(quant_dtype_list[-1])
+
+        self.set_act_per_channel(per_channel_list[0])
+        self.set_weight_per_channel(per_channel_list[-1])
+
+        self.set_act_symmetric(symmetric_list[0])
+        self.set_weight_symmetric(symmetric_list[-1])
+
+        self.set_act_narrow_range(narrow_range_list[0])
+        self.set_weight_narrow_range(narrow_range_list[-1])
+
+        self.set_enable_fusion(config.get("enable_fusion", False))
+        self.set_bn_fold(config.get("bn_fold", False))
+        self.set_one_conv_fold(config.get("one_conv_fold", True))
 
     def apply(self, network: Cell) -> Cell:
         """

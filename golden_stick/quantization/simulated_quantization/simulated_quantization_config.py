@@ -20,7 +20,7 @@ from ..constant import QuantDtype
 class SimulatedQuantizationConfig:
     """Config for aware-training-quantization."""
     def __init__(self):
-        self.bn_fold = True
+        self.bn_fold = False
         self.freeze_bn = 10000000
         self.act_quant_delay = 0
         self.weight_quant_delay = 0
