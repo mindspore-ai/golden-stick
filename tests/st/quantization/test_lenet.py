@@ -203,15 +203,3 @@ def test_lenet_accuracy():
     acc = model.eval(ds_eval, dataset_sink_mode=True)
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.98
-
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend_training
-@pytest.mark.env_onecard
-def test_ascend_empty():
-    """
-    Feature: empty testcase for ascend.
-    Description: empty.
-    Expectation: success.
-    """
-    os.getenv('DATASET_PATH')
