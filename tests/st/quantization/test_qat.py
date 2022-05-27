@@ -54,6 +54,8 @@ def test_set_config():
     qat.set_weight_per_channel(True)
     qat.set_act_narrow_range(False)
     qat.set_weight_narrow_range(False)
+    qat.set_one_conv_fold(True)
+    qat.set_bn_fold(False)
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
 

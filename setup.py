@@ -25,8 +25,6 @@ setup(
     description='A MindSpore model optimization algorithm set..',
     url='https://www.mindspore.cn',
     packages=find_packages(include=['golden_stick*']),
-    install_requires=['mindspore>=1.7.0',
-                      ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
