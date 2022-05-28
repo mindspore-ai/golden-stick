@@ -65,8 +65,6 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
          less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
         ValueError: If the first element of `per_channel` is `True`.
-        NotImplementedError: If `bn_fold` is `True`.
-        NotImplementedError: If `one_conv_fold` is `False`.
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
 
     Examples:
@@ -128,27 +126,21 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `bn_fold` is not bool.
-            NotImplementedError: Only supported if `bn_fold` is False yet.
         """
         Validator.check_bool(bn_fold, "bn_fold", self.__class__.__name__)
-        if bn_fold:
-            raise NotImplementedError(f"Only supported if `bn_fold` is False yet.")
         self._config.bn_fold = bn_fold
 
     def set_one_conv_fold(self, one_conv_fold):
         """
-        Set value of bn_fold of `_config`
+        Set value of one_conv_fold of `_config`
 
         Args:
             one_conv_fold (bool): Whether quantization algorithm use one_conv_fold or not.
 
         Raises:
             TypeError: If `one_conv_fold` is not bool.
-            NotImplementedError: Only supported if `one_conv_fold` is True yet.
         """
         Validator.check_bool(one_conv_fold, "one_conv_fold", self.__class__.__name__)
-        if not one_conv_fold:
-            raise NotImplementedError(f"Only supported if `one_conv_fold` is True yet.")
         self._config.one_conv_fold = one_conv_fold
 
     def set_act_quant_delay(self, act_quant_delay):
@@ -168,7 +160,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_quant_delay(self, weight_quant_delay):
         """
-        Set value of act_quant_delay of `_config`
+        Set value of weight_quant_delay of `_config`
 
         Args:
             weight_quant_delay (int): Number of steps after which weight is quantized during train and eval.
@@ -288,7 +280,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_narrow_range(self, weight_narrow_range):
         """
-        Set value of weight_symmetric of `_config`
+        Set value of weight_narrow_range of `_config`
 
         Args:
             weight_narrow_range (bool): Whether the quantization algorithm use weight narrow_range or not. If
@@ -309,7 +301,6 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `enable_fusion` is not bool.
-            NotImplementedError: Only supported if `act_per_channel` is `False` yet.
         """
         Validator.check_bool(enable_fusion, "enable_fusion", self.__class__.__name__)
         self._config.enable_fusion = enable_fusion

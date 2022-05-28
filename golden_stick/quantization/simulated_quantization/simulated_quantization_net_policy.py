@@ -39,7 +39,7 @@ class SimulatedNetPolicy(NetPolicy):
         self._layer_policy_map: dict = {}
 
     def build(self):
-        """Initialize `DefaultNetworkPolicy`. A `DefaultNetworkPolicy` can only be built once."""
+        """Initialize `SimulatedNetPolicy`. A `SimulatedNetPolicy` can only be built once."""
         if self._build:
             return
         if self._config.enable_fusion:
