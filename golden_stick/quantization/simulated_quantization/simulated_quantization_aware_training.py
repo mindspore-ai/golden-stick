@@ -51,18 +51,23 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
               The first element represents data flow and the second element represents weights.
               Default: (False, False).
             - enable_fusion (bool): Whether apply fusion before applying quantization.
+            - bn_fold (bool): Whether to use bn fold ops for simulation inference operation.
+            - one_conv_fold (bool): Whether to use one conv bn fold ops for simulation inference operation.
 
     Supported Platforms:
          ``Ascend`` ``GPU``
 
     Raises:
         TypeError: If the element of `quant_delay` is not int.
-        TypeError: If the element of `per_channel`, `symmetric`, `narrow_range` is not bool.
+        TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
         TypeError: If the element of `quant_dtype` is not `QuantDtype`.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
          less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
-        ValueError: If the first element of `per_channel` is `True`
+        ValueError: If the first element of `per_channel` is `True`.
+        NotImplementedError: If `bn_fold` is `True`.
+        NotImplementedError: If `one_conv_fold` is `False`.
+        NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
 
     Examples:
         >>> from golden_stick.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
@@ -122,11 +127,12 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             bn_fold (bool): Whether quantization algorithm use bn_fold or not.
 
         Raises:
-            NotImplementedError: Not support for bn fold yet.
+            TypeError: If `bn_fold` is not bool.
+            NotImplementedError: Only supported if `bn_fold` is False yet.
         """
         Validator.check_bool(bn_fold, "bn_fold", self.__class__.__name__)
         if bn_fold:
-            raise NotImplementedError(f"Not support for bn fold yet.")
+            raise NotImplementedError(f"Only supported if `bn_fold` is False yet.")
         self._config.bn_fold = bn_fold
 
     def set_one_conv_fold(self, one_conv_fold):
@@ -137,11 +143,12 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             one_conv_fold (bool): Whether quantization algorithm use one_conv_fold or not.
 
         Raises:
-            NotImplementedError: Only support for one_conv_fold yet.
+            TypeError: If `one_conv_fold` is not bool.
+            NotImplementedError: Only supported if `one_conv_fold` is True yet.
         """
-        Validator.check_bool(one_conv_fold, "bn_fold", self.__class__.__name__)
+        Validator.check_bool(one_conv_fold, "one_conv_fold", self.__class__.__name__)
         if not one_conv_fold:
-            raise NotImplementedError(f"Only support for one_conv_fold yet.")
+            raise NotImplementedError(f"Only supported if `one_conv_fold` is True yet.")
         self._config.one_conv_fold = one_conv_fold
 
     def set_act_quant_delay(self, act_quant_delay):
@@ -184,11 +191,11 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `act_per_channel` is not bool.
-            ValueError: act_per_channel is True.
+            NotImplementedError: Only supported if `act_per_channel` is `False` yet.
         """
         Validator.check_bool(act_per_channel, "act_per_channel", self.__class__.__name__)
         if act_per_channel:
-            raise ValueError(f'act_per_channel only support False now')
+            raise NotImplementedError(f'Only supported if `act_per_channel` is `False` yet.')
         self._config.act_per_channel = act_per_channel
 
     def set_weight_per_channel(self, weight_per_channel):
@@ -214,11 +221,11 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `act_quant_dtype` is not QuantDtype.
-            NotImplementedError: act_quant_delay is not INT8.
+            NotImplementedError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
         """
         Validator.check_isinstance("act quant dtype", act_quant_dtype, QuantDtype)
         if act_quant_dtype != QuantDtype.INT8:
-            raise NotImplementedError("act_quant_dtype only support int8 yet.")
+            raise NotImplementedError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.act_quant_dtype = act_quant_dtype
 
     def set_weight_quant_dtype(self, weight_quant_dtype):
@@ -230,11 +237,11 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
-            NotImplementedError: weight_quant_dtype is not INT8.
+            NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
         """
         Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
         if weight_quant_dtype != QuantDtype.INT8:
-            raise NotImplementedError("weight_quant_dtype only support int8 yet.")
+            raise NotImplementedError("Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.weight_quant_dtype = weight_quant_dtype
 
     def set_act_symmetric(self, act_symmetric):
@@ -302,6 +309,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `enable_fusion` is not bool.
+            NotImplementedError: Only supported if `act_per_channel` is `False` yet.
         """
         Validator.check_bool(enable_fusion, "enable_fusion", self.__class__.__name__)
         self._config.enable_fusion = enable_fusion

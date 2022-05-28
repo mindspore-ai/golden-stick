@@ -96,15 +96,16 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
         super(SimulatedFakeQuantizerPerChannel, self).__init__(ema=ema, ema_decay=ema_decay, symmetric=symmetric,
                                                                narrow_range=narrow_range, num_bits=num_bits,
                                                                quant_delay=quant_delay)
-        self._float_min = Parameter(Tensor(np.array([-6] * num_channels).astype(np.float32), mindspore.float32),
-                                    name="float_min", requires_grad=False)
-        self._float_max = Parameter(Tensor(np.array([6] * num_channels).astype(np.float32), mindspore.float32),
-                                    name="float_max", requires_grad=False)
-        quant_func = partial(Q.FakeQuantPerChannel, channel_axis=channel_axis)
-        self._init_fake_quant_func(quant_func)
-        self._min_max_update_func = Q.MinMaxUpdatePerChannel(channel_axis=channel_axis, ema=ema, ema_decay=ema_decay)
         self._channel_axis = channel_axis
         self._num_channels = num_channels
+        self._float_min = Parameter(Tensor(np.array([-6] * self._num_channels).astype(np.float32), mindspore.float32),
+                                    name="float_min", requires_grad=False)
+        self._float_max = Parameter(Tensor(np.array([6] * self._num_channels).astype(np.float32), mindspore.float32),
+                                    name="float_max", requires_grad=False)
+        quant_func = partial(Q.FakeQuantPerChannel, channel_axis=self._channel_axis)
+        self._init_fake_quant_func(quant_func)
+        self._min_max_update_func = Q.MinMaxUpdatePerChannel(channel_axis=self._channel_axis, ema=self._ema,
+                                                             ema_decay=self._ema_decay)
 
     def extend_repr(self):
         """Display instance object as string."""
