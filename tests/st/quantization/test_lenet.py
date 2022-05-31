@@ -157,21 +157,26 @@ def test_lenet():
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-def test_lenet_accuracy():
+def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option):
     """
-    Feature: DefaultQuantAwareTraining algorithm.
-    Description: Apply DefaultQuantAwareTraining on lenet and test accuracy.
+    Feature: test accuracy of sim qat work on lenet5.
+    Description: Apply sim qat on lenet5 and test accuracy.
     Expectation: accuracy is larger than 0.98.
     """
-    data_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
-    ds_train = create_dataset(os.path.join(data_path, "train"), 32, 1)
+    mnist_path = mnist_path_option
+    if mnist_path_option is None:
+        mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
+    data_path = os.path.join(mnist_path, "train")
+    ds_train = create_dataset(data_path, 32, 1)
     step_size = ds_train.get_dataset_size()
     network = LeNet5(10)
 
     # load quantization aware network checkpoint
-    ckpt_path = os.getenv("CHECKPOINT_PATH", "/home/workspace/mindspore_ckpt")
-    ckpt_file = os.path.join(ckpt_path, "ckpt/checkpoint_lenet-10_1875.ckpt")
-    param_dict = load_checkpoint(ckpt_file)
+    ckpt_path = lenet_ckpt_path_option
+    if ckpt_path is None:
+        ckpt_path = os.path.join(os.getenv("CHECKPOINT_PATH", "/home/workspace/mindspore_ckpt"),
+                                 "ckpt/checkpoint_lenet-10_1875.ckpt")
+    param_dict = load_checkpoint(ckpt_path)
     load_nonquant_param_into_quant_net(network, param_dict)
 
     # convert network to quantization aware network
@@ -197,7 +202,7 @@ def test_lenet_accuracy():
                 dataset_sink_mode=True)
     print("============== End Training ==============")
 
-    ds_eval = create_dataset(os.path.join(data_path, "test"), 32, 1)
+    ds_eval = create_dataset(os.path.join(mnist_path, "test"), 32, 1)
 
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval, dataset_sink_mode=True)
