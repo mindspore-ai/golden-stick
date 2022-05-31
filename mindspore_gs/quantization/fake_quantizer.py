@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""FakeQuantizer."""
+"""
+FakeQuantizer.
+FakeQuantizer should be a Cell for automatic-differentiation
+"""
 from mindspore.nn.cell import Cell
 
-"""FakeQuantizer should be a Cell for automatic-differentiation"""
 FakeQuantizer = Cell

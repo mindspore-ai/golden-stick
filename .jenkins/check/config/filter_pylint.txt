@@ -1,11 +1,14 @@
 # Quantization
-"golden-stick/golden_stick/quantization/simulated_quantization/simulated_quantization_transforms.py"    "unused-argument"
-"golden-stick/golden_stick/quantization/net_policy.py"                                                  "unused-argument"
-"golden-stick/golden_stick/quantization/quantization_aware_training.py"                                 "not-an-iterable"
+"golden-stick/mindspore_gs/quantization/simulated_quantization/simulated_quantization_transforms.py"    "unused-argument"
+"golden-stick/mindspore_gs/quantization/net_policy.py"                                                  "unused-argument"
+"golden-stick/mindspore_gs/quantization/quantization_aware_training.py"                                 "not-an-iterable"
+"golden-stick/mindspore_gs/quantization/fake_quantizer.py"                                              "invalid-name"
 
 # tests
 "golden-stick/tests/st/quantization/test_qat.py"                                                        "protected-access"
 "golden-stick/tests/st/quantization/test_lenet.py"                                                      "protected-access"
+"golden-stick/tests/st/quantization/test_resnet.py"                                                     "unused-argument"
+"golden-stick/tests/st/quantization/test_resnet.py"                                                     "protected-access"
 "golden-stick/tests/"                                                                                   "missing-docstring"
 
 

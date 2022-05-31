@@ -68,7 +68,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
 
     Examples:
-        >>> from golden_stick.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
+        >>> from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
         >>> from mindspore import nn
         >>> from mindspore.common.initializer import Normal
         >>> class LeNet5(nn.Cell):

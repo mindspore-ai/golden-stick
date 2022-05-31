@@ -17,10 +17,10 @@
 from collections import OrderedDict
 import os
 import pytest
-from golden_stick.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
-from golden_stick.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
+from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
+from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
-from golden_stick.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 import mindspore.dataset as ds
 import mindspore.dataset.vision.c_transforms as CV
 import mindspore.dataset.transforms.c_transforms as C

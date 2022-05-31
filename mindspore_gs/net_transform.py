@@ -61,7 +61,7 @@ class NetTransformer:
 
     @staticmethod
     def create_node(cell: Cell, targets: [Union[ScopedValue, str]], args: [ScopedValue] = None,
-                    kwargs: {str: ScopedValue} = None, name: str = "") -> Node:
+                    kwargs: {str: ScopedValue}=None, name: str = "") -> Node:
         return Node.create_call_cell(cell, targets, args, kwargs, name)
 
     def insert(self, position, node: Node) -> Optional[Node]:

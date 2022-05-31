@@ -15,7 +15,7 @@
 """test CompAlgo."""
 
 import pytest
-from golden_stick import CompAlgo
+from mindspore_gs import CompAlgo
 
 
 @pytest.mark.level0
