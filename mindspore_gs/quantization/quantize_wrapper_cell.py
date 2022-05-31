@@ -46,6 +46,9 @@ class QuantizeWrapperCell(Cell):
             fq_data = quantizer(weight)
             setattr(self._handler, weight_name, fq_data)
 
+    def get_handler(self):
+        return self._handler
+
     def construct(self, *inputs, **kwargs):
         """
         Defines the computation of QuantizeWrapperCell to be performed.

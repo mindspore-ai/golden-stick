@@ -12,3 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""
+MindSpore golden stick learned-scale-quantization.
+"""
+
+from .learned_scale_quantization_aware_training import LearnedScaleQuantizationAwareTraining
+
+__all__ = ["LearnedScaleQuantizationAwareTraining"]

@@ -245,7 +245,7 @@ def compute_kl_threshold(data, bitwidth):
         hist, bin_edges = np.histogram(np.abs(data), range=(0, data_max), density=True)
     hist = hist / np.sum(hist)
     cumsum = np.cumsum(hist)
-    bit_pow_range = pow(2, int(bitwidth.num_bits) - 1)
+    bit_pow_range = pow(2, int(bitwidth) - 1)
     threshold = []
     scaling_factor = []
     kl = []

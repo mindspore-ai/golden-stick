@@ -17,6 +17,7 @@ MindSpore golden stick module.
 """
 
 from .comp_algo import CompAlgo
-from .quantization import QuantizationAwareTraining, SimulatedQuantizationAwareTraining
+from .quantization import *
 
-__all__ = ["CompAlgo", "QuantizationAwareTraining", "SimulatedQuantizationAwareTraining"]
+__all__ = []
+__all__.extend(quantization.__all__)

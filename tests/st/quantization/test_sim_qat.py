@@ -19,12 +19,13 @@ import sys
 from collections import OrderedDict
 import pytest
 import mindspore
-from mindspore import nn
+from mindspore import nn, context
 from mindspore.train.serialization import load_checkpoint
 from mindspore.train.callback import ModelCheckpoint, CheckpointConfig
 from mindspore.train import Model
 from mindspore.nn.metrics import Accuracy
-from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
+from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
+from mindspore_gs.quantization.learned_scale_quantization import LearnedScaleQuantizationAwareTraining as LearnedQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
@@ -51,13 +52,13 @@ class NetToQuant(nn.Cell):
 @pytest.mark.env_onecard
 def test_set_config():
     """
-    Feature: DefaultQuantAwareTraining algorithm set functions.
+    Feature: SimQAT algorithm set functions.
     Description: Apply DefaultQuantAwareTraining on lenet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
 
     network = NetToQuant()
-    qat = SimulatedQuantizationAwareTraining()
+    qat = SimQAT()
     qat.set_act_quant_delay(900)
     qat.set_weight_quant_delay(900)
     qat.set_act_per_channel(False)
@@ -88,11 +89,11 @@ def test_set_config():
 @pytest.mark.env_onecard
 def test_config_enable_fusion():
     """
-    Feature: set_enable_fusion api of DefaultQuantAwareTraining.
+    Feature: set_enable_fusion api of SimQAT.
     Description: Check default value of enable_fusion and value after called set_enable_fusion.
     Expectation: Config success.
     """
-    qat = SimulatedQuantizationAwareTraining()
+    qat = SimQAT()
     assert not qat._config.enable_fusion
     qat.set_enable_fusion(True)
     assert qat._config.enable_fusion
@@ -103,15 +104,29 @@ def test_config_enable_fusion():
 @pytest.mark.env_onecard
 def test_config_one_conv_fold():
     """
-    Feature: set_one_conv_fold api of DefaultQuantAwareTraining.
+    Feature: set_one_conv_fold api of SimQAT.
     Description: Check default value of one_conv_fold and value after called set_one_conv_fold.
     Expectation: Config success.
     """
-    qat = SimulatedQuantizationAwareTraining()
+    qat = SimQAT()
     assert qat._config.one_conv_fold
     qat.set_one_conv_fold(False)
     assert not qat._config.one_conv_fold
 
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_config_freeze_bn():
+    """
+    Feature: set_freeze_bn api of SimQAT.
+    Description: Check default value of freeze_bn and value after called set_freeze_bn.
+    Expectation: Config success.
+    """
+    qat = SimQAT()
+    assert qat._config.freeze_bn == 10000000
+    qat.set_freeze_bn(0)
+    assert qat._config.freeze_bn == 0
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
@@ -125,8 +140,7 @@ def test_lenet():
 
     from lenet.src.lenet import LeNet5
     network = LeNet5(10)
-    qat = SimulatedQuantizationAwareTraining({"per_channel": [False, True], "symmetric": [False, True],
-                                              "quant_delay": [900, 900]})
+    qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
     assert cells.get("Conv2dQuant", None) is not None
@@ -159,7 +173,9 @@ def test_lenet():
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option):
+@pytest.mark.parametrize("algorithm", [SimQAT, LearnedQAT])
+@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
+def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, run_mode):
     """
     Feature: test accuracy of sim qat work on lenet5.
     Description: Apply sim qat on lenet5 and test accuracy.
@@ -168,6 +184,7 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option):
 
     from lenet.src.lenet import LeNet5
     from lenet.src.dataset import create_dataset as create_mnist_ds
+    context.set_context(mode=run_mode)
     mnist_path = mnist_path_option
     if mnist_path_option is None:
         mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
@@ -185,8 +202,11 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option):
     mindspore.load_param_into_net(network, param_dict)
 
     # convert network to quantization aware network
-    qat = SimulatedQuantizationAwareTraining({"per_channel": [False, True], "symmetric": [False, True],
-                                              "quant_delay": [900, 900]})
+    if algorithm == SimQAT:
+        qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True],
+                      "quant_delay": [900, 900]})
+    else:
+        qat = LearnedQAT()
     new_network = qat.apply(network)
 
     # define network loss
@@ -203,13 +223,12 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option):
     model = Model(new_network, net_loss, net_opt, metrics={"Accuracy": Accuracy()})
 
     print("============== Starting Training ==============")
-    model.train(10, ds_train, callbacks=[ckpt_callback],
-                dataset_sink_mode=True)
+    model.train(10, ds_train, callbacks=[ckpt_callback])
     print("============== End Training ==============")
 
     ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
 
     print("============== Starting Testing ==============")
-    acc = model.eval(ds_eval, dataset_sink_mode=True)
+    acc = model.eval(ds_eval)
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.98
