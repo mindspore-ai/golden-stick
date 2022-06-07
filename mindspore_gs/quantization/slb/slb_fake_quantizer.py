@@ -93,17 +93,16 @@ class SlbQuantizer(nn.Cell):
     """
     def __init__(self, num_bits=8):
         super(SlbQuantizer, self).__init__()
-        self.base = Tensor(2, mindspore.float32)
-        self.pow = P.Pow()
         self.reshape = P.Reshape()
         self.round = P.Floor()
         self._num_bits = num_bits
 
-        scale = self.pow(self.base, self._num_bits) - 1
-        self.scale = self.reshape(scale, (1, 1, 1, 1))
+        scale = 2 ** self._num_bits - 1
+        self.scale = Tensor(scale, mindspore.float32)
 
     def construct(self, input_):
-        return self.round(input_ * self.scale) / self.scale
+        scale = self.reshape(self.scale, (1, 1, 1, 1))
+        return self.round(input_ * scale) / scale
 
     def bprop(self, input_, out, dout):
         """
