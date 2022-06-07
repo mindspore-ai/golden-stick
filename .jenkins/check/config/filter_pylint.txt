@@ -12,3 +12,6 @@
 "golden-stick/tests/"                                                                                   "missing-docstring"
 
 
+# SCOP
+"golden-stick/mindspore_gs/pruner/scop_pruner.py"                                            "protected-access"
+
