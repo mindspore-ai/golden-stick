@@ -51,8 +51,13 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
               The first element represents data flow and the second element represents weights.
               Default: (False, False).
             - enable_fusion (bool): Whether apply fusion before applying quantization.
+              Default: False.
+            - freeze_bn (int): Number of steps after which BatchNorm OP parameters fixed to global mean and variance.
+              Default: 10000000.
             - bn_fold (bool): Whether to use bn fold ops for simulation inference operation.
+              Default: False.
             - one_conv_fold (bool): Whether to use one conv bn fold ops for simulation inference operation.
+              Default: True.
 
     Supported Platforms:
          ``Ascend`` ``GPU``
@@ -61,6 +66,8 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         TypeError: If the element of `quant_delay` is not int.
         TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
         TypeError: If the element of `quant_dtype` is not `QuantDtype`.
+        TypeError: If `freeze_bn` is not int.
+        ValueError: `freeze_bn` is less than 0.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
          less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
@@ -106,10 +113,8 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()
-        self._update_qconfig_by_dict(config)
-
-        self._qat_policy = SimulatedNetPolicy(self._config)
+        self._create_qconfig_by_dict(config)
+        self._qat_policy = self._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
         if "custom_transforms" in config.keys():
@@ -292,6 +297,21 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Validator.check_bool(weight_narrow_range, "weight_narrow_range", self.__class__.__name__)
         self._config.weight_narrow_range = weight_narrow_range
 
+    def set_freeze_bn(self, freeze_bn):
+        """
+        Set value of freeze_bn of `_config`
+
+        Args:
+            freeze_bn (int): Number of steps after which BatchNorm OP parameters fixed to global mean and variance.
+
+        Raises:
+            TypeError: If `freeze_bn` is not int.
+            ValueError: `freeze_bn` is less than 0.
+        """
+        Validator.check_is_int(freeze_bn, "freeze_bn", self.__class__.__name__)
+        Validator.check_int(freeze_bn, 0, Rel.GE, "freeze_bn", self.__class__.__name__)
+        self._config.freeze_bn = freeze_bn
+
     def set_enable_fusion(self, enable_fusion):
         """
         Set value of enable_fusion of `_config`
@@ -305,21 +325,30 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Validator.check_bool(enable_fusion, "enable_fusion", self.__class__.__name__)
         self._config.enable_fusion = enable_fusion
 
-    def _update_qconfig_by_dict(self, config: dict):
+    @staticmethod
+    def _convert2list(name, value):
+        if not isinstance(value, list) and not isinstance(value, tuple):
+            value = [value]
+        elif len(value) > 2:
+            raise ValueError("input `{}` len should less then 2".format(name))
+        return value
+
+    def _init_net_policy(self, config):
+        return SimulatedNetPolicy(config)
+
+    def _create_qconfig_by_dict(self, config: dict):
         """Update `_config` from a dict"""
-
-        def convert2list(name, value):
-            if not isinstance(value, list) and not isinstance(value, tuple):
-                value = [value]
-            elif len(value) > 2:
-                raise ValueError("input `{}` len should less then 2".format(name))
-            return value
-
-        quant_delay_list = convert2list("quant delay", config.get("quant_delay", [0, 0]))
-        quant_dtype_list = convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
-        per_channel_list = convert2list("per channel", config.get("per_channel", [False, True]))
-        symmetric_list = convert2list("symmetric", config.get("symmetric", [False, True]))
-        narrow_range_list = convert2list("narrow range", config.get("narrow_range", [False, False]))
+        self._config = SimulatedQuantizationConfig()
+        quant_delay_list = SimulatedQuantizationAwareTraining._convert2list("quant delay",
+                                                                            config.get("quant_delay", [0, 0]))
+        quant_dtype_list = SimulatedQuantizationAwareTraining.\
+            _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
+        per_channel_list = SimulatedQuantizationAwareTraining._convert2list("per channel",
+                                                                            config.get("per_channel", [False, True]))
+        symmetric_list = SimulatedQuantizationAwareTraining. \
+            _convert2list("symmetric", config.get("symmetric", [False, True]))
+        narrow_range_list = SimulatedQuantizationAwareTraining. \
+            _convert2list("narrow range", config.get("narrow_range", [False, False]))
 
         self.set_act_quant_delay(quant_delay_list[0])
         self.set_weight_quant_delay(quant_delay_list[-1])
@@ -339,6 +368,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         self.set_enable_fusion(config.get("enable_fusion", False))
         self.set_bn_fold(config.get("bn_fold", False))
         self.set_one_conv_fold(config.get("one_conv_fold", True))
+        self.set_freeze_bn(config.get("freeze_bn", 10000000))
 
     def apply(self, network: Cell) -> Cell:
         """

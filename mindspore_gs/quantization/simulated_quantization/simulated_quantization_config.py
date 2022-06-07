@@ -18,7 +18,10 @@ from ..constant import QuantDtype
 
 
 class SimulatedQuantizationConfig:
-    """Config for aware-training-quantization."""
+    """
+    Config for simulated quantization aware training.
+    See more details in simulated_quantization_aware_training.py
+    """
     def __init__(self):
         self.bn_fold = False
         self.freeze_bn = 10000000

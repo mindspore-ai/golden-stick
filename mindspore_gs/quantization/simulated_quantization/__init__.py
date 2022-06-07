@@ -16,8 +16,6 @@
 MindSpore golden stick simulated-quantization.
 """
 
-from .simulated_quantization_layer_policy import SimulatedLayerPolicy
-from .simulated_quantization_net_policy import SimulatedNetPolicy
 from .simulated_quantization_aware_training import SimulatedQuantizationAwareTraining
 
-__all__ = ["SimulatedLayerPolicy", "SimulatedNetPolicy", "SimulatedQuantizationAwareTraining"]
+__all__ = ["SimulatedQuantizationAwareTraining"]

@@ -18,5 +18,6 @@ MindSpore golden stick module.
 
 from .quantization_aware_training import QuantizationAwareTraining
 from .simulated_quantization import SimulatedQuantizationAwareTraining
+from .learned_scale_quantization import LearnedScaleQuantizationAwareTraining
 
-__all__ = ["QuantizationAwareTraining", "SimulatedQuantizationAwareTraining"]
+__all__ = ["SimulatedQuantizationAwareTraining", "LearnedScaleQuantizationAwareTraining"]
