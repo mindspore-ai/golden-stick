@@ -18,7 +18,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='mindspore_gs',
+    name='golden_stick',
     version='0.2',
     author='The MindSpore Authors',
     author_email='contact@mindspore.cn',
