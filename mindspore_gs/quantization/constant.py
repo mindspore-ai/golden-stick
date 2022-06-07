@@ -30,6 +30,7 @@ class QuantDtype(enum.Enum):
     """
     An enum for quant datatype, contains `INT2` ~ `INT8`, `UINT2` ~ `UINT8`.
     """
+    INT1 = "INT1"
     INT2 = "INT2"
     INT3 = "INT3"
     INT4 = "INT4"
@@ -38,6 +39,7 @@ class QuantDtype(enum.Enum):
     INT7 = "INT7"
     INT8 = "INT8"
 
+    UINT1 = "UINT1"
     UINT2 = "UINT2"
     UINT3 = "UINT3"
     UINT4 = "UINT4"
@@ -64,7 +66,7 @@ class QuantDtype(enum.Enum):
             >>> quant_dtype = QuantDtype.INT8
             >>> is_signed = QuantDtype.is_signed(quant_dtype)
         """
-        return dtype in [QuantDtype.INT2, QuantDtype.INT3, QuantDtype.INT4, QuantDtype.INT5,
+        return dtype in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT3, QuantDtype.INT4, QuantDtype.INT5,
                          QuantDtype.INT6, QuantDtype.INT7, QuantDtype.INT8]
 
     @staticmethod
@@ -83,6 +85,7 @@ class QuantDtype(enum.Enum):
             >>> quant_dtype = QuantDtype.switch_signed(quant_dtype)
         """
         type_map = {
+            QuantDtype.INT1: QuantDtype.UINT1,
             QuantDtype.INT2: QuantDtype.UINT2,
             QuantDtype.INT3: QuantDtype.UINT3,
             QuantDtype.INT4: QuantDtype.UINT4,
@@ -90,6 +93,7 @@ class QuantDtype(enum.Enum):
             QuantDtype.INT6: QuantDtype.UINT6,
             QuantDtype.INT7: QuantDtype.UINT7,
             QuantDtype.INT8: QuantDtype.UINT8,
+            QuantDtype.UINT1: QuantDtype.INT1,
             QuantDtype.UINT2: QuantDtype.INT2,
             QuantDtype.UINT3: QuantDtype.INT3,
             QuantDtype.UINT4: QuantDtype.INT4,
