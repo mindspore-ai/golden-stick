@@ -13,10 +13,9 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick module.
+MindSpore golden stick quantization module.
 """
 
-from .quantization_aware_training import QuantizationAwareTraining
 from .simulated_quantization import SimulatedQuantizationAwareTraining
 from .learned_scale_quantization import LearnedScaleQuantizationAwareTraining
 
