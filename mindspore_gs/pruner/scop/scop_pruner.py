@@ -14,14 +14,14 @@
 # ============================================================================
 """ScopPruner."""
 
-from comp_algo import CompAlgo
+import mindspore
 import mindspore.nn as nn
 import mindspore.ops as ops
-import mindspore
-from mindspore import Tensor
 import mindspore.common.dtype as mstype
+from mindspore import Tensor
 from mindspore.ops import constexpr
 from mindspore import Parameter
+from ...comp_algo import CompAlgo
 
 
 @constexpr

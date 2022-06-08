@@ -5,7 +5,10 @@
 "golden-stick/mindspore_gs/quantization/fake_quantizer.py"                                              "invalid-name"
 
 # SCOP
-"golden-stick/mindspore_gs/pruner/scop_pruner.py"                                                       "protected-access"
+"golden-stick/mindspore_gs/pruner/scop/scop_pruner.py"                                                  "protected-access"
 
 # tests
+"golden-stick/tests/st/loss_monitor.py"                                                                 "unused-argument"
+"golden-stick/tests/st/models/resnet.py"                                                                "unused-argument"
+"golden-stick/tests/st/models/resnet.py"                                                                "missing-docstring"
 "golden-stick/tests/st/quantization/test_sim_qat.py"                                                    "protected-access"

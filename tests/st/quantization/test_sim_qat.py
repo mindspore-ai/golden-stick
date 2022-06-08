@@ -18,6 +18,7 @@ import os
 import sys
 from collections import OrderedDict
 import pytest
+import numpy as np
 import mindspore
 from mindspore import nn, context
 from mindspore.train.serialization import load_checkpoint
@@ -128,6 +129,7 @@ def test_config_freeze_bn():
     qat.set_freeze_bn(0)
     assert qat._config.freeze_bn == 0
 
+
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
@@ -173,7 +175,7 @@ def test_lenet():
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("algorithm", [SimQAT, LearnedQAT])
+@pytest.mark.parametrize("algorithm", [SimQAT])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
 def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, run_mode):
     """
@@ -232,3 +234,229 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, ru
     acc = model.eval(ds_eval)
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.98
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_resnet():
+    """
+    Feature: Simulated quantization algorithm.
+    Description: Apply simulated_quantization on resnet.
+    Expectation: Apply success.
+    """
+
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    from resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from models.resnet import resnet50
+
+    mindspore.context.set_context(mode=mindspore.context.GRAPH_MODE, device_target="GPU")
+
+    network = resnet50(10)
+    qat = create_simqat()
+    new_network = qat.apply(network)
+
+    cells: OrderedDict = new_network.name_cells()
+    assert cells.get("Conv2dBnFoldQuant", None) is not None
+    conv_quant: QuantizeWrapperCell = cells.get("Conv2dBnFoldQuant")
+    assert isinstance(conv_quant, QuantizeWrapperCell)
+    conv_handler = conv_quant._handler
+    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
+    assert weight_fake_quant._symmetric
+    assert weight_fake_quant._quant_delay == 900
+    act_fake_quant = conv_quant._output_quantizer
+    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
+    assert not act_fake_quant._symmetric
+    assert act_fake_quant._quant_delay == 900
+
+    assert cells.get("DenseQuant", None) is not None
+    dense_quant: QuantizeWrapperCell = cells.get("DenseQuant")
+    assert isinstance(dense_quant, QuantizeWrapperCell)
+    dense_handler = dense_quant._handler
+    weight_fake_quant: SimulatedFakeQuantizerPerChannel = dense_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
+    assert weight_fake_quant._symmetric
+    assert weight_fake_quant._quant_delay == 900
+    act_fake_quant = dense_quant._output_quantizer
+    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
+    assert not act_fake_quant._symmetric
+    assert act_fake_quant._quant_delay == 900
+
+    assert cells.get("layer1", None) is not None
+    seq_cell: nn.Cell = cells.get("layer1")
+    res_block: nn.Cell = seq_cell.name_cells().get("cell_list_0")
+    res_block_cells: OrderedDict = res_block.name_cells()
+    assert res_block_cells.get("Conv2dBnFoldQuant", None) is not None
+    res_block_conv_quant: QuantizeWrapperCell = cells.get("Conv2dBnFoldQuant")
+    assert isinstance(res_block_conv_quant, QuantizeWrapperCell)
+    res_block_conv_handler = res_block_conv_quant._handler
+    res_block_conv_weight_fake_quant: SimulatedFakeQuantizerPerChannel = res_block_conv_handler.fake_quant_weight
+    assert isinstance(res_block_conv_weight_fake_quant, SimulatedFakeQuantizerPerChannel)
+    assert res_block_conv_weight_fake_quant._symmetric
+    assert res_block_conv_weight_fake_quant._quant_delay == 900
+    res_block_conv_act_fake_quant = res_block_conv_quant._output_quantizer
+    assert isinstance(res_block_conv_act_fake_quant, SimulatedFakeQuantizerPerLayer)
+    assert not res_block_conv_act_fake_quant._symmetric
+    assert res_block_conv_act_fake_quant._quant_delay == 900
+    print("============== test resnet simqat success ==============")
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_resnet_accuracy():
+    """
+    Feature: Simulated quantization algorithm.
+    Description: Apply simulated_quantization on resnet and test accuracy
+    Expectation: Loss of first epoch is smaller than 1.8.
+    """
+
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    import multiprocessing
+    import mindspore.dataset as ds
+    from resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from resnet.src.lr_generator import get_lr
+    from mindspore.train.loss_scale_manager import FixedLossScaleManager
+    from models.resnet import resnet50
+    from loss_monitor import LossMonitor
+
+    # config
+    dataset_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
+    target = "GPU"
+    class_num = 10
+    epoch_size = 1
+    warmup_epochs = 0
+    lr_decay_mode = "cosine"
+    lr_init = 0.01
+    lr_end = 0.00001
+    lr_max = 0.1
+    loss_scale = 1024
+    momentum = 0.9
+    weight_decay = 0.0001
+    step_threshold = 20
+
+    mindspore.set_seed(1)
+    mindspore.context.set_context(mode=mindspore.context.GRAPH_MODE, device_target=target)
+
+    def _init_weight(net):
+        """init_weight"""
+        for _, cell in net.cells_and_names():
+            if isinstance(cell, nn.Conv2d):
+                cell.weight.set_data(mindspore.common.initializer.initializer(
+                    mindspore.common.initializer.XavierUniform(), cell.weight.shape, cell.weight.dtype))
+            if isinstance(cell, nn.Dense):
+                cell.weight.set_data(mindspore.common.initializer.initializer(
+                    mindspore.common.initializer.TruncatedNormal(), cell.weight.shape, cell.weight.dtype))
+
+    def _get_num_parallel_workers(num_parallel_workers):
+        """
+        Get num_parallel_workers used in dataset operations.
+        If num_parallel_workers > the real CPU cores number, set num_parallel_workers = the real CPU cores number.
+        """
+        cores = multiprocessing.cpu_count()
+        if isinstance(num_parallel_workers, int):
+            if cores < num_parallel_workers:
+                print("The num_parallel_workers {} is set too large, now set it {}".format(num_parallel_workers, cores))
+                num_parallel_workers = cores
+        else:
+            print("The num_parallel_workers {} is invalid, now set it {}".format(num_parallel_workers, min(cores, 8)))
+            num_parallel_workers = min(cores, 8)
+        return num_parallel_workers
+
+    def _create_dataset(dataset_path, do_train, batch_size=128, train_image_size=224):
+        """
+        create a train or evaluate cifar10 dataset for resnet50
+        Args:
+            dataset_path(string): the path of dataset.
+            do_train(bool): whether dataset is used for train or eval.
+            batch_size(int): the batch size of dataset. Default: 128
+
+        Returns:
+            dataset
+        """
+        ds.config.set_prefetch_size(64)
+        data_set = ds.Cifar10Dataset(dataset_path, num_parallel_workers=_get_num_parallel_workers(12), shuffle=True,
+                                     num_samples=20000)
+
+        # define map operations
+        trans = []
+        if do_train:
+            trans += [
+                ds.vision.c_transforms.RandomCrop((32, 32), (4, 4, 4, 4)),
+                ds.vision.c_transforms.RandomHorizontalFlip(prob=0.5)
+            ]
+
+        trans += [
+            ds.vision.c_transforms.Resize((train_image_size, train_image_size)),
+            ds.vision.c_transforms.Rescale(1.0 / 255.0, 0.0),
+            ds.vision.c_transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]),
+            ds.vision.c_transforms.HWC2CHW()
+        ]
+
+        type_cast_op = ds.transforms.c_transforms.TypeCast(mindspore.int32)
+
+        data_set = data_set.map(operations=type_cast_op, input_columns="label",
+                                num_parallel_workers=_get_num_parallel_workers(8))
+        # only enable cache for eval
+        data_set = data_set.map(operations=trans, input_columns="image",
+                                num_parallel_workers=_get_num_parallel_workers(8))
+
+        # apply batch operations
+        data_set = data_set.batch(batch_size, drop_remainder=True)
+
+        return data_set
+
+    def _init_group_params(net):
+        decayed_params = []
+        no_decayed_params = []
+        for param in net.trainable_params():
+            if 'beta' not in param.name and 'gamma' not in param.name and 'bias' not in param.name:
+                decayed_params.append(param)
+            else:
+                no_decayed_params.append(param)
+
+        group_params = [{'params': decayed_params, 'weight_decay': weight_decay},
+                        {'params': no_decayed_params},
+                        {'order_params': net.trainable_params()}]
+        return group_params
+
+    dataset = _create_dataset(dataset_path=dataset_path, do_train=True, batch_size=64, train_image_size=224)
+    step_size = dataset.get_dataset_size()
+    net = resnet50(class_num=class_num)
+    _init_weight(net=net)
+
+    # apply golden-stick algo
+    algo = create_simqat()
+    net = algo.apply(net)
+
+    lr = get_lr(lr_init=lr_init, lr_end=lr_end, lr_max=lr_max, warmup_epochs=warmup_epochs, total_epochs=epoch_size,
+                steps_per_epoch=step_size, lr_decay_mode=lr_decay_mode)
+    lr = mindspore.Tensor(lr)
+    # define opt
+    group_params = _init_group_params(net)
+    opt = nn.Momentum(group_params, lr, momentum, weight_decay=weight_decay, loss_scale=loss_scale)
+
+    loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction='mean')
+    loss_scale = FixedLossScaleManager(loss_scale, drop_overflow_update=False)
+
+    metrics = {"acc"}
+    metrics.clear()
+    model = mindspore.Model(net, loss_fn=loss, optimizer=opt, loss_scale_manager=loss_scale, metrics=metrics,
+                            keep_batchnorm_fp32=False)
+
+    # define callbacks
+    monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
+    callbacks = [monitor, algo.callback()]
+    # train model
+    dataset_sink_mode = target != "CPU"
+    print("============== Starting Training ==============")
+    model.train(epoch_size, dataset, callbacks=callbacks, sink_size=dataset.get_dataset_size(),
+                dataset_sink_mode=dataset_sink_mode)
+    print("============== End Training ==============")
+    expect_avg_step_loss = 2.3
+    avg_step_loss = np.mean(np.array(monitor.losses))
+    print("average step loss:{}".format(avg_step_loss))
+    assert avg_step_loss <= expect_avg_step_loss

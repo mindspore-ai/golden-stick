@@ -12,21 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""test CompAlgo."""
+"""
+MindSpore golden stick scop.
+"""
 
-import pytest
-from mindspore_gs.comp_algo import CompAlgo
+from .scop_pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo
 
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_init():
-    """
-    Feature: CompAlgo init algorithm.
-    Description: Initialize a CompAlgo.
-    Expectation: Success.
-    """
-
-    algo = CompAlgo({})
-    assert algo
+__all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo"]
