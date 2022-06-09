@@ -4,6 +4,8 @@
 "golden-stick/mindspore_gs/quantization/quantization_aware_training.py"                                 "not-an-iterable"
 "golden-stick/mindspore_gs/quantization/fake_quantizer.py"                                              "invalid-name"
 "golden-stick/mindspore_gs/quantization/slb/slb_fake_quantizer.py"                                      "unused-argument"
+"golden-stick/mindspore_gs/quantization/converter.py"                                                   "protected-access"
+"golden-stick/mindspore_gs/quantization/quant_utils.py"                                                 "protected-access"
 
 # SCOP
 "golden-stick/mindspore_gs/pruner/scop/scop_pruner.py"                                                  "protected-access"

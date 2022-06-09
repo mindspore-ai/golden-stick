@@ -49,6 +49,12 @@ class QuantizeWrapperCell(Cell):
     def get_handler(self):
         return self._handler
 
+    def get_input_quantizer(self):
+        return self._input_quantizer
+
+    def get_output_quantizer(self):
+        return self._output_quantizer
+
     def construct(self, *inputs, **kwargs):
         """
         Defines the computation of QuantizeWrapperCell to be performed.
