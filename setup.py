@@ -19,7 +19,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mindspore_gs',
-    version='0.2',
+    version='0.1.0',
     author='The MindSpore Authors',
     author_email='contact@mindspore.cn',
     description='A MindSpore model optimization algorithm set..',
