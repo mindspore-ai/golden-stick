@@ -16,13 +16,13 @@
 from ..simulated_quantization.simulated_quantization_config import SimulatedQuantizationConfig
 
 
-class LearnedScaleQuantizationConfig(SimulatedQuantizationConfig):
+class LearnedStepSizeQuantizationConfig(SimulatedQuantizationConfig):
     """
     Config for learned scale quantization aware training.
     See more details in learned_scale_quantization_aware_training.py
     """
     def __init__(self):
-        super(LearnedScaleQuantizationConfig, self).__init__()
+        super(LearnedStepSizeQuantizationConfig, self).__init__()
         self.weight_symmetric = True
         self.act_symmetric = True
         self.weight_narrow_range = True

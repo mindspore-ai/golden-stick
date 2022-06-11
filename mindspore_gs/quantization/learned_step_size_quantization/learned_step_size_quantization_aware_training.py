@@ -17,14 +17,14 @@ from mindspore.nn import Cell
 from mindspore._checkparam import Validator
 from ..constant import QuantDtype
 from ..simulated_quantization.simulated_quantization_aware_training import SimulatedQuantizationAwareTraining as SimQAT
-from .learned_scale_quantization_net_policy import LearnedScaleQuantizationNetPolicy as LsqNetPolicy
-from .learned_scale_quantization_config import LearnedScaleQuantizationConfig as LsqConfig
-from .learned_scale_fake_quantizers import LearnedScaleFakeQuantizerPerLayer as LsqFqPerLayer, \
-    LearnedScaleFakeQuantizePerChannel as LsqFqPerChannel
+from .learned_step_size_quantization_net_policy import LearnedStepSizeQuantizationNetPolicy as LsqNetPolicy
+from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig as LsqConfig
+from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer as LsqFqPerLayer, \
+    LearnedStepSizeFakeQuantizePerChannel as LsqFqPerChannel
 from ..quantize_wrapper_cell import QuantizeWrapperCell
 
 
-class LearnedScaleQuantizationAwareTraining(SimQAT):
+class LearnedStepSizeQuantizationAwareTraining(SimQAT):
     """
     Derived class of SimQAT. LSQ quantization algorithm..
     Args:
@@ -70,7 +70,7 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
 
     Examples:
-        >>> from mindspore_gs.quantization.learned_scale_quantization import LearnedScaleQuantizationAwareTraining
+        >>> from mindspore_gs.quantization.learned_scale_quantization import LearnedStepSizeQuantizationAwareTraining
         >>> from mindspore import nn
         >>> from mindspore.common.initializer import Normal
         >>> class LeNet5(nn.Cell):
@@ -99,7 +99,7 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         ...         return x
         ...
         >>> net = LeNet5()
-        >>> learned_quantization = LearnedScaleQuantizationAwareTraining()
+        >>> learned_quantization = LearnedStepSizeQuantizationAwareTraining()
         >>> net_qat = learned_quantization.apply(net)
     """
 
@@ -112,7 +112,7 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         Validator.check_bool(act_symmetric, "act_symmetric", self.__class__.__name__)
         if not act_symmetric:
             raise NotImplementedError("Learned scale quantization only support `act_symmetric` is `True` currently")
-        super(LearnedScaleQuantizationAwareTraining, self).set_act_symmetric(act_symmetric)
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(act_symmetric)
 
     def set_weight_symmetric(self, weight_symmetric):
         """
@@ -123,7 +123,7 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
         if not weight_symmetric:
             raise NotImplementedError("Learned scale quantization only support `weight_symmetric` is `True` currently")
-        super(LearnedScaleQuantizationAwareTraining, self).set_act_symmetric(weight_symmetric)
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(weight_symmetric)
 
     def set_act_narrow_range(self, act_narrow_range):
         """
@@ -146,7 +146,7 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         if not weight_narrow_range:
             raise NotImplementedError("Learned scale quantization only support `weight_narrow_range` is `True` "
                                       "currently")
-        super(LearnedScaleQuantizationAwareTraining, self).set_weight_narrow_range(weight_narrow_range)
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_narrow_range(weight_narrow_range)
 
     def set_act_quant_delay(self, act_quant_delay):
         """
@@ -157,7 +157,7 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         Validator.check_is_int(act_quant_delay, "act_quant_delay", self.__class__.__name__)
         if act_quant_delay != 0:
             raise NotImplementedError("Learned scale quantization only support `act_quant_delay` is 0 currently")
-        super(LearnedScaleQuantizationAwareTraining, self).set_act_quant_delay(act_quant_delay)
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_quant_delay(act_quant_delay)
 
     def set_weight_quant_delay(self, weight_quant_delay):
         """
@@ -168,7 +168,7 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         Validator.check_is_int(weight_quant_delay, "weight_quant_delay", self.__class__.__name__)
         if weight_quant_delay != 0:
             raise NotImplementedError("Learned scale quantization only support `weight_quant_delay` is 0 currently")
-        super(LearnedScaleQuantizationAwareTraining, self).set_weight_quant_delay(weight_quant_delay)
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_quant_delay(weight_quant_delay)
 
     def set_freeze_bn(self, freeze_bn):
         """
@@ -179,10 +179,10 @@ class LearnedScaleQuantizationAwareTraining(SimQAT):
         Validator.check_is_int(freeze_bn, "freeze_bn", self.__class__.__name__)
         if freeze_bn != 0:
             raise NotImplementedError("Learned scale quantization only support `freeze_bn` is 0 currently")
-        super(LearnedScaleQuantizationAwareTraining, self).set_freeze_bn(freeze_bn)
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_freeze_bn(freeze_bn)
 
     def apply(self, network: Cell) -> Cell:
-        quanted_net = super(LearnedScaleQuantizationAwareTraining, self).apply(network)
+        quanted_net = super(LearnedStepSizeQuantizationAwareTraining, self).apply(network)
         self._reset_weights_quantization_params(quanted_net)
         return quanted_net
 

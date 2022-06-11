@@ -19,8 +19,9 @@ from functools import partial
 from mindspore.nn import Cell
 from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
-from .learned_scale_fake_quantizers import LearnedScaleFakeQuantizerPerLayer, LearnedScaleFakeQuantizePerChannel
-from .learned_scale_quantization_config import LearnedScaleQuantizationConfig
+from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer, \
+    LearnedStepSizeFakeQuantizePerChannel
+from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig
 from ..simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
 from ..fake_quantizer import FakeQuantizer
 from ..quantize_wrapper_cell import QuantizeWrapperCell
@@ -31,25 +32,25 @@ class LearnedScaleQuantizationLayerPolicy(SimulatedLayerPolicy):
     Derived class of SimulatedLayerPolicy. LSQ layer policy.
     """
     def __init__(self, weight_names: [], act_names: [],
-                 config: LearnedScaleQuantizationConfig = LearnedScaleQuantizationConfig()):
+                 config: LearnedStepSizeQuantizationConfig = LearnedStepSizeQuantizationConfig()):
         super(LearnedScaleQuantizationLayerPolicy, self).__init__(weight_names, act_names, config)
         if config.weight_per_channel:
-            self._weight_quantizer_partial = partial(LearnedScaleFakeQuantizePerChannel,
+            self._weight_quantizer_partial = partial(LearnedStepSizeFakeQuantizePerChannel,
                                                      quant_delay=config.weight_quant_delay,
                                                      num_bits=self._num_bits,
                                                      neg_trunc=config.weight_neg_trunc)
         else:
-            self._weight_quantizer_partial = partial(LearnedScaleFakeQuantizerPerLayer,
+            self._weight_quantizer_partial = partial(LearnedStepSizeFakeQuantizerPerLayer,
                                                      quant_delay=config.weight_quant_delay,
                                                      num_bits=self._num_bits,
                                                      neg_trunc=config.weight_neg_trunc)
         if config.act_per_channel:
             raise NotImplementedError("act quant only support perlayer now!")
-        self._act_quantizer: Optional[FakeQuantizer] = LearnedScaleFakeQuantizerPerLayer(
+        self._act_quantizer: Optional[FakeQuantizer] = LearnedStepSizeFakeQuantizerPerLayer(
             quant_delay=config.act_quant_delay, num_bits=self._num_bits, neg_trunc=config.act_neg_trunc)
-        self._input_quantizer: Optional[FakeQuantizer] = LearnedScaleFakeQuantizerPerLayer(
+        self._input_quantizer: Optional[FakeQuantizer] = LearnedStepSizeFakeQuantizerPerLayer(
             quant_delay=config.act_quant_delay, num_bits=self._num_bits)
-        self._output_quantizer: Optional[FakeQuantizer] = LearnedScaleFakeQuantizerPerLayer(
+        self._output_quantizer: Optional[FakeQuantizer] = LearnedStepSizeFakeQuantizerPerLayer(
             quant_delay=config.act_quant_delay, num_bits=self._num_bits)
 
 

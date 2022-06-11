@@ -16,8 +16,8 @@
 MindSpore golden stick module.
 """
 
-from .quantization import SimulatedQuantizationAwareTraining, LearnedScaleQuantizationAwareTraining, SlbQuantAwareTraining
+from .quantization import SimulatedQuantizationAwareTraining, LearnedStepSizeQuantizationAwareTraining, SlbQuantAwareTraining
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo
 
-__all__ = ["SimulatedQuantizationAwareTraining", "LearnedScaleQuantizationAwareTraining", "SlbQuantAwareTraining",
+__all__ = ["SimulatedQuantizationAwareTraining", "LearnedStepSizeQuantizationAwareTraining", "SlbQuantAwareTraining",
            "PrunerKfCompressAlgo", "PrunerFtCompressAlgo"]

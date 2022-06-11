@@ -17,7 +17,7 @@ MindSpore golden stick quantization module.
 """
 
 from .simulated_quantization import SimulatedQuantizationAwareTraining
-from .learned_scale_quantization import LearnedScaleQuantizationAwareTraining
+from .learned_step_size_quantization import LearnedStepSizeQuantizationAwareTraining
 from .slb import SlbQuantAwareTraining
 
-__all__ = ["SimulatedQuantizationAwareTraining", "LearnedScaleQuantizationAwareTraining", "SlbQuantAwareTraining"]
+__all__ = ["SimulatedQuantizationAwareTraining", "LearnedStepSizeQuantizationAwareTraining", "SlbQuantAwareTraining"]

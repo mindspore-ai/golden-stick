@@ -42,13 +42,13 @@ def _calculate_quant_max(num_bits, neg_trunc=False):
     return quant_max
 
 
-class LearnedScaleFakeQuantizerPerLayer(FakeQuantizer):
+class LearnedStepSizeFakeQuantizerPerLayer(FakeQuantizer):
     """
     Derived class of FakeQuantizer. Use learning-rate from each epoch to compute scale and zero-point.
     """
 
     def __init__(self, num_bits=8, quant_delay=0, min_init=-6, max_init=6, neg_trunc=False):
-        super(LearnedScaleFakeQuantizerPerLayer, self).__init__()
+        super(LearnedStepSizeFakeQuantizerPerLayer, self).__init__()
         self._num_bits = num_bits
         self.neg_trunc = neg_trunc
         self._quant_max = _calculate_quant_max(self._num_bits, self.neg_trunc)
@@ -73,14 +73,14 @@ class LearnedScaleFakeQuantizerPerLayer(FakeQuantizer):
         return out
 
 
-class LearnedScaleFakeQuantizePerChannel(FakeQuantizer):
+class LearnedStepSizeFakeQuantizePerChannel(FakeQuantizer):
     """
     Derived class of FakeQuantizer. perchannel version of LearnedFakeQuantizerPerLayer.
     """
 
     def __init__(self, num_bits=8, num_channels=1, channel_axis=1, quant_delay=0,
                  float_min=-6, float_max=6, neg_trunc=False):
-        super(LearnedScaleFakeQuantizePerChannel, self).__init__()
+        super(LearnedStepSizeFakeQuantizePerChannel, self).__init__()
         self._num_bits = num_bits
         self._quant_max = _calculate_quant_max(self._num_bits, neg_trunc)
         self.quant_max = Parameter(Tensor(np.array([self._quant_max]).astype(np.float32)))
