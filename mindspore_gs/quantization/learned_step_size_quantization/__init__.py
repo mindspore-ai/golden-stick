@@ -16,6 +16,6 @@
 MindSpore golden stick learned-scale-quantization.
 """
 
-from .learned_scale_quantization_aware_training import LearnedScaleQuantizationAwareTraining
+from .learned_step_size_quantization_aware_training import LearnedStepSizeQuantizationAwareTraining
 
-__all__ = ["LearnedScaleQuantizationAwareTraining"]
+__all__ = ["LearnedStepSizeQuantizationAwareTraining"]

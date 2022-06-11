@@ -26,7 +26,8 @@ from mindspore.train.serialization import load_checkpoint
 from mindspore.train import Model
 from mindspore.nn.metrics import Accuracy
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
-from mindspore_gs.quantization.learned_scale_quantization import LearnedScaleQuantizationAwareTraining as LearnedQAT
+from mindspore_gs.quantization.learned_step_size_quantization import LearnedStepSizeQuantizationAwareTraining as \
+    LearnedQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell

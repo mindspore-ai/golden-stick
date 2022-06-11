@@ -16,17 +16,17 @@
 
 from mindspore.nn.layer import Conv2d, Dense, Conv2dBnAct
 from ..simulated_quantization.simulated_quantization_net_policy import SimulatedNetPolicy
-from .learned_scale_quantization_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
-from .learned_scale_quantization_config import LearnedScaleQuantizationConfig
+from .learned_step_size_quantization_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
+from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig
 
 
-class LearnedScaleQuantizationNetPolicy(SimulatedNetPolicy):
+class LearnedStepSizeQuantizationNetPolicy(SimulatedNetPolicy):
     """
     Derived class of SimulatedNetPolicy. LSQ quantization config.
     """
-    def __init__(self, config=LearnedScaleQuantizationConfig()):
+    def __init__(self, config=LearnedStepSizeQuantizationConfig()):
         super().__init__(config)
-        self._config: LearnedScaleQuantizationConfig = config
+        self._config: LearnedStepSizeQuantizationConfig = config
 
     def build(self):
         super().build()
