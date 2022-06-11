@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick module.
-"""
+"""Config for aware-training-quantization."""
 
-from .quantization import SimulatedQuantizationAwareTraining, LearnedScaleQuantizationAwareTraining, SlbQuantAwareTraining
-from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo
+from ..constant import QuantDtype
 
-__all__ = ["SimulatedQuantizationAwareTraining", "LearnedScaleQuantizationAwareTraining", "SlbQuantAwareTraining",
-           "PrunerKfCompressAlgo", "PrunerFtCompressAlgo"]
+class SlbQuantConfig:
+    """
+    Config for slb quantization aware training.
+    See more details in slb_quant_aware_training.py
+    """
+    def __init__(self):
+        self.act_quant_dtype = QuantDtype.INT8
+        self.weight_quant_dtype = QuantDtype.INT1

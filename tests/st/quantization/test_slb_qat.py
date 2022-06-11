@@ -22,13 +22,12 @@ import pytest
 import numpy as np
 import mindspore
 from mindspore import nn, context
-from mindspore.train.serialization import load_checkpoint
+import mindspore.train.callback as cb
 from mindspore.train import Model
 from mindspore.nn.metrics import Accuracy
-from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
-from mindspore_gs.quantization.learned_scale_quantization import LearnedScaleQuantizationAwareTraining as LearnedQAT
-from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
-    SimulatedFakeQuantizerPerChannel
+from mindspore_gs.quantization.slb import SlbQuantAwareTraining as QBNNQAT
+from mindspore_gs.quantization.constant import QuantDtype
+from mindspore_gs.quantization.slb.slb_fake_quantizer import QBNNFakeQuantizerPerLayer, QBNNACTQuantizer
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
@@ -36,7 +35,7 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../
 
 class NetToQuant(nn.Cell):
     """
-    Network with single conv2d to be quanted
+    Network with single conv2d to be quanted.
     """
 
     def __init__(self):
@@ -51,136 +50,85 @@ class NetToQuant(nn.Cell):
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-def test_set_config():
+@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+def test_set_config(quant_bit):
     """
-    Feature: SimQAT algorithm set functions.
-    Description: Apply DefaultQuantAwareTraining on lenet.
+    Feature: SlbQAT algorithm set functions.
+    Description: Apply SlbQuantAwareTraining on lenet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
 
     network = NetToQuant()
-    qat = SimQAT()
-    qat.set_act_quant_delay(900)
-    qat.set_weight_quant_delay(900)
-    qat.set_act_per_channel(False)
-    qat.set_weight_per_channel(True)
-    qat.set_act_narrow_range(False)
-    qat.set_weight_narrow_range(False)
-    qat.set_one_conv_fold(True)
-    qat.set_bn_fold(False)
+    qat = QBNNQAT()
+    if quant_bit == "W4A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT4)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W2A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT2)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W1A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT1)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W1A4":
+        qat.set_weight_quant_dtype(QuantDtype.INT1)
+        qat.set_act_quant_dtype(QuantDtype.INT4)
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
 
-    assert cells.get("Conv2dQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQuant")
+    assert cells.get("Conv2dQBNNQuant", None) is not None
+    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQBNNQuant")
     assert isinstance(conv_quant, QuantizeWrapperCell)
     conv_handler = conv_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
+    weight_fake_quant: QBNNFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, QBNNFakeQuantizerPerLayer)
     act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
+    assert isinstance(act_fake_quant, QBNNACTQuantizer)
 
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_config_enable_fusion():
-    """
-    Feature: set_enable_fusion api of SimQAT.
-    Description: Check default value of enable_fusion and value after called set_enable_fusion.
-    Expectation: Config success.
-    """
-    qat = SimQAT()
-    assert not qat._config.enable_fusion
-    qat.set_enable_fusion(True)
-    assert qat._config.enable_fusion
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-def test_config_one_conv_fold():
+@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+def test_lenet(quant_bit):
     """
-    Feature: set_one_conv_fold api of SimQAT.
-    Description: Check default value of one_conv_fold and value after called set_one_conv_fold.
-    Expectation: Config success.
-    """
-    qat = SimQAT()
-    assert qat._config.one_conv_fold
-    qat.set_one_conv_fold(False)
-    assert not qat._config.one_conv_fold
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_config_freeze_bn():
-    """
-    Feature: set_freeze_bn api of SimQAT.
-    Description: Check default value of freeze_bn and value after called set_freeze_bn.
-    Expectation: Config success.
-    """
-    qat = SimQAT()
-    assert qat._config.freeze_bn == 10000000
-    qat.set_freeze_bn(0)
-    assert qat._config.freeze_bn == 0
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_lenet():
-    """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on lenet.
+    Feature: slb quantization algorithm.
+    Description: Apply slb qat on lenet.
     Expectation: Apply success.
     """
 
     from lenet.src.lenet import LeNet5
     network = LeNet5(10)
-    qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
+    if quant_bit == "W4A8":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4]})
+    elif quant_bit == "W2A8":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2]})
+    elif quant_bit == "W1A8":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1]})
+    elif quant_bit == "W1A4":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT4, QuantDtype.INT1]})
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQuant")
+    assert cells.get("Conv2dQBNNQuant", None) is not None
+    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQBNNQuant")
     assert isinstance(conv_quant, QuantizeWrapperCell)
     conv_handler = conv_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
+    weight_fake_quant: QBNNFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, QBNNFakeQuantizerPerLayer)
     act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
+    assert isinstance(act_fake_quant, QBNNACTQuantizer)
 
-    assert cells.get("DenseQuant", None) is not None
-    dense_quant: QuantizeWrapperCell = cells.get("DenseQuant")
-    assert isinstance(dense_quant, QuantizeWrapperCell)
-    dense_handler = dense_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = dense_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
-    act_fake_quant = dense_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("algorithm", [SimQAT])
+@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
-def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, run_mode):
+def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
     """
-    Feature: test accuracy of sim qat work on lenet5.
-    Description: Apply sim qat on lenet5 and test accuracy.
+    Feature: test accuracy of slb qat work on lenet5.
+    Description: Apply slb qat on lenet5 and test accuracy.
     Expectation: accuracy is larger than 0.98.
     """
 
@@ -194,20 +142,49 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, ru
     ds_train = create_mnist_ds(data_path, 32, 1)
     network = LeNet5(10)
 
-    # load quantization aware network checkpoint
-    ckpt_path = lenet_ckpt_path_option
-    if ckpt_path is None:
-        ckpt_path = os.path.join(os.getenv("CHECKPOINT_PATH", "/home/workspace/mindspore_ckpt"),
-                                 "ckpt/checkpoint_lenet-10_1875.ckpt")
-    param_dict = load_checkpoint(ckpt_path)
-    mindspore.load_param_into_net(network, param_dict)
+    class TemperatureScheduler(cb.Callback):
+        """
+        TemperatureScheduler for QBNN.
+        """
+        def __init__(self, model):
+            super().__init__()
+            self.epochs = 10
+            self.t_start_val = 5.0
+            self.t_start_time = 0.2
+            self.t_end_time = 0.6
+            self.t_factor = 1.1
+            self.model = model
+
+        def epoch_begin(self, run_context):
+            """
+            Epoch_begin.
+            """
+            cb_params = run_context.original_args()
+            epoch = cb_params.cur_epoch_num
+            # Compute temperature value
+            t = self.t_start_val
+            t_start_epoch = int(self.epochs*self.t_start_time)
+            t_end_epoch = int(self.epochs*self.t_end_time)
+            if epoch > t_start_epoch:
+                t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
+            # Assign new value to temperature parameter
+            for _, cell in self.model.train_network.cells_and_names():
+                if cell.cls_name == 'QBNNFakeQuantizerPerLayer': # for QBNN
+                    cell.set_temperature(t)
+                    if epoch == t_end_epoch:
+                        cell.set_temperature_end_flag()
+                        print('Temperature stops changing. Start applying one-hot to latent weights.')
+
 
     # convert network to quantization aware network
-    if algorithm == SimQAT:
-        qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True],
-                      "quant_delay": [900, 900]})
-    else:
-        qat = LearnedQAT()
+    if quant_bit == "W4A8":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4]})
+    elif quant_bit == "W2A8":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2]})
+    elif quant_bit == "W1A8":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1]})
+    elif quant_bit == "W1A4":
+        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT4, QuantDtype.INT1]})
     new_network = qat.apply(network)
 
     # define network loss
@@ -219,7 +196,7 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, ru
     model = Model(new_network, net_loss, net_opt, metrics={"Accuracy": Accuracy()})
 
     print("============== Starting Training ==============")
-    model.train(10, ds_train, callbacks=[])
+    model.train(10, ds_train, callbacks=[TemperatureScheduler(model)])
     print("============== End Training ==============")
 
     ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
@@ -227,89 +204,67 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, ru
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval)
     print("============== {} ==============".format(acc))
-    assert acc['Accuracy'] > 0.98
+    assert acc['Accuracy'] > 0.97
+
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
+@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
-def test_resnet(run_mode):
+def test_resnet(quant_bit, run_mode):
     """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on resnet.
+    Feature: slb quantization algorithm.
+    Description: Apply slb qat on resnet.
     Expectation: Apply success.
     """
 
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    from resnet.golden_stick.quantization.simqat.simqat import create_simqat
-    from models.resnet import resnet50
+    from models.resnet import resnet18
 
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
 
-    network = resnet50(10)
-    qat = create_simqat()
+    network = resnet18(10)
+    qat = QBNNQAT()
+    if quant_bit == "W4A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT4)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W2A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT2)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W1A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT1)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W1A4":
+        qat.set_weight_quant_dtype(QuantDtype.INT1)
+        qat.set_act_quant_dtype(QuantDtype.INT4)
     new_network = qat.apply(network)
 
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dBnFoldQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dBnFoldQuant")
+    assert cells.get("Conv2dQBNNQuant", None) is not None
+    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQBNNQuant")
     assert isinstance(conv_quant, QuantizeWrapperCell)
     conv_handler = conv_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
+    weight_fake_quant: QBNNFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, QBNNFakeQuantizerPerLayer)
     act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
-
-    assert cells.get("DenseQuant", None) is not None
-    dense_quant: QuantizeWrapperCell = cells.get("DenseQuant")
-    assert isinstance(dense_quant, QuantizeWrapperCell)
-    dense_handler = dense_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = dense_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
-    act_fake_quant = dense_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
-
-    assert cells.get("layer1", None) is not None
-    seq_cell: nn.Cell = cells.get("layer1")
-    res_block: nn.Cell = seq_cell.name_cells().get("cell_list_0")
-    res_block_cells: OrderedDict = res_block.name_cells()
-    assert res_block_cells.get("Conv2dBnFoldQuant", None) is not None
-    res_block_conv_quant: QuantizeWrapperCell = cells.get("Conv2dBnFoldQuant")
-    assert isinstance(res_block_conv_quant, QuantizeWrapperCell)
-    res_block_conv_handler = res_block_conv_quant._handler
-    res_block_conv_weight_fake_quant: SimulatedFakeQuantizerPerChannel = res_block_conv_handler.fake_quant_weight
-    assert isinstance(res_block_conv_weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert res_block_conv_weight_fake_quant._symmetric
-    assert res_block_conv_weight_fake_quant._quant_delay == 900
-    res_block_conv_act_fake_quant = res_block_conv_quant._output_quantizer
-    assert isinstance(res_block_conv_act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not res_block_conv_act_fake_quant._symmetric
-    assert res_block_conv_act_fake_quant._quant_delay == 900
-    print("============== test resnet simqat success ==============")
+    assert isinstance(act_fake_quant, QBNNACTQuantizer)
+    print("============== test resnet slbqat success ==============")
 
 
-def _create_resnet_accuracy_model(run_mode=context.GRAPH_MODE):
+def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
     """
-    create model lr dataset for resnet simqat accuracy test.
-    merge into test_resnet_accuracy after pynative bug is fixed.
+    Create model lr dataset for resnet slbqat accuracy test.
+    Merge into test_resnet_accuracy after pynative bug is fixed.
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     import mindspore.dataset as ds
-    from resnet.golden_stick.quantization.simqat.simqat import create_simqat
     from resnet.src.lr_generator import get_lr
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
-    from models.resnet import resnet50
+    from models.resnet import resnet18
 
     # config
     dataset_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
@@ -344,7 +299,7 @@ def _create_resnet_accuracy_model(run_mode=context.GRAPH_MODE):
 
     def _create_dataset(dataset_path, batch_size=128, train_image_size=224):
         """
-        create a train or evaluate cifar10 dataset for resnet50
+        Create a train or evaluate cifar10 dataset for resnet50.
         Args:
             dataset_path(string): the path of dataset.
             batch_size(int): the batch size of dataset. Default: 128
@@ -390,12 +345,24 @@ def _create_resnet_accuracy_model(run_mode=context.GRAPH_MODE):
 
     dataset = _create_dataset(dataset_path=dataset_path, batch_size=64, train_image_size=224)
     step_size = dataset.get_dataset_size()
-    net = resnet50(class_num=class_num)
+    net = resnet18(class_num=class_num)
     _init_weight(net=net)
 
     # apply golden-stick algo
-    algo = create_simqat()
-    net = algo.apply(net)
+    qat = QBNNQAT()
+    if quant_bit == "W4A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT4)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W2A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT2)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W1A8":
+        qat.set_weight_quant_dtype(QuantDtype.INT1)
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+    elif quant_bit == "W1A4":
+        qat.set_weight_quant_dtype(QuantDtype.INT1)
+        qat.set_act_quant_dtype(QuantDtype.INT4)
+    net = qat.apply(net)
 
     lr = get_lr(lr_init=lr_init, lr_end=lr_end, lr_max=lr_max, warmup_epochs=warmup_epochs, total_epochs=epoch_size,
                 steps_per_epoch=step_size, lr_decay_mode=lr_decay_mode)
@@ -411,18 +378,20 @@ def _create_resnet_accuracy_model(run_mode=context.GRAPH_MODE):
     metrics.clear()
     model = mindspore.Model(net, loss_fn=loss, optimizer=opt, loss_scale_manager=loss_scale, metrics=metrics,
                             keep_batchnorm_fp32=False)
-    return model, lr, dataset, algo
+    return model, lr, dataset, qat
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-def test_resnet_accuracy_graph():
+@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+def test_resnet_accuracy_graph(quant_bit):
     """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on resnet and test accuracy
+    Feature: slb quantization algorithm.
+    Description: Apply slb qat on resnet and test accuracy
     Expectation: Loss of first epoch is smaller than 2.5.
     """
+
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     from loss_monitor import LossMonitor
 
@@ -430,11 +399,46 @@ def test_resnet_accuracy_graph():
     target = "GPU"
     epoch_size = 1
 
+    class TemperatureScheduler(cb.Callback):
+        """
+        TemperatureScheduler for QBNN.
+        """
+        def __init__(self, model):
+            super().__init__()
+            self.epochs = epoch_size
+            self.t_start_val = 5.0
+            self.t_start_time = 0.2
+            self.t_end_time = 0.6
+            self.t_factor = 1.1
+            self.model = model
+
+        def epoch_begin(self, run_context):
+            """
+            Epoch_begin.
+            """
+            cb_params = run_context.original_args()
+            epoch = cb_params.cur_epoch_num
+            # Compute temperature value
+            t = self.t_start_val
+            t_start_epoch = int(self.epochs*self.t_start_time)
+            t_end_epoch = int(self.epochs*self.t_end_time)
+            if epoch > t_start_epoch:
+                t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
+            # Assign new value to temperature parameter
+            for _, cell in self.model.train_network.cells_and_names():
+                if cell.cls_name == 'QBNNFakeQuantizerPerLayer': # for QBNN
+                    cell.set_temperature(t)
+                    if epoch == t_end_epoch:
+                        cell.set_temperature_end_flag()
+                        print('Temperature stops changing. Start applying one-hot to latent weights.')
+
     mindspore.context.set_context(mode=context.GRAPH_MODE, device_target=target)
-    model, lr, dataset, algo = _create_resnet_accuracy_model(context.GRAPH_MODE)
+    model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.GRAPH_MODE)
+
+
     # define callbacks
     monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
-    callbacks = [monitor, algo.callback()]
+    callbacks = [monitor, TemperatureScheduler(model), qat.callback()]
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")
@@ -447,11 +451,11 @@ def test_resnet_accuracy_graph():
     assert avg_step_loss <= expect_avg_step_loss
 
 
-def test_resnet_accuracy_pynative():
+def test_resnet_accuracy_pynative(quant_bit):
     """
     Feature: Simulated quantization algorithm.
     Description: Apply simulated_quantization on resnet and test accuracy
-    Expectation: Loss of first epoch is smaller than 4.52.
+    Expectation: Loss of first epoch is smaller than 2.8.
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     from loss_monitor import LossMonitor
@@ -460,18 +464,51 @@ def test_resnet_accuracy_pynative():
     target = "GPU"
     epoch_size = 1
 
+    class TemperatureScheduler(cb.Callback):
+        """
+        TemperatureScheduler for QBNN.
+        """
+        def __init__(self, model):
+            super().__init__()
+            self.epochs = epoch_size
+            self.t_start_val = 5.0
+            self.t_start_time = 0.2
+            self.t_end_time = 0.6
+            self.t_factor = 1.1
+            self.model = model
+
+        def epoch_begin(self, run_context):
+            """
+            Epoch_begin.
+            """
+            cb_params = run_context.original_args()
+            epoch = cb_params.cur_epoch_num
+            # Compute temperature value
+            t = self.t_start_val
+            t_start_epoch = int(self.epochs*self.t_start_time)
+            t_end_epoch = int(self.epochs*self.t_end_time)
+            if epoch > t_start_epoch:
+                t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
+            # Assign new value to temperature parameter
+            for _, cell in self.model.train_network.cells_and_names():
+                if cell.cls_name == 'QBNNFakeQuantizerPerLayer': # for QBNN
+                    cell.set_temperature(t)
+                    if epoch == t_end_epoch:
+                        cell.set_temperature_end_flag()
+                        print('Temperature stops changing. Start applying one-hot to latent weights.')
+
     mindspore.context.set_context(mode=context.PYNATIVE_MODE, device_target=target)
-    model, lr, dataset, algo = _create_resnet_accuracy_model(context.PYNATIVE_MODE)
+    model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.PYNATIVE_MODE)
     # define callbacks
     monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
-    callbacks = [monitor, algo.callback()]
+    callbacks = [monitor, TemperatureScheduler(model), qat.callback()]
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")
     model.train(epoch_size, dataset, callbacks=callbacks, sink_size=dataset.get_dataset_size(),
                 dataset_sink_mode=dataset_sink_mode)
     print("============== End Training ==============")
-    expect_avg_step_loss = 4.52
+    expect_avg_step_loss = 4.5
     avg_step_loss = np.mean(np.array(monitor.losses))
     print("average step loss:{}".format(avg_step_loss))
     assert avg_step_loss <= expect_avg_step_loss

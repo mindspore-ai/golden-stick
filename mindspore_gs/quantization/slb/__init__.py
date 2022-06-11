@@ -13,11 +13,10 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick module.
+MindSpore golden stick slb-quantization.
 """
 
-from .quantization import SimulatedQuantizationAwareTraining, LearnedScaleQuantizationAwareTraining, SlbQuantAwareTraining
-from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo
 
-__all__ = ["SimulatedQuantizationAwareTraining", "LearnedScaleQuantizationAwareTraining", "SlbQuantAwareTraining",
-           "PrunerKfCompressAlgo", "PrunerFtCompressAlgo"]
+from .slb_quant_aware_training import SlbQuantAwareTraining
+
+__all__ = ["SlbQuantAwareTraining"]

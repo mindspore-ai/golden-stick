@@ -3,6 +3,7 @@
 "golden-stick/mindspore_gs/quantization/net_policy.py"                                                  "unused-argument"
 "golden-stick/mindspore_gs/quantization/quantization_aware_training.py"                                 "not-an-iterable"
 "golden-stick/mindspore_gs/quantization/fake_quantizer.py"                                              "invalid-name"
+"golden-stick/mindspore_gs/quantization/slb/slb_fake_quantizer.py"                                      "unused-argument"
 
 # SCOP
 "golden-stick/mindspore_gs/pruner/scop/scop_pruner.py"                                                  "protected-access"
@@ -12,3 +13,4 @@
 "golden-stick/tests/st/models/resnet.py"                                                                "unused-argument"
 "golden-stick/tests/st/models/resnet.py"                                                                "missing-docstring"
 "golden-stick/tests/st/quantization/test_sim_qat.py"                                                    "protected-access"
+"golden-stick/tests/st/quantization/test_slb_qat.py"                                                    "protected-access"
