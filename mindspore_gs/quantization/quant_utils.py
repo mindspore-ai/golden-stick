@@ -18,9 +18,11 @@ import numpy as np
 from mindspore._checkparam import Validator
 from mindspore.nn.layer.quant import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
     Conv2dQuant, DenseQuant
-from mindspore.nn import Cell, FakeQuantWithMinMaxObserver
+from .fake_quantizer import FakeQuantizer
 
-__all__ = ["load_nonquant_param_into_quant_net", "query_quant_layers", "compute_kl_threshold"]
+__all__ = ["load_nonquant_param_into_quant_net", "query_quant_layers", "compute_kl_threshold",
+           "scale_zp_max_min_from_fake_quant_cell", "fold_batchnorm", "without_fold_batchnorm",
+           "get_quant_min_max", "weight2int"]
 
 
 def cal_quantization_params(input_min,
@@ -130,15 +132,13 @@ def weight2int(data, scale, zero_point, quant_min, quant_max):
 
 
 def scale_zp_max_min_from_fake_quant_cell(cell, data_type):
-    """Get calculate quantization params for scale, zero point, max and min from `FakeQuantWithMinMaxObserver`."""
-    minq = cell.minq.data.asnumpy()
-    maxq = cell.maxq.data.asnumpy()
-    # make sure maxq > 0 and minq <= 0
-    if cell.mode == 'LEARNED_SCALE':
-        maxq = np.abs(maxq)
-        minq = -np.abs(minq)
-    quant_min, quant_max = get_quant_min_max(data_type, num_bits=cell.num_bits, narrow_range=cell.narrow_range)
-    symmetric = cell.symmetric and not cell.neg_trunc
+    """Get calculate quantization params for scale, zero point, max and min from `FakeQuantizer`."""
+    minq = cell._float_min.data.asnumpy()
+    maxq = cell._float_max.data.asnumpy()
+
+    quant_min, quant_max = get_quant_min_max(data_type, num_bits=getattr(cell, "_num_bits", 8),
+                                             narrow_range=cell._narrow_range)
+    symmetric = cell._symmetric
     scale, zp = cal_quantization_params(
         minq, maxq,
         quant_min, quant_max, data_type,
@@ -339,7 +339,7 @@ def query_quant_layers(network):
     for cell_and_name in network.cells_and_names():
         cell_name = cell_and_name[0]
         cell = cell_and_name[1]
-        if isinstance(cell, FakeQuantWithMinMaxObserver):
+        if isinstance(cell, FakeQuantizer):
             print(tplt.format(cell_name, cell.quant_dtype))
 
 

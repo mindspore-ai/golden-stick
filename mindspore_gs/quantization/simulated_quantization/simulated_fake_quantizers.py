@@ -57,7 +57,7 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
                                                 symmetric=self._symmetric,
                                                 narrow_range=self._narrow_range,
                                                 quant_delay=self._quant_delay)
-            self._fake_quant_infer = self.fake_quant_train
+            self._fake_quant_infer = self._fake_quant_train
         else:
             quant_func = partial(quant_func,
                                  ema=self._ema,

@@ -113,6 +113,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
+        self._config = None
         self._create_qconfig_by_dict(config)
         self._qat_policy = self._init_net_policy(self._config)
         self._custom_transforms = {}
@@ -337,7 +338,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         return SimulatedNetPolicy(config)
 
     def _create_qconfig_by_dict(self, config: dict):
-        """Update `_config` from a dict"""
+        """Create `_config` from a dict"""
         self._config = SimulatedQuantizationConfig()
         quant_delay_list = SimulatedQuantizationAwareTraining._convert2list("quant delay",
                                                                             config.get("quant_delay", [0, 0]))
