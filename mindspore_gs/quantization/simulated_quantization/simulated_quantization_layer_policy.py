@@ -112,24 +112,34 @@ class SimulatedLayerPolicy(LayerPolicy):
 
 
 class ConvLayerPolicy(SimulatedLayerPolicy):
+    """
+    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Conv2d.
+    """
     def wrap_cell(self, handler: Cell) -> Cell:
         conv_quant = Conv2dQuant.from_float(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_quant, self)
 
 
 class DenseLayerPolicy(SimulatedLayerPolicy):
+    """
+    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
+    """
     def wrap_cell(self, handler: Cell) -> Cell:
         dense_quant = DenseQuant.from_float(handler, self.get_quant_config())
         return QuantizeWrapperCell(dense_quant, self)
 
 
 class ConvBnLayerPolicy(SimulatedLayerPolicy):
+    """
+    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.ConvBn.
+    """
     def wrap_cell(self, handler: Cell) -> Cell:
         if self._config.bn_fold:
             if self._config.one_conv_fold:
                 conv_bn_quant = Conv2dBnFoldQuantOneConv.from_float(handler, self.get_quant_config())
             else:
-                conv_bn_quant = Conv2dBnFoldQuant.from_float(handler, self.get_quant_config())
+                conv_bn_quant = Conv2dBnFoldQuant.from_float(handler, self.get_quant_config(),
+                                                             {"freeze_bn": self._config.freeze_bn})
         else:
             conv_bn_quant = Conv2dBnWithoutFoldQuant.from_float(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_bn_quant, self)
