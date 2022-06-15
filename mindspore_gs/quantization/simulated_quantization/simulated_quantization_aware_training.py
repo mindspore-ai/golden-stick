@@ -28,6 +28,7 @@ from .simulated_quantization_config import SimulatedQuantizationConfig
 class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
     """
     Derived class of GoldenStick. Simulated QAT-algorithm.
+
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. supported attribute are listed below:
@@ -59,9 +60,6 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             - one_conv_fold (bool): Whether to use one conv bn fold ops for simulation inference operation.
               Default: True.
 
-    Supported Platforms:
-         ``Ascend`` ``GPU``
-
     Raises:
         TypeError: If the element of `quant_delay` is not int.
         TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
@@ -69,10 +67,15 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         TypeError: If `freeze_bn` is not int.
         ValueError: `freeze_bn` is less than 0.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
-         less than 2.
+            less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
         ValueError: If the first element of `per_channel` is `True`.
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
+
+
+    Supported Platforms:
+        ``GPU``
+
 
     Examples:
         >>> from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
