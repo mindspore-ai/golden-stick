@@ -33,12 +33,13 @@ def generate_int(shape):
 class KfConv2d(nn.Cell):
     """KF Conv2d."""
 
-    def __init__(self, conv_ori, bn_ori):
+    def __init__(self, conv_ori, bn_ori, prex):
         super(KfConv2d, self).__init__()
         self.conv = conv_ori
         self.bn = bn_ori
         self.out_channels = self.conv.out_channels
-        self.kfscale = Parameter(ops.Ones()((1, self.out_channels, 1, 1), mindspore.float32), requires_grad=True)
+        self.kfscale = Parameter(ops.Ones()((1, self.out_channels, 1, 1), mindspore.float32), requires_grad=True,
+                                 name=prex + '.kfscale')
         self.kfscale.data.fill(0.5)
         self.concat_op = ops.Concat(axis=0)
 
@@ -66,13 +67,13 @@ def generate_tensor(shape, mask_list):
 class MaskedConv2dbn(nn.Cell):
     """Mask Conv2d and bn."""
 
-    def __init__(self, kf_conv2d_ori):
+    def __init__(self, kf_conv2d_ori, prex):
         super(MaskedConv2dbn, self).__init__()
         self.conv = kf_conv2d_ori.conv
         self.bn = kf_conv2d_ori.bn
         self.zeros = ops.Zeros()
         self.one = ops.Ones()
-        self.out_index = Parameter(kf_conv2d_ori.out_index, requires_grad=False)
+        self.out_index = Parameter(kf_conv2d_ori.out_index, requires_grad=False, name=prex + '.out_index')
         self.cast = ops.Cast()
         self.mask = self.out_index.asnumpy().tolist()
 
@@ -206,7 +207,19 @@ class PrunedConv2dbn2(nn.Cell):
 
 
 class PrunerKfCompressAlgo(CompAlgo):
-    """Prune algo."""
+    """
+    Derived class of GoldenStick. Scop-algorithm.
+    Construct effective knockoff counterparts.
+    Supported Platforms:
+         ``Ascend`` ``GPU``
+
+    Examples:
+        >>> from mindspore_gs.pruner.scop import PrunerKfCompressAlgo
+        >>> from models.resnet import resnet50
+        >>> net = resnet50()
+        >>> pruner = PrunerKfCompressAlgo({})
+        >>> net_prune = pruner.apply(net)
+    """
 
     def callbacks(self):
         return self._callback
@@ -219,7 +232,13 @@ class PrunerKfCompressAlgo(CompAlgo):
             for ik, k in enumerate(keys):
                 if isinstance(modules[k], nn.Conv2d):
                     if k not in ('0', 'conv1_3x3', 'conv1_7x7'):
-                        modules[k] = KfConv2d(modules[k], modules[keys[ik + 1]])
+                        for value, param in modules[k].parameters_and_names():
+                            prex = param.name.strip(value)
+                        modules[k] = KfConv2d(modules[k], modules[keys[ik + 1]], prex)
+                        for params in modules[k].conv.get_parameters():
+                            params.name = prex + params.name
+                        for params in modules[k].bn.get_parameters():
+                            params.name = prex + params.name
                         modules[keys[ik + 1]] = nn.SequentialCell()
                 elif (not isinstance(modules[k], KfConv2d)) and modules[k]._cells:
                     _inject(modules[k]._cells)
@@ -232,7 +251,19 @@ class PrunerKfCompressAlgo(CompAlgo):
 
 
 class PrunerFtCompressAlgo(CompAlgo):
-    """Prune algo."""
+    """
+    Derived class of GoldenStick. Scop-algorithm.
+    FineTune for recover net.
+    Supported Platforms:
+         ``Ascend`` ``GPU``
+
+    Examples:
+        >>> from mindspore_gs.pruner.scop import PrunerFtCompressAlgo
+        >>> from models.resnet import resnet50
+        >>> net = resnet50()
+        >>> pruner = PrunerFtCompressAlgo({})
+        >>> net_prune = pruner.apply(net)
+    """
 
     def callbacks(self):
         return self._callback
@@ -245,7 +276,13 @@ class PrunerFtCompressAlgo(CompAlgo):
 
             for _, k in enumerate(keys):
                 if isinstance(modules[k], KfConv2d):
-                    modules[k] = MaskedConv2dbn(modules[k])
+                    for value, param in modules[k].parameters_and_names():
+                        prex = param.name.strip(value.split('.')[-1])
+                    modules[k] = MaskedConv2dbn(modules[k], prex)
+                    for params in modules[k].conv.get_parameters():
+                        params.name = prex + params.name
+                    for params in modules[k].bn.get_parameters():
+                        params.name = prex + params.name
                 elif (not isinstance(modules[k], KfConv2d)) and modules[k]._cells:
                     _inject(modules[k]._cells)
 
