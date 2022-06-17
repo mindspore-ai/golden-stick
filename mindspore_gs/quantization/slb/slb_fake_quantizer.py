@@ -75,7 +75,8 @@ class QBNNFakeQuantizerPerLayer(FakeQuantizer):
             # Compute one-hot representation of matrix A's argmax
             weights = self.onehot(self.argmax(x), x.shape[-1], self.true_tensor, self.false_tensor)
         else:
-            if not self.flag_temperature_end_changing:
+            is_temperature_end_changing = self.flag_temperature_end_changing
+            if not is_temperature_end_changing:
                 # Compute matrix P of probabilities (as softmax of A*T)
                 weights = self.softmax(x * self.temperature)
             else:
