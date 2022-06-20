@@ -18,7 +18,7 @@ from ..constant import QuantDtype
 
 class SlbQuantConfig:
     """
-    Config for slb quantization aware training.
+    Config for SLB(Searching for Low-Bit Weights) QAT-algorithm.
     See more details in slb_quant_aware_training.py
     """
     def __init__(self):
