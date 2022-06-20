@@ -30,7 +30,7 @@ from .slb_quant_config import SlbQuantConfig
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
     """
-    Derived class of GoldenStick. SLB QAT-algorithm.
+    Derived class of GoldenStick. SLB(Searching for Low-Bit Weights) QAT-algorithm.
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
