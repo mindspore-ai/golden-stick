@@ -1,1 +1,5 @@
-mindspore >= 1.7.0
+numpy >= 1.17.0
+scipy >= 1.5.2
+
+# for ut/st
+pytest >= 1.6.0

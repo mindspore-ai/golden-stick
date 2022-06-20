@@ -6,14 +6,16 @@
 
 - MindSpore Golden Stick
     - [概述](#概述)
-    - 安装
-        - [MindSpore版本依赖关系](#MindSpore版本依赖关系)
+    - [设计思路](#设计思路)
+    - [安装](#安装)
+        - [MindSpore版本依赖关系](#mindSpore版本依赖关系)
         - [pip安装](#pip安装)
         - [源码编译安装](#源码编译安装)
+        - [验证](#验证安装是否成功)
     - [快速入门](#快速入门)
-    - 文档
+    - [文档](#文档)
         - [开发者教程](#开发者教程)
-    - 社区
+    - [社区](#社区)
         - [治理](#治理)
         - [交流](#交流)
     - [贡献](#贡献)
@@ -116,3 +118,4 @@ import mindspore_gs
 
 ## 许可证
 
+[Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
