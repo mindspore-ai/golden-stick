@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick slb-quantization.
+MindSpore golden stick SLB(Searching for Low-Bit Weights) QAT-algorithm.
 """
 
 
