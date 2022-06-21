@@ -6,14 +6,16 @@
 
 - MindSpore Golden Stick
     - [Overview](#overview)
-    - Installation
+    - [Design Features](#design-features)
+    - [Installation](#installation)
         - [Version dependency](#version-dependency)
         - [Installing from pip command](#installing-from-pip-command)
         - [Installing from source code](#installing-from-source-code)
+        - [Verification](#verification)
     - [Quick Start](#quick-start)
-    - Documents
+    - [Documents](#documents)
         - [Developer Guide](#developer-guide)
-    - Community
+    - [Community](#community)
         - [Governance](#governance)
         - [Communication](#communication)
     - [Contributions](#contributions)
@@ -112,5 +114,3 @@ Welcome to MindSpore contribution.
 ## License
 
 [Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
-
-

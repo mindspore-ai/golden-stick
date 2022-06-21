@@ -6,10 +6,10 @@
 
 ### 主要特性和增强
 
-- [STABLE] Add MindSpore Golden Stick APIs for model compression.
-- [BETA]   Provide a quant-aware-training algorithm named Simulated quantization(SimQAT).
-- [BETA]   Provide a quant-aware-training algorithm: Searching for Low-Bit Weights in Quantized Neural Networks(SLB).
-- [STABLE] Provide a pruning algorithm: Scientific Control for Reliable Neural Network Pruning(SCOP)
+- [STABLE] 新增金箍棒特性，金箍棒是MindSpore的模型压缩算法集。当前版本提供了一套统一的算法接入接口和简单的模型定义改写能力。
+- [BETA] 提供一个名为SimQAT（Simulated Quantization Aware Training）的感知量化算法，是一种最基本的感知量化算法。
+- [BETA] 提供一个名为SLB（Searching for Low-Bit Weights in Quantized Neural Networks）的感知量化算法，是一种非线性、高精度的感知量化算法，在低比特量化上优势明显。
+- [STABLE] 提供一个名为SCOP（Scientific Control for Reliable Neural Network Pruning）的剪枝算法，是一种高精度的结构化剪枝算法，当前主要应用于CV网络上。
 
 ### 接口变更
 

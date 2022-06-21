@@ -6,10 +6,10 @@
 
 ### Major Features and Improvements
 
-- [STABLE] Add MindSpore Golden Stick APIs for model compression.
-- [BETA]   Provide a quant-aware-training algorithm named Simulated quantization(SimQAT).
-- [BETA]   Provide a quant-aware-training algorithm: Searching for Low-Bit Weights in Quantized Neural Networks(SLB).
-- [STABLE] Provide a pruner algorithm: Scientific Control for Reliable Neural Network Pruning(SCOP)
+- [STABLE] Add MindSpore Golden Stick feature, which is a model compression algorithm set on MindSpore. MindSpore Golden Stick provides a unified set of algorithm access interfaces and simple model definition rewriting capabilities in current version.
+- [BETA] Provides a quantization aware training algorithm named SimQAT (Simulated Quantization Aware Training), which is the most basic quantization aware training algorithm.
+- [BETA] Provides a quantization aware training algorithm called SLB (Searching for Low-Bit Weights in Quantized Neural Networks), which is a nonlinear, high-precision quantization aware training algorithm with obvious advantages in low-bit quantization.
+- [STABLE] Provides a pruning algorithm named SCOP (Scientific Control for Reliable Neural Network Pruning), which is a high-precision structured pruning algorithm and is currently mainly used in CV networks.
 
 ### API Change
 

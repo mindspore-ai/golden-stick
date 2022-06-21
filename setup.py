@@ -25,6 +25,10 @@ setup(
     description='A MindSpore model optimization algorithm set..',
     url='https://www.mindspore.cn',
     packages=find_packages(include=['mindspore_gs*']),
+    install_requires=[
+        'numpy >= 1.17.0',
+        'scipy >= 1.5.2',
+    ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
