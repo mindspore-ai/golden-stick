@@ -376,7 +376,7 @@ def test_resnet_accuracy_graph(quant_bit):
         def __init__(self, model):
             super().__init__()
             self.epochs = epoch_size
-            self.t_start_val = 1.0
+            self.t_start_val = 5.0
             self.t_start_time = 0.2
             self.t_end_time = 0.6
             self.t_factor = 1.2
@@ -398,7 +398,7 @@ def test_resnet_accuracy_graph(quant_bit):
             for _, cell in self.model.train_network.cells_and_names():
                 if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
                     cell.set_temperature(t)
-                    if epoch >= t_end_epoch:
+                    if epoch == t_end_epoch:
                         cell.set_temperature_end_flag()
 
     mindspore.context.set_context(mode=context.GRAPH_MODE, device_target=target)
