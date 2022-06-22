@@ -37,7 +37,7 @@ class SlbLayerPolicy(LayerPolicy):
     def __init__(self, weight_names: [], act_names: [], config: SlbQuantConfig = SlbQuantConfig()):
         self._config = config
         weight_num_bits = config.weight_quant_dtype.num_bits
-        if weight_num_bits not in [1,2,4]:
+        if weight_num_bits not in [1, 2, 4]:
             raise NotImplementedError("Only support int4|int2|int1 weight quant now!")
 
         self._weight_quantizer_partial = partial(SlbFakeQuantizerPerLayer, num_bits=weight_num_bits)
