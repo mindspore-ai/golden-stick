@@ -5,17 +5,15 @@
 ## 相关的Issue
 
 ## 日志白名单
+如果新增报错日志或者修改报错日志需要提供报错白名单，其中**用户是否可定位**：表示当前报错是用户的输入有误，用户可以根据报错日志定位到自己的输入有何种错误。
 
-新增报错日志或者修改报错日志需要提供报错白名单
-
-**用户是否可定位**：表示当前报错是用户的输入有误，用户可以根据报错日志定位到自己的输入有何种错误。
-
+<!--
 示例：
-
-> | 文件路径 | 报错代码行 | 报错日志类型 | 出错场景和错误分析 | 用户是否可定位 | 定位说明（无法定位的需要给出原因） |
-> | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-> | mindspore_gs\quantization\simulated_quantization\simulated_quantization_aware_training.py | 115 | TypeError | 用户输入的config参数不是一个字典 | 是 | 日志中说明了是用户输入的config参数有误，说明了该参数期望的类型 |
-> | mindspore_gs\quantization\simulated_quantization\simulated_quantization_layer_policy.py | 60 | NotImplementedError | SimQAT算法中配置了perchannel的激活量化，当前算法不支持 | 否 | 该配置项在对外接口处已经做了白名单校验，此处获取到不支持的场景值，应该是内部参数传递有误，不是用户输入有误 |
+| 文件路径 | 报错代码行 | 报错日志类型 | 出错场景和错误分析 | 用户是否可定位 | 定位说明（无法定位的需要给出原因） |
+| :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
+| mindspore_gs\quantization\simulated_quantization\simulated_quantization_aware_training.py | 115 | TypeError | 用户输入的config参数不是一个字典 | 是 | 日志中说明了是用户输入的config参数有误，说明了该参数期望的类型 |
+| mindspore_gs\quantization\simulated_quantization\simulated_quantization_layer_policy.py | 60 | NotImplementedError | SimQAT算法中配置了perchannel的激活量化，当前算法不支持 | 否 | 该配置项在对外接口处已经做了白名单校验，此处获取到不支持的场景值，应该是内部参数传递有误，不是用户输入有误 |
+-->
 
 ## 规范
 - [ ] 涉及新增对外接口或者修改对外接口
