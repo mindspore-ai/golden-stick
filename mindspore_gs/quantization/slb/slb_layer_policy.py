@@ -22,42 +22,28 @@ from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
 from ..layer_policy import LayerPolicy
 from ..quantize_wrapper_cell import QuantizeWrapperCell
 from ..fake_quantizer import FakeQuantizer
-from .slb_fake_quantizer import QBNNFakeQuantizerPerLayer as SlbFakeQuantizerPerLayer, \
-    QBNNACTQuantizer as SlbActQuantizer
-from .slb_quant import Conv2dQBNNQuant as Conv2dSlbQuant
+from .slb_fake_quantizer import SlbFakeQuantizerPerLayer
+from .slb_quant import Conv2dSlbQuant
 from .slb_quant_config import SlbQuantConfig
-from ..constant import QuantDtype
 
 
 class SlbLayerPolicy(LayerPolicy):
     """
     Derived class of LayerPolicy. slb layer policy.
-    Use slb perlayer fake quantizer as weight fake quantizer, linear perlayer fake quantizer as act fake quantizer.
+    Use slb perlayer fake quantizer as weight fake quantizer.
 
     """
 
     def __init__(self, weight_names: [], act_names: [], config: SlbQuantConfig = SlbQuantConfig()):
         self._config = config
-        if config.weight_quant_dtype == QuantDtype.INT4:
-            num_bits = 4
-        elif config.weight_quant_dtype == QuantDtype.INT2:
-            num_bits = 2
-        elif config.weight_quant_dtype == QuantDtype.INT1:
-            num_bits = 1
-        else:
+        weight_num_bits = config.weight_quant_dtype.num_bits
+        if weight_num_bits not in [1,2,4]:
             raise NotImplementedError("Only support int4|int2|int1 weight quant now!")
 
-        if config.act_quant_dtype == QuantDtype.INT8:
-            act_num_bits = 8
-        elif config.act_quant_dtype == QuantDtype.INT4:
-            act_num_bits = 4
-        else:
-            raise NotImplementedError("Only support int8|int4 activation quant now!")
-
-        self._weight_quantizer_partial = partial(SlbFakeQuantizerPerLayer, num_bits=num_bits)
-        self._act_quantizer: Optional[FakeQuantizer] = SlbActQuantizer(num_bits=act_num_bits)
-        self._input_quantizer: Optional[FakeQuantizer] = SlbActQuantizer(num_bits=act_num_bits)
-        self._output_quantizer: Optional[FakeQuantizer] = SlbActQuantizer(num_bits=act_num_bits)
+        self._weight_quantizer_partial = partial(SlbFakeQuantizerPerLayer, num_bits=weight_num_bits)
+        self._act_quantizer: Optional[FakeQuantizer] = None
+        self._input_quantizer: Optional[FakeQuantizer] = None
+        self._output_quantizer: Optional[FakeQuantizer] = None
         self._weight_names = weight_names
         self._act_names = act_names
         self._input_num = 0
