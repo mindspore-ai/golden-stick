@@ -136,10 +136,10 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
         def __init__(self, model):
             super().__init__()
             self.epochs = 10
-            self.t_start_val = 1.0
+            self.t_start_val = 5.0
             self.t_start_time = 0.2
             self.t_end_time = 0.6
-            self.t_factor = 5.2
+            self.t_factor = 1.1
             self.model = model
 
         def epoch_begin(self, run_context):
@@ -158,7 +158,7 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
             for _, cell in self.model.train_network.cells_and_names():
                 if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
                     cell.set_temperature(t)
-                    if epoch >= t_end_epoch:
+                    if epoch == t_end_epoch:
                         cell.set_temperature_end_flag()
 
 
@@ -379,7 +379,7 @@ def test_resnet_accuracy_graph(quant_bit):
             self.t_start_val = 5.0
             self.t_start_time = 0.2
             self.t_end_time = 0.6
-            self.t_factor = 1.2
+            self.t_factor = 1.1
             self.model = model
 
         def epoch_begin(self, run_context):
@@ -439,10 +439,10 @@ def test_resnet_accuracy_pynative(quant_bit):
         def __init__(self, model):
             super().__init__()
             self.epochs = epoch_size
-            self.t_start_val = 1.0
+            self.t_start_val = 5.0
             self.t_start_time = 0.2
             self.t_end_time = 0.6
-            self.t_factor = 1.2
+            self.t_factor = 1.1
             self.model = model
 
         def epoch_begin(self, run_context):
