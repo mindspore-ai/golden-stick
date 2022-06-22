@@ -69,12 +69,13 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         """
         SlbFakeQuantizer apply method.
         """
-        if not self.training:
+        is_training = self.training
+        if is_training == False:
             # Compute one-hot representation of matrix A's argmax
             weights = self.onehot(self.argmax(x), x.shape[-1], self.true_tensor, self.false_tensor)
         else:
             is_temperature_end_changing = self.flag_temperature_end_changing
-            if not is_temperature_end_changing:
+            if is_temperature_end_changing == 0:
                 # Compute matrix P of probabilities (as softmax of A*T)
                 weights = self.softmax(x * self.temperature)
             else:
