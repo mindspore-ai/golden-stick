@@ -22,5 +22,4 @@ class SlbQuantConfig:
     See more details in slb_quant_aware_training.py
     """
     def __init__(self):
-        self.act_quant_dtype = QuantDtype.INT8
         self.weight_quant_dtype = QuantDtype.INT1
