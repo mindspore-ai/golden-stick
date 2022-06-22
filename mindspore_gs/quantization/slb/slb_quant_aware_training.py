@@ -35,7 +35,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
 
-            - quant_dtype (QuantDtype): Datatype used to quantize weights, weights quantization support int4|int2|int1 now.
+            - quant_dtype (QuantDtype): Datatype used to quantize weights, weights quantization
+              support int4|int2|int1 now.
               Default: QuantDtype.INT1.
 
     Supported Platforms:
@@ -108,7 +109,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
         if weight_quant_dtype not in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4]:
             raise NotImplementedError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
-                                      "`QuantDtype.INT2` or `QuantDtype.INT4` yet. but got {}".format(weight_quant_dtype))
+                                      "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
+                                      "but got {}".format(weight_quant_dtype))
         self._config.weight_quant_dtype = weight_quant_dtype
 
     def _init_net_policy(self, config):
