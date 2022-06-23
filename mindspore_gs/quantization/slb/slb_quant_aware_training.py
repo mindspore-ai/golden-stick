@@ -35,18 +35,15 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
 
-            - quant_dtype (Union[QuantDtype, list, tuple]): Datatype used to quantize weights and activations. The first
-              element represents data flow and the second element represents weights. It is necessary to consider the
-              precision support of hardware devices in the practical quantization infer scenaries.
-              Weights quantization support int4|int2|int1, and activations quantization support int8|int4 now.
-              Default: (QuantDtype.INT8, QuantDtype.INT1).
+            - quant_dtype (QuantDtype): Datatype used to quantize weights, weights quantization
+              support int4|int2|int1 now.
+              Default: QuantDtype.INT1.
 
     Supported Platforms:
         ``GPU``
 
     Raises:
-        TypeError: If the element of `quant_dtype` is not `QuantDtype`.
-        ValueError: If the length of `quant_dtype` is not less than 2.
+        TypeError: If `quant_dtype` is not `QuantDtype`.
 
     Examples:
         >>> from mindspore_gs.quantization.slb import SlbQuantAwareTraining
@@ -97,29 +94,12 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if "custom_policies" in config.keys():
             self._custom_layer_policy_map = config["custom_policies"]
 
-    def set_act_quant_dtype(self, act_quant_dtype):
-        """
-        Set value of act_quant_dtype of `_config`
-
-        Args:
-            act_quant_dtype (QuantDtype): Datatype used to quantize activations. Default: QuantDtype.INT8.
-
-        Raises:
-            TypeError: If `act_quant_dtype` is not QuantDtype.
-            NotImplementedError: Only supported if `act_quant_dtype` is `QuantDtype.INT4` or `QuantDtype.INT8` yet.
-        """
-        Validator.check_isinstance("activation quant dtype", act_quant_dtype, QuantDtype)
-        if act_quant_dtype not in [QuantDtype.INT4, QuantDtype.INT8]:
-            raise NotImplementedError("Only supported if `act_quant_dtype` is `QuantDtype.INT4` " \
-                                      "or `QuantDtype.INT8` yet.")
-        self._config.act_quant_dtype = act_quant_dtype
-
     def set_weight_quant_dtype(self, weight_quant_dtype):
         """
         Set value of weight_quant_dtype of `_config`
 
         Args:
-            weight_quant_dtype (QuantDtype): Datatype used to quantize activations. Default: QuantDtype.INT1.
+            weight_quant_dtype (QuantDtype): Datatype used to quantize weights. Default: QuantDtype.INT1.
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
@@ -129,16 +109,9 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
         if weight_quant_dtype not in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4]:
             raise NotImplementedError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
-                                      "`QuantDtype.INT2` or `QuantDtype.INT4` yet.")
+                                      "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
+                                      "but got {}".format(weight_quant_dtype))
         self._config.weight_quant_dtype = weight_quant_dtype
-
-    @staticmethod
-    def _convert2list(name, value):
-        if not isinstance(value, list) and not isinstance(value, tuple):
-            value = [value]
-        elif len(value) > 2:
-            raise ValueError("input `{}` len should less then 2".format(name))
-        return value
 
     def _init_net_policy(self, config):
         return SlbNetPolicy(config)
@@ -146,12 +119,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
     def _create_qconfig_by_dict(self, config: dict):
         """Create `_config` from a dict"""
         self._config = SlbQuantConfig()
-        quant_dtype_list = SlbQuantAwareTraining.\
-            _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT1]))
-
-        self.set_act_quant_dtype(quant_dtype_list[0])
-        self.set_weight_quant_dtype(quant_dtype_list[-1])
-
+        self.set_weight_quant_dtype(config.get("quant_dtype", QuantDtype.INT1))
 
     def apply(self, network: Cell) -> Cell:
         """

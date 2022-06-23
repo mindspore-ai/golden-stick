@@ -25,9 +25,9 @@ from mindspore import nn, context
 import mindspore.train.callback as cb
 from mindspore.train import Model
 from mindspore.nn.metrics import Accuracy
-from mindspore_gs.quantization.slb import SlbQuantAwareTraining as QBNNQAT
+from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.constant import QuantDtype
-from mindspore_gs.quantization.slb.slb_fake_quantizer import QBNNFakeQuantizerPerLayer, QBNNACTQuantizer
+from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
@@ -50,46 +50,37 @@ class NetToQuant(nn.Cell):
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
 def test_set_config(quant_bit):
     """
-    Feature: SlbQAT algorithm set functions.
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set functions.
     Description: Apply SlbQuantAwareTraining on lenet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
 
     network = NetToQuant()
-    qat = QBNNQAT()
-    if quant_bit == "W4A8":
+    qat = SlbQAT()
+    if quant_bit == "W4":
         qat.set_weight_quant_dtype(QuantDtype.INT4)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W2A8":
+    elif quant_bit == "W2":
         qat.set_weight_quant_dtype(QuantDtype.INT2)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W1A8":
+    elif quant_bit == "W1":
         qat.set_weight_quant_dtype(QuantDtype.INT1)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W1A4":
-        qat.set_weight_quant_dtype(QuantDtype.INT1)
-        qat.set_act_quant_dtype(QuantDtype.INT4)
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
 
-    assert cells.get("Conv2dQBNNQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQBNNQuant")
+    assert cells.get("Conv2dSlbQuant", None) is not None
+    conv_quant: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
     assert isinstance(conv_quant, QuantizeWrapperCell)
     conv_handler = conv_quant._handler
-    weight_fake_quant: QBNNFakeQuantizerPerLayer = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, QBNNFakeQuantizerPerLayer)
-    act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, QBNNACTQuantizer)
-
+    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
 def test_lenet(quant_bit):
     """
     Feature: slb quantization algorithm.
@@ -99,31 +90,27 @@ def test_lenet(quant_bit):
 
     from lenet.src.lenet import LeNet5
     network = LeNet5(10)
-    if quant_bit == "W4A8":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4]})
-    elif quant_bit == "W2A8":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2]})
-    elif quant_bit == "W1A8":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1]})
-    elif quant_bit == "W1A4":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT4, QuantDtype.INT1]})
+    if quant_bit == "W4":
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT4})
+    elif quant_bit == "W2":
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT2})
+    elif quant_bit == "W1":
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT1})
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dQBNNQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQBNNQuant")
+    assert cells.get("Conv2dSlbQuant", None) is not None
+    conv_quant: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
     assert isinstance(conv_quant, QuantizeWrapperCell)
     conv_handler = conv_quant._handler
-    weight_fake_quant: QBNNFakeQuantizerPerLayer = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, QBNNFakeQuantizerPerLayer)
-    act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, QBNNACTQuantizer)
+    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
 
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
 def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
     """
@@ -144,15 +131,15 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
 
     class TemperatureScheduler(cb.Callback):
         """
-        TemperatureScheduler for QBNN.
+        TemperatureScheduler for SLB.
         """
         def __init__(self, model):
             super().__init__()
             self.epochs = 10
-            self.t_start_val = 5.0
+            self.t_start_val = 1.0
             self.t_start_time = 0.2
             self.t_end_time = 0.6
-            self.t_factor = 1.1
+            self.t_factor = 3.2
             self.model = model
 
         def epoch_begin(self, run_context):
@@ -169,22 +156,19 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
                 t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
             # Assign new value to temperature parameter
             for _, cell in self.model.train_network.cells_and_names():
-                if cell.cls_name == 'QBNNFakeQuantizerPerLayer': # for QBNN
+                if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
                     cell.set_temperature(t)
                     if epoch == t_end_epoch:
                         cell.set_temperature_end_flag()
-                        print('Temperature stops changing. Start applying one-hot to latent weights.')
 
 
     # convert network to quantization aware network
-    if quant_bit == "W4A8":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4]})
-    elif quant_bit == "W2A8":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2]})
-    elif quant_bit == "W1A8":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1]})
-    elif quant_bit == "W1A4":
-        qat = QBNNQAT({"quant_dtype": [QuantDtype.INT4, QuantDtype.INT1]})
+    if quant_bit == "W4":
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT4})
+    elif quant_bit == "W2":
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT2})
+    elif quant_bit == "W1":
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT1})
     new_network = qat.apply(network)
 
     # define network loss
@@ -204,14 +188,14 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval)
     print("============== {} ==============".format(acc))
-    assert acc['Accuracy'] > 0.97
+    assert acc['Accuracy'] > 0.95
 
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
 def test_resnet(quant_bit, run_mode):
     """
@@ -227,30 +211,22 @@ def test_resnet(quant_bit, run_mode):
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
 
     network = resnet18(10)
-    qat = QBNNQAT()
-    if quant_bit == "W4A8":
+    qat = SlbQAT()
+    if quant_bit == "W4":
         qat.set_weight_quant_dtype(QuantDtype.INT4)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W2A8":
+    elif quant_bit == "W2":
         qat.set_weight_quant_dtype(QuantDtype.INT2)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W1A8":
+    elif quant_bit == "W1":
         qat.set_weight_quant_dtype(QuantDtype.INT1)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W1A4":
-        qat.set_weight_quant_dtype(QuantDtype.INT1)
-        qat.set_act_quant_dtype(QuantDtype.INT4)
     new_network = qat.apply(network)
 
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dQBNNQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQBNNQuant")
+    assert cells.get("Conv2dSlbQuant", None) is not None
+    conv_quant: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
     assert isinstance(conv_quant, QuantizeWrapperCell)
     conv_handler = conv_quant._handler
-    weight_fake_quant: QBNNFakeQuantizerPerLayer = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, QBNNFakeQuantizerPerLayer)
-    act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, QBNNACTQuantizer)
+    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
     print("============== test resnet slbqat success ==============")
 
 
@@ -349,19 +325,13 @@ def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
     _init_weight(net=net)
 
     # apply golden-stick algo
-    qat = QBNNQAT()
-    if quant_bit == "W4A8":
+    qat = SlbQAT()
+    if quant_bit == "W4":
         qat.set_weight_quant_dtype(QuantDtype.INT4)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W2A8":
+    elif quant_bit == "W2":
         qat.set_weight_quant_dtype(QuantDtype.INT2)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W1A8":
+    elif quant_bit == "W1":
         qat.set_weight_quant_dtype(QuantDtype.INT1)
-        qat.set_act_quant_dtype(QuantDtype.INT8)
-    elif quant_bit == "W1A4":
-        qat.set_weight_quant_dtype(QuantDtype.INT1)
-        qat.set_act_quant_dtype(QuantDtype.INT4)
     net = qat.apply(net)
 
     lr = get_lr(lr_init=lr_init, lr_end=lr_end, lr_max=lr_max, warmup_epochs=warmup_epochs, total_epochs=epoch_size,
@@ -384,7 +354,7 @@ def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4A8", "W2A8", "W1A8", "W1A4"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
 def test_resnet_accuracy_graph(quant_bit):
     """
     Feature: slb quantization algorithm.
@@ -406,10 +376,10 @@ def test_resnet_accuracy_graph(quant_bit):
         def __init__(self, model):
             super().__init__()
             self.epochs = epoch_size
-            self.t_start_val = 5.0
+            self.t_start_val = 1.0
             self.t_start_time = 0.2
             self.t_end_time = 0.6
-            self.t_factor = 1.1
+            self.t_factor = 1.2
             self.model = model
 
         def epoch_begin(self, run_context):
@@ -426,15 +396,13 @@ def test_resnet_accuracy_graph(quant_bit):
                 t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
             # Assign new value to temperature parameter
             for _, cell in self.model.train_network.cells_and_names():
-                if cell.cls_name == 'QBNNFakeQuantizerPerLayer': # for QBNN
+                if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
                     cell.set_temperature(t)
                     if epoch == t_end_epoch:
                         cell.set_temperature_end_flag()
-                        print('Temperature stops changing. Start applying one-hot to latent weights.')
 
     mindspore.context.set_context(mode=context.GRAPH_MODE, device_target=target)
     model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.GRAPH_MODE)
-
 
     # define callbacks
     monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
@@ -471,10 +439,10 @@ def test_resnet_accuracy_pynative(quant_bit):
         def __init__(self, model):
             super().__init__()
             self.epochs = epoch_size
-            self.t_start_val = 5.0
+            self.t_start_val = 1.0
             self.t_start_time = 0.2
             self.t_end_time = 0.6
-            self.t_factor = 1.1
+            self.t_factor = 1.2
             self.model = model
 
         def epoch_begin(self, run_context):
@@ -491,11 +459,10 @@ def test_resnet_accuracy_pynative(quant_bit):
                 t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
             # Assign new value to temperature parameter
             for _, cell in self.model.train_network.cells_and_names():
-                if cell.cls_name == 'QBNNFakeQuantizerPerLayer': # for QBNN
+                if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
                     cell.set_temperature(t)
                     if epoch == t_end_epoch:
                         cell.set_temperature_end_flag()
-                        print('Temperature stops changing. Start applying one-hot to latent weights.')
 
     mindspore.context.set_context(mode=context.PYNATIVE_MODE, device_target=target)
     model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.PYNATIVE_MODE)

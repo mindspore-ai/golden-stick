@@ -16,15 +16,13 @@
 
 import numpy as np
 import mindspore
-from mindspore import nn
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
-from mindspore.ops import composite as C
 from ..fake_quantizer import FakeQuantizer
 
 
-class QBNNFakeQuantizerPerLayer(FakeQuantizer):
+class SlbFakeQuantizerPerLayer(FakeQuantizer):
     """
     Implement of SlbFakeQuantizer.
     1. Define weight_list and auxiliary coefficient matrix.
@@ -32,7 +30,7 @@ class QBNNFakeQuantizerPerLayer(FakeQuantizer):
     3. Select quantized weight with the highest probability.
     """
     def __init__(self, num_bits=1):
-        super(QBNNFakeQuantizerPerLayer, self).__init__()
+        super(SlbFakeQuantizerPerLayer, self).__init__()
         self._num_bits = num_bits
         self.argmax = P.Argmax()
         self.onehot = P.OneHot()
@@ -71,12 +69,13 @@ class QBNNFakeQuantizerPerLayer(FakeQuantizer):
         """
         SlbFakeQuantizer apply method.
         """
-        if not self.training:
+        is_training = self.training
+        if is_training == False:
             # Compute one-hot representation of matrix A's argmax
             weights = self.onehot(self.argmax(x), x.shape[-1], self.true_tensor, self.false_tensor)
         else:
             is_temperature_end_changing = self.flag_temperature_end_changing
-            if not is_temperature_end_changing:
+            if is_temperature_end_changing == 0:
                 # Compute matrix P of probabilities (as softmax of A*T)
                 weights = self.softmax(x * self.temperature)
             else:
@@ -86,58 +85,3 @@ class QBNNFakeQuantizerPerLayer(FakeQuantizer):
         weights = weights * self.w_list
         out = self.sum(weights, -1)
         return out
-
-
-class SlbQuantizer(nn.Cell):
-    """
-    Quantizer for QBNNACTQuantizer.
-    """
-    def __init__(self, num_bits=8):
-        super(SlbQuantizer, self).__init__()
-        self.reshape = P.Reshape()
-        self.round = P.Floor()
-        self._num_bits = num_bits
-
-        scale = 2 ** self._num_bits - 1
-        self.scale = Tensor(scale, mindspore.float32)
-
-    def construct(self, input_):
-        scale = self.reshape(self.scale, (1, 1, 1, 1))
-        return self.round(input_ * scale) / scale
-
-    def bprop(self, input_, out, dout):
-        """
-        Do backpropogation
-        """
-        return (dout,)
-
-
-class QBNNACTQuantizer(FakeQuantizer):
-    """
-    Activation quantization method.
-    """
-    def __init__(self, num_bits=8):
-        super(QBNNACTQuantizer, self).__init__()
-        self._num_bits = num_bits
-        self.min_val = Tensor(0, mindspore.float32)
-        self.max_val = Tensor(1000, mindspore.float32)
-        self.max_val2 = Tensor(1.49999, mindspore.float32)
-        self.relu_upper_bound = Parameter(Tensor([1], mindspore.float32),
-                                          name='relu_upper_bound', requires_grad=True)
-        self.quantize = SlbQuantizer(num_bits)
-
-    def construct(self, x):
-        """
-        Activation quantization apply method.
-        """
-        # Clip from above
-        x = x - (x >= self.relu_upper_bound).astype(mindspore.float32)*(x - self.relu_upper_bound)
-        # Normalize
-        x = x / self.relu_upper_bound
-        # Clip negative values;
-        # obtain float "coordinates" in the bit space
-        x = C.clip_by_value(x, self.min_val, self.max_val)
-        x = self.quantize(x)
-        # Scale back to original magnitude
-        x = x * self.relu_upper_bound
-        return x
