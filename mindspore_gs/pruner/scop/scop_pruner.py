@@ -210,8 +210,9 @@ class PrunerKfCompressAlgo(CompAlgo):
     """
     Derived class of GoldenStick. Scop-algorithm.
     Construct effective knockoff counterparts.
+
     Supported Platforms:
-         ``Ascend`` ``GPU``
+        ``Ascend`` ``GPU``
 
     Examples:
         >>> from mindspore_gs.pruner.scop import PrunerKfCompressAlgo
@@ -224,7 +225,7 @@ class PrunerKfCompressAlgo(CompAlgo):
     def callbacks(self):
         return self._callback
 
-    def tranform_conv(self, net):
+    def _tranform_conv(self, net):
         """Transform conv."""
 
         def _inject(modules):
@@ -247,15 +248,16 @@ class PrunerKfCompressAlgo(CompAlgo):
         return net
 
     def apply(self, network):
-        return self.tranform_conv(network)
+        return self._tranform_conv(network)
 
 
 class PrunerFtCompressAlgo(CompAlgo):
     """
     Derived class of GoldenStick. Scop-algorithm.
     FineTune for recover net.
+
     Supported Platforms:
-         ``Ascend`` ``GPU``
+        ``Ascend`` ``GPU``
 
     Examples:
         >>> from mindspore_gs.pruner.scop import PrunerFtCompressAlgo
@@ -268,7 +270,7 @@ class PrunerFtCompressAlgo(CompAlgo):
     def callbacks(self):
         return self._callback
 
-    def recover_conv(self, net):
+    def _recover_conv(self, net):
         """Recover conv."""
 
         def _inject(modules):
@@ -289,7 +291,7 @@ class PrunerFtCompressAlgo(CompAlgo):
         _inject(net._cells)
         return net
 
-    def pruning_conv(self, net):
+    def _pruning_conv(self, net):
         """Prune conv."""
 
         def _inject(modules):
@@ -310,4 +312,4 @@ class PrunerFtCompressAlgo(CompAlgo):
         return net
 
     def apply(self, network):
-        return self.recover_conv(network)
+        return self._recover_conv(network)
