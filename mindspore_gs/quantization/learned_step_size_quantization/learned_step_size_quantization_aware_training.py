@@ -26,7 +26,8 @@ from ..quantize_wrapper_cell import QuantizeWrapperCell
 
 class LearnedStepSizeQuantizationAwareTraining(SimQAT):
     """
-    Derived class of SimQAT. LSQ quantization algorithm..
+    Derived class of SimQAT. LSQ quantization algorithm.
+
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. supported attribute are listed below:
@@ -54,9 +55,6 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
             - bn_fold (bool): Whether to use bn fold ops for simulation inference operation.
             - one_conv_fold (bool): Whether to use one conv bn fold ops for simulation inference operation.
 
-    Supported Platforms:
-         ``Ascend`` ``GPU``
-
     Raises:
         TypeError: If the element of `quant_delay` is not int.
         TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
@@ -64,10 +62,13 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         TypeError: If `freeze_bn` is not int.
         ValueError: `freeze_bn` is less than 0.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
-         less than 2.
+            less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
         ValueError: If the first element of `per_channel` is `True`.
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
+
+    Supported Platforms:
+        ``GPU``
 
     Examples:
         >>> from mindspore_gs.quantization.learned_scale_quantization import LearnedStepSizeQuantizationAwareTraining
