@@ -31,6 +31,7 @@ from .slb_quant_config import SlbQuantConfig
 class SlbQuantAwareTraining(QuantizationAwareTraining):
     """
     Derived class of GoldenStick. SLB(Searching for Low-Bit Weights) QAT-algorithm.
+
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
@@ -39,11 +40,11 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
               support int4|int2|int1 now.
               Default: QuantDtype.INT1.
 
-    Supported Platforms:
-        ``GPU``
-
     Raises:
         TypeError: If `quant_dtype` is not `QuantDtype`.
+
+    Supported Platforms:
+        ``GPU``
 
     Examples:
         >>> from mindspore_gs.quantization.slb import SlbQuantAwareTraining

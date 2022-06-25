@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-Note:
-    Constant module for compression. This is interface that is subject to change or deletion.
-"""
+"""SlbQuant."""
 
 from functools import partial
 import mindspore
@@ -84,6 +81,7 @@ class Conv2dSlbQuant(nn.Cell):
         ``GPU``
 
     Examples:
+        >>> import numpy as np
         >>> import mindspore
         >>> from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant, quant_config_slb_default
         >>> from mindspore import Tensor
@@ -92,8 +90,8 @@ class Conv2dSlbQuant(nn.Cell):
         >>> x = Tensor(np.array([[[[1, 0, 3], [1, 4, 7], [2, 5, 2]]]]), mindspore.float32)
         >>> result = conv2d_quant(x)
         >>> print(result)
-        [[[[5.9296875  13.8359375]
-           [11.859375  17.78125]]]]
+        [[[[-4.  -8.]
+           [-2.  4.]]]]
     """
 
     def __init__(self,
@@ -172,6 +170,7 @@ class Conv2dSlbQuant(nn.Cell):
         A class method to create `Conv2dSlbQuant` from a `Conv2d`
 
         Examples:
+            >>> from functools import partial
             >>> from mindspore import nn
             >>> from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
             >>> from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant

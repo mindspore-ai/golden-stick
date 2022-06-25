@@ -19,6 +19,7 @@ import mindspore
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
+from mindspore._checkparam import Validator
 from ..fake_quantizer import FakeQuantizer
 
 
@@ -28,10 +29,16 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
     1. Define weight_list and auxiliary coefficient matrix.
     2. Optimize auxiliary coefficient matrix.
     3. Select quantized weight with the highest probability.
+
+    Args:
+        num_bits (int): The quant bit of weight, Default: 1.
+
+    Raises:
+        TypeError: If `num_bits` is not an int.
     """
     def __init__(self, num_bits=1):
         super(SlbFakeQuantizerPerLayer, self).__init__()
-        self._num_bits = num_bits
+        self.num_bits = Validator.check_positive_int(num_bits, "num_bits")
         self.argmax = P.Argmax()
         self.onehot = P.OneHot()
         self.softmax = P.Softmax()
@@ -40,11 +47,11 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         self.true_tensor = Tensor(1, mindspore.float32)
         self.false_tensor = Tensor(0, mindspore.float32)
 
-        if self._num_bits == 1:
+        if self.num_bits == 1:
             self.w_list = Parameter(Tensor([-1, 1], mindspore.float32).view(1, 1, 1, 1, -1),
                                     name='w_list', requires_grad=False)
         else:
-            self.w_list_init = np.linspace(-1, 1, 2**self._num_bits)
+            self.w_list_init = np.linspace(-1, 1, 2**self.num_bits)
             self.w_list = Parameter(Tensor(self.w_list_init, mindspore.float32).view(1, 1, 1, 1, -1),
                                     name='w_list', requires_grad=False)
 
@@ -56,7 +63,14 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
     def set_temperature(self, t):
         """
         Change the temperature in training
+
+        Args:
+            t (float): the current temperature. Default: 1.
+
+        Raises:
+            TypeError: If `t` is not a float.
         """
+        t = Validator.check_positive_float(t, "temperature")
         self.assign(self.temperature, Tensor([t], mindspore.float32))
 
     def set_temperature_end_flag(self):
