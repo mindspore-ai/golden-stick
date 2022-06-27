@@ -105,7 +105,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
             NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, `QuantDtype.INT2`
-            or `QuantDtype.INT4` yet.
+                or `QuantDtype.INT4` yet.
         """
         Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
         if weight_quant_dtype not in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4]:
