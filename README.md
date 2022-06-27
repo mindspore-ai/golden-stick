@@ -33,12 +33,17 @@ MindSpore Golden Stick also provides the infrastructure for algorithm developers
 
 ## Design Features
 
-1. Provide user-centric APIs to reduce user learning costs: MindSpore Golden Stick defines an abstract class of algorithms. All algorithm implementations should inherit from this base class. Users can also use the interfaces defined by the base class to directly apply all algorithms without learning the application of each algorithm. Way. This also facilitates the subsequent exploration of combined algorithms or algorithm search optimization based on the algorithm ecology.
-2. Provide some infrastructure capabilities to reduce algorithm access costs: MindSpore Golden Stick provides some infrastructure capabilities for algorithm implementation, such as commissioning and network modification. The debugging capabilities mainly include network dumping, layer-by-layer profiling and other capabilities, which are designed to help algorithm developers locate bugs in algorithm implementation and help users find algorithms that meet their needs. The network modification capability refers to the ability to modify the network structure defined by Python through a series of APIs, which aims to allow algorithm developers to focus on the implementation of the algorithm without repeating the wheel for different network definitions.
+1. Provide user-centric APIs to reduce user learning costs:
+
+   There are many types of model compression algorithms, such as quantization-aware training algorithms, pruning algorithms, matrix decomposition algorithms, knowledge distillation algorithms, etc. In each type of compression algorithm, there are also various specific algorithms, such as LSQ and PACT, which are both quantization-aware training algorithms. Different algorithms usually have different applying method, which increases the learning cost for users to apply algorithms. MindSpore Golden Stick sorts out and abstracts the algorithm application process, and provides a unified set of algorithm application interfaces to minimize the learning cost while applying model compression algorithm. At the same time, this feature also facilitates the exploration of technologies such as AMC (Automatic Model Compression Technology) and NAS (Network Structure Search Technology) based on the algorithm ecology.
+
+2. Provide some infrastructure capabilities to reduce algorithm access costs:
+
+   Model compression algorithms are often designed or optimized for specific network structures, but rarely pay attention to specific network definitions. MindSpore Golden Stick provides the ability to modify the front-end network definition through the API, allowing algorithm developers to focus on the implementation of the algorithm without reinventing the wheel for different network definitions. In addition, MindSpore Golden Stick will also provide some debugging capabilities, including network dump, layer-by-layer profiling, algorithm effect analysis, visualization and other capabilities, aiming to help algorithm developers improve development and research efficiency, and help users find algorithms that meet their needs.
 
 ### Future Roadmap
 
-The current release of MindSpore Golden Stick contains a stable API and provides a linear quantization algorithm, a nonlinear quantization algorithm and a structured pruning algorithm. More algorithms, better network support and debugging capabilities will be provided in the future. Later, with the enrichment of algorithms, the ability to combine algorithms and algorithm search optimization is also planned, so stay tuned.
+The current release version of MindSpore Golden Stick provides a stable API and provides a linear quantization algorithm, a nonlinear quantization algorithm and a structured pruning algorithm. More algorithms and better network support will be provided in the future version, and debugging capabilities will also be provided in subsequent versions. With the enrichment of algorithms in the future, MindSpore Golden Stick will also explore capabilities such as AMC, NAS, etc., so stay tuned.
 
 ## Installation
 
@@ -89,7 +94,7 @@ import mindspore_gs
 
 ## Quick Start
 
-Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/quantization.md) as an example for demonstrating how to use MindSpore Golden Stick.
+Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) as an example for demonstrating how to use MindSpore Golden Stick.
 
 ## Documents
 
