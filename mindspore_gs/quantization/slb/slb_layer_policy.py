@@ -32,6 +32,8 @@ class SlbLayerPolicy(LayerPolicy):
     Derived class of LayerPolicy. slb layer policy.
     Use slb perlayer fake quantizer as weight fake quantizer.
 
+    Supported Config:
+        ``quant_dtype``.
     """
 
     def __init__(self, weight_names: [], act_names: [], config: SlbQuantConfig = SlbQuantConfig()):
