@@ -80,35 +80,57 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
     Examples:
         >>> from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
         >>> from mindspore import nn
-        >>> from mindspore.common.initializer import Normal
-        >>> class LeNet5(nn.Cell):
-        ...     def __init__(self, num_class=10, num_channel=1):
-        ...         super(LeNet5, self).__init__()
-        ...         self.conv1 = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
-        ...         self.conv2 = nn.Conv2d(6, 16, 5, pad_mode='valid')
-        ...         self.fc1 = nn.Dense(16 * 5 * 5, 120, weight_init=Normal(0.02))
-        ...         self.fc2 = nn.Dense(120, 84, weight_init=Normal(0.02))
-        ...         self.fc3 = nn.Dense(84, num_class, weight_init=Normal(0.02))
-        ...         self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
-        ...         self.flatten = nn.Flatten()
-        ...         self.relu = nn.ReLU()
+        ... class NetToQuant(nn.Cell):
+        ...     def __init__(self, num_channel=1):
+        ...         super(NetToQuant, self).__init__()
+        ...         self.conv = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
+        ...         self.bn = nn.BatchNorm2d(6)
         ...
         ...     def construct(self, x):
-        ...         x = self.conv1(x)
-        ...         x = self.relu(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.conv2(x)
-        ...         x = self.relu(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.flatten(x)
-        ...         x = self.relu(self.fc1(x))
-        ...         x = self.relu(self.fc2(x))
-        ...         x = self.fc3(x)
+        ...         x = self.conv(x)
+        ...         x = self.bn(x)
         ...         return x
         ...
-        >>> net = LeNet5()
+        >>> ## 1) Define network to be quantized
+        >>> net = NetToQuant()
+        >>> ## 2) Define SimQAT Algorithm
         >>> simulated_quantization = SimulatedQuantizationAwareTraining()
+        >>> ## 3) Use set functions to change config
+        >>> simulated_quantization.set_enable_fusion(True)
+        >>> simulated_quantization.set_act_quant_delay(900)
+        >>> simulated_quantization.set_act_quant_delay(900)
+        >>> simulated_quantization.set_weight_quant_delay(900)
+        >>> simulated_quantization.set_act_per_channel(False)
+        >>> simulated_quantization.set_weight_per_channel(True)
+        >>> simulated_quantization.set_act_narrow_range(False)
+        >>> simulated_quantization.set_weight_narrow_range(False)
+        >>> simulated_quantization.set_one_conv_fold(True)
+        >>> simulated_quantization.set_bn_fold(False)
+        >>> ## 4) Apply SimQAT algorithm to origin network
         >>> net_qat = simulated_quantization.apply(net)
+        >>> ## 5) Print network and check it. Conv2d and Dense should be transformed to QuantizeWrapperCells,
+        >>> ## attributes such as quant_delay、 symmetric、narrow_range should be set as attributes in fake_quant_weight、
+        >>> ## _input_quantizer and _output_quantizer respectively, the fake quantizer should be set as
+        >>> ## SimulatedFakeQuantizerPerChannel if perchannel is set to be true, conv2d+bn should be fused and converted
+        >>> ## to Conv2dBnWithoutFoldQuant if enable_fusion is set to be true, one_conv_fold is true, and bn_fold is
+        >>> ## false
+        >>> print(net_qat)
+        NetToQuantOpt<
+          (_handler): NetToQuant<
+            (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
+            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter (name=_handler.bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=_handler.bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=_handler.bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=_handler.bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+            >
+          (Conv2dBnWithoutFoldQuant): QuantizeWrapperCell<
+            handler: in_channels=1, out_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, input quantizer: bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900, output quantizer: bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900
+            (_handler): Conv2dBnWithoutFoldQuant<
+              in_channels=1, out_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
+              (fake_quant_weight): SimulatedFakeQuantizerPerChannel<bit_num=8, symmetric=True, narrow_range=False, ema=False(0.999), per_channel=True(0, 6), quant_delay=900>
+              (batchnorm): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.0030000000000000027, gamma=Parameter (name=Conv2dBnWithoutFoldQuant._handler.batchnorm.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=Conv2dBnWithoutFoldQuant._handler.batchnorm.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=Conv2dBnWithoutFoldQuant._handler.batchnorm.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=Conv2dBnWithoutFoldQuant._handler.batchnorm.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+              >
+            (_input_quantizer): SimulatedFakeQuantizerPerLayer<bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900>
+            (_output_quantizer): SimulatedFakeQuantizerPerLayer<bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900>
+            >
+          >
     """
 
     def __init__(self, config=None):
@@ -376,13 +398,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def apply(self, network: Cell) -> Cell:
         """
-        Apply default QAT-Algorithm on `network`
-
-        Args:
-            network (Cell): Network to be quantized.
-
-        Returns:
-            Quantized network.
+        Derived from `QuantizationAwareTraining`, apply simulated QAT-Algorithm on `network`.
         """
         self._qat_policy.build()
         return super(SimulatedQuantizationAwareTraining, self).apply(network)
