@@ -35,15 +35,15 @@ MindSpore Golden Stick同时为算法开发者提供修改网络定义的基础�
 
 1. 提供以用户为中心的API，降低用户学习成本
 
-   MindSpore Golden Stick定义了一个算法的抽象类，所有的算法实现都应该继承于此基类，而用户也可以使用基类定义的接口直接应用所有的算法，而不需要针对每一个算法都学习其应用方式。这也方便了后续在算法生态的基础上，做一些组合算法或算法搜优的探索。
+   模型压缩算法种类繁多，有如量化感知训练算法、剪枝算法、矩阵分解算法、知识蒸馏算法等；在每类压缩算法中，还有会各种具体的算法，比如LSQ、PACT都是量化感知训练算法。不同算法的应用方式往往各不相同，这增加了用户应用算法的学习成本。MindSpore Golden Stick对算法应用流程做了梳理和抽象，提供了一套统一的算法应用接口，最大程度缩减算法应用的学习成本。同时这也方便了后续在算法生态的基础上，做一些AMC（自动模型压缩技术）、NAS（网络结构搜索）等技术的探索。
 
 2. 提供一些基础设施能力，降低算法接入成本
 
-   MindSpore Golden Stick提供了用于算法实现一些基础设施能力，比如调测、网络修改等能力。调测能力主要包括网络dump、逐层profiling等能力，旨在帮助算法开发者定位算法实现中的bug，帮助用户寻找契合于自己需求的算法。网络修改能力是指通过一系列API，修改Python定义的网络结构的能力，旨在让算法开发者聚焦于算法的实现，而不用对不同的网络定义重复造轮子。
+   模型压缩算法往往会针对特定的网络结构做设计或者优化，而很少关注具体的网络定义。MindSpore Golden Stick提供了通过接口修改前端网络定义的能力，让算法开发者聚焦于算法的实现，而不用对不同的网络定义重复造轮子。此外MindSpore Golden Stick还会提供了一些调测能力，包括网络dump、逐层profiling、算法效果分析、可视化等能力，旨在帮助算法开发者提升开发和研究效率，帮助用户寻找契合于自己需求的算法。
 
 未来规划
 
-  MindSpore Golden Stick当前版本包含一个稳定的API，并提供一个线性量化算法，一个非线性量化算法和一个结构化剪枝算法。后续会提供更多的算法、更完善的网络支持和调测能力。后期随着算法的丰富，还规划了组合算法和算法搜优的能力，敬请期待。
+  MindSpore Golden Stick初始版本提供一个稳定的API，并提供一个线性量化算法，一个非线性量化算法和一个结构化剪枝算法。后续会提供更多的算法和更完善的网络支持，调测能力也会在后续版本提供。将来随着算法的丰富，MindSpore Golden Stick还会探索算法搜优、算法硬件自适应和NAS等能力，敬请期待。
 
 ## 安装
 
@@ -94,7 +94,7 @@ import mindspore_gs
 
 ## 快速入门
 
-以一个简单的算法[Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/quantization.md) 作为例子，演示如何在训练中应用金箍棒中的算法。
+以一个简单的算法[Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) 作为例子，演示如何在训练中应用金箍棒中的算法。
 
 ## 文档
 
