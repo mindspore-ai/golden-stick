@@ -81,9 +81,8 @@ class MaskedConv2dbn(nn.Cell):
         """Calculate."""
         x = self.conv(x)
         x = self.bn(x)
-        mask = self.zeros((x.shape), mstype.float32).asnumpy()
+        mask = self.zeros((x.shape), mstype.float32)
         mask[:, self.mask, :, :] = 1.0
-        mask = Tensor(mask)
         x = x * mask
         return x
 
