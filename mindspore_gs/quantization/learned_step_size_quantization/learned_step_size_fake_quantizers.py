@@ -51,12 +51,13 @@ class LearnedStepSizeFakeQuantizerPerLayer(FakeQuantizer):
                  narrow_range=True):
         super(LearnedStepSizeFakeQuantizerPerLayer, self).__init__()
         self._num_bits = num_bits
-        self.neg_trunc = neg_trunc
+        self._neg_trunc = neg_trunc
         self._symmetric = symmetric
         self._narrow_range = narrow_range
-        self._quant_max = _calculate_quant_max(self._num_bits, self.neg_trunc)
+        self._quant_delay = quant_delay
+        self._quant_max = _calculate_quant_max(self._num_bits, self._neg_trunc)
         self.quant_max = Parameter(Tensor(np.array([self._quant_max]).astype(np.float32)))
-        quant_func = partial(Q.FakeLearnedScaleQuantPerLayer, quant_delay=quant_delay, neg_trunc=self.neg_trunc)
+        quant_func = partial(Q.FakeLearnedScaleQuantPerLayer, quant_delay=self._quant_delay, neg_trunc=self._neg_trunc)
         self.fake_quant_train = quant_func(training=True)
         self.fake_quant_infer = quant_func(training=False)
         self._float_min = Parameter(Tensor([min_init], mindspore.float32), name="float_min")
@@ -75,6 +76,13 @@ class LearnedStepSizeFakeQuantizerPerLayer(FakeQuantizer):
             out = self.fake_quant_infer(x, self._float_max, self.quant_max)
         return out
 
+    def extend_repr(self):
+        """Display instance object as string."""
+        s = 'bit_num={}, neg_trunc={}, symmetric={}, narrow_range={}, ' \
+            'per_channel={}, quant_delay={}'.format(self._num_bits, self._neg_trunc, self._symmetric,
+                                                    self._narrow_range, False, self._quant_delay)
+        return s
+
 
 class LearnedStepSizeFakeQuantizePerChannel(FakeQuantizer):
     """
@@ -86,11 +94,14 @@ class LearnedStepSizeFakeQuantizePerChannel(FakeQuantizer):
         super(LearnedStepSizeFakeQuantizePerChannel, self).__init__()
         self._num_bits = num_bits
         self._symmetric = symmetric
+        self._neg_trunc = neg_trunc
         self._narrow_range = narrow_range
-        self._quant_max = _calculate_quant_max(self._num_bits, neg_trunc)
+        self._channel_axis = channel_axis
+        self._quant_delay = quant_delay
+        self._quant_max = _calculate_quant_max(self._num_bits, self._neg_trunc)
         self.quant_max = Parameter(Tensor(np.array([self._quant_max]).astype(np.float32)))
-        quant_func = partial(Q.FakeLearnedScaleQuantPerChannel, quant_delay=quant_delay, neg_trunc=neg_trunc,
-                             channel_axis=channel_axis)
+        quant_func = partial(Q.FakeLearnedScaleQuantPerChannel, quant_delay=self._quant_delay,
+                             neg_trunc=self._neg_trunc, channel_axis=self._channel_axis)
         self.fake_quant_train = quant_func(training=True)
         self.fake_quant_infer = quant_func(training=False)
         self._num_channels = num_channels
@@ -125,3 +136,11 @@ class LearnedStepSizeFakeQuantizePerChannel(FakeQuantizer):
         else:
             out = self.fake_quant_infer(x, self._float_max, self.quant_max)
         return out
+
+    def extend_repr(self):
+        """Display instance object as string."""
+        s = 'num_bits={}, symmetric={}, narrow_range={}, neg_trunc={}, per_channel={}({}, {}), ' \
+            'quant_delay={}'.format(self._num_bits, self._symmetric, self._narrow_range,
+                                    self._neg_trunc, True,
+                                    self._channel_axis, self._num_channels, self._quant_delay)
+        return s
