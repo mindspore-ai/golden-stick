@@ -214,10 +214,6 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         super(LearnedStepSizeQuantizationAwareTraining, self).set_freeze_bn(freeze_bn)
 
     def apply(self, network: Cell) -> Cell:
-        """
-        Override from `QuantizationAwareTraining`, apply lsq-algorithm on `network`. Read `network` weight parameters
-        and reset quantization parameters of fake quantizers.
-        """
         quanted_net = super(LearnedStepSizeQuantizationAwareTraining, self).apply(network)
         self._reset_weights_quantization_params(quanted_net)
         return quanted_net

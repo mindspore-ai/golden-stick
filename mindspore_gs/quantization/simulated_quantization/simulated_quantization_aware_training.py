@@ -403,8 +403,5 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         self.set_freeze_bn(config.get("freeze_bn", 10000000))
 
     def apply(self, network: Cell) -> Cell:
-        """
-        Override from `QuantizationAwareTraining`, apply simulated QAT-Algorithm on `network`.
-        """
         self._qat_policy.build()
         return super(SimulatedQuantizationAwareTraining, self).apply(network)

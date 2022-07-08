@@ -48,36 +48,44 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     Examples:
         >>> from mindspore_gs.quantization.slb import SlbQuantAwareTraining
+        >>> from mindspore_gs.quantization.constant import QuantDtype
         >>> from mindspore import nn
-        >>> from mindspore.common.initializer import Normal
-        >>> class LeNet5(nn.Cell):
-        ...     def __init__(self, num_class=10, num_channel=1):
-        ...         super(LeNet5, self).__init__()
-        ...         self.conv1 = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
-        ...         self.conv2 = nn.Conv2d(6, 16, 5, pad_mode='valid')
-        ...         self.fc1 = nn.Dense(16 * 5 * 5, 120, weight_init=Normal(0.02))
-        ...         self.fc2 = nn.Dense(120, 84, weight_init=Normal(0.02))
-        ...         self.fc3 = nn.Dense(84, num_class, weight_init=Normal(0.02))
-        ...         self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
-        ...         self.flatten = nn.Flatten()
-        ...         self.relu = nn.ReLU()
+        >>> class NetToQuant(nn.Cell):
+        ...     def __init__(self, num_channel=1):
+        ...         super(NetToQuant, self).__init__()
+        ...         self.conv = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
+        ...         self.bn = nn.BatchNorm2d(6)
         ...
         ...     def construct(self, x):
-        ...         x = self.conv1(x)
-        ...         x = self.relu(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.conv2(x)
-        ...         x = self.relu(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.flatten(x)
-        ...         x = self.relu(self.fc1(x))
-        ...         x = self.relu(self.fc2(x))
-        ...         x = self.fc3(x)
+        ...         x = self.conv(x)
+        ...         x = self.bn(x)
         ...         return x
         ...
-        >>> net = LeNet5()
-        >>> slb_qat = SlbQuantAwareTraining()
-        >>> net_qat = slb_qat.apply(net)
+        >>> ## 1) Define network to be quantized
+        >>> net = NetToQuant()
+        >>> ## 2) Define SLB QAT-Algorithm
+        >>> slb_quantization = SlbQuantAwareTraining()
+        >>> ## 3) Use set functions to change config
+        >>> slb_quantization.set_weight_quant_dtype(QuantDtype.INT1)
+        >>> ## 4) Apply SLB QAT-algorithm to origin network
+        >>> net_qat = slb_quantization.apply(net)
+        >>> ## 5) Print network and check the result. Conv2d should be transformed to QuantizeWrapperCells.
+        >>> ## Since we set weight_quant_dtype to be QuantDtype.INT1, the bit_num value of fake_quant_weight
+        >>> ## should be 1, and the weight_bit_num value of Conv2dSlbQuant should be 1.
+        >>> print(net_qat)
+        NetToQuantOpt<
+          (_handler): NetToQuant<
+            (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
+            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter (name=bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+            >
+          (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter (name=bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+          (Conv2dSlbQuant): QuantizeWrapperCell<
+            (_handler): Conv2dSlbQuant<
+              in_channels=1, out_channels=6, kernel_size=(5, 5), weight_bit_num=1, stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
+              (fake_quant_weight): SlbFakeQuantizerPerLayer<bit_num=1>
+              >
+            >
+          >
     """
 
     def __init__(self, config=None):
@@ -123,14 +131,5 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         self.set_weight_quant_dtype(config.get("quant_dtype", QuantDtype.INT1))
 
     def apply(self, network: Cell) -> Cell:
-        """
-        Apply SLB QAT-Algorithm on `network`
-
-        Args:
-            network (Cell): Network to be quantized.
-
-        Returns:
-            Quantized network.
-        """
         self._qat_policy.build()
         return super(SlbQuantAwareTraining, self).apply(network)

@@ -99,3 +99,8 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         weights = weights * self.w_list
         out = self.sum(weights, -1)
         return out
+
+    def extend_repr(self):
+        """Display instance object as string."""
+        s = 'bit_num={}'.format(self.num_bits)
+        return s
