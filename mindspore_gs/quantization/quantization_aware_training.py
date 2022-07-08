@@ -168,7 +168,7 @@ class QuantizationAwareTraining(CompAlgo):
 
     def apply(self, network: Cell) -> Cell:
         """
-        Apply QAT-Algorithm on `network`， use the following steps to make `network` available for quantization aware
+        Apply QAT-Algorithm on `network`, use the following steps to make `network` available for quantization aware
         training:
             1. fuse certain cells in `network` using pattern engine which is defined by net policy.
             2. propagate layer policies defined through cells.

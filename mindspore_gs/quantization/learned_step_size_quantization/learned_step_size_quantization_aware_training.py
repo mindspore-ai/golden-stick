@@ -39,11 +39,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
               element represents data flow and the second element represents weights. It is necessary to consider the
               precision support of hardware devices in the practical quantization infer scenaries.
               Default: (QuantDtype.INT8, QuantDtype.INT8).
-            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If `True`
+            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If True
               then base on per channel, otherwise base on per layer. The first element represents data flow and the
-              second element represents weights, and the first element must be `False` now.
+              second element represents weights, and the first element must be False now.
               Default: (False, False).
-            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If `True`
+            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If True
               then base on symmetric, otherwise base on asymmetric. The first element represents data flow and the
               second element represents weights.
               Default: (False, False).
@@ -64,7 +64,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
             less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
-        ValueError: If the first element of `per_channel` is `True`.
+        ValueError: If the first element of `per_channel` is True.
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
 
     Supported Platforms:
@@ -93,20 +93,29 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         >>> learned_quantization = LearnedStepSizeQuantizationAwareTraining()
         >>> ## 3) Use set functions to change config
         >>> learned_quantization.set_enable_fusion(True)
+        >>> learned_quantization.set_bn_fold(False)
         >>> learned_quantization.set_act_symmetric(True)
         >>> learned_quantization.set_weight_symmetric(True)
         >>> learned_quantization.set_act_narrow_range(True)
         >>> learned_quantization.set_weight_narrow_range(True)
         >>> learned_quantization.set_act_quant_delay(0)
         >>> learned_quantization.set_weight_quant_delay(0)
-        >>> learned_quantization.set_freeze_bn(0)
-        >>> learned_quantization.set_one_conv_fold(True)
-        >>> learned_quantization.set_bn_fold(False)
         >>> ## 4) Apply LSQ algorithm to origin network
         >>> net_qat = learned_quantization.apply(net)
-        >>> ## 5) Print network and check it. Conv2d and Dense should be transformed to QuantizeWrapperCells,
-        >>> ## attributes such as quant_delay、 symmetric、narrow_range、perchannel should be set as attributes in
-        >>> ## fake_quant_weight、_input_quantizer and _output_quantizer respectively.
+        >>> ## 5) Print network and check the result. Conv2d and Dense should be transformed to QuantizeWrapperCells.
+        >>> ## Since we set enable_fusion to be True, bn_fold to be False, the Conv2d and BatchNorm2d Cells are
+        >>> ## fused and converted to Conv2dBnWithoutFoldQuant.
+        >>> ## Since we set act_symmetric to be True, the symmetric value of _input_quantizer and _output_quantizer
+        >>> ## are set to be True.
+        >>> ## Since we set weight_symmetric to be True, the symmetric value of fake_quant_weight are set to be
+        >>> ## True.
+        >>> ## Since we set act_narrow_range to be True, the narrow_range value of _input_quantizer and
+        >>> ## _output_quantizer are set to be True.
+        >>> ## Since we set weight_narrow_range to be True, the narrow_range value of fake_quant_weight are set to be
+        >>> ## True.
+        >>> ## Since we set act_quant_delay to be 0, the quant_delay value of _input_quantizer and _output_quantizer
+        >>> ## are set to be 0.
+        >>> ## Since we set weight_quant_delay to be 0, the quant_delay value of fake_quant_weight are set to be 0.
         >>> print(net_qat)
         NetToQuantOpt<
           (_handler): NetToQuant<
@@ -130,44 +139,44 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         """
         Raises:
             TypeError: If `act_symmetric` is not bool.
-            NotImplementedError:  Learned scale quantization only support `act_symmetric` is `True` currently.
+            NotImplementedError:  Learned scale quantization only support `act_symmetric` is True currently.
         """
         Validator.check_bool(act_symmetric, "act_symmetric", self.__class__.__name__)
         if not act_symmetric:
-            raise NotImplementedError("Learned scale quantization only support `act_symmetric` is `True` currently")
+            raise NotImplementedError("Learned scale quantization only support `act_symmetric` is True currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(act_symmetric)
 
     def set_weight_symmetric(self, weight_symmetric):
         """
         Raises:
             TypeError: If `weight_symmetric` is not bool.
-            NotImplementedError:  Learned scale quantization only support `weight_symmetric` is `True` currently.
+            NotImplementedError:  Learned scale quantization only support `weight_symmetric` is True currently.
         """
         Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
         if not weight_symmetric:
-            raise NotImplementedError("Learned scale quantization only support `weight_symmetric` is `True` currently")
+            raise NotImplementedError("Learned scale quantization only support `weight_symmetric` is True currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(weight_symmetric)
 
     def set_act_narrow_range(self, act_narrow_range):
         """
         Raises:
             TypeError: If `act_narrow_range` is not bool.
-            NotImplementedError:  Learned scale quantization only support `act_narrow_range` is `True` currently
+            NotImplementedError:  Learned scale quantization only support `act_narrow_range` is True currently
         """
         Validator.check_bool(act_narrow_range, "act_narrow_range", self.__class__.__name__)
         if not act_narrow_range:
-            raise NotImplementedError("Learned scale quantization only support `act_narrow_range` is `True` currently")
+            raise NotImplementedError("Learned scale quantization only support `act_narrow_range` is True currently")
         self._config.act_narrow_range = act_narrow_range
 
     def set_weight_narrow_range(self, weight_narrow_range):
         """
         Raises:
             TypeError: If `weight_narrow_range` is not bool.
-            NotImplementedError:  Learned scale quantization only support `weight_narrow_range` is `True` currently
+            NotImplementedError:  Learned scale quantization only support `weight_narrow_range` is True currently
         """
         Validator.check_bool(weight_narrow_range, "weight_narrow_range", self.__class__.__name__)
         if not weight_narrow_range:
-            raise NotImplementedError("Learned scale quantization only support `weight_narrow_range` is `True` "
+            raise NotImplementedError("Learned scale quantization only support `weight_narrow_range` is True "
                                       "currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_narrow_range(weight_narrow_range)
 
@@ -206,8 +215,8 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
     def apply(self, network: Cell) -> Cell:
         """
-        Derived from `QuantizationAwareTraining`, apply lsq-algorithm on `network`. Read `network` weight params and
-        calculate to reset the quantization params of fake quantizers.
+        Override from `QuantizationAwareTraining`, apply lsq-algorithm on `network`. Read `network` weight parameters
+        and reset quantization parameters of fake quantizers.
         """
         quanted_net = super(LearnedStepSizeQuantizationAwareTraining, self).apply(network)
         self._reset_weights_quantization_params(quanted_net)

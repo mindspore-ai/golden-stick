@@ -40,11 +40,11 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
               element represents data flow and the second element represents weights. It is necessary to consider the
               precision support of hardware devices in the practical quantization infer scenaries.
               Default: (QuantDtype.INT8, QuantDtype.INT8).
-            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If `True`
+            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If True
               then base on per channel, otherwise base on per layer. The first element represents data flow and the
-              second element represents weights, and the first element must be `False` now.
+              second element represents weights, and the first element must be False now.
               Default: (False, False).
-            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If `True`
+            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If True
               then base on symmetric, otherwise base on asymmetric. The first element represents data flow and the
               second element represents weights.
               Default: (False, False).
@@ -69,7 +69,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
             less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
-        ValueError: If the first element of `per_channel` is `True`.
+        ValueError: If the first element of `per_channel` is True.
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
 
 
@@ -97,23 +97,29 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         >>> simulated_quantization = SimulatedQuantizationAwareTraining()
         >>> ## 3) Use set functions to change config
         >>> simulated_quantization.set_enable_fusion(True)
-        >>> simulated_quantization.set_act_quant_delay(900)
+        >>> simulated_quantization.set_bn_fold(False)
         >>> simulated_quantization.set_act_quant_delay(900)
         >>> simulated_quantization.set_weight_quant_delay(900)
         >>> simulated_quantization.set_act_per_channel(False)
         >>> simulated_quantization.set_weight_per_channel(True)
         >>> simulated_quantization.set_act_narrow_range(False)
         >>> simulated_quantization.set_weight_narrow_range(False)
-        >>> simulated_quantization.set_one_conv_fold(True)
-        >>> simulated_quantization.set_bn_fold(False)
         >>> ## 4) Apply SimQAT algorithm to origin network
         >>> net_qat = simulated_quantization.apply(net)
-        >>> ## 5) Print network and check it. Conv2d and Dense should be transformed to QuantizeWrapperCells,
-        >>> ## attributes such as quant_delay、 symmetric、narrow_range should be set as attributes in fake_quant_weight、
-        >>> ## _input_quantizer and _output_quantizer respectively, the fake quantizer should be set as
-        >>> ## SimulatedFakeQuantizerPerChannel if perchannel is set to be true, conv2d+bn should be fused and converted
-        >>> ## to Conv2dBnWithoutFoldQuant if enable_fusion is set to be true, one_conv_fold is true, and bn_fold is
-        >>> ## false
+        >>> ## 5) Print network and check the result. Conv2d and Dense should be transformed to QuantizeWrapperCells.
+        >>> ## Since we set enable_fusion to be True, bn_fold to be False, the Conv2d and BatchNorm2d Cells are
+        >>> ## fused and converted to Conv2dBnWithoutFoldQuant.
+        >>> ## Since we set act_quant_delay to be 900, the quant_delay value of _input_quantizer and _output_quantizer
+        >>> ## are set to be 900.
+        >>> ## Since we set weight_quant_delay to be 900, the quant_delay value of fake_quant_weight are set to be 900.
+        >>> ## Since we set act_per_channel to be False, the per_channel value of _input_quantizer and
+        >>> ## _output_quantizer are set to be False.
+        >>> ## Since we set weight_per_channel to be True, the per_channel value of fake_quant_weight are set to be
+        >>> ## True.
+        >>> ## Since we set act_narrow_range to be False, the narrow_range value of _input_quantizer and
+        >>> ## _output_quantizer are set to be False.
+        >>> ## Since we set weight_narrow_range to be False, the narrow_range value of fake_quant_weight are set to be
+        >>> ## True.
         >>> print(net_qat)
         NetToQuantOpt<
           (_handler): NetToQuant<
@@ -209,16 +215,16 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of act_per_channel of `_config`
 
         Args:
-            act_per_channel (bool): Quantization granularity based on layer or on channel. If `True` then base on
-                per channel, otherwise base on per layer. Only support `False` now.
+            act_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
+                per channel, otherwise base on per layer. Only support False now.
 
         Raises:
             TypeError: If `act_per_channel` is not bool.
-            NotImplementedError: Only supported if `act_per_channel` is `False` yet.
+            NotImplementedError: Only supported if `act_per_channel` is False yet.
         """
         Validator.check_bool(act_per_channel, "act_per_channel", self.__class__.__name__)
         if act_per_channel:
-            raise NotImplementedError(f'Only supported if `act_per_channel` is `False` yet.')
+            raise NotImplementedError(f'Only supported if `act_per_channel` is False yet.')
         self._config.act_per_channel = act_per_channel
 
     def set_weight_per_channel(self, weight_per_channel):
@@ -226,7 +232,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of weight_per_channel of `_config`
 
         Args:
-            weight_per_channel (bool): Quantization granularity based on layer or on channel. If `True` then base on
+            weight_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
                 per channel, otherwise base on per layer.
 
         Raises:
@@ -272,7 +278,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of act_symmetric of `_config`
 
         Args:
-            act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. If `True` then base on
+            act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. If True then base on
                 symmetric, otherwise base on asymmetric.
 
         Raises:
@@ -286,7 +292,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of weight_symmetric of `_config`
 
         Args:
-            weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. If `True` then
+            weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. If True then
                 base on symmetric, otherwise base on asymmetric.
 
         Raises:
@@ -300,7 +306,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of act_narrow_range of `_config`
 
         Args:
-            act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. If `True` then
+            act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. If True then
                 base on narrow_range, otherwise base on not narrow_range.
 
         Raises:
@@ -315,7 +321,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Args:
             weight_narrow_range (bool): Whether the quantization algorithm use weight narrow_range or not. If
-                `True` then base on narrow_range, otherwise base on not narrow_range.
+                True then base on narrow_range, otherwise base on not narrow_range.
 
         Raises:
             TypeError: If `weight_narrow_range` is not bool.
@@ -398,7 +404,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def apply(self, network: Cell) -> Cell:
         """
-        Derived from `QuantizationAwareTraining`, apply simulated QAT-Algorithm on `network`.
+        Override from `QuantizationAwareTraining`, apply simulated QAT-Algorithm on `network`.
         """
         self._qat_policy.build()
         return super(SimulatedQuantizationAwareTraining, self).apply(network)
