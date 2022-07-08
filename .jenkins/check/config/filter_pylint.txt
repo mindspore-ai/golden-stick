@@ -9,6 +9,7 @@
 "golden-stick/mindspore_gs/quantization/quant_utils.py"                                                                  "protected-access"
 "golden-stick/mindspore_gs/quantization/simulated_quantization/simulated_quantization_aware_training.py"                 "line-too-long"
 "golden-stick/mindspore_gs/quantization/learned_step_size_quantization/learned_step_size_quantization_aware_training.py" "line-too-long"
+"golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                                                 "line-too-long"
 
 # SCOP
 "golden-stick/mindspore_gs/pruner/scop/scop_pruner.py"                                                   "protected-access"
