@@ -138,8 +138,8 @@ class Conv2dSlbQuant(nn.Cell):
                             f"but got {type(padding).__name__}!")
         self.group = Validator.check_positive_int(group, "group", self.cls_name)
 
-        num_bits = quant_dtype.num_bits
-        self._weight_num = 2**num_bits
+        self._num_bits = quant_dtype.num_bits
+        self._weight_num = 2**self._num_bits
 
         weight_init = init.HeNormal(mode='fan_out', nonlinearity='relu')
         weight_shape = [out_channels, in_channels // group, *self.kernel_size, self._weight_num]
@@ -211,8 +211,8 @@ class Conv2dSlbQuant(nn.Cell):
 
     def extend_repr(self):
         """Display instance object as string."""
-        s = 'in_channels={}, out_channels={}, kernel_size={}, stride={}, ' \
+        s = 'in_channels={}, out_channels={}, kernel_size={}, weight_bit_num={}, stride={}, ' \
             'pad_mode={}, padding={}, dilation={}, group={}, ' \
-            'has_bias={}'.format(self.in_channels, self.out_channels, self.kernel_size, self.stride, self.pad_mode,
-                                 self.padding, self.dilation, self.group, self.has_bias)
+            'has_bias={}'.format(self.in_channels, self.out_channels, self.kernel_size, self._num_bits, self.stride,
+                                 self.pad_mode, self.padding, self.dilation, self.group, self.has_bias)
         return s
