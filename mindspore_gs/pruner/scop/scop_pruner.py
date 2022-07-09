@@ -214,11 +214,39 @@ class PrunerKfCompressAlgo(CompAlgo):
         ``Ascend`` ``GPU``
 
     Examples:
-        >>> from mindspore_gs.pruner.scop import PrunerKfCompressAlgo
+        >>> from mindspore_gs import PrunerKfCompressAlgo
         >>> from models.resnet import resnet50
-        >>> net = resnet50()
-        >>> pruner = PrunerKfCompressAlgo({})
-        >>> net_prune = pruner.apply(net)
+        >>> class NetToPrune(nn.Cell):
+        ...     def __init__(self, num_channel=1):
+        ...         super(NetToPrune, self).__init__()
+        ...         self.conv = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
+        ...         self.bn = nn.BatchNorm2d(6)
+        ...
+        ...     def construct(self, x):
+        ...         x = self.conv(x)
+        ...         x = self.bn(x)
+        ...         return x
+        ...
+        >>> ## 1) Define network to be quantized
+        >>> net = NetToPrune()
+        >>> ## 2) Define Knockoff Algorithm
+        >>> kf_pruning = PrunerKfCompressAlgo()
+        >>> ## 3) Apply Konckoff-algorithm to origin network
+        >>> net_pruning = kf_pruning.apply(net)
+        >>> ## 4) Print network and check the result. Conv2d and bn should be transformed to KfConv2d.
+        >>> print(net_pruning)
+        NetToPrune<
+          (conv): KfConv2d<
+            (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid,
+              padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
+            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter
+              (name=conv.bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter
+              (name=conv.bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter
+              (name=conv.bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter
+              (name=conv.bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+            >
+          (bn): SequentialCell<>
+          >
     """
 
     def callbacks(self):
@@ -259,11 +287,40 @@ class PrunerFtCompressAlgo(CompAlgo):
         ``Ascend`` ``GPU``
 
     Examples:
-        >>> from mindspore_gs.pruner.scop import PrunerFtCompressAlgo
+        >>> from mindspore_gs import PrunerKfCompressAlgo, PrunerFtCompressAlgo
         >>> from models.resnet import resnet50
-        >>> net = resnet50()
-        >>> pruner = PrunerFtCompressAlgo({})
-        >>> net_prune = pruner.apply(net)
+        >>> class NetToPrune(nn.Cell):
+        ...     def __init__(self, num_channel=1):
+        ...         super(NetToPrune, self).__init__()
+        ...         self.conv = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
+        ...         self.bn = nn.BatchNorm2d(6)
+        ...
+        ...     def construct(self, x):
+        ...         x = self.conv(x)
+        ...         x = self.bn(x)
+        ...         return x
+        ...
+        >>> net = NetToPrune()
+        >>> kf_pruning = PrunerKfCompressAlgo()
+        >>> net_pruning_kf = kf_pruning.apply(net)
+        >>> ## 1) Define FineTune Algorithm
+        >>> ft_pruning = PrunerFtCompressAlgo()
+        >>> ## 2) Apply FineTune-algorithm to origin network
+        >>> net_pruning_ft = ft_pruning.apply(net_pruning_kf)
+        >>> ## 3) Print network and check the result. Conv2d and bn should be transformed to KfConv2d.
+        >>> print(net_pruning_ft)
+        NetToPrune<
+          (conv): MaskedConv2dbn<
+            (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid,
+              padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
+            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter
+              (name=conv.bn.bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter
+              (name=conv.bn.bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter
+              (name=conv.bn.bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter
+              (name=conv.bn.bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+            >
+          (bn): SequentialCell<>
+          >
     """
 
     def callbacks(self):
