@@ -116,8 +116,38 @@ class ConvLayerPolicy(SimulatedLayerPolicy):
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
     def wrap_cell(self, handler: Cell) -> Cell:
-        conv_quant = Conv2dQuant.from_float(handler, self.get_quant_config())
+        conv_quant = ConvLayerPolicy._create_conv2dquant_from_conv(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_quant, self)
+
+    @staticmethod
+    def _create_conv2dquant_from_conv(conv, quant_config: OpQuantConfig):
+        """
+        A static method to create `Conv2dQuant` from a `Conv2d`
+
+        Examples:
+            >>> from mindspore import nn
+            >>> ic = 10
+            >>> oc = 100
+            >>> kernel_size = 3
+            >>> conv_op = nn.Conv2d(ic, oc, kernel_size)
+            >>> # when apply QAT on `conv_op`, QAT need to create a quant conv2d whose weight is fake-quanted
+            >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
+            >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
+            >>> conv_quant = ConvLayerPolicy._create_conv2dquant_from_conv(conv_op, quant_config)
+        """
+        return Conv2dQuant(
+            conv.in_channels,
+            conv.out_channels,
+            kernel_size=conv.kernel_size,
+            stride=conv.stride,
+            pad_mode=conv.pad_mode,
+            padding=conv.padding,
+            dilation=conv.dilation,
+            group=conv.group,
+            has_bias=conv.has_bias,
+            bias_init=conv.bias_init,
+            weight_init=conv.weight_init,
+            quant_config=quant_config)
 
 
 class DenseLayerPolicy(SimulatedLayerPolicy):
@@ -125,8 +155,33 @@ class DenseLayerPolicy(SimulatedLayerPolicy):
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
     """
     def wrap_cell(self, handler: Cell) -> Cell:
-        dense_quant = DenseQuant.from_float(handler, self.get_quant_config())
+        dense_quant = DenseLayerPolicy._create_densequant_from_dense(handler, self.get_quant_config())
         return QuantizeWrapperCell(dense_quant, self)
+
+    @staticmethod
+    def _create_densequant_from_dense(dense, quant_config: OpQuantConfig):
+        """
+        A static method to create `DenseQuant` from a `Dense`
+
+        Examples:
+            >>> from mindspore import nn
+            >>> ic = 10
+            >>> oc = 100
+            >>> dense_op = nn.Dense(ic, oc)
+            >>> # when apply QAT on `dense_op`, QAT need to create a quant dense whose weight is fake-quanted
+            >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
+            >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
+            >>> dense_quant = DenseLayerPolicy._create_densequant_from_dense(dense_op, quant_config)
+        """
+        return DenseQuant(
+            dense.in_channels,
+            dense.out_channels,
+            dense.weight,
+            dense.bias,
+            dense.has_bias,
+            dense.activation,
+            quant_config=quant_config
+        )
 
 
 class ConvBnLayerPolicy(SimulatedLayerPolicy):
@@ -136,10 +191,126 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
         if self._config.bn_fold:
             if self._config.one_conv_fold:
-                conv_bn_quant = Conv2dBnFoldQuantOneConv.from_float(handler, self.get_quant_config())
+                conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquantoneconv(handler, self.get_quant_config())
             else:
-                conv_bn_quant = Conv2dBnFoldQuant.from_float(handler, self.get_quant_config(),
-                                                             {"freeze_bn": self._config.freeze_bn})
+                conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquant(handler, self.get_quant_config(),
+                                                                            {"freeze_bn": self._config.freeze_bn})
         else:
-            conv_bn_quant = Conv2dBnWithoutFoldQuant.from_float(handler, self.get_quant_config())
+            conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnwithoutfoldquant(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_bn_quant, self)
+
+    @staticmethod
+    def _create_conv2dbnfoldquantoneconv(convbn, quant_config: OpQuantConfig):
+        """
+        A static method to create `Conv2dBnFoldQuantOneConv` from a `Conv2dBnAct`
+
+        Examples:
+            >>> from mindspore import nn
+            >>> ic = 10
+            >>> oc = 100
+            >>> kernel_size = 3
+            >>> conv_bn_op = nn.Conv2dBnAct(ic, oc, kernel_size)
+            >>> # when apply QAT on `conv_bn_op`, QAT need to create a quant Conv2dBnAct whose weight is fake-quanted,
+            >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
+            >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
+            >>> conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquantoneconv(conv_bn_op, quant_config)
+        """
+        kwargs = {'in_channels': convbn.conv.in_channels,
+                  'out_channels': convbn.conv.out_channels,
+                  'kernel_size': convbn.conv.kernel_size,
+                  'stride': convbn.conv.stride,
+                  'pad_mode': convbn.conv.pad_mode,
+                  'padding': convbn.conv.padding,
+                  'dilation': convbn.conv.dilation,
+                  'group': convbn.conv.group,
+                  'has_bias': convbn.conv.has_bias,
+                  'bias_init': convbn.conv.bias_init,
+                  'weight_init': convbn.conv.weight_init,
+                  'quant_config': quant_config,
+                  'fake': True,
+                  }
+        if hasattr(convbn, 'batchnorm'):
+            kwargs['eps'] = convbn.batchnorm.eps
+            kwargs['momentum'] = convbn.batchnorm.momentum
+            kwargs['beta_init'] = convbn.batchnorm.beta_init
+            kwargs['gamma_init'] = convbn.batchnorm.gamma_init
+            kwargs['mean_init'] = convbn.batchnorm.moving_mean_init
+            kwargs['var_init'] = convbn.batchnorm.moving_var_init
+        return Conv2dBnFoldQuantOneConv(**kwargs)
+
+    @staticmethod
+    def _create_conv2dbnfoldquant(convbn, quant_config: OpQuantConfig, extra_args: dict):
+        """
+        A static method to create `Conv2dBnFoldQuantOneConv` from a `Conv2dBnAct`
+
+        Examples:
+            >>> from mindspore import nn
+            >>> ic = 10
+            >>> oc = 100
+            >>> kernel_size = 3
+            >>> conv_bn_op = nn.Conv2dBnAct(ic, oc, kernel_size)
+            >>> # when apply QAT on `conv_bn_op`, QAT need to create a quant Conv2dBnAct whose weight is fake-quanted
+            >>> quant_config: OpQuantConfig = OpQuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
+            >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
+            >>> extra_args = {"freeze_bn": 100000}
+            >>> conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquant(conv_bn_op, quant_config, extra_args)
+        """
+        kwargs = {'in_channels': convbn.conv.in_channels,
+                  'out_channels': convbn.conv.out_channels,
+                  'kernel_size': convbn.conv.kernel_size,
+                  'stride': convbn.conv.stride,
+                  'pad_mode': convbn.conv.pad_mode,
+                  'padding': convbn.conv.padding,
+                  'dilation': convbn.conv.dilation,
+                  'group': convbn.conv.group,
+                  'has_bias': convbn.conv.has_bias,
+                  'bias_init': convbn.conv.bias_init,
+                  'weight_init': convbn.conv.weight_init,
+                  'quant_config': quant_config,
+                  'fake': True,
+                  }
+        if hasattr(convbn, 'batchnorm'):
+            kwargs['eps'] = convbn.batchnorm.eps
+            kwargs['momentum'] = convbn.batchnorm.momentum
+            kwargs['beta_init'] = convbn.batchnorm.beta_init
+            kwargs['gamma_init'] = convbn.batchnorm.gamma_init
+            kwargs['mean_init'] = convbn.batchnorm.moving_mean_init
+            kwargs['var_init'] = convbn.batchnorm.moving_var_init
+        kwargs = {**kwargs, **extra_args}
+        return Conv2dBnFoldQuant(**kwargs)
+
+    @staticmethod
+    def _create_conv2dbnwithoutfoldquant(convbn, quant_config: OpQuantConfig):
+        """
+        A static method to create `Conv2dBnWithoutFoldQuant` from a `Conv2dBnAct`
+
+        Examples:
+            >>> from mindspore import nn
+            >>> ic = 10
+            >>> oc = 100
+            >>> kernel_size = 3
+            >>> conv_bn_op = nn.Conv2dBnAct(ic, oc, kernel_size)
+            >>> # when apply QAT on `conv_bn_op`, QAT need to create a quant Conv2dBnAct whose weight is fake-quanted
+            >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
+            >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
+            >>> conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnwithoutfoldquant(conv_bn_op, quant_config)
+        """
+
+        kwargs = {'in_channels': convbn.conv.in_channels,
+                  'out_channels': convbn.conv.out_channels,
+                  'kernel_size': convbn.conv.kernel_size,
+                  'stride': convbn.conv.stride,
+                  'pad_mode': convbn.conv.pad_mode,
+                  'padding': convbn.conv.padding,
+                  'dilation': convbn.conv.dilation,
+                  'group': convbn.conv.group,
+                  'has_bias': convbn.conv.has_bias,
+                  'bias_init': convbn.conv.bias_init,
+                  'weight_init': convbn.conv.weight_init,
+                  'quant_config': quant_config,
+                  }
+        if hasattr(convbn, 'batchnorm'):
+            kwargs['eps'] = convbn.batchnorm.eps
+            kwargs['momentum'] = convbn.batchnorm.momentum
+        kwargs = {**kwargs}
+        return Conv2dBnWithoutFoldQuant(**kwargs)
