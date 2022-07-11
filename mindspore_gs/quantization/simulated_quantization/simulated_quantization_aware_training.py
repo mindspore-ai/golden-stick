@@ -403,5 +403,22 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         self.set_freeze_bn(config.get("freeze_bn", 10000000))
 
     def apply(self, network: Cell) -> Cell:
+        """
+        Apply SimQAT Algorithm on `network`, use the following steps to make `network` available for quantization aware
+        training:
+            1. Fuse certain cells in `network` using pattern engine which is defined by net policy. Default fuse
+            pattern: Conv2d + BatchNorm2d + ReLU, Conv2d + ReLU, Dense + BatchNorm2d + ReLU, Dense + BatchNorm2d,
+            Dense + ReLU.
+            2. Propagate LayerPolicies defined in NetPolicy through network.
+            3. Reduce redundant fake quantizers which means two or more fake quantizers existing on one tensor.
+            4. Apply LayerPolicies to convert normal cells to `QuantizeWrapperCell`s. We will insert real fake quantizer
+            into network in this step.
+
+        Args:
+            network (Cell): Network to be quantized.
+
+        Returns:
+            Quantized network.
+        """
         self._qat_policy.build()
         return super(SimulatedQuantizationAwareTraining, self).apply(network)
