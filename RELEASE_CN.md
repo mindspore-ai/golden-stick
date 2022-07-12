@@ -21,7 +21,7 @@
 
 感谢以下人员作出的贡献：
 
-韩凯, 刘治成, 付中前, 韩刚强, 程嘉晖。
+ghostnet, liuzhicheng01, fuzhongqian, hangangqiang, cjh9368.
 
 欢迎以任意形式对项目提供贡献!
 
