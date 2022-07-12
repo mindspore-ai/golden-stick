@@ -131,5 +131,19 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         self.set_weight_quant_dtype(config.get("quant_dtype", QuantDtype.INT1))
 
     def apply(self, network: Cell) -> Cell:
+        """
+        Apply SLB quantization Algorithm on `network`, use the following steps to make `network` available for
+        quantization aware training:
+            1. Fuse certain cells in `network` using pattern engine which is defined by net policy.
+            2. Propagate layer policies defined through cells.
+            3. Reduce redundant fake quantizers when they are redundant.
+            4. Apply layer policies to convert normal cells to `QuantizeWrapperCell`s.
+
+        Args:
+            network (Cell): Network to be quantized.
+
+        Returns:
+            Quantized network.
+        """
         self._qat_policy.build()
         return super(SlbQuantAwareTraining, self).apply(network)
