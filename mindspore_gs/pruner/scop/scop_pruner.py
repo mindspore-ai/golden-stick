@@ -17,6 +17,7 @@
 import mindspore
 import mindspore.nn as nn
 import mindspore.ops as ops
+import mindspore.context as context
 import mindspore.common.dtype as mstype
 from mindspore import Tensor
 from mindspore.ops import constexpr
@@ -69,6 +70,7 @@ class MaskedConv2dbn(nn.Cell):
 
     def __init__(self, kf_conv2d_ori, prex):
         super(MaskedConv2dbn, self).__init__()
+        self.target = context.get_context("device_target").upper()
         self.conv = kf_conv2d_ori.conv
         self.bn = kf_conv2d_ori.bn
         self.zeros = ops.Zeros()
@@ -81,6 +83,10 @@ class MaskedConv2dbn(nn.Cell):
         """Calculate."""
         x = self.conv(x)
         x = self.bn(x)
+        if self.target == 'ASCEND':
+            new_mask = generate_tensor(x.shape, self.mask)
+            output = ops.MaskedFill()(x, new_mask, 0.0)
+            return output
         mask = self.zeros((x.shape), mstype.float32)
         mask[:, self.mask, :, :] = 1.0
         x = x * mask
