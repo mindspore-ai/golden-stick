@@ -21,6 +21,6 @@
 
 Thanks goes to these wonderful people:
 
-Kai Han, Zhicheng Liu, Zhongqian Fu, Gangqiang Han, Jiahui Cheng.
+ghostnet, liuzhicheng01, fuzhongqian, hangangqiang, cjh9368.
 
 Contributions of any kind are welcome!
