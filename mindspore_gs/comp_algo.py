@@ -37,7 +37,7 @@ class CompAlgo:
             network (Cell): Network to be compressed.
 
         Returns:
-            Compressed Network.
+            Compressed network.
         """
 
         return network
