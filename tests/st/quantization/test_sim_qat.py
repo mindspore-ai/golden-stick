@@ -24,8 +24,6 @@ from mindspore.train.serialization import load_checkpoint
 from mindspore.train import Model
 from mindspore.nn.metrics import Accuracy
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
-from mindspore_gs.quantization.learned_step_size_quantization import LearnedStepSizeQuantizationAwareTraining as \
-    LearnedQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
@@ -174,9 +172,8 @@ def test_lenet():
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("algorithm", [SimQAT])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
-def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, run_mode):
+def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, run_mode):
     """
     Feature: test accuracy of sim qat work on lenet5.
     Description: Apply sim qat on lenet5 and test accuracy.
@@ -202,11 +199,7 @@ def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, ru
     mindspore.load_param_into_net(network, param_dict)
 
     # convert network to quantization aware network
-    if algorithm == SimQAT:
-        qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True],
-                      "quant_delay": [900, 900]})
-    else:
-        qat = LearnedQAT()
+    qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
     new_network = qat.apply(network)
 
     # define network loss
