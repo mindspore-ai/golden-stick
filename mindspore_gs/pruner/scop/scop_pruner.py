@@ -281,6 +281,15 @@ class PrunerKfCompressAlgo(CompAlgo):
         return net
 
     def apply(self, network):
+        """
+        Transform input `network` to a knockoff network.
+
+        Args:
+            network (Cell): Network to be pruned.
+
+        Returns:
+            Knockoff network.
+        """
         return self._tranform_conv(network)
 
 
@@ -374,4 +383,13 @@ class PrunerFtCompressAlgo(CompAlgo):
         return net
 
     def apply(self, network):
+        """
+        Transform a knockoff `network` to a normal and pruned network.
+
+        Args:
+            network (Cell): Knockoff network.
+
+        Returns:
+            Pruned network.
+        """
         return self._recover_conv(network)

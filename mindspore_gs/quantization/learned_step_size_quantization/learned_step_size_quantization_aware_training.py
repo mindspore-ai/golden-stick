@@ -32,40 +32,20 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. supported attribute are listed below:
 
-            - quant_delay (Union[int, list, tuple]): Number of steps after which weights and activations are quantized
-              during train and eval. The first element represents data flow and the second element represents weights.
-              Default: (0, 0).
-            - quant_dtype (Union[QuantDtype, list, tuple]): Datatype used to quantize weights and activations. The first
-              element represents data flow and the second element represents weights. It is necessary to consider the
-              precision support of hardware devices in the practical quantization infer scenaries.
-              Default: (QuantDtype.INT8, QuantDtype.INT8).
-            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If True
-              then base on per channel, otherwise base on per layer. The first element represents data flow and the
-              second element represents weights, and the first element must be False now.
-              Default: (False, False).
-            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If True
-              then base on symmetric, otherwise base on asymmetric. The first element represents data flow and the
-              second element represents weights.
-              Default: (False, False).
-            - narrow_range (Union[bool, list, tuple]): Whether the quantization algorithm uses narrow range or not.
-              The first element represents data flow and the second element represents weights.
-              Default: (False, False).
-            - enable_fusion (bool): Whether apply fusion before applying quantization.
-            - freeze_bn (int): Number of steps after which BatchNorm OP parameters fixed to global mean and variance.
             - bn_fold (bool): Whether to use bn fold ops for simulation inference operation.
-            - one_conv_fold (bool): Whether to use one conv bn fold ops for simulation inference operation.
+              Default: False.
 
     Raises:
-        TypeError: If the element of `quant_delay` is not int.
-        TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
-        TypeError: If the element of `quant_dtype` is not `QuantDtype`.
-        TypeError: If `freeze_bn` is not int.
         ValueError: `freeze_bn` is less than 0.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
             less than 2.
         ValueError: If the element of `quant_delay` is less than 0.
         ValueError: If the first element of `per_channel` is True.
         NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
+        TypeError: If the element of `quant_delay` is not int.
+        TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
+        TypeError: If the element of `quant_dtype` is not `QuantDtype`.
+        TypeError: If `freeze_bn` is not int.
 
     Supported Platforms:
         ``GPU``
@@ -217,10 +197,10 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         """
         Apply LSQ Algorithm on `network`, use the following steps to make `network` available for quantization aware
         training:
-            1. Fuse certain cells in `network` using pattern engine which is defined by net policy.
-            2. Propagate layer policies defined through cells.
-            3. Reduce redundant fake quantizers when they are redundant.
-            4. Apply layer policies to convert normal cells to `QuantizeWrapperCell`s.
+        1. Fuse certain cells in `network` using pattern engine which is defined by net policy.
+        2. Propagate layer policies defined through cells.
+        3. Reduce redundant fake quantizers when they are redundant.
+        4. Apply layer policies to convert normal cell to `QuantizeWrapperCell`.
 
         Args:
             network (Cell): Network to be quantized.
