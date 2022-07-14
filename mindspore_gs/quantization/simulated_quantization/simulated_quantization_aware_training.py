@@ -406,6 +406,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         """
         Apply SimQAT Algorithm on `network`, use the following steps to make `network` available for quantization aware
         training:
+
         1. Fuse certain cells in `network` using pattern engine which is defined by net policy. Default fuse pattern:
            Conv2d + BatchNorm2d + ReLU, Conv2d + ReLU, Dense + BatchNorm2d + ReLU, Dense + BatchNorm2d, Dense + ReLU.
         2. Propagate LayerPolicies defined in NetPolicy through network.

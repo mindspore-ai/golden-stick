@@ -197,6 +197,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         """
         Apply LSQ Algorithm on `network`, use the following steps to make `network` available for quantization aware
         training:
+
         1. Fuse certain cells in `network` using pattern engine which is defined by net policy.
         2. Propagate layer policies defined through cells.
         3. Reduce redundant fake quantizers when they are redundant.
