@@ -213,8 +213,13 @@ class PrunedConv2dbn2(nn.Cell):
 
 class PrunerKfCompressAlgo(CompAlgo):
     """
-    Derived class of GoldenStick. Scop-algorithm.
-    Construct effective knockoff counterparts.
+    Derived class of GoldenStick. Scop-algorithm. Construct effective knockoff counterparts.
+
+
+    Args:
+        config (Dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
+            `PrunerKfCompressAlgo` currently, but for compatibility, the config parameter in the constructor of class A
+            is retained.
 
     Supported Platforms:
         ``Ascend`` ``GPU``
@@ -297,6 +302,11 @@ class PrunerFtCompressAlgo(CompAlgo):
     """
     Derived class of GoldenStick. Scop-algorithm.
     FineTune for recover net.
+
+    Args:
+        config (Dict): Configuration of `PrunerFtCompressAlgo`. There are no configurable options for
+            `PrunerFtCompressAlgo` currently, but for compatibility, the config parameter in the constructor of class A
+            is retained.
 
     Supported Platforms:
         ``Ascend`` ``GPU``
