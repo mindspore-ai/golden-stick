@@ -118,4 +118,4 @@ Welcome to MindSpore contribution.
 
 ## License
 
-[Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
+[Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/r0.1/LICENSE)
