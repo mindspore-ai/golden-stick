@@ -19,6 +19,8 @@ factors after training. See more details in `A White Paper on Neural Network Qua
 
 from mindspore.nn import Cell
 from mindspore._checkparam import Validator, Rel
+from mindspore import context
+from mindspore import log as logger
 from ..quantization_aware_training import QuantizationAwareTraining
 from ..constant import QuantDtype
 from .simulated_quantization_net_policy import SimulatedNetPolicy
@@ -141,6 +143,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def __init__(self, config=None):
         super(SimulatedQuantizationAwareTraining, self).__init__(config)
+        self._is_cpu = context.get_context('device_target') == "CPU"
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
@@ -166,6 +169,10 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         """
         Validator.check_bool(bn_fold, "bn_fold", self.__class__.__name__)
         self._config.bn_fold = bn_fold
+        if self._is_cpu and self._config.enable_fusion and self._config.bn_fold and not self._config.one_conv_fold:
+            logger.warning("Current device target is CPU, and Current config: enable_fusion=True, bn_fold=True, "
+                           "one_conv_fold=False, this may lead to replacing Conv2d + BatchNorm2d pattern with "
+                           "Conv2dBnFoldQuant which is not implemented in CPU backend!")
 
     def set_one_conv_fold(self, one_conv_fold):
         """
@@ -179,6 +186,10 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         """
         Validator.check_bool(one_conv_fold, "one_conv_fold", self.__class__.__name__)
         self._config.one_conv_fold = one_conv_fold
+        if self._is_cpu and self._config.enable_fusion and self._config.bn_fold and not self._config.one_conv_fold:
+            logger.warning("Current device target is CPU, and Current config: enable_fusion=True, bn_fold=True, "
+                           "one_conv_fold=False, this may lead to replacing Conv2d + BatchNorm2d pattern with "
+                           "Conv2dBnFoldQuant which is not implemented in CPU backend!")
 
     def set_act_quant_delay(self, act_quant_delay):
         """
@@ -356,6 +367,10 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         """
         Validator.check_bool(enable_fusion, "enable_fusion", self.__class__.__name__)
         self._config.enable_fusion = enable_fusion
+        if self._is_cpu and self._config.enable_fusion and self._config.bn_fold and not self._config.one_conv_fold:
+            logger.warning("Current device target is CPU, and Current config: enable_fusion=True, bn_fold=True, "
+                           "one_conv_fold=False, this may lead to replacing Conv2d + BatchNorm2d pattern with "
+                           "Conv2dBnFoldQuant which is not implemented in CPU backend!")
 
     @staticmethod
     def _convert2list(name, value):
@@ -373,7 +388,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         self._config = SimulatedQuantizationConfig()
         quant_delay_list = SimulatedQuantizationAwareTraining._convert2list("quant delay",
                                                                             config.get("quant_delay", [0, 0]))
-        quant_dtype_list = SimulatedQuantizationAwareTraining.\
+        quant_dtype_list = SimulatedQuantizationAwareTraining. \
             _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
         per_channel_list = SimulatedQuantizationAwareTraining._convert2list("per channel",
                                                                             config.get("per_channel", [False, True]))
