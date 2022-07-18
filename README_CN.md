@@ -32,19 +32,17 @@ MindSpore Golden Stick是华为诺亚团队和华为MindSpore团队联合设计�
 
 2. 基于MindSpore Rewite这个基础能力，MindSpore Golden Stick会提供各种类型的算法，比如SimQAT算法、SLB量化算法、SCOP剪枝算法等；
 
-3. 在算法的更上层，MindSpore Golden Stick还规划了如AMC（自动模型压缩技术）、NAS（网络结构搜索）、HAQ（硬件感知的自动量化）等高阶技术；
+3. 在算法的更上层，MindSpore Golden Stick还规划了如AMC（自动模型压缩技术）、NAS（网络结构搜索）、HAQ（硬件感知的自动量化）等高阶技术。当前版本未开放该能力；
 
-4. 为了方便开发者分析调试算法，MindSpore Golden Stick提供了一些工具，如Visualization工具（可视化工具）、Profiler工具（逐层分析工具）、Summary工具（算法压缩效果分析工具）等；
+4. 为了方便开发者分析调试算法，MindSpore Golden Stick提供了一些工具，如Visualization工具（可视化工具）、Profiler工具（逐层分析工具）、Summary工具（算法压缩效果分析工具）等。当前版本未开放该能力；
 
 5. 在最外层，MindSpore Golden Stick封装了一套简洁的用户接口。
 
 ![金箍棒架构图](docs/golden-stick-arch.png)
 
-> 架构图是MindSpore Golden Stick的全貌，其中包含了当前版本已经实现的功能以及规划在RoadMap中能力。具体开放的功能可以参考对应版本的ReleaseNotes。
-
 ## 设计思路
 
-MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要的设计理念是针对业界种类繁多的的模型压缩算法，提供给用户一个尽可能统一且简洁的体验，降低用户的算法应用成本。MindSpore Golden Stick通过两个举措来实现该理念：
+MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要的设计理念是针对业界种类繁多的模型压缩算法，提供给用户一个尽可能统一且简洁的体验，降低用户的算法应用成本。MindSpore Golden Stick通过两个举措来实现该理念：
 
 1. 统一的算法接口设计，降低用户应用成本
 
@@ -60,21 +58,29 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 
 ## 安装
 
-MindSpore Golden Stick依赖MindSpore训练推理框架，安装完[MindSpore](https://gitee.com/mindspore/mindspore#安装)，再安装MindSpore Golden Stick。可以采用pip安装或者源码编译安装两种方式。
+### 环境限制
+
+下表列出了安装、编译和运行MindSpore Golden Stick所需的系统环境：
+
+| 软件名称 |  版本   |
+| :-----: | :-----: |
+| Ubuntu  |  18.04  |
+| Python  |  3.7-3.9 |
+
+> 其他的三方依赖请参考[requirements文件](https://gitee.com/mindspore/golden-stick/blob/r0.1/requirements.txt)。
+> 当前MindSpore Golden Stick仅能在Ubuntu18.04上运行。
 
 ### MindSpore版本依赖关系
 
-由于MindSpore Golden Stick与MindSpore有依赖关系，请按照根据下表中所指示的对应关系，在[MindSpore下载页面](https://www.mindspore.cn/versions)下载并安装对应的whl包。
-
-```shell
-pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{MindSpore-Version}/MindSpore/cpu/ubuntu_x86/mindspore-{MindSpore-Version}-cp37-cp37m-linux_x86_64.whl
-```
+MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表中所指示的对应关系，并参考[MindSpore安装指导](https://mindspore.cn/install)安装对应版本的MindSpore：
 
 | MindSpore Golden Stick版本 |                             分支                             | MindSpore版本 |
 | :---------------------: | :----------------------------------------------------------: | :-------: |
 |          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/) |   1.8.0   |
 
-## pip安装
+安装完MindSpore后，继续安装MindSpore Golden Stick。可以采用pip安装或者源码编译安装两种方式。
+
+### pip安装
 
 使用pip命令安装，请从[MindSpore Golden Stick下载页面](https://www.mindspore.cn/versions)下载并安装whl包。
 
@@ -86,7 +92,7 @@ pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{ms_version}/gol
 > - `{ms_version}`表示与MindSpore Golden Stick匹配的MindSpore版本号，例如下载0.1.0版本MindSpore Golden Stick时，`{ms_version}`应写为1.8.0。
 > - `{mg_version}`表示MindSpore Golden Stick版本号，例如下载0.1.0版本MindSpore Golden Stick时，`{mg_version}`应写为0.1.0。
 
-## 源码编译安装
+### 源码编译安装
 
 下载[源码](https://gitee.com/mindspore/golden-stick)，下载后进入`golden_stick`目录。
 
@@ -97,7 +103,7 @@ pip install output/mindspore_gs-0.1.0-py3-none-any.whl
 
 其中，`build.sh`为`golden_stick`目录下的编译脚本文件。
 
-## 验证安装是否成功
+### 验证安装是否成功
 
 执行以下命令，验证安装结果。导入Python模块不报错即安装成功：
 

@@ -32,13 +32,15 @@ MindSpore Golden Stick is a model compression algorithm set jointly designed and
 
 2. Based on MindSpore Rewrite, MindSpore Golden Stick will provide various types of algorithms, such as SimQAT algorithm, SLB quantization algorithm, SCOP pruning algorithm, etc.;
 
-3. At the upper level of the algorithm, MindSpore Golden Stick also plans advanced technologies such as AMC (automatic model compression technology), NAS (network structure search), and HAQ (hardware-aware automatic quantization);
+3. At the upper level of the algorithm, MindSpore Golden Stick also plans advanced technologies such as AMC (automatic model compression technology), NAS (network structure search), and HAQ (hardware-aware automatic quantization). This feature will be provided in future;
 
-4. In order to facilitate developers to analyze and debug algorithms, MindSpore Golden Stick provides some tools, such as visualization tool, profiler tool, summary tool, etc.;
+4. In order to facilitate developers to analyze and debug algorithms, MindSpore Golden Stick provides some tools, such as visualization tool, profiler tool, summary tool, etc. This feature will be provided in future;
 
 5. In the outermost layer, MindSpore Golden Stick encapsulates a set of concise user interface.
 
 ![MindSpore_GS_Architecture](docs/golden-stick-arch.png)
+
+> The architecture diagram is the overall picture of MindSpore Golden Stick, which includes the features that have been implemented in the current version and the capabilities planned in RoadMap. Please refer to release notes for available features in current version.
 
 ## Design Features
 
@@ -54,23 +56,31 @@ In addition to providing rich model compression algorithms, an important design 
 
 ### Future Roadmap
 
-The current release version of MindSpore Golden Stick provides a stable API and provides a linear quantization algorithm, a nonlinear quantization algorithm and a structured pruning algorithm. More algorithms and better network support will be provided in the future version, and debugging capabilities will also be provided in subsequent versions. With the enrichment of algorithms in the future, MindSpore Golden Stick will also explore capabilities such as AMC, HAQ(Hardware-Aware Automated Quantization), NAS, etc., so stay tuned.
+The current release version of MindSpore Golden Stick provides a stable API and provides a linear quantization algorithm, a nonlinear quantization algorithm and a structured pruning algorithm. More algorithms and better network support will be provided in the future version, and debugging capabilities will also be provided in subsequent versions. With the enrichment of algorithms in the future, MindSpore Golden Stick will also explore capabilities such as AMC, HAQ, NAS, etc., so stay tuned.
 
 ## Installation
 
-MindSpore Golden Stick depends on the MindSpore training and inference framework. Therefore, please first install [MindSpore](https://gitee.com/mindspore/mindspore/blob/master/README.md#installation) following the instruction on the official website, then install MindSpore Golden Stick. You can install from `pip` or source code.
+### Environmental restrictions
+
+The following table lists the environment required for installing, compiling and running MindSpore Golden Stick:
+
+| software | version  |
+| :-----: | :-----: |
+| Ubuntu  |  18.04  |
+| Python  |  3.7-3.9 |
+
+> Please refer to [requirements](https://gitee.com/mindspore/golden-stick/blob/r0.1/requirements.txt) for other third party dependencies.
+> MindSpore Golden Stick can only run on Ubuntu18.04.
 
 ### Version dependency
 
-Due the dependency between MindSpore Golden Stick and MindSpore, please follow the table below and install the corresponding MindSpore verision from [MindSpore download page](https://www.mindspore.cn/versions/en).
-
-```shell
-pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{MindSpore-Version}/MindSpore/cpu/ubuntu_x86/mindspore-{MindSpore-Version}-cp37-cp37m-linux_x86_64.whl
-```
+The MindSpore Golden Stick depends on the MindSpore training and inference framework, please refer the table below and [MindSpore Installation Guide](https://mindspore.cn/install) to install the corresponding MindSpore verision:
 
 | MindSpore Golden Stick Version |                            Branch                            | MindSpore version |
 | :-----------------------------: | :----------------------------------------------------------: | :-------: |
 |          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/) |   1.8.0   |
+
+After MindSpore is installed, you can use pip or source code build for MindSpore Golden Stick installation.
 
 ### Installing from pip command
 
@@ -90,7 +100,7 @@ Download [source code](https://gitee.com/mindspore/golden-stick), then enter the
 
 ```shell
 bash build.sh
-pip install output/mindspore_rl-{mg_version}-py3-none-any.whl
+pip install output/mindspore_gs-{mg_version}-py3-none-any.whl
 ```
 
 `build.sh` is the compiling script in `golden-stick` directory.
