@@ -25,5 +25,3 @@ MindSpore Golden Stick是华为诺亚团队和华为MindSpore团队联合设计�
 ghostnet, liuzhicheng01, fuzhongqian, hangangqiang, cjh9368.
 
 欢迎以任意形式对项目提供贡献!
-
-[View English](./RELEASE_CN.md)
