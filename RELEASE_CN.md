@@ -12,12 +12,6 @@ MindSpore Golden Stick是华为诺亚团队和华为MindSpore团队联合设计�
 - [BETA] 提供一个名为SLB（Searching for Low-Bit Weights in Quantized Neural Networks）的感知量化算法，是一种非线性、高精度的感知量化算法，在低比特量化上优势明显。
 - [STABLE] 提供一个名为SCOP（Scientific Control for Reliable Neural Network Pruning）的剪枝算法，是一种高精度的结构化剪枝算法，当前主要应用于CV网络上。
 
-### 接口变更
-
-#### 后向兼容变更
-
-##### Python接口
-
 ### 贡献者
 
 感谢以下人员作出的贡献：
