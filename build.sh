@@ -16,6 +16,14 @@
 
 echo "---------------- GoldenStick: build start ----------------"
 BASEPATH=$(cd "$(dirname $0)"; pwd)
+COMMITID=$(git log --format='[sha1]:%h,[branch]:%d' --abbrev=8 -1)
+COMMITRET=$?
+if [ ${COMMITRET} -ne 0 ]; then
+  echo "Get commit id info failed, exec command(git log --format='[sha1]:%h,[branch]:%d' --abbrev=8 -1) failed!"
+  exit ${COMMITRET}
+fi
+export COMMIT_ID=${COMMITID}
+export BUILD_PATH="${BASEPATH}/build/"
 
 python3 setup.py bdist_wheel -d ${BASEPATH}/output
 
