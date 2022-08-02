@@ -42,15 +42,19 @@ class CompAlgo:
 
         return network
 
-    def callback(self) -> Callback:
+    def callbacks(self, *args, **kwargs) -> [Callback]:
         """
-        Define what task need to be done when training for QAT.
+        Define what task need to be done when training.
+
+        Args:
+            args (Union[list, tuple, optional]): Arguments passed to the function.
+            kwargs (Union[dict, optional]): The keyword arguments.
 
         Returns:
-            Instance of Callback
+            List of instance of Callbacks.
         """
 
-        return Callback()
+        return []
 
     def loss(self, loss_fn: callable) -> callable:
         """

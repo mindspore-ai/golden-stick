@@ -22,7 +22,6 @@ import pytest
 import numpy as np
 import mindspore
 from mindspore import nn, context
-import mindspore.train.callback as cb
 from mindspore.train import Model
 from mindspore.nn.metrics import Accuracy
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
@@ -66,6 +65,12 @@ def test_set_config(quant_bit):
         qat.set_weight_quant_dtype(QuantDtype.INT2)
     elif quant_bit == "W1":
         qat.set_weight_quant_dtype(QuantDtype.INT1)
+    qat.set_epoch_size(100)
+    qat.set_has_trained_epoch(0)
+    qat.set_t_start_val(1.0)
+    qat.set_t_start_time(0.2)
+    qat.set_t_end_time(0.6)
+    qat.set_t_factor(1.2)
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
 
@@ -75,6 +80,355 @@ def test_set_config(quant_bit):
     conv_handler = conv_quant._handler
     weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
+    assert qat._config.epoch_size == 100
+    assert qat._config.has_trained_epoch == 0
+    assert qat._config.t_start_val == 1.0
+    assert qat._config.t_start_time == 0.2
+    assert qat._config.t_end_time == 0.6
+    assert qat._config.t_factor == 1.2
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_weight_quant_dtype_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_weight_quant_dtype().
+    Description: Feed int type `weight_quant_dtype` into set_weight_quant_dtype() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_weight_quant_dtype(weight_quant_dtype=3)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_weight_quant_dtype_range():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_weight_quant_dtype().
+    Description: Feed QuantDtype type `weight_quant_dtype` into set_weight_quant_dtype() functional interface.
+    Expectation: Except NotImplementedError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_weight_quant_dtype(weight_quant_dtype=QuantDtype.INT8)
+    except NotImplementedError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_epoch_size_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_epoch_size().
+    Description: Feed float type `epoch_size` into set_epoch_size() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_epoch_size(epoch_size=3.2)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_epoch_size_range():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_epoch_size().
+    Description: Feed int type `epoch_size` into set_epoch_size() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_epoch_size(epoch_size=-1)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_has_trained_epoch_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_has_trained_epoch().
+    Description: Feed float type `has_trained_epoch` into set_has_trained_epoch() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_has_trained_epoch(has_trained_epoch=3.2)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_has_trained_epoch_range():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_has_trained_epoch().
+    Description: Feed int type `has_trained_epoch` into set_has_trained_epoch() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_has_trained_epoch(has_trained_epoch=-10)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_start_val_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_val().
+    Description: Feed int type `t_start_val` into set_t_start_val() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_start_val(t_start_val=2)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_start_val_range():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_val().
+    Description: Feed float type `t_start_val` into set_t_start_val() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_start_val(t_start_val=-2.1)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_start_time_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_time().
+    Description: Feed int type `t_start_time` into set_t_start_time() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_start_time(t_start_time=2)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_start_time_range():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_time().
+    Description: Feed float type `t_start_time` into set_t_start_time() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_start_time(t_start_time=-2.1)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_end_time_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_end_time().
+    Description: Feed int type `t_end_time` into set_t_end_time() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_end_time(t_end_time=2)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_end_time_range():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_end_time().
+    Description: Feed float type `t_end_time` into set_t_end_time() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_end_time(t_end_time=-2.1)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_factor_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_factor().
+    Description: Feed int type `t_factor` into set_t_factor() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_factor(t_factor=2)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_t_factor_range():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_factor().
+    Description: Feed float type `t_factor` into set_t_factor() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_t_factor(t_factor=-2.1)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_callbacks_epoch_initial():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Description: Not feed `epoch_size` and `has_trained_epoch`.
+    Expectation: Except RuntimeError.
+    """
+
+    network = NetToQuant()
+    qat = SlbQAT()
+    new_network = qat.apply(network)
+    model = Model(new_network)
+    try:
+        qat.callbacks(model=model)
+    except RuntimeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_callbacks_epoch_range_compare():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Description: Feed incorrect `epoch_size` and `has_trained_epoch`.
+    Expectation: Except ValueError.
+    """
+
+    network = NetToQuant()
+    qat = SlbQAT()
+    new_network = qat.apply(network)
+    model = Model(new_network)
+    try:
+        qat.set_epoch_size(epoch_size=100)
+        qat.set_has_trained_epoch(has_trained_epoch=120)
+        qat.callbacks(model=model)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_callbacks_time_range_compare():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Description: Feed incorrect `t_start_time` and `t_end_time`.
+    Expectation: Except ValueError.
+    """
+
+    network = NetToQuant()
+    qat = SlbQAT()
+    new_network = qat.apply(network)
+    model = Model(new_network)
+    try:
+        qat.set_epoch_size(epoch_size=100)
+        qat.set_has_trained_epoch(has_trained_epoch=0)
+        qat.set_t_start_time(t_start_time=0.7)
+        qat.set_t_end_time(t_end_time=0.4)
+        qat.callbacks(model=model)
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_callbacks_model_type():
+    """
+    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Description: Feed int type `model` into callbacks() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_epoch_size(epoch_size=100)
+        qat.set_has_trained_epoch(has_trained_epoch=0)
+        qat.set_t_start_time(t_start_time=0.2)
+        qat.set_t_end_time(t_end_time=0.6)
+        qat.callbacks(model=10)
+    except ValueError:
+        return
+    assert False
 
 
 @pytest.mark.level0
@@ -91,11 +445,17 @@ def test_lenet(quant_bit):
     from lenet.src.lenet import LeNet5
     network = LeNet5(10)
     if quant_bit == "W4":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT4})
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT4, "epoch_size": 100,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 1.2})
     elif quant_bit == "W2":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT2})
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT2, "epoch_size": 100,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 1.2})
     elif quant_bit == "W1":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT1})
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT1, "epoch_size": 100,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 1.2})
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
     assert cells.get("Conv2dSlbQuant", None) is not None
@@ -104,6 +464,13 @@ def test_lenet(quant_bit):
     conv_handler = conv_quant._handler
     weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
+    assert qat._config.epoch_size == 100
+    assert qat._config.has_trained_epoch == 0
+    assert qat._config.t_start_val == 1.0
+    assert qat._config.t_start_time == 0.2
+    assert qat._config.t_end_time == 0.6
+    assert qat._config.t_factor == 1.2
+
 
 
 
@@ -129,46 +496,19 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
     ds_train = create_mnist_ds(data_path, 32, 1)
     network = LeNet5(10)
 
-    class TemperatureScheduler(cb.Callback):
-        """
-        TemperatureScheduler for SLB.
-        """
-        def __init__(self, model):
-            super().__init__()
-            self.epochs = 10
-            self.t_start_val = 1.0
-            self.t_start_time = 0.2
-            self.t_end_time = 0.6
-            self.t_factor = 3.2
-            self.model = model
-
-        def epoch_begin(self, run_context):
-            """
-            Epoch_begin.
-            """
-            cb_params = run_context.original_args()
-            epoch = cb_params.cur_epoch_num
-            # Compute temperature value
-            t = self.t_start_val
-            t_start_epoch = int(self.epochs*self.t_start_time)
-            t_end_epoch = int(self.epochs*self.t_end_time)
-            if epoch > t_start_epoch:
-                t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
-            # Assign new value to temperature parameter
-            for _, cell in self.model.train_network.cells_and_names():
-                if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
-                    cell.set_temperature(t)
-                    if epoch == t_end_epoch:
-                        cell.set_temperature_end_flag()
-
-
     # convert network to quantization aware network
     if quant_bit == "W4":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT4})
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT4, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     elif quant_bit == "W2":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT2})
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT2, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     elif quant_bit == "W1":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT1})
+        qat = SlbQAT({"quant_dtype": QuantDtype.INT1, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     new_network = qat.apply(network)
 
     # define network loss
@@ -180,7 +520,7 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
     model = Model(new_network, net_loss, net_opt, metrics={"Accuracy": Accuracy()})
 
     print("============== Starting Training ==============")
-    model.train(10, ds_train, callbacks=[TemperatureScheduler(model)])
+    model.train(10, ds_train, callbacks=qat.callbacks(model))
     print("============== End Training ==============")
 
     ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
@@ -212,12 +552,19 @@ def test_resnet(quant_bit, run_mode):
 
     network = resnet18(10)
     qat = SlbQAT()
+
     if quant_bit == "W4":
         qat.set_weight_quant_dtype(QuantDtype.INT4)
     elif quant_bit == "W2":
         qat.set_weight_quant_dtype(QuantDtype.INT2)
     elif quant_bit == "W1":
         qat.set_weight_quant_dtype(QuantDtype.INT1)
+    qat.set_epoch_size(100)
+    qat.set_has_trained_epoch(0)
+    qat.set_t_start_val(1.0)
+    qat.set_t_start_time(0.2)
+    qat.set_t_end_time(0.6)
+    qat.set_t_factor(1.2)
     new_network = qat.apply(network)
 
     cells: OrderedDict = new_network.name_cells()
@@ -227,7 +574,14 @@ def test_resnet(quant_bit, run_mode):
     conv_handler = conv_quant._handler
     weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
+    assert qat._config.epoch_size == 100
+    assert qat._config.has_trained_epoch == 0
+    assert qat._config.t_start_val == 1.0
+    assert qat._config.t_start_time == 0.2
+    assert qat._config.t_end_time == 0.6
+    assert qat._config.t_factor == 1.2
     print("============== test resnet slbqat success ==============")
+
 
 
 def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
@@ -276,6 +630,7 @@ def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
     def _create_dataset(dataset_path, batch_size=128, train_image_size=224):
         """
         Create a train or evaluate cifar10 dataset for resnet50.
+
         Args:
             dataset_path(string): the path of dataset.
             batch_size(int): the batch size of dataset. Default: 128
@@ -332,6 +687,12 @@ def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
         qat.set_weight_quant_dtype(QuantDtype.INT2)
     elif quant_bit == "W1":
         qat.set_weight_quant_dtype(QuantDtype.INT1)
+    qat.set_epoch_size(100)
+    qat.set_has_trained_epoch(0)
+    qat.set_t_start_val(1.0)
+    qat.set_t_start_time(0.2)
+    qat.set_t_end_time(0.6)
+    qat.set_t_factor(1.2)
     net = qat.apply(net)
 
     lr = get_lr(lr_init=lr_init, lr_end=lr_end, lr_max=lr_max, warmup_epochs=warmup_epochs, total_epochs=epoch_size,
@@ -369,44 +730,12 @@ def test_resnet_accuracy_graph(quant_bit):
     target = "GPU"
     epoch_size = 1
 
-    class TemperatureScheduler(cb.Callback):
-        """
-        TemperatureScheduler for QBNN.
-        """
-        def __init__(self, model):
-            super().__init__()
-            self.epochs = epoch_size
-            self.t_start_val = 1.0
-            self.t_start_time = 0.2
-            self.t_end_time = 0.6
-            self.t_factor = 1.2
-            self.model = model
-
-        def epoch_begin(self, run_context):
-            """
-            Epoch_begin.
-            """
-            cb_params = run_context.original_args()
-            epoch = cb_params.cur_epoch_num
-            # Compute temperature value
-            t = self.t_start_val
-            t_start_epoch = int(self.epochs*self.t_start_time)
-            t_end_epoch = int(self.epochs*self.t_end_time)
-            if epoch > t_start_epoch:
-                t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
-            # Assign new value to temperature parameter
-            for _, cell in self.model.train_network.cells_and_names():
-                if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
-                    cell.set_temperature(t)
-                    if epoch == t_end_epoch:
-                        cell.set_temperature_end_flag()
-
     mindspore.context.set_context(mode=context.GRAPH_MODE, device_target=target)
     model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.GRAPH_MODE)
 
     # define callbacks
     monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
-    callbacks = [monitor, TemperatureScheduler(model), qat.callback()]
+    callbacks = [monitor] + qat.callbacks(model)
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")
@@ -432,43 +761,11 @@ def test_resnet_accuracy_pynative(quant_bit):
     target = "GPU"
     epoch_size = 1
 
-    class TemperatureScheduler(cb.Callback):
-        """
-        TemperatureScheduler for QBNN.
-        """
-        def __init__(self, model):
-            super().__init__()
-            self.epochs = epoch_size
-            self.t_start_val = 1.0
-            self.t_start_time = 0.2
-            self.t_end_time = 0.6
-            self.t_factor = 1.2
-            self.model = model
-
-        def epoch_begin(self, run_context):
-            """
-            Epoch_begin.
-            """
-            cb_params = run_context.original_args()
-            epoch = cb_params.cur_epoch_num
-            # Compute temperature value
-            t = self.t_start_val
-            t_start_epoch = int(self.epochs*self.t_start_time)
-            t_end_epoch = int(self.epochs*self.t_end_time)
-            if epoch > t_start_epoch:
-                t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
-            # Assign new value to temperature parameter
-            for _, cell in self.model.train_network.cells_and_names():
-                if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
-                    cell.set_temperature(t)
-                    if epoch == t_end_epoch:
-                        cell.set_temperature_end_flag()
-
     mindspore.context.set_context(mode=context.PYNATIVE_MODE, device_target=target)
     model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.PYNATIVE_MODE)
     # define callbacks
     monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
-    callbacks = [monitor, TemperatureScheduler(model), qat.callback()]
+    callbacks = [monitor] + qat.callbacks(model)
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")
