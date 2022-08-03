@@ -47,9 +47,11 @@ def test_resnet(run_mode):
     pruner_kf = PrunerKfCompressAlgo({})
     new_network = pruner_kf.apply(network)
     flag = False
-    for _, (_, module) in enumerate(new_network.cells_and_names()):
+    for num, (_, module) in enumerate(new_network.cells_and_names()):
         if isinstance(module, KfConv2d):
             flag = True
+        if num == 1:
+            assert isinstance(module, nn.Conv2d)
     assert flag
     print("============== test resnet scop success ==============")
 

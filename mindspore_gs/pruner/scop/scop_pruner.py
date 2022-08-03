@@ -102,25 +102,23 @@ class PrunedConv2dbn1(nn.Cell):
         newconv = nn.Conv2d(in_channels=masked_module.conv.in_channels, out_channels=len(masked_module.out_index),
                             kernel_size=masked_module.conv.kernel_size, stride=masked_module.conv.stride,
                             has_bias=False, padding=masked_module.conv.padding, pad_mode='pad')
-
+        self.conv = newconv
         weight_data = masked_module.conv.weight.data.clone()
-        weight_data = Parameter(ops.Gather()(weight_data, masked_module.out_index, 0), requires_grad=True,
-                                name=masked_module.conv.weight.name)
-        newconv.weight = weight_data
+        self.conv.weight = Parameter(ops.Gather()(weight_data, masked_module.out_index, 0), requires_grad=True,
+                                     name=masked_module.conv.weight.name)
 
         newbn = nn.BatchNorm2d(len(masked_module.out_index))
-        newbn.gamma = Parameter(ops.Gather()(masked_module.bn.gamma.data.clone(), masked_module.out_index, 0),
-                                requires_grad=True, name=masked_module.bn.gamma.name)
-        newbn.beta = Parameter(ops.Gather()(masked_module.bn.beta.data.clone(), masked_module.out_index, 0),
-                               requires_grad=True, name=masked_module.bn.beta.name)
-        newbn.moving_mean = Parameter(
-            ops.Gather()(masked_module.bn.moving_mean.data.clone(), masked_module.out_index, 0), requires_grad=False)
-        newbn.moving_variance = Parameter(
-            ops.Gather()(masked_module.bn.moving_variance.data.clone(), masked_module.out_index, 0),
-            requires_grad=False)
-
-        self.conv = newconv
         self.bn = newbn
+        self.bn.gamma = Parameter(ops.Gather()(masked_module.bn.gamma.data.clone(), masked_module.out_index, 0),
+                                  requires_grad=True, name=masked_module.bn.gamma.name)
+        self.bn.beta = Parameter(ops.Gather()(masked_module.bn.beta.data.clone(), masked_module.out_index, 0),
+                                 requires_grad=True, name=masked_module.bn.beta.name)
+        self.bn.moving_mean = Parameter(
+            ops.Gather()(masked_module.bn.moving_mean.data.clone(), masked_module.out_index, 0), requires_grad=False,
+            name=masked_module.bn.moving_mean.name)
+        self.bn.moving_variance = Parameter(
+            ops.Gather()(masked_module.bn.moving_variance.data.clone(), masked_module.out_index, 0),
+            requires_grad=False, name=masked_module.bn.moving_variance.name)
 
         self.oriout_channels = masked_module.conv.out_channels
         self.out_index = masked_module.out_index
@@ -141,24 +139,24 @@ class PrunedConv2dbnmiddle(nn.Cell):
         newconv = nn.Conv2d(in_channels=len(masked_module.in_index), out_channels=len(masked_module.out_index),
                             kernel_size=masked_module.conv.kernel_size, stride=masked_module.conv.stride,
                             has_bias=False, padding=masked_module.conv.padding, pad_mode=masked_module.conv.pad_mode)
+        self.conv = newconv
 
         weight_data = masked_module.conv.weight.data.clone()
         weight_data = ops.Gather()(ops.Gather()(weight_data, masked_module.out_index, 0), masked_module.in_index, 1)
-        newconv.weight = Parameter(weight_data, requires_grad=True, name=masked_module.conv.weight.name)
+        self.conv.weight = Parameter(weight_data, requires_grad=True, name=masked_module.conv.weight.name)
 
         newbn = nn.BatchNorm2d(len(masked_module.out_index))
-        newbn.gamma = Parameter(ops.Gather()(masked_module.bn.gamma.data.clone(), masked_module.out_index, 0),
-                                requires_grad=True, name=masked_module.bn.gamma.name)
-        newbn.beta = Parameter(ops.Gather()(masked_module.bn.beta.data.clone(), masked_module.out_index, 0),
-                               requires_grad=True, name=masked_module.bn.beta.name)
-        newbn.moving_mean = Parameter(
-            ops.Gather()(masked_module.bn.moving_mean.data.clone(), masked_module.out_index, 0), requires_grad=False)
-        newbn.moving_variance = Parameter(
-            ops.Gather()(masked_module.bn.moving_variance.data.clone(), masked_module.out_index, 0),
-            requires_grad=False)
-
-        self.conv = newconv
         self.bn = newbn
+        self.bn.gamma = Parameter(ops.Gather()(masked_module.bn.gamma.data.clone(), masked_module.out_index, 0),
+                                  requires_grad=True, name=masked_module.bn.gamma.name)
+        self.bn.beta = Parameter(ops.Gather()(masked_module.bn.beta.data.clone(), masked_module.out_index, 0),
+                                 requires_grad=True, name=masked_module.bn.beta.name)
+        self.bn.moving_mean = Parameter(
+            ops.Gather()(masked_module.bn.moving_mean.data.clone(), masked_module.out_index, 0), requires_grad=False,
+            name=masked_module.bn.moving_mean.name)
+        self.bn.moving_variance = Parameter(
+            ops.Gather()(masked_module.bn.moving_variance.data.clone(), masked_module.out_index, 0),
+            requires_grad=False, name=masked_module.bn.moving_variance.name)
 
         self.oriout_channels = masked_module.conv.out_channels
         self.out_index = masked_module.out_index
@@ -179,24 +177,24 @@ class PrunedConv2dbn2(nn.Cell):
         newconv = nn.Conv2d(in_channels=len(masked_module.in_index), out_channels=len(masked_module.out_index),
                             kernel_size=masked_module.conv.kernel_size, stride=masked_module.conv.stride,
                             has_bias=False, padding=masked_module.conv.padding, pad_mode='pad')
+        self.conv = newconv
 
         weight_data = masked_module.conv.weight.data.clone()
         weight_data = ops.Gather()(ops.Gather()(weight_data, masked_module.out_index, 0), masked_module.in_index, 1)
-        newconv.weight = Parameter(weight_data, requires_grad=True, name=masked_module.conv.weight.name)
+        self.conv.weight = Parameter(weight_data, requires_grad=True, name=masked_module.conv.weight.name)
 
         newbn = nn.BatchNorm2d(len(masked_module.out_index))
-        newbn.gamma = Parameter(ops.Gather()(masked_module.bn.gamma.data.clone(), masked_module.out_index, 0),
-                                requires_grad=True, name=masked_module.bn.gamma.name)
-        newbn.beta = Parameter(ops.Gather()(masked_module.bn.beta.data.clone(), masked_module.out_index, 0),
-                               requires_grad=True, name=masked_module.bn.beta.name)
-        newbn.moving_mean = Parameter(
-            ops.Gather()(masked_module.bn.moving_mean.data.clone(), masked_module.out_index, 0), requires_grad=False)
-        newbn.moving_variance = Parameter(
-            ops.Gather()(masked_module.bn.moving_variance.data.clone(), masked_module.out_index, 0),
-            requires_grad=False)
-
-        self.conv = newconv
         self.bn = newbn
+        self.bn.gamma = Parameter(ops.Gather()(masked_module.bn.gamma.data.clone(), masked_module.out_index, 0),
+                                  requires_grad=True, name=masked_module.bn.gamma.name)
+        self.bn.beta = Parameter(ops.Gather()(masked_module.bn.beta.data.clone(), masked_module.out_index, 0),
+                                 requires_grad=True, name=masked_module.bn.beta.name)
+        self.bn.moving_mean = Parameter(
+            ops.Gather()(masked_module.bn.moving_mean.data.clone(), masked_module.out_index, 0), requires_grad=False,
+            name=masked_module.bn.moving_mean.name)
+        self.bn.moving_variance = Parameter(
+            ops.Gather()(masked_module.bn.moving_variance.data.clone(), masked_module.out_index, 0),
+            requires_grad=False, name=masked_module.bn.moving_variance.name)
 
         self.oriout_channels = masked_module.conv.out_channels
         self.out_index = masked_module.out_index
@@ -206,7 +204,7 @@ class PrunedConv2dbn2(nn.Cell):
         """Calculate."""
         x = self.conv(x)
         x = self.bn(x)
-        output = self.zeros((x.shape[0], self.oriout_channels, x.shape[2], x.shape[3]))
+        output = self.zeros((x.shape[0], self.oriout_channels, x.shape[2], x.shape[3]), mstype.float32)
         output[:, self.out_index, :, :] = x
         return output
 
@@ -260,8 +258,14 @@ class PrunerKfCompressAlgo(CompAlgo):
           >
     """
 
-    def callbacks(self):
-        return self._callback
+    def _tranform(self, net):
+        """Transform net."""
+        module = net._cells
+        keys = list(module.keys())
+        for _, k in enumerate(keys):
+            if 'layer' in k:
+                module[k] = self._tranform_conv(module[k])
+        return net
 
     def _tranform_conv(self, net):
         """Transform conv."""
@@ -281,7 +285,6 @@ class PrunerKfCompressAlgo(CompAlgo):
                         modules[keys[ik + 1]] = nn.SequentialCell()
                 elif (not isinstance(modules[k], KfConv2d)) and modules[k]._cells:
                     _inject(modules[k]._cells)
-
         _inject(net._cells)
         return net
 
@@ -295,7 +298,7 @@ class PrunerKfCompressAlgo(CompAlgo):
         Returns:
             Knockoff network.
         """
-        return self._tranform_conv(network)
+        return self._tranform(network)
 
 
 class PrunerFtCompressAlgo(CompAlgo):
@@ -347,9 +350,6 @@ class PrunerFtCompressAlgo(CompAlgo):
           (bn): SequentialCell<>
           >
     """
-
-    def callbacks(self):
-        return self._callback
 
     def _recover_conv(self, net):
         """Recover conv."""
