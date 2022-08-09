@@ -63,21 +63,23 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
               Default: True.
 
     Raises:
-        TypeError: If the element of `quant_delay` is not int.
-        TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
-        TypeError: If the element of `quant_dtype` is not `QuantDtype`.
+        TypeError: If `bn_fold`, `one_conv_fold` or `enable_fusion` is not bool.
         TypeError: If `freeze_bn` is not int.
-        ValueError: `freeze_bn` is less than 0.
+        TypeError: If `quant_delay` is not int, or every element of `quant_delay` is not int.
+        TypeError: If `quant_dtype` is not `QuantDtype`, or every element of `quant_dtype` is not `QuantDtype`.
+        TypeError: If `per_channel` is not bool, or every element of `per_channel` is not bool.
+        TypeError: If `symmetric` is not bool, or every element of `symmetric` is not bool.
+        TypeError: If `narrow_range` is not bool, or every element of `narrow_range` is not bool.
+        ValueError: If `freeze_bn` is less than 0.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
             less than 2.
-        ValueError: If the element of `quant_delay` is less than 0.
-        ValueError: If the first element of `per_channel` is True.
-        NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
-
+        ValueError: If `quant_delay` is less than 0, or any element of `quant_delay` is less than 0.
+        NotImplementedError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
+            `QuantDtype.INT8`.
+        NotImplementedError: If `per_channel` is True, or the first element of `per_channel` is True.
 
     Supported Platforms:
         ``GPU``
-
 
     Examples:
         >>> from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
@@ -263,7 +265,9 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             TypeError: If `act_quant_dtype` is not QuantDtype.
             NotImplementedError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
         """
-        Validator.check_isinstance("act quant dtype", act_quant_dtype, QuantDtype)
+        if not isinstance(act_quant_dtype, QuantDtype):
+            raise TypeError(f'The parameter `act quant dtype` must be isinstance of QuantDtype, '
+                            f'but got {act_quant_dtype}.')
         if act_quant_dtype != QuantDtype.INT8:
             raise NotImplementedError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.act_quant_dtype = act_quant_dtype
@@ -279,7 +283,9 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             TypeError: If `weight_quant_dtype` is not QuantDtype.
             NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
         """
-        Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
+        if not isinstance(weight_quant_dtype, QuantDtype):
+            raise TypeError(f'The parameter `weight quant dtype` must be isinstance of QuantDtype, '
+                            f'but got {weight_quant_dtype}.')
         if weight_quant_dtype != QuantDtype.INT8:
             raise NotImplementedError("Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.weight_quant_dtype = weight_quant_dtype

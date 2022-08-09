@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick learned-scale-quantization.
+MindSpore golden stick learned-step-size-quantization.
 """
 
 from .learned_step_size_quantization_aware_training import LearnedStepSizeQuantizationAwareTraining

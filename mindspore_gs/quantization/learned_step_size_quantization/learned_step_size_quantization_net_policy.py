@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""learned scale quantization net_policy."""
+"""learned step size quantization net_policy."""
 
 from mindspore.nn.layer import Conv2d, Dense, Conv2dBnAct
 from ..simulated_quantization.simulated_quantization_net_policy import SimulatedNetPolicy
-from .learned_step_size_quantization_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
+from .learned_step_size_quantization_layer_policy import LearnedStepSizeQuantizationConvLayerPolicy, \
+    LearnedStepSizeQuantizationDenseLayerPolicy, LearnedStepSizeQuantizationConvBnLayerPolicy
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig
 
 
@@ -30,7 +31,7 @@ class LearnedStepSizeQuantizationNetPolicy(SimulatedNetPolicy):
 
     def build(self):
         super().build()
-        self._layer_policy_map[Conv2d] = ConvLayerPolicy([], [], self._config)
-        self._layer_policy_map[Dense] = DenseLayerPolicy([], [], self._config)
-        self._layer_policy_map[Conv2dBnAct] = ConvBnLayerPolicy([], [], self._config)
+        self._layer_policy_map[Conv2d] = LearnedStepSizeQuantizationConvLayerPolicy([], [], self._config)
+        self._layer_policy_map[Dense] = LearnedStepSizeQuantizationDenseLayerPolicy([], [], self._config)
+        self._layer_policy_map[Conv2dBnAct] = LearnedStepSizeQuantizationConvBnLayerPolicy([], [], self._config)
         self._build = True
