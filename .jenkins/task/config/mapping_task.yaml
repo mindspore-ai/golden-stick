@@ -1,0 +1,59 @@
+# Copyright 2022 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+
+GS_ALL:
+  mindspore_gs/comp_algo.py
+  mindspore_gs/net_transform.py
+  tests/st/golden_stick
+  tests/st/loss_monitor.py
+
+GS_CI:
+  build.sh
+  setup.py
+  requirements.txt
+  .gitmodules
+  .gitignore
+  .jenkins
+  .gitee
+
+GS_DOCS:
+  CONTRIBUTING.md
+  LICENSE
+  NOTICE
+  OWNERS
+  README.md
+  README_CN.md
+  RELEASE.md
+  RELEASE_CN.md
+  SECURITY.md
+  Third_Party_Open_Source_Software_Notice
+  docs
+
+GS_QAT_SIMQAT:
+    mindspore_gs/quantization/simulated_quantization
+    mindspore_gs/quantization/learned_step_size_quantization
+    tests/st/quantization/test_sim_qat.py
+
+GS_QAT_LSQ:
+    mindspore_gs/quantization/simulated_quantization
+    mindspore_gs/quantization/learned_step_size_quantization
+
+GS_QAT_SLB:
+    mindspore_gs/quantization/slb
+    tests/st/quantization/test_slb_qat.py
+
+GS_PRUNER_SCOP:
+    mindspore_gs/pruner/scop
+    tests/st/pruner/test_scop.py
