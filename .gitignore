@@ -2,3 +2,4 @@ build/
 output/
 *.egg-info/
 *.egg
+mindspore_gs/.commit_id
