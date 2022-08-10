@@ -415,7 +415,7 @@ def test_resnet_accuracy_graph():
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")
-    model.train(epoch_size, train_ds, callbacks=[algo.callback()], sink_size=train_ds.get_dataset_size(),
+    model.train(epoch_size, train_ds, callbacks=[], sink_size=train_ds.get_dataset_size(),
                 dataset_sink_mode=dataset_sink_mode)
     print("============== End Training ==============")
     print("============== Starting Test ==============")
@@ -547,7 +547,7 @@ def test_resnet_accuracy_pynative():
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")
-    model.train(epoch_size, train_ds, callbacks=[algo.callback()], sink_size=train_ds.get_dataset_size(),
+    model.train(epoch_size, train_ds, callbacks=[], sink_size=train_ds.get_dataset_size(),
                 dataset_sink_mode=dataset_sink_mode)
     print("============== End Training ==============")
     print("============== Starting Test ==============")

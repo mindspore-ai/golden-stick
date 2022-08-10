@@ -23,3 +23,9 @@ class SlbQuantConfig:
     """
     def __init__(self):
         self.weight_quant_dtype = QuantDtype.INT1
+        self.epoch_size = -1
+        self.has_trained_epoch = -1
+        self.t_start_val = 1.0
+        self.t_start_time = 0.2
+        self.t_end_time = 0.6
+        self.t_factor = 1.2

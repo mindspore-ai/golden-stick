@@ -20,8 +20,10 @@ with the highest probability are selected to establish the desired quantized net
 See more details in `Searching for Low-Bit Weights in Quantized Neural Networks
 <https://arxiv.org/pdf/2009.08695.pdf>`. """
 
+from mindspore import Model
 from mindspore.nn import Cell
-from mindspore._checkparam import Validator
+from mindspore.train.callback import Callback
+from mindspore._checkparam import Validator, Rel
 from ..quantization_aware_training import QuantizationAwareTraining
 from ..constant import QuantDtype
 from .slb_net_policy import SlbNetPolicy
@@ -39,9 +41,23 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             - quant_dtype (QuantDtype): Datatype used to quantize weights, weights quantization
               support int4|int2|int1 now.
               Default: QuantDtype.INT1.
+            - epoch_size (int): Total training epochs. Default: 100.
+            - has_trained_epoch (int): The trained epochs. Default: 0.
+            - t_start_val (float): Initial value of temperature hyperparameters. Default: 1.
+            - t_start_time (float): Fraction of epochs after which temperature hyperparameters starting changing.
+              Default: 0.2.
+            - t_end_time (float): Fraction of epochs after which temperature hyperparameters stopping changing.
+              Default: 0.6.
+            - t_factor (float): Multiplicative factor of temperature hyperparameters changing.
+              Default: 1.2.
 
     Raises:
         TypeError: If `quant_dtype` is not `QuantDtype`.
+        TypeError: If `epoch_size` or `has_trained_epoch` is not an int.
+        TypeError: If `t_start_val`, `t_start_time`, `t_end_time` or `t_factor` is not float.
+        ValueError: If `epoch_size` or `has_trained_epoch` is less than 0.
+        ValueError: If `t_start_val`, `t_start_time`, `t_end_time` or `t_factor` is less than 0.
+        ValueError: If `t_start_time` or `t_end_time` is greater than 1.
 
     Supported Platforms:
         ``GPU``
@@ -67,9 +83,18 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> slb_quantization = SlbQuantAwareTraining()
         >>> ## 3) Use set functions to change config
         >>> slb_quantization.set_weight_quant_dtype(QuantDtype.INT1)
-        >>> ## 4) Apply SLB QAT-algorithm to origin network
+        >>> slb_quantization.set_epoch_size(100)
+        >>> slb_quantization.set_has_trained_epoch(0)
+        >>> slb_quantization.set_t_start_val(1.0)
+        >>> slb_quantization.set_t_start_time(0.2)
+        >>> slb_quantization.set_t_end_time(0.6)
+        >>> slb_quantization.set_t_factor(1.2)
+        >>> ## 4) Print SLB QAT-Algorithm object and check the config setting result
+        >>> print(slb_quantization)
+        weight_quant_dtype=INT1, epoch_size=100, has_trained_epoch=0, t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2
+        >>> ## 5) Apply SLB QAT-algorithm to origin network
         >>> net_qat = slb_quantization.apply(net)
-        >>> ## 5) Print network and check the result. Conv2d should be transformed to QuantizeWrapperCells.
+        >>> ## 6) Print network and check the result. Conv2d should be transformed to QuantizeWrapperCells.
         >>> ## Since we set weight_quant_dtype to be QuantDtype.INT1, the bit_num value of fake_quant_weight
         >>> ## should be 1, and the weight_bit_num value of Conv2dSlbQuant should be 1.
         >>> print(net_qat)
@@ -115,12 +140,98 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, `QuantDtype.INT2`
                 or `QuantDtype.INT4` yet.
         """
-        Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
+        weight_quant_dtype = Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
         if weight_quant_dtype not in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4]:
             raise NotImplementedError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
                                       "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
-                                      "but got {}".format(weight_quant_dtype))
+                                      "But got {}".format(weight_quant_dtype))
         self._config.weight_quant_dtype = weight_quant_dtype
+
+    def set_epoch_size(self, epoch_size):
+        """
+        Set value of epoch_size of `_config`
+
+        Args:
+            epoch_size (int): the epoch size of training, default: 100.
+
+        Raises:
+            TypeError: If `epoch_size` is not int.
+            ValueError: If `epoch_size` is not greater than 0.
+        """
+        epoch_size = Validator.check_int(epoch_size, 0, Rel.GT, "epoch_size", self.__class__.__name__)
+        self._config.epoch_size = epoch_size
+
+    def set_has_trained_epoch(self, has_trained_epoch):
+        """
+        Set value of has_trained_epoch of `_config`
+
+        Args:
+            has_trained_epoch (int): the trained epochs of training, default: 0.
+
+        Raises:
+            TypeError: If `has_trained_epoch` is not int.
+            ValueError: If `has_trained_epoch` is less than 0.
+        """
+        has_trained_epoch = Validator.check_int(has_trained_epoch, 0, Rel.GE, "has_trained_epoch", self.__class__.__name__)
+        self._config.has_trained_epoch = has_trained_epoch
+
+    def set_t_start_val(self, t_start_val):
+        """
+        Set value of t_start_val of `_config`
+
+        Args:
+            t_start_val (float): Initial value of temperature hyperparameters, default: 1.0.
+
+        Raises:
+            TypeError: If `t_start_val` is not float.
+            ValueError: `t_start_val` is not greater than 0.
+        """
+        t_start_val = Validator.check_positive_float(t_start_val, "t_start_val", self.__class__.__name__)
+        self._config.t_start_val = t_start_val
+
+    def set_t_start_time(self, t_start_time):
+        """
+        Set value of t_start_time of `_config`
+
+        Args:
+            t_start_time (float): Fraction of epochs after which temperature hyperparameters starting changing, default: 0.2.
+
+        Raises:
+            TypeError: If `t_start_time` is not float.
+            ValueError: If `t_start_time` is less than 0. or greater than 1.
+        """
+        t_start_time = Validator.check_float_range(t_start_time, 0.0, 1.0, Rel.INC_BOTH, \
+                                                   "t_start_time", self.__class__.__name__)
+        self._config.t_start_time = t_start_time
+
+    def set_t_end_time(self, t_end_time):
+        """
+        Set value of t_end_time of `_config`
+
+        Args:
+            t_end_time (float): Fraction of epochs after which temperature hyperparameters stopping changing, default: 0.6.
+
+        Raises:
+            TypeError: If `t_end_time` is not float.
+            ValueError: If `t_end_time` is less than 0. or greater than 1.
+        """
+        t_end_time = Validator.check_float_range(t_end_time, 0.0, 1.0, Rel.INC_BOTH, \
+                                                 "t_end_time", self.__class__.__name__)
+        self._config.t_end_time = t_end_time
+
+    def set_t_factor(self, t_factor):
+        """
+        Set value of t_factor of `_config`
+
+        Args:
+            t_factor (float): Multiplicative factor of temperature hyperparameters changing, default: 1.2.
+
+        Raises:
+            TypeError: If `t_factor` is not float.
+            ValueError: If `t_factor` is not greater than 0.
+        """
+        t_factor = Validator.check_positive_float(t_factor, "t_factor", self.__class__.__name__)
+        self._config.t_factor = t_factor
 
     def _init_net_policy(self, config):
         return SlbNetPolicy(config)
@@ -129,6 +240,51 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         """Create `_config` from a dict"""
         self._config = SlbQuantConfig()
         self.set_weight_quant_dtype(config.get("quant_dtype", QuantDtype.INT1))
+
+        if "epoch_size" in config:
+            self.set_epoch_size(config["epoch_size"])
+        if "has_trained_epoch" in config:
+            self.set_has_trained_epoch(config["has_trained_epoch"])
+        self.set_t_start_val(config.get("t_start_val", 1.0))
+        self.set_t_start_time(config.get("t_start_time", 0.2))
+        self.set_t_end_time(config.get("t_end_time", 0.6))
+        self.set_t_factor(config.get("t_factor", 1.2))
+
+    def callbacks(self, model: Model) -> [Callback]:
+        """
+        Define TemperatureScheduler callback for SLB QAT-algorithm.
+
+        Args:
+            model (Model): Model to be used.
+
+        Raises:
+            RuntimeError: If `epoch_size` is not initialized!
+            RuntimeError: If `has_trained_epoch` is not initialized!
+            ValueError: If `epoch_size` is not greater than `has_trained_epoch`.
+            ValueError: If `t_end_time` is less than `t_start_time`.
+            TypeError: If `model` is not Model.
+
+        Returns:
+            List of instance of Callbacks.
+        """
+
+        if self._config.epoch_size == -1:
+            raise RuntimeError("The `epoch_size` need to be initialized!")
+        if self._config.has_trained_epoch == -1:
+            raise RuntimeError("The `has_trained_epoch` need to be initialized!")
+
+        if self._config.epoch_size <= self._config.has_trained_epoch:
+            raise ValueError("The `epoch_size` should be greater than `has_trained_epoch`.")
+        if self._config.t_end_time < self._config.t_start_time:
+            raise ValueError("The `t_end_time` should not be less than `t_start_time`.")
+
+        model = Validator.check_isinstance("model", model, Model)
+
+        cb = []
+        cb.append(TemperatureScheduler(model, self._config.epoch_size, self._config.has_trained_epoch,
+                                       self._config.t_start_val, self._config.t_start_time,
+                                       self._config.t_end_time, self._config.t_factor))
+        return cb
 
     def apply(self, network: Cell) -> Cell:
         """
@@ -146,5 +302,48 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Returns:
             Quantized network.
         """
+
         self._qat_policy.build()
         return super(SlbQuantAwareTraining, self).apply(network)
+
+    def __repr__(self):
+        """Display instance object as string."""
+        s = 'weight_quant_dtype={}, epoch_size={}, has_trained_epoch={}, t_start_val={}, t_start_time={}, t_end_time={}, ' \
+            't_factor={}'.format(self._config.weight_quant_dtype, self._config.epoch_size, self._config.has_trained_epoch,
+                                 self._config.t_start_val, self._config.t_start_time, self._config.t_end_time, self._config.t_factor)
+        return s
+
+
+class TemperatureScheduler(Callback):
+    """
+    Define TemperatureScheduler callback for SLB QAT-algorithm.
+    """
+    def __init__(self, model, epoch_size=100, has_trained_epoch=0,
+                 t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2):
+        super().__init__()
+        self.epochs = epoch_size
+        self.has_trained_epoch = has_trained_epoch
+        self.t_start_val = t_start_val
+        self.t_start_time = t_start_time
+        self.t_end_time = t_end_time
+        self.t_factor = t_factor
+        self.model = model
+
+    def epoch_begin(self, run_context):
+        """
+        Epoch_begin.
+        """
+        cb_params = run_context.original_args()
+        epoch = cb_params.cur_epoch_num + self.has_trained_epoch
+        # Compute temperature value
+        t = self.t_start_val
+        t_start_epoch = int(self.epochs*self.t_start_time)
+        t_end_epoch = int(self.epochs*self.t_end_time)
+        if epoch > t_start_epoch:
+            t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
+        # Assign new value to temperature parameter
+        for _, cell in self.model.train_network.cells_and_names():
+            if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
+                cell.set_temperature(t)
+                if epoch >= t_end_epoch:
+                    cell.set_temperature_end_flag()

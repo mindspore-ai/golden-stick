@@ -10,6 +10,8 @@
 "golden-stick/mindspore_gs/quantization/simulated_quantization/simulated_quantization_aware_training.py"                 "line-too-long"
 "golden-stick/mindspore_gs/quantization/learned_step_size_quantization/learned_step_size_quantization_aware_training.py" "line-too-long"
 "golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                                                 "line-too-long"
+"golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                                                 "arguments-differ"
+"golden-stick/mindspore_gs/comp_algo.py"                                                                                 "unused-argument"
 
 # SCOP
 "golden-stick/mindspore_gs/pruner/scop/scop_pruner.py"                                                   "protected-access"
