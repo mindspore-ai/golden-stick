@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""test qat."""
+"""test sim_qat applied on resnet50 network and cifar10 dataset."""
 
 import os
 import sys
@@ -20,213 +20,9 @@ from collections import OrderedDict
 import pytest
 import mindspore
 from mindspore import nn, context
-from mindspore.train.serialization import load_checkpoint
-from mindspore.train import Model
-from mindspore.nn.metrics import Accuracy
-from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
-from mindspore_gs.quantization.learned_step_size_quantization import LearnedStepSizeQuantizationAwareTraining as \
-    LearnedQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
-
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
-
-
-class NetToQuant(nn.Cell):
-    """
-    Network with single conv2d to be quanted
-    """
-
-    def __init__(self):
-        super(NetToQuant, self).__init__()
-        self.conv = nn.Conv2d(5, 6, 5, pad_mode='valid')
-
-    def construct(self, x):
-        x = self.conv(x)
-        return x
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_set_config():
-    """
-    Feature: SimQAT algorithm set functions.
-    Description: Apply DefaultQuantAwareTraining on lenet.
-    Expectation: Apply success and coordinate attributes are same as config.
-    """
-
-    network = NetToQuant()
-    qat = SimQAT()
-    qat.set_act_quant_delay(900)
-    qat.set_weight_quant_delay(900)
-    qat.set_act_per_channel(False)
-    qat.set_weight_per_channel(True)
-    qat.set_act_narrow_range(False)
-    qat.set_weight_narrow_range(False)
-    qat.set_one_conv_fold(True)
-    qat.set_bn_fold(False)
-    new_network = qat.apply(network)
-    cells: OrderedDict = new_network.name_cells()
-
-    assert cells.get("Conv2dQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQuant")
-    assert isinstance(conv_quant, QuantizeWrapperCell)
-    conv_handler = conv_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
-    act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_config_enable_fusion():
-    """
-    Feature: set_enable_fusion api of SimQAT.
-    Description: Check default value of enable_fusion and value after called set_enable_fusion.
-    Expectation: Config success.
-    """
-    qat = SimQAT()
-    assert not qat._config.enable_fusion
-    qat.set_enable_fusion(True)
-    assert qat._config.enable_fusion
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_config_one_conv_fold():
-    """
-    Feature: set_one_conv_fold api of SimQAT.
-    Description: Check default value of one_conv_fold and value after called set_one_conv_fold.
-    Expectation: Config success.
-    """
-    qat = SimQAT()
-    assert qat._config.one_conv_fold
-    qat.set_one_conv_fold(False)
-    assert not qat._config.one_conv_fold
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_config_freeze_bn():
-    """
-    Feature: set_freeze_bn api of SimQAT.
-    Description: Check default value of freeze_bn and value after called set_freeze_bn.
-    Expectation: Config success.
-    """
-    qat = SimQAT()
-    assert qat._config.freeze_bn == 10000000
-    qat.set_freeze_bn(0)
-    assert qat._config.freeze_bn == 0
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_lenet():
-    """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on lenet.
-    Expectation: Apply success.
-    """
-
-    from lenet.src.lenet import LeNet5
-    network = LeNet5(10)
-    qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
-    new_network = qat.apply(network)
-    cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQuant")
-    assert isinstance(conv_quant, QuantizeWrapperCell)
-    conv_handler = conv_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
-    act_fake_quant = conv_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
-
-    assert cells.get("DenseQuant", None) is not None
-    dense_quant: QuantizeWrapperCell = cells.get("DenseQuant")
-    assert isinstance(dense_quant, QuantizeWrapperCell)
-    dense_handler = dense_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = dense_handler.fake_quant_weight
-    assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
-    assert weight_fake_quant._quant_delay == 900
-    act_fake_quant = dense_quant._output_quantizer
-    assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
-    assert act_fake_quant._quant_delay == 900
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("algorithm", [SimQAT])
-@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
-def test_lenet_accuracy(mnist_path_option, lenet_ckpt_path_option, algorithm, run_mode):
-    """
-    Feature: test accuracy of sim qat work on lenet5.
-    Description: Apply sim qat on lenet5 and test accuracy.
-    Expectation: accuracy is larger than 0.98.
-    """
-
-    from lenet.src.lenet import LeNet5
-    from lenet.src.dataset import create_dataset as create_mnist_ds
-    context.set_context(mode=run_mode)
-    mnist_path = mnist_path_option
-    if mnist_path_option is None:
-        mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
-    data_path = os.path.join(mnist_path, "train")
-    ds_train = create_mnist_ds(data_path, 32, 1)
-    network = LeNet5(10)
-
-    # load quantization aware network checkpoint
-    ckpt_path = lenet_ckpt_path_option
-    if ckpt_path is None:
-        ckpt_path = os.path.join(os.getenv("CHECKPOINT_PATH", "/home/workspace/mindspore_ckpt"),
-                                 "ckpt/checkpoint_lenet-10_1875.ckpt")
-    param_dict = load_checkpoint(ckpt_path)
-    mindspore.load_param_into_net(network, param_dict)
-
-    # convert network to quantization aware network
-    if algorithm == SimQAT:
-        qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True],
-                      "quant_delay": [900, 900]})
-    else:
-        qat = LearnedQAT()
-    new_network = qat.apply(network)
-
-    # define network loss
-    net_loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction="mean")
-    # define network optimization
-    net_opt = nn.Momentum(new_network.trainable_params(), 0.01, 0.9)
-
-    # define model
-    model = Model(new_network, net_loss, net_opt, metrics={"Accuracy": Accuracy()})
-
-    print("============== Starting Training ==============")
-    model.train(10, ds_train, callbacks=[])
-    print("============== End Training ==============")
-
-    ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
-
-    print("============== Starting Testing ==============")
-    acc = model.eval(ds_eval)
-    print("============== {} ==============".format(acc))
-    assert acc['Accuracy'] > 0.98
 
 
 @pytest.mark.level0
@@ -242,8 +38,8 @@ def test_resnet(run_mode):
 
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    from resnet.golden_stick.quantization.simqat.simqat import create_simqat
-    from models.resnet import resnet50
+    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.st.models.resnet import resnet50
 
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
 
@@ -306,14 +102,13 @@ def test_resnet_accuracy_graph():
     Description: Apply simulated_quantization on resnet and test accuracy
     Expectation: Accuracy of is bigger than 0.45.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     import mindspore.dataset as ds
-    from resnet.golden_stick.quantization.simqat.simqat import create_simqat
-    from resnet.src.lr_generator import get_lr
+    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.models.official.cv.resnet.src.lr_generator import get_lr
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
-    from models.resnet import resnet18
+    from tests.st.models.resnet import resnet18
 
     # config
     train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
@@ -436,14 +231,13 @@ def test_resnet_accuracy_pynative():
     Description: Apply simulated_quantization on resnet and test accuracy
     Expectation: Accuracy of is bigger than 0.3.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     import mindspore.dataset as ds
-    from resnet.golden_stick.quantization.simqat.simqat import create_simqat
-    from resnet.src.lr_generator import get_lr
+    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.models.official.cv.resnet.src.lr_generator import get_lr
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
-    from models.resnet import resnet18
+    from tests.st.models.resnet import resnet18
 
     # config
     train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
