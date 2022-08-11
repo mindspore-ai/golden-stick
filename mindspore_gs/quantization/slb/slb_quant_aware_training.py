@@ -41,8 +41,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             - quant_dtype (QuantDtype): Datatype used to quantize weights, weights quantization
               support int4|int2|int1 now.
               Default: QuantDtype.INT1.
-            - epoch_size (int): Total training epochs. Default: 100.
-            - has_trained_epoch (int): The trained epochs. Default: 0.
+            - epoch_size (int): Total training epochs.
+            - has_trained_epoch (int): The trained epochs.
             - t_start_val (float): Initial value of temperature hyperparameters. Default: 1.
             - t_start_time (float): Fraction of epochs after which temperature hyperparameters starting changing.
               Default: 0.2.
@@ -55,8 +55,10 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         TypeError: If `quant_dtype` is not `QuantDtype`.
         TypeError: If `epoch_size` or `has_trained_epoch` is not an int.
         TypeError: If `t_start_val`, `t_start_time`, `t_end_time` or `t_factor` is not float.
-        ValueError: If `epoch_size` or `has_trained_epoch` is less than 0.
-        ValueError: If `t_start_val`, `t_start_time`, `t_end_time` or `t_factor` is less than 0.
+        ValueError: If `epoch_size` is not greater than 0.
+        ValueError: If `has_trained_epoch` is less than 0.
+        ValueError: If `t_start_val` or `t_factor` is not greater than 0.
+        ValueError: If `t_start_time` or `t_end_time` is less than 0.
         ValueError: If `t_start_time` or `t_end_time` is greater than 1.
 
     Supported Platforms:
@@ -167,7 +169,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of epoch_size of `_config`
 
         Args:
-            epoch_size (int): the epoch size of training, default: 100.
+            epoch_size (int): the epoch size of training.
 
         Raises:
             TypeError: If `epoch_size` is not int.
@@ -181,7 +183,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of has_trained_epoch of `_config`
 
         Args:
-            has_trained_epoch (int): the trained epochs of training, default: 0.
+            has_trained_epoch (int): the trained epochs of training.
 
         Raises:
             TypeError: If `has_trained_epoch` is not int.
@@ -199,7 +201,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `t_start_val` is not float.
-            ValueError: `t_start_val` is not greater than 0.
+            ValueError: If `t_start_val` is not greater than 0.
         """
         t_start_val = Validator.check_positive_float(t_start_val, "t_start_val", self.__class__.__name__)
         self._config.t_start_val = t_start_val
