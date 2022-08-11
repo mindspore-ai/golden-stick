@@ -161,7 +161,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_bn_fold(self, bn_fold):
         """
-        Set value of bn_fold of `_config`
+        Set value of bn_fold of quantization aware training `config`
 
         Args:
             bn_fold (bool): Whether quantization algorithm use bn_fold or not.
@@ -178,7 +178,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_one_conv_fold(self, one_conv_fold):
         """
-        Set value of one_conv_fold of `_config`
+        Set value of one_conv_fold of quantization aware training `config`
 
         Args:
             one_conv_fold (bool): Whether quantization algorithm use one_conv_fold or not.
@@ -195,7 +195,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_act_quant_delay(self, act_quant_delay):
         """
-        Set value of act_quant_delay of `_config`
+        Set value of act_quant_delay of quantization aware training `config`
 
         Args:
             act_quant_delay (int): Number of steps after which activation is quantized during train and eval.
@@ -210,7 +210,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_quant_delay(self, weight_quant_delay):
         """
-        Set value of weight_quant_delay of `_config`
+        Set value of weight_quant_delay of quantization aware training `config`
 
         Args:
             weight_quant_delay (int): Number of steps after which weight is quantized during train and eval.
@@ -225,7 +225,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_act_per_channel(self, act_per_channel):
         """
-        Set value of act_per_channel of `_config`
+        Set value of act_per_channel of quantization aware training `config`
 
         Args:
             act_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
@@ -242,7 +242,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_per_channel(self, weight_per_channel):
         """
-        Set value of weight_per_channel of `_config`
+        Set value of weight_per_channel of quantization aware training `config`
 
         Args:
             weight_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
@@ -256,7 +256,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_act_quant_dtype(self, act_quant_dtype):
         """
-        Set value of act_quant_dtype of `_config`
+        Set value of act_quant_dtype of quantization aware training `config`
 
         Args:
             act_quant_dtype (QuantDtype): Datatype used to quantize activations.
@@ -274,10 +274,10 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_quant_dtype(self, weight_quant_dtype):
         """
-        Set value of weight_quant_dtype of `_config`
+        Set value of weight_quant_dtype of quantization aware training `config`
 
         Args:
-            weight_quant_dtype (QuantDtype): Datatype used to quantize activations.
+            weight_quant_dtype (QuantDtype): Datatype used to quantize weight.
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
@@ -292,7 +292,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_act_symmetric(self, act_symmetric):
         """
-        Set value of act_symmetric of `_config`
+        Set value of act_symmetric of quantization aware training `config`
 
         Args:
             act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. If True then base on
@@ -306,7 +306,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_symmetric(self, weight_symmetric):
         """
-        Set value of weight_symmetric of `_config`
+        Set value of weight_symmetric of quantization aware training `config`
 
         Args:
             weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. If True then
@@ -320,7 +320,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_act_narrow_range(self, act_narrow_range):
         """
-        Set value of act_narrow_range of `_config`
+        Set value of act_narrow_range of quantization aware training `config`
 
         Args:
             act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. If True then
@@ -334,7 +334,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_narrow_range(self, weight_narrow_range):
         """
-        Set value of weight_narrow_range of `_config`
+        Set value of weight_narrow_range of quantization aware training `config`
 
         Args:
             weight_narrow_range (bool): Whether the quantization algorithm use weight narrow_range or not. If
@@ -348,7 +348,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_freeze_bn(self, freeze_bn):
         """
-        Set value of freeze_bn of `_config`
+        Set value of freeze_bn of quantization aware training `config`
 
         Args:
             freeze_bn (int): Number of steps after which BatchNorm OP parameters fixed to global mean and variance.
@@ -363,7 +363,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_enable_fusion(self, enable_fusion):
         """
-        Set value of enable_fusion of `_config`
+        Set value of enable_fusion of quantization aware training `config`
 
         Args:
             enable_fusion (bool): Whether apply fusion before applying quantization, default is False.
@@ -390,7 +390,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         return SimulatedNetPolicy(config)
 
     def _create_qconfig_by_dict(self, config: dict):
-        """Create `_config` from a dict"""
+        """Create quantization aware training `config` from a dict"""
         self._config = SimulatedQuantizationConfig()
         quant_delay_list = SimulatedQuantizationAwareTraining._convert2list("quant delay",
                                                                             config.get("quant_delay", [0, 0]))
