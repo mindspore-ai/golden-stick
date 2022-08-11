@@ -82,16 +82,31 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> ## 2) Define SLB QAT-Algorithm
         >>> slb_quantization = SlbQuantAwareTraining()
         >>> ## 3) Use set functions to change config
+        >>> ## 3.1) set_weight_quant_dtype is used to set the weight quantization bit, and support QuantDtype.INT4, QuantDtype.INT2,
+        >>> ## QuantDtype.INT1 now.
         >>> slb_quantization.set_weight_quant_dtype(QuantDtype.INT1)
+        >>> ## 3.2) set_epoch_size is used to set the epoch size of training.
         >>> slb_quantization.set_epoch_size(100)
+        >>> ## 3.3) set_has_trained_epoch is used to set the trained epoch size of training.
         >>> slb_quantization.set_has_trained_epoch(0)
+        >>> ## 3.4) set_t_start_val is used to set the initial value of temperature hyperparameters.
         >>> slb_quantization.set_t_start_val(1.0)
+        >>> ## 3.5) set_t_start_time is used to set the fraction of epochs after which temperature hyperparameters starting changing.
         >>> slb_quantization.set_t_start_time(0.2)
+        >>> ## 3.6) set_t_end_time is used to set the fraction of epochs after which temperature hyperparameters stopping changing.
         >>> slb_quantization.set_t_end_time(0.6)
+        >>> ## 3.7) set_t_factor is used to set the multiplicative factor of temperature hyperparameters changing.
         >>> slb_quantization.set_t_factor(1.2)
         >>> ## 4) Print SLB QAT-Algorithm object and check the config setting result
+        >>> ## Since we set weight_quant_dtype to be QuantDtype.INT1, the value of the attribute weight_quant_dtype is INT1
+        >>> ## Since we set epoch_size to be 100, the value of the attribute epoch_size is 100
+        >>> ## Since we set has_trained_epoch to be 0, the value of the attribute has_trained_epoch is 0
+        >>> ## Since we set t_start_val to be 1.0, the value of the attribute t_start_val is 1.0
+        >>> ## Since we set t_start_time to be 0.2, the value of the attribute t_start_time is 0.2
+        >>> ## Since we set t_end_time to be 0.6, the value of the attribute t_end_time is 0.6
+        >>> ## Since we set t_factor to be 1.2, the value of the attribute t_factor is 1.2
         >>> print(slb_quantization)
-        weight_quant_dtype=INT1, epoch_size=100, has_trained_epoch=0, t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2
+        SlbQuantAwareTraining<weight_quant_dtype=INT1, epoch_size=100, has_trained_epoch=0, t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2>
         >>> ## 5) Apply SLB QAT-algorithm to origin network
         >>> net_qat = slb_quantization.apply(net)
         >>> ## 6) Print network and check the result. Conv2d should be transformed to QuantizeWrapperCells.
@@ -308,9 +323,11 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def __repr__(self):
         """Display instance object as string."""
-        s = 'weight_quant_dtype={}, epoch_size={}, has_trained_epoch={}, t_start_val={}, t_start_time={}, t_end_time={}, ' \
-            't_factor={}'.format(self._config.weight_quant_dtype, self._config.epoch_size, self._config.has_trained_epoch,
-                                 self._config.t_start_val, self._config.t_start_time, self._config.t_end_time, self._config.t_factor)
+        s = 'SlbQuantAwareTraining<weight_quant_dtype={}, epoch_size={}, has_trained_epoch={}, t_start_val={}, ' \
+            't_start_time={}, t_end_time={}, t_factor={}>'.format(self._config.weight_quant_dtype, self._config.epoch_size,
+                                                                  self._config.has_trained_epoch, self._config.t_start_val,
+                                                                  self._config.t_start_time, self._config.t_end_time,
+                                                                  self._config.t_factor)
         return s
 
 
