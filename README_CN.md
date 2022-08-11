@@ -38,7 +38,7 @@ MindSpore Golden Stick是华为诺亚团队和华为MindSpore团队联合设计�
 
 5. 在最外层，MindSpore Golden Stick封装了一套简洁的用户接口。
 
-![金箍棒架构图](docs/golden-stick-arch.png)
+![金箍棒架构图](docs/images/golden-stick-arch.png)
 
 > 架构图是MindSpore Golden Stick的全貌，其中包含了当前已经实现的功能以及规划在RoadMap中能力。具体开放的功能可以参考对应版本的ReleaseNotes。
 
