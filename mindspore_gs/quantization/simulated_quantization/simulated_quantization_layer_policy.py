@@ -116,11 +116,11 @@ class ConvLayerPolicy(SimulatedLayerPolicy):
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
     def wrap_cell(self, handler: Cell) -> Cell:
-        conv_quant = ConvLayerPolicy._create_conv2dquant_from_conv(handler, self.get_quant_config())
+        conv_quant = ConvLayerPolicy.create_conv2dquant_from_conv(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_quant, self)
 
     @staticmethod
-    def _create_conv2dquant_from_conv(conv, quant_config: OpQuantConfig):
+    def create_conv2dquant_from_conv(conv, quant_config: OpQuantConfig):
         """
         A static method to create `Conv2dQuant` from a `Conv2d`
 
@@ -133,7 +133,7 @@ class ConvLayerPolicy(SimulatedLayerPolicy):
             >>> # when apply QAT on `conv_op`, QAT need to create a quant conv2d whose weight is fake-quanted
             >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
             >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
-            >>> conv_quant = ConvLayerPolicy._create_conv2dquant_from_conv(conv_op, quant_config)
+            >>> conv_quant = ConvLayerPolicy.create_conv2dquant_from_conv(conv_op, quant_config)
         """
         return Conv2dQuant(
             conv.in_channels,
@@ -155,11 +155,11 @@ class DenseLayerPolicy(SimulatedLayerPolicy):
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
     """
     def wrap_cell(self, handler: Cell) -> Cell:
-        dense_quant = DenseLayerPolicy._create_densequant_from_dense(handler, self.get_quant_config())
+        dense_quant = DenseLayerPolicy.create_densequant_from_dense(handler, self.get_quant_config())
         return QuantizeWrapperCell(dense_quant, self)
 
     @staticmethod
-    def _create_densequant_from_dense(dense, quant_config: OpQuantConfig):
+    def create_densequant_from_dense(dense, quant_config: OpQuantConfig):
         """
         A static method to create `DenseQuant` from a `Dense`
 
@@ -171,7 +171,7 @@ class DenseLayerPolicy(SimulatedLayerPolicy):
             >>> # when apply QAT on `dense_op`, QAT need to create a quant dense whose weight is fake-quanted
             >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
             >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
-            >>> dense_quant = DenseLayerPolicy._create_densequant_from_dense(dense_op, quant_config)
+            >>> dense_quant = DenseLayerPolicy.create_densequant_from_dense(dense_op, quant_config)
         """
         return DenseQuant(
             dense.in_channels,
@@ -191,16 +191,16 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
         if self._config.bn_fold:
             if self._config.one_conv_fold:
-                conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquantoneconv(handler, self.get_quant_config())
+                conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquantoneconv(handler, self.get_quant_config())
             else:
-                conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquant(handler, self.get_quant_config(),
-                                                                            {"freeze_bn": self._config.freeze_bn})
+                conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquant(handler, self.get_quant_config(),
+                                                                           {"freeze_bn": self._config.freeze_bn})
         else:
-            conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnwithoutfoldquant(handler, self.get_quant_config())
+            conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnwithoutfoldquant(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_bn_quant, self)
 
     @staticmethod
-    def _create_conv2dbnfoldquantoneconv(convbn, quant_config: OpQuantConfig):
+    def create_conv2dbnfoldquantoneconv(convbn, quant_config: OpQuantConfig):
         """
         A static method to create `Conv2dBnFoldQuantOneConv` from a `Conv2dBnAct`
 
@@ -213,7 +213,7 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
             >>> # when apply QAT on `conv_bn_op`, QAT need to create a quant Conv2dBnAct whose weight is fake-quanted,
             >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
             >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
-            >>> conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquantoneconv(conv_bn_op, quant_config)
+            >>> conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquantoneconv(conv_bn_op, quant_config)
         """
         kwargs = {'in_channels': convbn.conv.in_channels,
                   'out_channels': convbn.conv.out_channels,
@@ -239,7 +239,7 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
         return Conv2dBnFoldQuantOneConv(**kwargs)
 
     @staticmethod
-    def _create_conv2dbnfoldquant(convbn, quant_config: OpQuantConfig, extra_args: dict):
+    def create_conv2dbnfoldquant(convbn, quant_config: OpQuantConfig, extra_args: dict):
         """
         A static method to create `Conv2dBnFoldQuantOneConv` from a `Conv2dBnAct`
 
@@ -253,7 +253,7 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
             >>> quant_config: OpQuantConfig = OpQuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
             >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
             >>> extra_args = {"freeze_bn": 100000}
-            >>> conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnfoldquant(conv_bn_op, quant_config, extra_args)
+            >>> conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquant(conv_bn_op, quant_config, extra_args)
         """
         kwargs = {'in_channels': convbn.conv.in_channels,
                   'out_channels': convbn.conv.out_channels,
@@ -280,7 +280,7 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
         return Conv2dBnFoldQuant(**kwargs)
 
     @staticmethod
-    def _create_conv2dbnwithoutfoldquant(convbn, quant_config: OpQuantConfig):
+    def create_conv2dbnwithoutfoldquant(convbn, quant_config: OpQuantConfig):
         """
         A static method to create `Conv2dBnWithoutFoldQuant` from a `Conv2dBnAct`
 
@@ -293,7 +293,7 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
             >>> # when apply QAT on `conv_bn_op`, QAT need to create a quant Conv2dBnAct whose weight is fake-quanted
             >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
             >>>                                         activation=FakeQuantWithMinMaxObserver.partial_init())
-            >>> conv_bn_quant = ConvBnLayerPolicy._create_conv2dbnwithoutfoldquant(conv_bn_op, quant_config)
+            >>> conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnwithoutfoldquant(conv_bn_op, quant_config)
         """
 
         kwargs = {'in_channels': convbn.conv.in_channels,

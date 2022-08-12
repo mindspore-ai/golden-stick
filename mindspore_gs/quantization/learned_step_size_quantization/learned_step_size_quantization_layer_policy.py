@@ -12,28 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""learned scale quantization layer policy"""
+"""learned step size quantization layer policy"""
 
 from typing import Optional
 from functools import partial
 from mindspore.nn import Cell
-from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
-    Conv2dBnFoldQuant
 from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer, \
     LearnedStepSizeFakeQuantizePerChannel
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig
-from ..simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
+from ..simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy, ConvLayerPolicy, \
+    DenseLayerPolicy, ConvBnLayerPolicy
 from ..fake_quantizer import FakeQuantizer
 from ..quantize_wrapper_cell import QuantizeWrapperCell
 
 
-class LearnedScaleQuantizationLayerPolicy(SimulatedLayerPolicy):
+class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LSQ layer policy.
     """
+
     def __init__(self, weight_names: [], act_names: [],
                  config: LearnedStepSizeQuantizationConfig = LearnedStepSizeQuantizationConfig()):
-        super(LearnedScaleQuantizationLayerPolicy, self).__init__(weight_names, act_names, config)
+        super(LearnedStepSizeQuantizationLayerPolicy, self).__init__(weight_names, act_names, config)
         if config.weight_per_channel:
             self._weight_quantizer_partial = partial(LearnedStepSizeFakeQuantizePerChannel,
                                                      quant_delay=config.weight_quant_delay,
@@ -62,35 +62,38 @@ class LearnedScaleQuantizationLayerPolicy(SimulatedLayerPolicy):
             narrow_range=config.act_narrow_range)
 
 
-class ConvLayerPolicy(LearnedScaleQuantizationLayerPolicy):
+class LearnedStepSizeQuantizationConvLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
     """
-    Derived class of LearnedScaleQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
+    Derived class of LearnedStepSizeQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
+
     def wrap_cell(self, handler: Cell) -> Cell:
-        conv_quant = Conv2dQuant.from_float(handler, self.get_quant_config())
+        conv_quant = ConvLayerPolicy.create_conv2dquant_from_conv(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_quant, self)
 
 
-class DenseLayerPolicy(LearnedScaleQuantizationLayerPolicy):
+class LearnedStepSizeQuantizationDenseLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
     """
-    Derived class of LearnedScaleQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
+    Derived class of LearnedStepSizeQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
+
     def wrap_cell(self, handler: Cell) -> Cell:
-        dense_quant = DenseQuant.from_float(handler, self.get_quant_config())
+        dense_quant = DenseLayerPolicy.create_densequant_from_dense(handler, self.get_quant_config())
         return QuantizeWrapperCell(dense_quant, self)
 
 
-class ConvBnLayerPolicy(LearnedScaleQuantizationLayerPolicy):
+class LearnedStepSizeQuantizationConvBnLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
     """
-    Derived class of LearnedScaleQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
+    Derived class of LearnedStepSizeQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
+
     def wrap_cell(self, handler: Cell) -> Cell:
         if self._config.bn_fold:
             if self._config.one_conv_fold:
-                conv_bn_quant = Conv2dBnFoldQuantOneConv.from_float(handler, self.get_quant_config())
+                conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquantoneconv(handler, self.get_quant_config())
             else:
-                conv_bn_quant = Conv2dBnFoldQuant.from_float(handler, self.get_quant_config(),
-                                                             {"freeze_bn": self._config.freeze_bn})
+                conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquant(handler, self.get_quant_config(),
+                                                                           {"freeze_bn": self._config.freeze_bn})
         else:
-            conv_bn_quant = Conv2dBnWithoutFoldQuant.from_float(handler, self.get_quant_config())
+            conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnwithoutfoldquant(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_bn_quant, self)

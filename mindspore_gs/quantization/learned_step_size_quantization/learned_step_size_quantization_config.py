@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""learned scale quantization config"""
+"""learned step size quantization config"""
 from ..simulated_quantization.simulated_quantization_config import SimulatedQuantizationConfig
 
 
 class LearnedStepSizeQuantizationConfig(SimulatedQuantizationConfig):
     """
-    Config for learned scale quantization aware training.
-    See more details in learned_scale_quantization_aware_training.py
+    Config for learned step size quantization aware training.
+    See more details in learned_step_size_quantization_aware_training.py
     """
     def __init__(self):
         super(LearnedStepSizeQuantizationConfig, self).__init__()

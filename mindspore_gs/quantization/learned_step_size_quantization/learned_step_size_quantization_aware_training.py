@@ -32,20 +32,50 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. supported attribute are listed below:
 
+            - quant_delay (Union[int, list, tuple]): Number of steps after which weights and activations are quantized
+              during train and eval. The first element represents data flow and the second element represents weights.
+              Default: (0, 0).
+            - quant_dtype (Union[QuantDtype, list, tuple]): Datatype used to quantize weights and activations. The first
+              element represents data flow and the second element represents weights. It is necessary to consider the
+              precision support of hardware devices in the practical quantization infer scenaries.
+              Default: (QuantDtype.INT8, QuantDtype.INT8).
+            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If True
+              then base on per channel, otherwise base on per layer. The first element represents data flow and the
+              second element represents weights, and the first element must be False now.
+              Default: (False, False).
+            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If True
+              then base on symmetric, otherwise base on asymmetric. The first element represents data flow and the
+              second element represents weights.
+              Default: (False, False).
+            - narrow_range (Union[bool, list, tuple]): Whether the quantization algorithm uses narrow range or not.
+              The first element represents data flow and the second element represents weights.
+              Default: (False, False).
+            - enable_fusion (bool): Whether apply fusion before applying quantization.
+              Default: False.
+            - freeze_bn (int): Number of steps after which BatchNorm OP parameters fixed to global mean and variance.
+              Default: 10000000.
             - bn_fold (bool): Whether to use bn fold ops for simulation inference operation.
               Default: False.
+            - one_conv_fold (bool): Whether to use one conv bn fold ops for simulation inference operation.
+              Default: True.
 
     Raises:
-        ValueError: `freeze_bn` is less than 0.
+        TypeError: If `bn_fold`, `one_conv_fold` or `enable_fusion` is not bool.
+        TypeError: If `freeze_bn` is not int.
+        TypeError: If `quant_delay` is not int, or every element of `quant_delay` is not int.
+        TypeError: If `quant_dtype` is not `QuantDtype`, or every element of `quant_dtype` is not `QuantDtype`.
+        TypeError: If `per_channel` is not bool, or every element of `per_channel` is not bool.
+        TypeError: If `symmetric` is not bool, or every element of `symmetric` is not bool.
+        TypeError: If `narrow_range` is not bool, or every element of `narrow_range` is not bool.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
             less than 2.
-        ValueError: If the element of `quant_delay` is less than 0.
-        ValueError: If the first element of `per_channel` is True.
-        NotImplementedError: If the element of `quant_dtype` is not `QuantDtype.INT8`.
-        TypeError: If the element of `quant_delay` is not int.
-        TypeError: If the element of `per_channel`, `symmetric`, `narrow_range`, `bn_fold`, `one_conv_fold` is not bool.
-        TypeError: If the element of `quant_dtype` is not `QuantDtype`.
-        TypeError: If `freeze_bn` is not int.
+        NotImplementedError：　If `freeze_bn` is not 0.
+        NotImplementedError: If `quant_delay` is not 0, or any element of `quant_delay` is not 0.
+        NotImplementedError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
+            `QuantDtype.INT8`.
+        NotImplementedError: If `per_channel` is True, or the first element of `per_channel` is True.
+        NotImplementedError: If `symmetric` is False, or any element of `symmetric` is False.
+        NotImplementedError: If `narrow_range` is False, or any element of `narrow_range` is False.
 
     Supported Platforms:
         ``GPU``
@@ -115,83 +145,211 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
           >
     """
 
-    def set_act_symmetric(self, act_symmetric):
+    def set_bn_fold(self, bn_fold):
         """
-        Raises:
-            TypeError: If `act_symmetric` is not bool.
-            NotImplementedError:  Learned scale quantization only support `act_symmetric` is True currently.
-        """
-        Validator.check_bool(act_symmetric, "act_symmetric", self.__class__.__name__)
-        if not act_symmetric:
-            raise NotImplementedError("Learned scale quantization only support `act_symmetric` is True currently")
-        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(act_symmetric)
+        Set value of bn_fold of `_config`
 
-    def set_weight_symmetric(self, weight_symmetric):
-        """
-        Raises:
-            TypeError: If `weight_symmetric` is not bool.
-            NotImplementedError:  Learned scale quantization only support `weight_symmetric` is True currently.
-        """
-        Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
-        if not weight_symmetric:
-            raise NotImplementedError("Learned scale quantization only support `weight_symmetric` is True currently")
-        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(weight_symmetric)
+        Args:
+            bn_fold (bool): Whether quantization algorithm use bn_fold or not.
 
-    def set_act_narrow_range(self, act_narrow_range):
-        """
         Raises:
-            TypeError: If `act_narrow_range` is not bool.
-            NotImplementedError:  Learned scale quantization only support `act_narrow_range` is True currently
+            TypeError: If `bn_fold` is not bool.
         """
-        Validator.check_bool(act_narrow_range, "act_narrow_range", self.__class__.__name__)
-        if not act_narrow_range:
-            raise NotImplementedError("Learned scale quantization only support `act_narrow_range` is True currently")
-        self._config.act_narrow_range = act_narrow_range
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_bn_fold(bn_fold)
 
-    def set_weight_narrow_range(self, weight_narrow_range):
+    def set_one_conv_fold(self, one_conv_fold):
         """
+        Set value of one_conv_fold of `_config`
+
+        Args:
+            one_conv_fold (bool): Whether quantization algorithm use one_conv_fold or not.
+
         Raises:
-            TypeError: If `weight_narrow_range` is not bool.
-            NotImplementedError:  Learned scale quantization only support `weight_narrow_range` is True currently
+            TypeError: If `one_conv_fold` is not bool.
         """
-        Validator.check_bool(weight_narrow_range, "weight_narrow_range", self.__class__.__name__)
-        if not weight_narrow_range:
-            raise NotImplementedError("Learned scale quantization only support `weight_narrow_range` is True "
-                                      "currently")
-        super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_narrow_range(weight_narrow_range)
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_one_conv_fold(one_conv_fold)
 
     def set_act_quant_delay(self, act_quant_delay):
         """
+        Set value of act_quant_delay of `_config`
+
+        Args:
+            act_quant_delay (int): Number of steps after which activation is quantized during train and eval.
+
         Raises:
             TypeError: If `act_quant_delay` is not int.
-            NotImplementedError:  Learned scale quantization only support `act_quant_delay` is 0 currently
+            NotImplementedError:  Learned step size quantization only support `act_quant_delay` is 0 currently
         """
         Validator.check_is_int(act_quant_delay, "act_quant_delay", self.__class__.__name__)
         if act_quant_delay != 0:
-            raise NotImplementedError("Learned scale quantization only support `act_quant_delay` is 0 currently")
+            raise NotImplementedError("Learned step size quantization only support `act_quant_delay` is 0 currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_quant_delay(act_quant_delay)
 
     def set_weight_quant_delay(self, weight_quant_delay):
         """
+        Set value of weight_quant_delay of `_config`
+
+        Args:
+            weight_quant_delay (int): Number of steps after which weight is quantized during train and eval.
+
         Raises:
             TypeError: If `weight_quant_delay` is not int.
-            NotImplementedError:  Learned scale quantization only support `weight_quant_delay` is 0 currently
+            NotImplementedError:  Learned step size quantization only support `weight_quant_delay` is 0 currently
         """
         Validator.check_is_int(weight_quant_delay, "weight_quant_delay", self.__class__.__name__)
         if weight_quant_delay != 0:
-            raise NotImplementedError("Learned scale quantization only support `weight_quant_delay` is 0 currently")
+            raise NotImplementedError("Learned step size quantization only support `weight_quant_delay` is 0 currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_quant_delay(weight_quant_delay)
+
+    def set_act_per_channel(self, act_per_channel):
+        """
+        Set value of act_per_channel of `_config`
+
+        Args:
+            act_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
+                per channel, otherwise base on per layer. Only support False now.
+
+        Raises:
+            TypeError: If `act_per_channel` is not bool.
+            NotImplementedError: Only supported if `act_per_channel` is False yet.
+        """
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_per_channel(act_per_channel)
+
+    def set_weight_per_channel(self, weight_per_channel):
+        """
+        Set value of weight_per_channel of `_config`
+
+        Args:
+            weight_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
+                per channel, otherwise base on per layer.
+
+        Raises:
+            TypeError: If `weight_per_channel` is not bool.
+        """
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_per_channel(weight_per_channel)
+
+    def set_act_quant_dtype(self, act_quant_dtype):
+        """
+        Set value of act_quant_dtype of `_config`
+
+        Args:
+            act_quant_dtype (QuantDtype): Datatype used to quantize activations.
+
+        Raises:
+            TypeError: If `act_quant_dtype` is not QuantDtype.
+            NotImplementedError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
+        """
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_quant_dtype(act_quant_dtype)
+
+    def set_weight_quant_dtype(self, weight_quant_dtype):
+        """
+        Set value of weight_quant_dtype of `_config`
+
+        Args:
+            weight_quant_dtype (QuantDtype): Datatype used to quantize activations.
+
+        Raises:
+            TypeError: If `weight_quant_dtype` is not QuantDtype.
+            NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
+        """
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_quant_dtype(weight_quant_dtype)
+
+    def set_act_symmetric(self, act_symmetric):
+        """
+        Set value of act_symmetric of `_config`
+
+        Args:
+            act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. Learned step size
+                quantization only support `act_symmetric` is True currently.
+
+        Raises:
+            TypeError: If `act_symmetric` is not bool.
+            NotImplementedError: If `act_symmetric` is not True.
+        """
+        Validator.check_bool(act_symmetric, "act_symmetric", self.__class__.__name__)
+        if not act_symmetric:
+            raise NotImplementedError("Learned step size quantization only support `act_symmetric` is True currently")
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(act_symmetric)
+
+    def set_weight_symmetric(self, weight_symmetric):
+        """
+        Set value of weight_symmetric of `_config`
+
+        Args:
+            weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. Learned step size
+                quantization only support `weight_symmetric` is True currently.
+
+        Raises:
+            TypeError: If `weight_symmetric` is not bool.
+            NotImplementedError: If `act_symmetric` is not True.
+        """
+        Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
+        if not weight_symmetric:
+            raise NotImplementedError("Learned step size quantization only support `weight_symmetric` is True currently")
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(weight_symmetric)
+
+    def set_act_narrow_range(self, act_narrow_range):
+        """
+        Set value of act_narrow_range of `_config`
+
+        Args:
+            act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. Learned step size
+                quantization only support `act_narrow_range` is True currently
+
+        Raises:
+            TypeError: If `act_narrow_range` is not bool.
+            NotImplementedError: If `act_narrow_range` is not True.
+        """
+        Validator.check_bool(act_narrow_range, "act_narrow_range", self.__class__.__name__)
+        if not act_narrow_range:
+            raise NotImplementedError("Learned step size quantization only support `act_narrow_range` is True currently")
+        self._config.act_narrow_range = act_narrow_range
+
+    def set_weight_narrow_range(self, weight_narrow_range):
+        """
+        Set value of weight_narrow_range of `_config`
+
+        Args:
+            weight_narrow_range (bool): Whether the quantization algorithm use weight narrow_range or not. Learned step
+                size quantization only support `weight_narrow_range` is True currently.
+
+        Raises:
+            TypeError: If `weight_narrow_range` is not bool.
+            NotImplementedError: If `weight_narrow_range` is not True.
+        """
+        Validator.check_bool(weight_narrow_range, "weight_narrow_range", self.__class__.__name__)
+        if not weight_narrow_range:
+            raise NotImplementedError("Learned step size quantization only support `weight_narrow_range` is True "
+                                      "currently")
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_narrow_range(weight_narrow_range)
 
     def set_freeze_bn(self, freeze_bn):
         """
+        Set value of freeze_bn of `_config`
+
+        Args:
+            freeze_bn (int): Number of steps after which BatchNorm OP parameters fixed to global mean and variance.
+
         Raises:
             TypeError: If `freeze_bn` is not int.
-            NotImplementedError:  Learned scale quantization only support `freeze_bn` is 0 currently
+            NotImplementedError: Learned step size quantization only support `freeze_bn` is 0 currently
         """
         Validator.check_is_int(freeze_bn, "freeze_bn", self.__class__.__name__)
         if freeze_bn != 0:
-            raise NotImplementedError("Learned scale quantization only support `freeze_bn` is 0 currently")
+            raise NotImplementedError("Learned step size quantization only support `freeze_bn` is 0 currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_freeze_bn(freeze_bn)
+
+    def set_enable_fusion(self, enable_fusion):
+        """
+        Set value of enable_fusion of `_config`
+
+        Args:
+            enable_fusion (bool): Whether apply fusion before applying quantization, default is False.
+
+        Raises:
+            TypeError: If `enable_fusion` is not bool.
+        """
+        super(LearnedStepSizeQuantizationAwareTraining, self).set_enable_fusion(enable_fusion)
 
     def apply(self, network: Cell) -> Cell:
         """
