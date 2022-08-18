@@ -479,7 +479,7 @@ def test_lenet(quant_bit):
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
-def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
+def test_lenet_accuracy(quant_bit, run_mode):
     """
     Feature: test accuracy of slb qat work on lenet5.
     Description: Apply slb qat on lenet5 and test accuracy.
@@ -489,9 +489,7 @@ def test_lenet_accuracy(mnist_path_option, quant_bit, run_mode):
     from lenet.src.lenet import LeNet5
     from lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=run_mode)
-    mnist_path = mnist_path_option
-    if mnist_path_option is None:
-        mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
+    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
     data_path = os.path.join(mnist_path, "train")
     ds_train = create_mnist_ds(data_path, 32, 1)
     network = LeNet5(10)
