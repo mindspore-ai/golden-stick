@@ -82,12 +82,13 @@ def test_gpu_accuracy_graph():
     ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 
     model_path = utils.train_network(ori_model_path, model_name, config_name, "quantization/simqat",
-                                     "run_standalone_train_gpu.sh", "GRAPH", "mnist", 500)
+                                     "run_standalone_train_gpu.sh",
+                                     utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH"), "mnist", 700)
 
     acc = utils.eval_network(model_path, model_name, config_name, "quantization/simqat", "run_eval_gpu.sh",
-                             "train/ckpt/checkpoint_lenet-10_1875.ckpt", "GRAPH", "mnist", 200)
+                             "train/ckpt/checkpoint_lenet-10_1875.ckpt",
+                             utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH"), "mnist", 200)
     assert acc > 0.98
-
 
 
 @pytest.mark.level0
@@ -106,8 +107,10 @@ def test_gpu_accuracy_pynative():
     ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 
     model_path = utils.train_network(ori_model_path, model_name, config_name, "quantization/simqat",
-                                     "run_standalone_train_gpu.sh", "PYNATIVE", "mnist", 700)
+                                     "run_standalone_train_gpu.sh",
+                                     utils.TrainEvalConfig.run_mode_train_eval_config("PYNATIVE"), "mnist", 700)
 
     acc = utils.eval_network(model_path, model_name, config_name, "quantization/simqat", "run_eval_gpu.sh",
-                             "train/ckpt/checkpoint_lenet-10_1875.ckpt", "PYNATIVE", "mnist", 200)
+                             "train/ckpt/checkpoint_lenet-10_1875.ckpt",
+                             utils.TrainEvalConfig.run_mode_train_eval_config("PYNATIVE"), "mnist", 200)
     assert acc > 0.98

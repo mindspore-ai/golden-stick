@@ -108,8 +108,9 @@ def copy_files(from_, to_, file_name):
 
 def exec_sed(file, src, dst):
     """ Replace `dst` string to `src` string in `file`. """
-    ret = os.system('sed -i "s#{0}#{1}#g" {2}'.format(src, dst, file))
-    return ret == 0
+    cmd = 'sed -i "s/{0}/{1}/g" {2}'.format(src, dst, file)
+    ret = os.system(cmd)
+    return ret == 0, cmd
 
 
 def process_check(cycle_time, cmd, wait_time=5):
@@ -130,8 +131,43 @@ def process_check(cycle_time, cmd, wait_time=5):
     return False
 
 
-def train_network(ori_model_path, model_name, config_name, algo_rpath, script_name, run_mode="GRAPH", ds_type="mnist",
-                  train_timeout_sec=300):
+class TrainEvalConfig:
+    """ A helper for replacing config into config file. """
+
+    run_mode_key = "mode_name"
+    epoch_size_key = "epoch_size"
+    device_target_key = "device_target"
+
+    def __init__(self):
+        """ Constructor of TrainEvalConfig. """
+        self.config_list = {}
+
+    @classmethod
+    def run_mode_train_eval_config(cls, run_mode: str):
+        """ create a run_mode TrainEvalConfig. """
+        config = cls()
+        config.add_config(TrainEvalConfig.run_mode_key, run_mode)
+        return config
+
+    def add_config(self, key: str, value: str):
+        """ add config to config list """
+        self.config_list[key] = value
+
+    def get_run_mode(self):
+        """ get run_mode from config list. """
+        mode = self.config_list.get(TrainEvalConfig.run_mode_key)
+        return mode if mode else "GRAPH"
+
+    def apply(self, file: str):
+        """ sed file with config list. """
+        for key, value in self.config_list.items():
+            ret, cmd = exec_sed(file, "^{}.*$".format(key), "{}: {}".format(key, value))
+            if not ret:
+                raise RuntimeError("Error occurred while executing {}".format(cmd))
+
+
+def train_network(ori_model_path, model_name, config_name, algo_rpath, script_name, config: TrainEvalConfig,
+                  ds_type="mnist", train_timeout_sec=300):
     """
     Train a network.
 
@@ -144,8 +180,7 @@ def train_network(ori_model_path, model_name, config_name, algo_rpath, script_na
         algo_rpath (str): Relative path of algorithm from '$model_path/golden_stick'. Take SimQAT algorithm in LeNet as
           an example, algo_rpath is 'quantization/simqat'.
         script_name (str): File name of script under '$model_path/golden_stick/scripts'
-        run_mode (str): Training mode, "GRAPH" for mindspore.context.GRAPH_MODE, "PYNATIVE" for
-          mindspore.context.PYNATIVE_MODE.
+        config (TrainEvalConfig): Train config to update config file.
         ds_type (str): Name of dataset, only support 'mnist' for MNIST dataset now!
         train_timeout_sec (int): Timeout in seconds, default 300.
 
@@ -166,8 +201,7 @@ def train_network(ori_model_path, model_name, config_name, algo_rpath, script_na
     algo_path = os.path.join(model_path, "golden_stick", algo_rpath)
     config_file = os.path.join(algo_path, config_name)
     assert os.path.exists(config_file)
-    exec_sed(config_file, "GRAPH", run_mode)
-    exec_sed(config_file, "PYNATIVE", run_mode)
+    config.apply(config_file)
     ds_path = os.getenv("DATASET_PATH", None)
     if ds_path:
         train_ds_path = os.path.join(ds_path, ds_sub_dir)
@@ -179,17 +213,17 @@ def train_network(ori_model_path, model_name, config_name, algo_rpath, script_na
     assert os.path.exists(os.path.join(exec_path, script_name))
     exec_train_network_shell = "cd {}; bash {} {} {} {}; cd -" \
         .format(exec_path, script_name, algo_path, config_file, train_ds_path)
-    print("=" * 10, "start training {} in {} mode".format(model_name, run_mode), "=" * 10, flush=True)
+    print("=" * 10, "start training {} in {} mode".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
     print("Train cmd: {}".format(exec_train_network_shell), flush=True)
     ret = os.system(exec_train_network_shell)
     assert ret == 0
     cmd = "ps -ef | grep python | grep train.py | grep {} | grep -v grep".format(config_name)
     process_check(train_timeout_sec, cmd, 1)
-    print("=" * 10, "finish training {} in {} mode.".format(model_name, run_mode), "=" * 10, flush=True)
+    print("=" * 10, "finish training {} in {} mode.".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
     return model_path
 
 
-def eval_network(model_path, model_name, config_name, algo_rpath, script_name, ckpt_rpath, run_mode="GRAPH",
+def eval_network(model_path, model_name, config_name, algo_rpath, script_name, ckpt_rpath, config: TrainEvalConfig,
                  ds_type="mnist", eval_timeout_sec=50):
     """
     Eval a network.
@@ -203,8 +237,7 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
           an example, algo_rpath is 'quantization/simqat'.
         script_name (str): File name of script under '$model_path/golden_stick/scripts'
         ckpt_rpath (str): Relative path of checkpoint file from '$model_path/golden_stick/scripts'
-        run_mode (str): Training mode, "GRAPH" for mindspore.context.GRAPH_MODE, "PYNATIVE" for
-          mindspore.context.PYNATIVE_MODE.
+        config (TrainEvalConfig): Eval config to update config file.
         ds_type (str): Name of dataset, only support 'mnist' for MNIST dataset now!
         eval_timeout_sec (int): Timeout in seconds, default 50.
 
@@ -222,8 +255,7 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
     algo_path = os.path.join(model_path, "golden_stick", algo_rpath)
     config_file = os.path.join(algo_path, config_name)
     assert os.path.exists(config_file)
-    exec_sed(config_file, "GRAPH", run_mode)
-    exec_sed(config_file, "PYNATIVE", run_mode)
+    config.apply(config_file)
     ds_path = os.getenv("DATASET_PATH", None)
     if ds_path:
         eval_ds_path = os.path.join(ds_path, ds_sub_dir)
@@ -238,13 +270,13 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
     assert os.path.exists(ckpt_file)
     exec_eval_network_shell = "cd {}; bash {} {} {} {} {}; cd -" \
         .format(exec_path, script_name, algo_path, config_file, eval_ds_path, ckpt_file)
-    print("=" * 10, "start evaling {} in {} mode".format(model_name, run_mode), "=" * 10, flush=True)
+    print("=" * 10, "start evaluating {} in {} mode".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
     print("Eval cmd: {}".format(exec_eval_network_shell), flush=True)
     ret = os.system(exec_eval_network_shell)
     assert ret == 0
     cmd = "ps -ef | grep python | grep eval.py | grep {} | grep -v grep".format(config_name)
     process_check(eval_timeout_sec, cmd, 1)
-    print("=" * 10, "finish evaling {} in {} mode.".format(model_name, run_mode), "=" * 10, flush=True)
+    print("=" * 10, "finish evaluating {} in {} mode.".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
 
     eval_log_file = os.path.join(exec_path, "eval", "log.txt")
     assert os.path.exists(eval_log_file)
@@ -255,5 +287,5 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
             if match_result is not None:
                 results.append(float(match_result.group(1)))
     assert len(results) == 1
-    print("=" * 10, "LeNet {} mode accuracy: {}".format(run_mode, results[0]), "=" * 10, flush=True)
+    print("=" * 10, "LeNet {} mode accuracy: {}".format(config.get_run_mode(), results[0]), "=" * 10, flush=True)
     return results[0]
