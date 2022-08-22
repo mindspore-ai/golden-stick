@@ -7,13 +7,13 @@ mindspore_gs.pruner
 
     import mindspore_gs.pruner as pruner
 
-SCOP Algorithm
---------------
+SCOP剪枝算法
+-----------
 
-.. autosummary::
+.. mscnautosummary::
     :toctree: pruner
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.pruner.scop.PrunerKfCompressAlgo
-    mindspore_gs.pruner.scop.PrunerFtCompressAlgo
+    mindspore_gs.pruner.PrunerKfCompressAlgo
+    mindspore_gs.pruner.PrunerFtCompressAlgo

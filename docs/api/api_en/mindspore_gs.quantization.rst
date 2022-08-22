@@ -15,7 +15,7 @@ Simulated Quantization Algorithm
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.quantization.simulated_quantization.SimulatedQuantizationAwareTraining
+    mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
 SLB Algorithm
 -------------
@@ -25,4 +25,4 @@ SLB Algorithm
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.quantization.slb.SlbQuantAwareTraining
+    mindspore_gs.quantization.SlbQuantAwareTraining

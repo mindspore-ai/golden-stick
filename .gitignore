@@ -4,3 +4,5 @@ output/
 *.egg
 mindspore_gs/.commit_id
 .idea/
+__pycache__
+
