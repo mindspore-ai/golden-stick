@@ -22,9 +22,8 @@ import re
 from mindspore import log as logger
 
 # CI env
-rank_table_path = "/home/workspace/mindspore_config/hccl/rank_table_8p.json"
 data_root = "/home/workspace/mindspore_dataset/"
-ckpt_root = "/home/workspace/mindspore_dataset/checkpoint"
+ckpt_root = "/home/workspace/mindspore_ckpt/ckpt"
 cur_path = os.path.split(os.path.realpath(__file__))[0]
 model_zoo_path = os.path.join(cur_path, "../../../tests/models")
 
@@ -94,16 +93,19 @@ def qat_config_compare(algo_cfg, target: dict):
     return True
 
 
-def copy_files(from_, to_, file_name):
+def copy_file(src, dst):
     """
     Copy file named `file_name` from `from_` dir to `to_` dir. If `file_name` is a dir, copy all files under the dir. If
     `file_name` exist in `to_` dir, it will be deleted.
     """
-    if not os.path.exists(os.path.join(from_, file_name)):
-        raise ValueError("There is no file or path", os.path.join(from_, file_name))
-    if os.path.exists(os.path.join(to_, file_name)):
-        shutil.rmtree(os.path.join(to_, file_name))
-    return os.system("cp -r {0} {1}".format(os.path.join(from_, file_name), to_))
+    if not os.path.exists(src):
+        raise ValueError("There is no file or path", src)
+    if os.path.exists(dst):
+        if os.path.isdir(dst):
+            shutil.rmtree(dst)
+        else:
+            os.remove(dst)
+    return os.system("cp -r {0} {1}".format(src, dst))
 
 
 def exec_sed(file, src, dst):
@@ -120,13 +122,10 @@ def process_check(cycle_time, cmd, wait_time=5):
         sub = subprocess.Popen(args="{}".format(cmd), shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, universal_newlines=True)
         stdout_data, _ = sub.communicate()
-        if sub.returncode != 0:
-            logger.warning("process execute failed: {}.".format(sub.returncode))
-            return False
         if not stdout_data:
             logger.info("process execute success.")
             return True
-        logger.info("process is running, please wait {}".format(i))
+        logger.info("process is running, please wait. time {}s.".format(i))
     logger.warning("process execute execute timeout.")
     return False
 
@@ -137,6 +136,7 @@ class TrainEvalConfig:
     run_mode_key = "mode_name"
     epoch_size_key = "epoch_size"
     device_target_key = "device_target"
+    batch_size_key = "batch_size"
 
     def __init__(self):
         """ Constructor of TrainEvalConfig. """
@@ -146,10 +146,10 @@ class TrainEvalConfig:
     def run_mode_train_eval_config(cls, run_mode: str):
         """ create a run_mode TrainEvalConfig. """
         config = cls()
-        config.add_config(TrainEvalConfig.run_mode_key, run_mode)
+        config.set_config(TrainEvalConfig.run_mode_key, run_mode)
         return config
 
-    def add_config(self, key: str, value: str):
+    def set_config(self, key: str, value: str):
         """ add config to config list """
         self.config_list[key] = value
 
@@ -166,8 +166,9 @@ class TrainEvalConfig:
                 raise RuntimeError("Error occurred while executing {}".format(cmd))
 
 
-def train_network(ori_model_path, model_name, config_name, algo_rpath, script_name, config: TrainEvalConfig,
-                  ds_type="mnist", train_timeout_sec=300):
+def train_network(ori_model_path, model_name, model_suffix, config_name, algo_rpath, script_name,
+                  config: TrainEvalConfig, ds_type="mnist", train_timeout_sec=300, continue_train=False,
+                  pretrained=False, ckpt_path="", train_log_rpath=""):
     """
     Train a network.
 
@@ -175,6 +176,7 @@ def train_network(ori_model_path, model_name, config_name, algo_rpath, script_na
         ori_model_path (str): Model directory path to submodule models. Take LeNet as an example, the relative path of
           LeNet from this file is: '../models/official/cv/'.
         model_name (str): Name of directory, take LeNet as an example, name of directory is 'lenet'.
+        model_suffix (str): Suffix for model path for unique directory.
         config_name (str): File name of config file. Take training LeNet network on MNIST dataset as an example, config
           file name is 'lenet_mnist_config.yaml'.
         algo_rpath (str): Relative path of algorithm from '$model_path/golden_stick'. Take SimQAT algorithm in LeNet as
@@ -183,6 +185,10 @@ def train_network(ori_model_path, model_name, config_name, algo_rpath, script_na
         config (TrainEvalConfig): Train config to update config file.
         ds_type (str): Name of dataset, only support 'mnist' for MNIST dataset now!
         train_timeout_sec (int): Timeout in seconds, default 300.
+        continue_train (bool): Is continue training.
+        pretrained (bool): Is has pretrained original network.
+        ckpt_path (str): Continue training or pretrained ckpt file path.
+        train_log_rpath (str): Relative path of train log file from model_path.
 
     Returns:
         A string represents real working model directory. Take LeNet as an example, it returns '$cur_path/lenet'.
@@ -190,12 +196,14 @@ def train_network(ori_model_path, model_name, config_name, algo_rpath, script_na
 
     if ds_type == "mnist":
         ds_sub_dir = "mnist/train"
+    elif ds_type == "cifar10":
+        ds_sub_dir = "cifar-10-batches-bin"
     else:
-        raise NotImplementedError("ds_type only support mnist now!")
+        raise NotImplementedError("ds_type not support {} now!".format(ds_type))
 
     cur_path_ = os.path.dirname(os.path.abspath(__file__))
-    copy_files(ori_model_path, cur_path_, model_name)
-    model_path = os.path.join(cur_path_, model_name)
+    copy_file(os.path.join(ori_model_path, model_name), os.path.join(cur_path_, model_name + model_suffix))
+    model_path = os.path.join(cur_path_, model_name + model_suffix)
     assert os.path.exists(model_path)
     exec_path = os.path.join(model_path, "golden_stick", "scripts")
     algo_path = os.path.join(model_path, "golden_stick", algo_rpath)
@@ -211,20 +219,37 @@ def train_network(ori_model_path, model_name, config_name, algo_rpath, script_na
     assert os.path.exists(algo_path)
     assert os.path.exists(train_ds_path)
     assert os.path.exists(os.path.join(exec_path, script_name))
-    exec_train_network_shell = "cd {}; bash {} {} {} {}; cd -" \
-        .format(exec_path, script_name, algo_path, config_file, train_ds_path)
+    if continue_train:
+        assert os.path.exists(ckpt_path)
+        exec_train_network_shell = "cd {}; bash {} {} {} {} PRETRAINED {}; cd -" \
+            .format(exec_path, script_name, algo_path, config_file, train_ds_path, ckpt_path)
+    elif pretrained:
+        assert os.path.exists(ckpt_path)
+        exec_train_network_shell = "cd {}; bash {} {} {} {} FP32 {}; cd -" \
+            .format(exec_path, script_name, algo_path, config_file, train_ds_path, ckpt_path)
+    else:
+        exec_train_network_shell = "cd {}; bash {} {} {} {}; cd -" \
+            .format(exec_path, script_name, algo_path, config_file, train_ds_path)
     print("=" * 10, "start training {} in {} mode".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
     print("Train cmd: {}".format(exec_train_network_shell), flush=True)
     ret = os.system(exec_train_network_shell)
     assert ret == 0
     cmd = "ps -ef | grep python | grep train.py | grep {} | grep -v grep".format(config_name)
-    process_check(train_timeout_sec, cmd, 1)
+    ret = process_check(train_timeout_sec, cmd, 1)
+    if not ret:
+        log_path = os.path.join(model_path, train_log_rpath)
+        if os.path.exists(log_path):
+            os.system("cat {}".format(log_path))
+        else:
+            os.system("echo {}".format("No train log file exist: " + log_path))
+        assert ret
     print("=" * 10, "finish training {} in {} mode.".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
     return model_path
 
 
 def eval_network(model_path, model_name, config_name, algo_rpath, script_name, ckpt_rpath, config: TrainEvalConfig,
-                 ds_type="mnist", eval_timeout_sec=50):
+                 ds_type="mnist", eval_timeout_sec=50, eval_log_file_name="log.txt",
+                 acc_regex="=== {'Accuracy': ([0-9,.]*)} ===", train_log_rpath=""):
     """
     Eval a network.
 
@@ -240,6 +265,9 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
         config (TrainEvalConfig): Eval config to update config file.
         ds_type (str): Name of dataset, only support 'mnist' for MNIST dataset now!
         eval_timeout_sec (int): Timeout in seconds, default 50.
+        eval_log_file_name (str): Name of log file.
+        acc_regex (str): Regex str for matching acc-result.
+        train_log_rpath (str): Relative path of train log file from model_path.
 
     Returns:
         A string represents real working model directory. Take LeNet as an example, it returns '$cur_path/lenet'.
@@ -247,13 +275,17 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
 
     if ds_type == "mnist":
         ds_sub_dir = "mnist/test"
+    elif ds_type == "cifar10":
+        ds_sub_dir = "cifar-10-verify-bin"
     else:
-        raise NotImplementedError("ds_type only support mnist now!")
+        raise NotImplementedError("ds_type not support {} now!".format(ds_type))
 
     assert os.path.exists(model_path)
     exec_path = os.path.join(model_path, "golden_stick", "scripts")
     algo_path = os.path.join(model_path, "golden_stick", algo_rpath)
     config_file = os.path.join(algo_path, config_name)
+    assert os.path.exists(exec_path)
+    assert os.path.exists(algo_path)
     assert os.path.exists(config_file)
     config.apply(config_file)
     ds_path = os.getenv("DATASET_PATH", None)
@@ -263,11 +295,15 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
         eval_ds_path = os.path.join(data_root, ds_sub_dir)
 
     ckpt_file = os.path.join(exec_path, ckpt_rpath)
-    assert os.path.exists(exec_path)
-    assert os.path.exists(algo_path)
     assert os.path.exists(os.path.join(exec_path, script_name))
     assert os.path.exists(eval_ds_path)
-    assert os.path.exists(ckpt_file)
+    if not os.path.exists(ckpt_file):
+        log_path = os.path.join(model_path, train_log_rpath)
+        if os.path.exists(log_path):
+            os.system("cat {}".format(log_path))
+        else:
+            os.system("echo {}".format("No train log file exist: " + log_path))
+        assert False
     exec_eval_network_shell = "cd {}; bash {} {} {} {} {}; cd -" \
         .format(exec_path, script_name, algo_path, config_file, eval_ds_path, ckpt_file)
     print("=" * 10, "start evaluating {} in {} mode".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
@@ -275,15 +311,21 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
     ret = os.system(exec_eval_network_shell)
     assert ret == 0
     cmd = "ps -ef | grep python | grep eval.py | grep {} | grep -v grep".format(config_name)
-    process_check(eval_timeout_sec, cmd, 1)
+    ret = process_check(eval_timeout_sec, cmd, 1)
+    eval_log_file = os.path.join(exec_path, "eval", eval_log_file_name)
+    if not ret:
+        if os.path.exists(eval_log_file):
+            os.system("cat {}".format(eval_log_file))
+        else:
+            os.system("echo {}".format("No eval log file exist: " + eval_log_file))
+        assert ret
     print("=" * 10, "finish evaluating {} in {} mode.".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
 
-    eval_log_file = os.path.join(exec_path, "eval", "log.txt")
     assert os.path.exists(eval_log_file)
     results = []
     with open(eval_log_file, "r") as file:
         for line in file.readlines():
-            match_result = re.search("=== {'Accuracy': ([0-9,.]*)} ===", line)
+            match_result = re.search(acc_regex, line)
             if match_result is not None:
                 results.append(float(match_result.group(1)))
     assert len(results) == 1

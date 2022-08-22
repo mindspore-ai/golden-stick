@@ -24,14 +24,21 @@ from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 from tests.st import test_utils as utils
 
 
+cur_path = os.path.dirname(os.path.abspath(__file__))
+model_name = "lenet"
+config_name = "lenet_mnist_config.yaml"
+ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
+train_log_rpath = os.path.join("golden_stick", "scripts", "train", "log")
+
+
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_lenet_apply():
     """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on lenet.
-    Expectation: Apply success.
+    Feature: simulated quantization algorithm.
+    Description: apply simulated_quantization on lenet5.
+    Expectation: apply success and structure of network as expect.
     """
 
     from ....models.official.cv.lenet.src.lenet import LeNet5
@@ -71,23 +78,19 @@ def test_lenet_apply():
 @pytest.mark.env_onecard
 def test_gpu_accuracy_graph():
     """
-    Feature: test accuracy of sim qat work on lenet5.
-    Description: Apply sim qat on lenet5 and test accuracy.
+    Feature: test accuracy of sim_qat on lenet5, mnist in Graph mode.
+    Description: apply sim_qat on lenet5 and test accuracy in Graph mod.
     Expectation: accuracy is larger than 0.98.
     """
 
-    cur_path = os.path.dirname(os.path.abspath(__file__))
-    model_name = "lenet"
-    config_name = "lenet_mnist_config.yaml"
-    ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
-
-    model_path = utils.train_network(ori_model_path, model_name, config_name, "quantization/simqat",
-                                     "run_standalone_train_gpu.sh",
-                                     utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH"), "mnist", 700)
-
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_accuracy_graph", config_name,
+                                     "quantization/simqat", "run_standalone_train_gpu.sh",
+                                     utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH"), "mnist", 700,
+                                     train_log_rpath=train_log_rpath)
     acc = utils.eval_network(model_path, model_name, config_name, "quantization/simqat", "run_eval_gpu.sh",
                              "train/ckpt/checkpoint_lenet-10_1875.ckpt",
-                             utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH"), "mnist", 200)
+                             utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH"), "mnist", 200,
+                             train_log_rpath=train_log_rpath)
     assert acc > 0.98
 
 
@@ -96,21 +99,84 @@ def test_gpu_accuracy_graph():
 @pytest.mark.env_onecard
 def test_gpu_accuracy_pynative():
     """
-    Feature: test accuracy of sim qat work on lenet5.
-    Description: Apply sim qat on lenet5 and test accuracy.
+    Feature: test accuracy of sim_qat on lenet5, mnist in PyNative mode.
+    Description: apply sim_qat on lenet5 and test accuracy in PyNative mod.
     Expectation: accuracy is larger than 0.98.
     """
 
-    cur_path = os.path.dirname(os.path.abspath(__file__))
-    model_name = "lenet"
-    config_name = "lenet_mnist_config.yaml"
-    ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
-
-    model_path = utils.train_network(ori_model_path, model_name, config_name, "quantization/simqat",
-                                     "run_standalone_train_gpu.sh",
-                                     utils.TrainEvalConfig.run_mode_train_eval_config("PYNATIVE"), "mnist", 700)
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_accuracy_pynative", config_name,
+                                     "quantization/simqat", "run_standalone_train_gpu.sh",
+                                     utils.TrainEvalConfig.run_mode_train_eval_config("PYNATIVE"), "mnist", 700,
+                                     train_log_rpath=train_log_rpath)
 
     acc = utils.eval_network(model_path, model_name, config_name, "quantization/simqat", "run_eval_gpu.sh",
                              "train/ckpt/checkpoint_lenet-10_1875.ckpt",
-                             utils.TrainEvalConfig.run_mode_train_eval_config("PYNATIVE"), "mnist", 200)
+                             utils.TrainEvalConfig.run_mode_train_eval_config("PYNATIVE"), "mnist", 200,
+                             train_log_rpath=train_log_rpath)
     assert acc > 0.98
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_gpu_continue_train():
+    """
+    Feature: test continue training feature of sim_qat on lenet5 in Graph mode.
+    Description: applying sim_qat on lenet5 and continue training with ckpt.
+    Expectation: continue training failed.
+    """
+
+    config = utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH")
+    config.set_config(utils.TrainEvalConfig.epoch_size_key, 1)
+
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_continue_train", config_name,
+                                     "quantization/simqat", "run_standalone_train_gpu.sh", config, "mnist", 700,
+                                     train_log_rpath=train_log_rpath)
+    ckpt_file = os.path.join(cur_path, "checkpoint_lenet-1_1875_{}.ckpt".format("test_gpu_continue_train"))
+    try:
+        utils.copy_file(os.path.join(model_path, "golden_stick", "scripts", "train/ckpt/checkpoint_lenet-1_1875.ckpt"),
+                        ckpt_file)
+    except ValueError:
+        log_path = os.path.join(model_path, train_log_rpath)
+        if os.path.exists(log_path):
+            os.system("cat {}".format(log_path))
+        else:
+            os.system("echo {}".format("No train log file exist: " + log_path))
+        assert False
+    assert os.path.exists(ckpt_file)
+
+    config.set_config(utils.TrainEvalConfig.epoch_size_key, 2)
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_continue_train", config_name,
+                                     "quantization/simqat", "run_standalone_train_gpu.sh", config, "mnist", 700,
+                                     continue_train=True, ckpt_path=ckpt_file, train_log_rpath=train_log_rpath)
+    # lenet not support continue train
+    assert not os.path.exists(os.path.join(model_path, "golden_stick", "scripts", "train", "ckpt",
+                                           "checkpoint_lenet-1_1875.ckpt"))
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_gpu_pre_train():
+    """
+    Feature: test pre-training feature of sim_qat on lenet5 in Graph mode.
+    Description: applying sim_qat on lenet5 and pre-training with ckpt.
+    Expectation: pre-training success.
+    """
+
+    ckpt_file = os.path.join(utils.ckpt_root, "checkpoint_lenet-10_1875.ckpt")
+    assert os.path.exists(ckpt_file)
+
+    config = utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH")
+    config.set_config(utils.TrainEvalConfig.epoch_size_key, 1)
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_pre_train", config_name,
+                                     "quantization/simqat", "run_standalone_train_gpu.sh", config, "mnist", 700,
+                                     pretrained=True, ckpt_path=ckpt_file, train_log_rpath=train_log_rpath)
+    if not os.path.exists(os.path.join(model_path, "golden_stick", "scripts", "train", "ckpt",
+                                       "checkpoint_lenet-1_1875.ckpt")):
+        log_path = os.path.join(model_path, train_log_rpath)
+        if os.path.exists(log_path):
+            os.system("cat {}".format(log_path))
+        else:
+            os.system("echo {}".format("No train log file exist: " + log_path))
+        assert False
