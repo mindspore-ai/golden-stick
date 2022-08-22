@@ -1,0 +1,19 @@
+mindspore_gs.pruner
+===================
+
+剪枝算法集。
+
+.. code-block::
+
+    import mindspore_gs.pruner as pruner
+
+SCOP Algorithm
+--------------
+
+.. autosummary::
+    :toctree: pruner
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.pruner.scop.PrunerKfCompressAlgo
+    mindspore_gs.pruner.scop.PrunerFtCompressAlgo
