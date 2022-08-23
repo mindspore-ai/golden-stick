@@ -1,7 +1,7 @@
-mindspore_gs.SlbQuantAwareTraining
-==================================
+mindspore_gs.quantization.SlbQuantAwareTraining
+===============================================
 
-.. py:class:: mindspore_gs.SlbQuantAwareTraining(config=None)
+.. py:class:: mindspore_gs.quantization.SlbQuantAwareTraining(config=None)
 
     用于定义SLB量化算子的类，通过调用接口apply()，可以在原网络定义的基础上，修改需要量化的网络层，生成带有伪量化节点的网络。
 

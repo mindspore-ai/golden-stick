@@ -1,7 +1,7 @@
-mindspore_gs.SimulatedQuantizationAwareTraining
-===============================================
+mindspore_gs.quantization.SimulatedQuantizationAwareTraining
+============================================================
 
-.. py:class:: mindspore.SimulatedQuantizationAwareTraining(config=None)
+.. py:class:: mindspore_gs.quantization.SimulatedQuantizationAwareTraining(config=None)
 
     SimulatedQuantizationAwareTraining是GoldenStick的子类，实现了模拟QAT算法。
 

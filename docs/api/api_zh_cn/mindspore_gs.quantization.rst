@@ -7,22 +7,22 @@ mindspore_gs.quantization
 
     import mindspore_gs.quantization as qat
 
-Simulated Quantization Algorithm
---------------------------------
+Simulated Quantization算法
+--------------------------
 
-.. autosummary::
+.. mscnautosummary::
     :toctree: quantization
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.quantization.simulated_quantization.SimulatedQuantizationAwareTraining
+    mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
-SLB Algorithm
--------------
+SLB量化算法
+----------
 
-.. autosummary::
+.. mscnautosummary::
     :toctree: quantization
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.quantization.slb.SlbQuantAwareTraining
+    mindspore_gs.quantization.SlbQuantAwareTraining
