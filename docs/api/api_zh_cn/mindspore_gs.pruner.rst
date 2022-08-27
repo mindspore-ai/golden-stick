@@ -15,5 +15,4 @@ SCOP剪枝算法
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.pruner.PrunerKfCompressAlgo
-    mindspore_gs.pruner.PrunerFtCompressAlgo
+    mindspore_gs.pruner.scop
