@@ -18,7 +18,7 @@ Simulated Quantization算法
     mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
 SLB量化算法
-----------
+-----------
 
 .. mscnautosummary::
     :toctree: quantization

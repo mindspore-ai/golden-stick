@@ -1,3 +1,6 @@
+mindspore_gs.pruner.PrunerFtCompressAlgo
+========================================
+
 .. py:class:: mindspore_gs.pruner.PrunerFtCompressAlgo(config)
 
     `PrunerFtCompressAlgo` 是GoldenStick的派生类，继承于基类 `CompAlgo` ，用于生成FineTune阶段的网络。
