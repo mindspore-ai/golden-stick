@@ -13,6 +13,7 @@ SCOP Algorithm
 .. autosummary::
     :toctree: pruner
     :nosignatures:
-    :template: classtemplate_module.rst
+    :template: classtemplate.rst
 
-    mindspore_gs.pruner.scop
+    mindspore_gs.pruner.scop.PrunerKfCompressAlgo
+    mindspore_gs.pruner.scop.PrunerFtCompressAlgo

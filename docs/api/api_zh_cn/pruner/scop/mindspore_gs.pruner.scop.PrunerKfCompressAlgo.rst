@@ -1,3 +1,6 @@
+mindspore_gs.pruner.PrunerKfCompressAlgo
+========================================
+
 .. py:class:: mindspore_gs.pruner.PrunerKfCompressAlgo(config)
 
     `PrunerKfCompressAlgo` 是GoldenStick的派生类，继承于基类 `CompAlgo` ，用于生成Knockoff阶段的网络。
