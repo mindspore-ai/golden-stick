@@ -15,11 +15,42 @@
 # ============================================================================
 CURRPATH=$(cd "$(dirname $0)" || exit; pwd)
 
-pytest -v $CURRPATH/st/golden_stick/test_compalgo.py
-RET=$?
-if [ ${RET} -ne 0 ]; then
-    exit ${RET}
+if [ $# != 1 ] && [ $# != 2 ]; then
+  echo "bash runtests.sh DATASET_PATH"
+  echo "bash runtests.sh DATASET_PATH ALGO_FILTER"
 fi
 
-RET=$?
-exit ${RET}
+ds_path=$1
+
+if [ $# == 2 ]; then
+  algo=$2
+else
+  algo="all"
+fi
+
+export SELF_CHECK=True
+export DATASET_PATH=$ds_path
+
+if [ "x$algo" == "xall" ] || [ "x$algo" == "xsim_qat" ]; then
+  echo "============================ start testing sim_qat"
+  pytest -vra $CURRPATH/st/quantization/sim_qat/*.py
+  RET=$?
+  if [ ${RET} -ne 0 ]; then
+      echo "============================ testing sim_qat failed"
+      exit ${RET}
+  fi
+  echo "============================ testing sim_qat successfully"
+fi
+
+if [ "x$algo" == "xall" ] || [ "x$algo" == "xlsq" ]; then
+  echo "============================ start testing lsq"
+  pytest -vra $CURRPATH/st/quantization/lsq/*.py
+  RET=$?
+  if [ ${RET} -ne 0 ]; then
+    echo "============================ testing lsq failed"
+      exit ${RET}
+  fi
+  echo "============================ testing lsq successfully"
+fi
+
+echo "============================ finish all testcases"

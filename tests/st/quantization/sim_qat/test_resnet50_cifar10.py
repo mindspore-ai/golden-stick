@@ -23,17 +23,24 @@ from mindspore import nn, context
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from tests.st import test_utils as utils
+
+cur_path = os.path.dirname(os.path.abspath(__file__))
+model_name = "resnet"
+config_name = "resnet50_cifar10_config.yaml"
+ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
+train_log_rpath = os.path.join("golden_stick", "scripts", "train_parallel", "log")
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
-def test_resnet(run_mode):
+def test_resnet_apply(run_mode):
     """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on resnet.
-    Expectation: Apply success.
+    Feature: simulated quantization algorithm.
+    Description: apply simulated_quantization on resnet50.
+    Expectation: apply success and structure of network as expect.
     """
 
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
@@ -90,264 +97,106 @@ def test_resnet(run_mode):
     assert isinstance(res_block_conv_act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not res_block_conv_act_fake_quant._symmetric
     assert res_block_conv_act_fake_quant._quant_delay == 900
-    print("============== test resnet simqat success ==============")
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
-def test_resnet_accuracy_graph():
+@pytest.mark.env_single
+def test_gpu_accuracy_graph():
     """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on resnet and test accuracy
-    Expectation: Accuracy of is bigger than 0.45.
+    Feature: test accuracy of sim_qat on resnet50, mnist in Graph mode.
+    Description: apply sim_qat on resnet50 and test accuracy in Graph mod.
+    Expectation: accuracy is larger than 0.15 after 3 epochs.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    import mindspore.dataset as ds
-    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
-    from tests.models.official.cv.resnet.src.lr_generator import get_lr
-    from mindspore.train.loss_scale_manager import FixedLossScaleManager
-    from tests.st.models.resnet import resnet18
 
-    # config
-    train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
-    test_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-verify-bin")
-    target = "GPU"
-    class_num = 10
-    epoch_size = 70
-    warmup_epochs = 0
-    lr_decay_mode = "cosine"
-    lr_init = 0.005
-    lr_end = 0.00001
-    lr_max = 0.005
-    loss_scale = 1024
-    momentum = 0.9
-    weight_decay = 0.0001
-    run_mode = context.GRAPH_MODE
+    is_self_check = os.getenv("SELF_CHECK", "False")
+    if is_self_check == "True":
+        epochs = 180
+        acc_thres = 0.91
+    else:
+        epochs = 2
+        acc_thres = 0.08
+    config = utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH")
+    config.set_config(utils.TrainEvalConfig.epoch_size_key, epochs)
 
-    mindspore.set_seed(1)
-    mindspore.context.set_context(mode=run_mode, device_target=target)
-
-    def _init_weight(net):
-        for _, cell in net.cells_and_names():
-            if isinstance(cell, nn.Conv2d):
-                cell.weight.set_data(mindspore.common.initializer.initializer(
-                    mindspore.common.initializer.XavierUniform(), cell.weight.shape, cell.weight.dtype))
-            if isinstance(cell, nn.Dense):
-                cell.weight.set_data(mindspore.common.initializer.initializer(
-                    mindspore.common.initializer.TruncatedNormal(), cell.weight.shape, cell.weight.dtype))
-
-    def _create_dataset(dataset_path, do_train, batch_size=128, train_image_size=224):
-        ds.config.set_prefetch_size(64)
-        if do_train:
-            data_set = ds.Cifar10Dataset(dataset_path, num_parallel_workers=1, shuffle=True, num_samples=500)
-        else:
-            data_set = ds.Cifar10Dataset(dataset_path, num_parallel_workers=1, shuffle=True)
-
-        # define map operations
-        trans = []
-        if do_train:
-            trans += [
-                ds.vision.RandomCrop((32, 32), (4, 4, 4, 4)),
-                ds.vision.RandomHorizontalFlip(prob=0.5)
-            ]
-
-        trans += [
-            ds.vision.Resize((train_image_size, train_image_size)),
-            ds.vision.Rescale(1.0 / 255.0, 0.0),
-            ds.vision.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]),
-            ds.vision.HWC2CHW()
-        ]
-
-        type_cast_op = ds.transforms.c_transforms.TypeCast(mindspore.int32)
-
-        data_set = data_set.map(operations=type_cast_op, input_columns="label", num_parallel_workers=1)
-        # only enable cache for eval
-        data_set = data_set.map(operations=trans, input_columns="image", num_parallel_workers=1)
-
-        # apply batch operations
-        data_set = data_set.batch(batch_size, drop_remainder=True)
-
-        return data_set
-
-    def _init_group_params(net):
-        decayed_params = []
-        no_decayed_params = []
-        for param in net.trainable_params():
-            if 'beta' not in param.name and 'gamma' not in param.name and 'bias' not in param.name:
-                decayed_params.append(param)
-            else:
-                no_decayed_params.append(param)
-
-        group_params = [{'params': decayed_params, 'weight_decay': weight_decay},
-                        {'params': no_decayed_params},
-                        {'order_params': net.trainable_params()}]
-        return group_params
-
-    train_ds = _create_dataset(dataset_path=train_ds_path, do_train=True, batch_size=16, train_image_size=224)
-    step_size = train_ds.get_dataset_size()
-    net = resnet18(class_num=class_num)
-    _init_weight(net=net)
-
-    # apply golden-stick algo
-    algo = create_simqat()
-    net = algo.apply(net)
-
-    lr = get_lr(lr_init=lr_init, lr_end=lr_end, lr_max=lr_max, warmup_epochs=warmup_epochs, total_epochs=epoch_size,
-                steps_per_epoch=step_size, lr_decay_mode=lr_decay_mode)
-    lr = mindspore.Tensor(lr)
-    # define opt
-    group_params = _init_group_params(net)
-    opt = nn.Momentum(group_params, lr, momentum, weight_decay=weight_decay, loss_scale=loss_scale)
-
-    loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction='mean')
-    loss_scale = FixedLossScaleManager(loss_scale, drop_overflow_update=False)
-
-    metrics = {"acc"}
-    model = mindspore.Model(net, loss_fn=loss, optimizer=opt, loss_scale_manager=loss_scale, metrics=metrics,
-                            keep_batchnorm_fp32=False)
-    # train model
-    dataset_sink_mode = target != "CPU"
-    print("============== Starting Training ==============")
-    model.train(epoch_size, train_ds, callbacks=[], sink_size=train_ds.get_dataset_size(),
-                dataset_sink_mode=dataset_sink_mode)
-    print("============== End Training ==============")
-    print("============== Starting Test ==============")
-    val_ds = _create_dataset(dataset_path=test_ds_path, do_train=False, batch_size=64, train_image_size=224)
-    metrics_res = model.eval(val_ds)
-    acc = metrics_res['acc']
-    print(f"============== acc: {acc} ==============")
-    assert acc >= 0.45
-    print("============== End Test ==============")
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_accuracy_graph", config_name,
+                                     "quantization/simqat", "run_distribute_train_gpu.sh", config, "cifar10", 700,
+                                     train_log_rpath=train_log_rpath)
+    acc = utils.eval_network(model_path, model_name, config_name, "quantization/simqat", "run_eval_gpu.sh",
+                             "train_parallel/output/checkpoint/ckpt_0/resnet-{}_195.ckpt".format(epochs), config,
+                             "cifar10", 200, "log", "'top_1_accuracy': ([0-9.]*)", train_log_rpath=train_log_rpath)
+    assert acc > acc_thres
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
-def test_resnet_accuracy_pynative():
+@pytest.mark.env_single
+def test_gpu_accuracy_pynative():
     """
-    Feature: Simulated quantization algorithm.
-    Description: Apply simulated_quantization on resnet and test accuracy
-    Expectation: Accuracy of is bigger than 0.3.
+    Feature: test accuracy of sim_qat on resnet50, mnist in PyNative mode.
+    Description: apply sim_qat on resnet50 and test accuracy in PyNative mod.
+    Expectation: accuracy is larger than 0.08 after 2 epochs.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    import mindspore.dataset as ds
-    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
-    from tests.models.official.cv.resnet.src.lr_generator import get_lr
-    from mindspore.train.loss_scale_manager import FixedLossScaleManager
-    from tests.st.models.resnet import resnet18
 
-    # config
-    train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
-    test_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-verify-bin")
-    target = "GPU"
-    class_num = 10
-    epoch_size = 30
-    warmup_epochs = 0
-    lr_decay_mode = "cosine"
-    lr_init = 0.005
-    lr_end = 0.00001
-    lr_max = 0.005
-    loss_scale = 1024
-    momentum = 0.9
-    weight_decay = 0.0001
-    run_mode = context.PYNATIVE_MODE
+    is_self_check = os.getenv("SELF_CHECK", "False")
+    if is_self_check == "True":
+        epochs = 180
+        acc_thres = 0.91
+    else:
+        epochs = 1
+        acc_thres = 0.04
 
-    mindspore.set_seed(1)
-    mindspore.context.set_context(mode=run_mode, device_target=target)
-    if run_mode == context.PYNATIVE_MODE:
-        epoch_size = 30
+    config = utils.TrainEvalConfig.run_mode_train_eval_config("PYNATIVE")
+    config.set_config(utils.TrainEvalConfig.epoch_size_key, epochs)
 
-    def _init_weight(net):
-        for _, cell in net.cells_and_names():
-            if isinstance(cell, nn.Conv2d):
-                cell.weight.set_data(mindspore.common.initializer.initializer(
-                    mindspore.common.initializer.XavierUniform(), cell.weight.shape, cell.weight.dtype))
-            if isinstance(cell, nn.Dense):
-                cell.weight.set_data(mindspore.common.initializer.initializer(
-                    mindspore.common.initializer.TruncatedNormal(), cell.weight.shape, cell.weight.dtype))
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_accuracy_pynative", config_name,
+                                     "quantization/simqat", "run_distribute_train_gpu.sh", config, "cifar10", 700,
+                                     train_log_rpath=train_log_rpath)
+    acc = utils.eval_network(model_path, model_name, config_name, "quantization/simqat", "run_eval_gpu.sh",
+                             "train_parallel/output/checkpoint/ckpt_0/resnet-{}_195.ckpt".format(epochs), config,
+                             "cifar10", 200, "log", "'top_1_accuracy': ([0-9.]*)", train_log_rpath=train_log_rpath)
+    assert acc > acc_thres
 
-    def _create_dataset(dataset_path, do_train, batch_size=128, train_image_size=224):
-        ds.config.set_prefetch_size(64)
-        if do_train:
-            data_set = ds.Cifar10Dataset(dataset_path, num_parallel_workers=1, shuffle=True, num_samples=500)
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_single
+def test_gpu_continue_train():
+    """
+    Feature: test continue training feature of sim_qat on resnet50 in Graph mode.
+    Description: applying sim_qat on resnet50 and continue training with ckpt.
+    Expectation: continue training success.
+    """
+
+    config = utils.TrainEvalConfig.run_mode_train_eval_config("GRAPH")
+    config.set_config(utils.TrainEvalConfig.epoch_size_key, 1)
+
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_continue_train", config_name,
+                                     "quantization/simqat", "run_distribute_train_gpu.sh", config, "cifar10", 700,
+                                     train_log_rpath=train_log_rpath)
+    ckpt_file = os.path.join(cur_path, "resnet-1_195_{}.ckpt".format("test_gpu_continue_train"))
+    try:
+        utils.copy_file(os.path.join(model_path, "golden_stick", "scripts",
+                                     "train_parallel/output/checkpoint/ckpt_0/resnet-1_195.ckpt"), ckpt_file)
+    except ValueError:
+        log_path = os.path.join(model_path, train_log_rpath)
+        if os.path.exists(log_path):
+            os.system("cat {}".format(log_path))
         else:
-            data_set = ds.Cifar10Dataset(dataset_path, num_parallel_workers=1, shuffle=True)
+            os.system("echo {}".format("No train log file exist: " + log_path))
+        assert False
+    assert os.path.exists(ckpt_file)
 
-        # define map operations
-        trans = []
-        if do_train:
-            trans += [
-                ds.vision.RandomCrop((32, 32), (4, 4, 4, 4)),
-                ds.vision.RandomHorizontalFlip(prob=0.5)
-            ]
-
-        trans += [
-            ds.vision.Resize((train_image_size, train_image_size)),
-            ds.vision.Rescale(1.0 / 255.0, 0.0),
-            ds.vision.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]),
-            ds.vision.HWC2CHW()
-        ]
-
-        type_cast_op = ds.transforms.c_transforms.TypeCast(mindspore.int32)
-
-        data_set = data_set.map(operations=type_cast_op, input_columns="label", num_parallel_workers=1)
-        # only enable cache for eval
-        data_set = data_set.map(operations=trans, input_columns="image", num_parallel_workers=1)
-
-        # apply batch operations
-        data_set = data_set.batch(batch_size, drop_remainder=True)
-
-        return data_set
-
-    def _init_group_params(net):
-        decayed_params = []
-        no_decayed_params = []
-        for param in net.trainable_params():
-            if 'beta' not in param.name and 'gamma' not in param.name and 'bias' not in param.name:
-                decayed_params.append(param)
-            else:
-                no_decayed_params.append(param)
-
-        group_params = [{'params': decayed_params, 'weight_decay': weight_decay},
-                        {'params': no_decayed_params},
-                        {'order_params': net.trainable_params()}]
-        return group_params
-
-    train_ds = _create_dataset(dataset_path=train_ds_path, do_train=True, batch_size=16, train_image_size=224)
-    step_size = train_ds.get_dataset_size()
-    net = resnet18(class_num=class_num)
-    _init_weight(net=net)
-
-    # apply golden-stick algo
-    algo = create_simqat()
-    net = algo.apply(net)
-
-    lr = get_lr(lr_init=lr_init, lr_end=lr_end, lr_max=lr_max, warmup_epochs=warmup_epochs, total_epochs=epoch_size,
-                steps_per_epoch=step_size, lr_decay_mode=lr_decay_mode)
-    lr = mindspore.Tensor(lr)
-    # define opt
-    group_params = _init_group_params(net)
-    opt = nn.Momentum(group_params, lr, momentum, weight_decay=weight_decay, loss_scale=loss_scale)
-
-    loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction='mean')
-    loss_scale = FixedLossScaleManager(loss_scale, drop_overflow_update=False)
-
-    metrics = {"acc"}
-    model = mindspore.Model(net, loss_fn=loss, optimizer=opt, loss_scale_manager=loss_scale, metrics=metrics,
-                            keep_batchnorm_fp32=False)
-    # train model
-    dataset_sink_mode = target != "CPU"
-    print("============== Starting Training ==============")
-    model.train(epoch_size, train_ds, callbacks=[], sink_size=train_ds.get_dataset_size(),
-                dataset_sink_mode=dataset_sink_mode)
-    print("============== End Training ==============")
-    print("============== Starting Test ==============")
-    val_ds = _create_dataset(dataset_path=test_ds_path, do_train=False, batch_size=64, train_image_size=224)
-    metrics_res = model.eval(val_ds)
-    acc = metrics_res['acc']
-    print(f"============== acc: {acc} ==============")
-    assert acc >= 0.3
-    print("============== End Test ==============")
+    config.set_config(utils.TrainEvalConfig.epoch_size_key, 2)
+    model_path = utils.train_network(ori_model_path, model_name, "test_gpu_continue_train", config_name,
+                                     "quantization/simqat", "run_distribute_train_gpu.sh", config, "cifar10", 700,
+                                     continue_train=True, ckpt_path=ckpt_file, train_log_rpath=train_log_rpath)
+    # lenet not support continue train
+    if not os.path.exists(os.path.join(model_path, "golden_stick", "scripts", "train_parallel", "output",
+                                       "checkpoint", "ckpt_0", "resnet-1_195.ckpt")):
+        log_path = os.path.join(model_path, train_log_rpath)
+        if os.path.exists(log_path):
+            os.system("cat {}".format(log_path))
+        else:
+            os.system("echo {}".format("No train log file exist: " + log_path))
+        assert False
