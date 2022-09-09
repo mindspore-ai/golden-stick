@@ -29,8 +29,8 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         - **ValueError** - `freeze_bn` 小于0。
         - **ValueError** - `quant_delay` ， `quant_dtype` ， `per_channel` ， `symmetric` 或者 `narrow_range` 的长度不小于2。
         - **ValueError** - `quant_delay` 小于0，或者 `quant_delay` 存在小于0的元素。
-        - **NotImplementedError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
-        - **NotImplementedError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为True。
+        - **TypeError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
+        - **ValueError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为True。
 
     .. py:method:: apply(network: Cell)
 
@@ -69,7 +69,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `act_per_channel` 数据类型不是bool。
-            - **NotImplementedError** - `act_per_channel` 不是False。
+            - **ValueError** - `act_per_channel` 不是False。
 
     .. py:method:: set_act_quant_delay(act_quant_delay)
 
@@ -91,7 +91,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `act_quant_dtype` 数据类型不是QuantDtype。
-            - **NotImplementedError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
+            - **TypeError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
 
     .. py:method:: set_act_symmetric(act_symmetric)
 
@@ -174,7 +174,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `weight_quant_dtype` 数据类型不是QuantDtype。
-            - **NotImplementedError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
+            - **TypeError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
 
     .. py:method:: set_weight_symmetric(weight_symmetric)
 

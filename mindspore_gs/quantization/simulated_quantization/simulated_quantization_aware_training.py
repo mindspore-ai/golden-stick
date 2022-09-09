@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Basic implementation of simulated quantization aware training, this algorithm adopts fake quantizer to simulate
-quantization, statistic min max of ops to be quantized through training procession, then calculates quantization
-factors after training. See more details in `A White Paper on Neural Network Quantization
-<https://arxiv.org/pdf/2106.08295.pdf>`. """
+"""SimulatedQuantizationAwareTraining."""
 
 from mindspore.nn import Cell
 from mindspore._checkparam import Validator, Rel
@@ -29,7 +26,10 @@ from .simulated_quantization_config import SimulatedQuantizationConfig
 
 class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
     """
-    Derived class of GoldenStick. Simulated QAT-algorithm.
+    Basic implementation of simulated quantization aware training, this algorithm adopts fake quantizer to simulate
+    quantization, statistic min max of ops to be quantized through training procession, then calculates quantization
+    factors after training. See more details in `A White Paper on Neural Network Quantization
+    <https://arxiv.org/pdf/2106.08295.pdf>`.
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
@@ -74,9 +74,9 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
             less than 2.
         ValueError: If `quant_delay` is less than 0, or any element of `quant_delay` is less than 0.
-        NotImplementedError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
+        TypeError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
             `QuantDtype.INT8`.
-        NotImplementedError: If `per_channel` is True, or the first element of `per_channel` is True.
+        ValueError: If `per_channel` is True, or the first element of `per_channel` is True.
 
     Supported Platforms:
         ``GPU``
@@ -233,11 +233,11 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `act_per_channel` is not bool.
-            NotImplementedError: Only supported if `act_per_channel` is False yet.
+            ValueError: Only supported if `act_per_channel` is False yet.
         """
         Validator.check_bool(act_per_channel, "act_per_channel", self.__class__.__name__)
         if act_per_channel:
-            raise NotImplementedError(f'Only supported if `act_per_channel` is False yet.')
+            raise ValueError(f'Only supported if `act_per_channel` is False yet.')
         self._config.act_per_channel = act_per_channel
 
     def set_weight_per_channel(self, weight_per_channel):
@@ -263,13 +263,13 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `act_quant_dtype` is not QuantDtype.
-            NotImplementedError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
+            TypeError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
         """
         if not isinstance(act_quant_dtype, QuantDtype):
             raise TypeError(f'The parameter `act quant dtype` must be isinstance of QuantDtype, '
                             f'but got {act_quant_dtype}.')
         if act_quant_dtype != QuantDtype.INT8:
-            raise NotImplementedError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
+            raise TypeError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.act_quant_dtype = act_quant_dtype
 
     def set_weight_quant_dtype(self, weight_quant_dtype):
@@ -281,13 +281,13 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
-            NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
+            TypeError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
         """
         if not isinstance(weight_quant_dtype, QuantDtype):
             raise TypeError(f'The parameter `weight quant dtype` must be isinstance of QuantDtype, '
                             f'but got {weight_quant_dtype}.')
         if weight_quant_dtype != QuantDtype.INT8:
-            raise NotImplementedError("Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.")
+            raise TypeError("Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.weight_quant_dtype = weight_quant_dtype
 
     def set_act_symmetric(self, act_symmetric):
