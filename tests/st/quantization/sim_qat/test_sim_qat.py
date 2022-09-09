@@ -196,7 +196,7 @@ def test_constructor_error():
     try:
         SimQAT(config)
         has_error = True
-    except NotImplementedError:
+    except ValueError:
         pass
     assert not has_error
 
@@ -204,7 +204,7 @@ def test_constructor_error():
     try:
         SimQAT(config)
         has_error = True
-    except NotImplementedError:
+    except TypeError:
         pass
     assert not has_error
 

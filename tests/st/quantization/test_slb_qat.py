@@ -113,13 +113,13 @@ def test_set_weight_quant_dtype_range():
     """
     Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_weight_quant_dtype().
     Description: Feed QuantDtype type `weight_quant_dtype` into set_weight_quant_dtype() functional interface.
-    Expectation: Except NotImplementedError.
+    Expectation: Except TypeError.
     """
 
     qat = SlbQAT()
     try:
         qat.set_weight_quant_dtype(weight_quant_dtype=QuantDtype.INT8)
-    except NotImplementedError:
+    except TypeError:
         return
     assert False
 

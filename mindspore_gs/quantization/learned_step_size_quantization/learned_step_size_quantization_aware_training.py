@@ -69,13 +69,12 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         TypeError: If `narrow_range` is not bool, or every element of `narrow_range` is not bool.
         ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
             less than 2.
-        NotImplementedError：　If `freeze_bn` is not 0.
-        NotImplementedError: If `quant_delay` is not 0, or any element of `quant_delay` is not 0.
-        NotImplementedError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
-            `QuantDtype.INT8`.
-        NotImplementedError: If `per_channel` is True, or the first element of `per_channel` is True.
-        NotImplementedError: If `symmetric` is False, or any element of `symmetric` is False.
-        NotImplementedError: If `narrow_range` is False, or any element of `narrow_range` is False.
+        ValueError：　If `freeze_bn` is not 0.
+        ValueError: If `quant_delay` is not 0, or any element of `quant_delay` is not 0.
+        TypeError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not `QuantDtype.INT8`.
+        ValueError: If `per_channel` is True, or the first element of `per_channel` is True.
+        ValueError: If `symmetric` is False, or any element of `symmetric` is False.
+        ValueError: If `narrow_range` is False, or any element of `narrow_range` is False.
 
     Supported Platforms:
         ``GPU``
@@ -178,11 +177,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `act_quant_delay` is not int.
-            NotImplementedError:  Learned step size quantization only support `act_quant_delay` is 0 currently
+            ValueError:  Learned step size quantization only support `act_quant_delay` is 0 currently.
         """
         Validator.check_is_int(act_quant_delay, "act_quant_delay", self.__class__.__name__)
         if act_quant_delay != 0:
-            raise NotImplementedError("Learned step size quantization only support `act_quant_delay` is 0 currently")
+            raise ValueError("Learned step size quantization only support `act_quant_delay` is 0 currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_quant_delay(act_quant_delay)
 
     def set_weight_quant_delay(self, weight_quant_delay):
@@ -194,11 +193,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `weight_quant_delay` is not int.
-            NotImplementedError:  Learned step size quantization only support `weight_quant_delay` is 0 currently
+            ValueError:  Learned step size quantization only support `weight_quant_delay` is 0 currently
         """
         Validator.check_is_int(weight_quant_delay, "weight_quant_delay", self.__class__.__name__)
         if weight_quant_delay != 0:
-            raise NotImplementedError("Learned step size quantization only support `weight_quant_delay` is 0 currently")
+            raise ValueError("Learned step size quantization only support `weight_quant_delay` is 0 currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_quant_delay(weight_quant_delay)
 
     def set_act_per_channel(self, act_per_channel):
@@ -211,7 +210,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `act_per_channel` is not bool.
-            NotImplementedError: Only supported if `act_per_channel` is False yet.
+            ValueError: Only supported if `act_per_channel` is False yet.
         """
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_per_channel(act_per_channel)
 
@@ -237,7 +236,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `act_quant_dtype` is not QuantDtype.
-            NotImplementedError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
+            TypeError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
         """
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_quant_dtype(act_quant_dtype)
 
@@ -250,7 +249,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
-            NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
+            TypeError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
         """
         super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_quant_dtype(weight_quant_dtype)
 
@@ -264,11 +263,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `act_symmetric` is not bool.
-            NotImplementedError: If `act_symmetric` is not True.
+            ValueError: If `act_symmetric` is not True.
         """
         Validator.check_bool(act_symmetric, "act_symmetric", self.__class__.__name__)
         if not act_symmetric:
-            raise NotImplementedError("Learned step size quantization only support `act_symmetric` is True currently")
+            raise ValueError("Learned step size quantization only support `act_symmetric` is True currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(act_symmetric)
 
     def set_weight_symmetric(self, weight_symmetric):
@@ -281,11 +280,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `weight_symmetric` is not bool.
-            NotImplementedError: If `act_symmetric` is not True.
+            ValueError: If `act_symmetric` is not True.
         """
         Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
         if not weight_symmetric:
-            raise NotImplementedError("Learned step size quantization only support `weight_symmetric` is True currently")
+            raise ValueError("Learned step size quantization only support `weight_symmetric` is True currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_act_symmetric(weight_symmetric)
 
     def set_act_narrow_range(self, act_narrow_range):
@@ -298,11 +297,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `act_narrow_range` is not bool.
-            NotImplementedError: If `act_narrow_range` is not True.
+            ValueError: If `act_narrow_range` is not True.
         """
         Validator.check_bool(act_narrow_range, "act_narrow_range", self.__class__.__name__)
         if not act_narrow_range:
-            raise NotImplementedError("Learned step size quantization only support `act_narrow_range` is True currently")
+            raise ValueError("Learned step size quantization only support `act_narrow_range` is True currently")
         self._config.act_narrow_range = act_narrow_range
 
     def set_weight_narrow_range(self, weight_narrow_range):
@@ -315,12 +314,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `weight_narrow_range` is not bool.
-            NotImplementedError: If `weight_narrow_range` is not True.
+            ValueError: If `weight_narrow_range` is not True.
         """
         Validator.check_bool(weight_narrow_range, "weight_narrow_range", self.__class__.__name__)
         if not weight_narrow_range:
-            raise NotImplementedError("Learned step size quantization only support `weight_narrow_range` is True "
-                                      "currently")
+            raise ValueError("Learned step size quantization only support `weight_narrow_range` is True currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_weight_narrow_range(weight_narrow_range)
 
     def set_freeze_bn(self, freeze_bn):
@@ -332,11 +330,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
         Raises:
             TypeError: If `freeze_bn` is not int.
-            NotImplementedError: Learned step size quantization only support `freeze_bn` is 0 currently
+            ValueError: Learned step size quantization only support `freeze_bn` is 0 currently
         """
         Validator.check_is_int(freeze_bn, "freeze_bn", self.__class__.__name__)
         if freeze_bn != 0:
-            raise NotImplementedError("Learned step size quantization only support `freeze_bn` is 0 currently")
+            raise ValueError("Learned step size quantization only support `freeze_bn` is 0 currently")
         super(LearnedStepSizeQuantizationAwareTraining, self).set_freeze_bn(freeze_bn)
 
     def set_enable_fusion(self, enable_fusion):

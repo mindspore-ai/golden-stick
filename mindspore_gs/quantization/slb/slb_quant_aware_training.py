@@ -154,14 +154,14 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
-            NotImplementedError: Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, `QuantDtype.INT2`
+            TypeError: Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, `QuantDtype.INT2`
                 or `QuantDtype.INT4` yet.
         """
         weight_quant_dtype = Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
         if weight_quant_dtype not in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4]:
-            raise NotImplementedError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
-                                      "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
-                                      "But got {}".format(weight_quant_dtype))
+            raise TypeError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
+                            "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
+                            "But got {}".format(weight_quant_dtype))
         self._config.weight_quant_dtype = weight_quant_dtype
 
     def set_epoch_size(self, epoch_size):

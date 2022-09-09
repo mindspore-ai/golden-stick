@@ -43,7 +43,7 @@ class SimulatedLayerPolicy(LayerPolicy):
         if config.weight_quant_dtype == QuantDtype.INT8:
             self._num_bits = 8
         else:
-            raise NotImplementedError("Only support int8 weight quant now!")
+            raise TypeError("Only support int8 weight quant now!")
         if config.weight_per_channel:
             self._weight_quantizer_partial = partial(SimulatedFakeQuantizerPerChannel,
                                                      ema=False,

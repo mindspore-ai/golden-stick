@@ -3,7 +3,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
 .. py:class:: mindspore_gs.quantization.SimulatedQuantizationAwareTraining(config=None)
 
-    SimulatedQuantizationAwareTraining是GoldenStick的子类，实现了模拟QAT算法。
+    模拟量化感知训练的基本实现，该算法在训练时使用伪量化节点来模拟量化计算的损失，并通过反向传播更新网络参数，使得网络参数更好地适应量化带来的损失。更多详细信息见 `神经网络量化白皮书<https://arxiv.org/pdf/2106.08295.pdf>` 。
 
     参数：
         - **config** (dict) - 存储用于量化感知训练的属性，键是属性名称，值是属性值。下面列出了支持的属性：
@@ -29,8 +29,8 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         - **ValueError** - `freeze_bn` 小于0。
         - **ValueError** - `quant_delay` ， `quant_dtype` ， `per_channel` ， `symmetric` 或者 `narrow_range` 的长度不小于2。
         - **ValueError** - `quant_delay` 小于0，或者 `quant_delay` 存在小于0的元素。
-        - **NotImplementedError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
-        - **NotImplementedError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为True。
+        - **TypeError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
+        - **ValueError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为True。
 
     .. py:method:: apply(network: Cell)
 
@@ -69,7 +69,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `act_per_channel` 数据类型不是bool。
-            - **NotImplementedError** - `act_per_channel` 不是False。
+            - **ValueError** - `act_per_channel` 不是False。
 
     .. py:method:: set_act_quant_delay(act_quant_delay)
 
@@ -91,7 +91,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `act_quant_dtype` 数据类型不是QuantDtype。
-            - **NotImplementedError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
+            - **TypeError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
 
     .. py:method:: set_act_symmetric(act_symmetric)
 
@@ -174,7 +174,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `weight_quant_dtype` 数据类型不是QuantDtype。
-            - **NotImplementedError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
+            - **TypeError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
 
     .. py:method:: set_weight_symmetric(weight_symmetric)
 
