@@ -17,8 +17,10 @@
 import mindspore
 import mindspore.nn as nn
 import mindspore.ops as ops
+from mindspore._checkparam import Validator, Rel
 import mindspore.context as context
 import mindspore.common.dtype as mstype
+from mindspore.train.callback import Callback
 from mindspore import Tensor
 from mindspore.ops import constexpr
 from mindspore import Parameter
@@ -209,6 +211,26 @@ class PrunedConv2dbn2(nn.Cell):
         return output
 
 
+class KfCallback(Callback):
+    """
+    Define konockoff data callback for scop algorithm.
+    """
+    def step_begin(self, run_context):
+        """
+        Step_begin.
+        """
+        cb_params = run_context.original_args()
+        cur_data = cb_params.train_dataset_element
+        kf = cur_data[0]
+        kf_label = cur_data[1]
+        idx = ops.Randperm(max_length=kf.shape[0])(ms.Tensor([kf.shape[0]], dtype=mstype.int32))
+        kf_input = kf[idx, :].view(kf.shape)
+        kf_input_label = kf_label[idx].view(kf_label.shape)
+        cur_data[0] = ops.Concat(axis=0)((cur_data[0], kf_input))
+        cur_data[1] = ops.Concat(axis=0)((cur_data[1], kf_input_label))
+        cb_params.train_dataset_element = cur_data
+
+
 class PrunerKfCompressAlgo(CompAlgo):
     """
     Derived class of GoldenStick. Scop-algorithm. Construct effective knockoff counterparts.
@@ -258,6 +280,12 @@ class PrunerKfCompressAlgo(CompAlgo):
           >
     """
 
+    def callbacks(self, *args, **kwargs):
+        """Callback."""
+        cb = []
+        cb.append(KfCallback())
+        return cb
+
     def _tranform(self, net):
         """Transform net."""
         module = net._cells
@@ -265,6 +293,11 @@ class PrunerKfCompressAlgo(CompAlgo):
         for _, k in enumerate(keys):
             if 'layer' in k:
                 module[k] = self._tranform_conv(module[k])
+        for param in net.get_parameters():
+            param.requires_grad = False
+        for _, (_, module) in enumerate(net.cells_and_names()):
+            if isinstance(module, KfConv2d):
+                module.kfscale.requires_grad = True
         return net
 
     def _tranform_conv(self, net):
@@ -351,6 +384,46 @@ class PrunerFtCompressAlgo(CompAlgo):
           >
     """
 
+    def __init__(self, prune_rate=0):
+        super(PrunerFtCompressAlgo, self).__init__(config=None)
+        self.prune_rate = prune_rate
+
+    def set_prune_rate(self, prune_rate):
+        """
+        Set value of prune_rate of `_config`
+
+        Args:
+            prune_rate (float): the size of network needs to be pruned.
+
+        Raises:
+            TypeError: If `prune_rate` is not float.
+            ValueError: If `prune_rate` is less than 0. or greater than 1.
+        """
+        prune_rate = Validator.check_float_range(prune_rate, 0.0, 1.0, Rel.INC_BOTH, \
+                                                 "prune_rate", self.__class__.__name__)
+        self.prune_rate = prune_rate
+
+    def _recover(self, net):
+        """Recover."""
+        kfconv_list = []
+        for _, (_, module) in enumerate(net.cells_and_names()):
+            if isinstance(module, KfConv2d):
+                kfconv_list.append(module)
+        for param in net.get_parameters():
+            param.requires_grad = True
+        for _, (_, module) in enumerate(net.cells_and_names()):
+            if isinstance(module, KfConv2d):
+                module.score = module.bn.gamma.data.abs() * ops.Squeeze()(
+                    module.kfscale.data - (1 - module.kfscale.data))
+        for kfconv in kfconv_list:
+            kfconv.prune_rate = self.prune_rate
+        for _, (_, module) in enumerate(net.cells_and_names()):
+            if isinstance(module, KfConv2d):
+                _, index = ops.Sort()(module.score)
+                num_pruned_channel = int(module.prune_rate * module.score.shape[0])
+                module.out_index = index[num_pruned_channel:]
+        return self._recover_conv(net)
+
     def _recover_conv(self, net):
         """Recover conv."""
 
@@ -402,4 +475,4 @@ class PrunerFtCompressAlgo(CompAlgo):
         Returns:
             Pruned network.
         """
-        return self._recover_conv(network)
+        return self._recover(network)
