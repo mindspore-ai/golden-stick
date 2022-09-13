@@ -12,12 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick module.
-"""
+"""MindSpore golden stick UniPruning module."""
 
-from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
-from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 
-__all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
-           "PrunerFtCompressAlgo", "UniPruner"]
+from .model_utils import (
+    get_model_size,
+    get_layer_type,
+    save_model_and_mask,
+    load_model,
+    find_ms_cell
+)
+from .importance_criteria import (
+    get_medians,
+    get_channel_importances,
+    choose_channel_group_to_zero
+)
+from .mask import (
+    get_mask,
+    get_expanded_mask,
+    do_mask
+)
+from .prune import (
+    update_channel_out,
+    prune_net
+)

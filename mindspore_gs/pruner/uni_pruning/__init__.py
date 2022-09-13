@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick module.
-"""
+"""MindSpore GoldenStick UniPruning."""
 
-from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
-from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 
-__all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
-           "PrunerFtCompressAlgo", "UniPruner"]
+from .uni_pruner import UniPruner
+
+__all__ = ["UniPruner"]
