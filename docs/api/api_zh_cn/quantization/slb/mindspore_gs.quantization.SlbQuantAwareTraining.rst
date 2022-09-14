@@ -35,7 +35,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
 
         异常：
             - **TypeError** - `weight_quant_dtype` 不是QuantDtype。
-            - **NotImplementedError** - `weight_quant_dtype` 不是 `QuantDtype.INT1` 、 `QuantDtype.INT2` 和 `QuantDtype.INT4` 中的一种。
+            - **TypeError** - `weight_quant_dtype` 不是 `QuantDtype.INT1` 、 `QuantDtype.INT2` 和 `QuantDtype.INT4` 中的一种。
 
     .. py:method:: set_epoch_size(epoch_size)
 

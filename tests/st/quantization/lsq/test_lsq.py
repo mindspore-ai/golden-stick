@@ -103,7 +103,7 @@ def test_set_act_quant_delay():
     Description: Feed data `act_quant_delay` into set_act_quant_delay() functional interface.
     Expectation:
         If the input is int and 0, config success.
-        If the input is int but not 0, except NotImplementedError.
+        If the input is int but not 0, except ValueError.
         If the input is not int, except TypeError.
     """
 
@@ -111,7 +111,7 @@ def test_set_act_quant_delay():
     lsq.set_act_quant_delay(0)
     assert lsq._config.act_quant_delay == 0
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_act_quant_delay(100)
     assert "Learned step size quantization only support `act_quant_delay` is 0 currently" in str(e.value)
 
@@ -129,7 +129,7 @@ def test_set_weight_quant_delay():
     Description: Feed data `weight_quant_delay` into set_weight_quant_delay() functional interface.
     Expectation:
         If the input is int and 0, config success.
-        If the input is int but not 0, except NotImplementedError.
+        If the input is int but not 0, except ValueError.
         If the input is not int, except TypeError.
     """
 
@@ -137,7 +137,7 @@ def test_set_weight_quant_delay():
     lsq.set_weight_quant_delay(0)
     assert lsq._config.weight_quant_delay == 0
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_weight_quant_delay(100)
     assert "Learned step size quantization only support `weight_quant_delay` is 0 currently" in str(e.value)
 
@@ -156,7 +156,7 @@ def test_set_act_per_channel():
     Description: Feed data `act_per_channel` into set_act_per_channel() functional interface.
     Expectation:
         If the input is bool and False, config success.
-        If the input is bool and True, except NotImplementedError.
+        If the input is bool and True, except ValueError.
         If the input is not bool, except TypeError.
     """
 
@@ -164,7 +164,7 @@ def test_set_act_per_channel():
     lsq.set_act_per_channel(False)
     assert not lsq._config.act_per_channel
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_act_per_channel(True)
     assert "Only supported if `act_per_channel` is False yet." in str(e.value)
 
@@ -203,7 +203,7 @@ def test_set_act_quant_dtype():
     Description: Feed data `act_quant_dtype` into set_act_quant_dtype() functional interface.
     Expectation:
         If the input is QuantDtype and QuantDtype.INT8, config success.
-        If the input is QuantDtype but not QuantDtype.INT8, except NotImplementedError.
+        If the input is QuantDtype but not QuantDtype.INT8, except TypeError.
         If the input is not QuantDtype, except TypeError.
     """
 
@@ -211,7 +211,7 @@ def test_set_act_quant_dtype():
     lsq.set_act_quant_dtype(QuantDtype.INT8)
     assert lsq._config.act_quant_dtype == QuantDtype.INT8
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(TypeError) as e:
         lsq.set_act_quant_dtype(QuantDtype.INT4)
     assert "Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet." in str(e.value)
 
@@ -229,7 +229,7 @@ def test_set_weight_quant_dtype():
     Description: Feed data `weight_quant_dtype` into set_weight_quant_dtype() functional interface.
     Expectation:
         If the input is QuantDtype and QuantDtype.INT8, config success.
-        If the input is QuantDtype but not QuantDtype.INT8, except NotImplementedError.
+        If the input is QuantDtype but not QuantDtype.INT8, except TypeError.
         If the input is not QuantDtype, except TypeError.
     """
 
@@ -237,7 +237,7 @@ def test_set_weight_quant_dtype():
     lsq.set_weight_quant_dtype(QuantDtype.INT8)
     assert lsq._config.weight_quant_dtype == QuantDtype.INT8
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(TypeError) as e:
         lsq.set_weight_quant_dtype(QuantDtype.INT4)
     assert "Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet." in str(e.value)
 
@@ -255,7 +255,7 @@ def test_set_act_symmetric():
     Description: Feed data `act_symmetric` into set_act_symmetric() functional interface.
     Expectation:
         If the input is bool and True, config success.
-        If the input is bool and False, except NotImplementedError.
+        If the input is bool and False, except ValueError.
         If the input is not bool, except TypeError.
     """
 
@@ -263,7 +263,7 @@ def test_set_act_symmetric():
     lsq.set_act_symmetric(True)
     assert lsq._config.act_symmetric
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_act_symmetric(False)
     assert "Learned step size quantization only support `act_symmetric` is True currently" in str(e.value)
 
@@ -281,7 +281,7 @@ def test_set_weight_symmetric():
     Description: Feed data `weight_symmetric` into set_weight_symmetric() functional interface.
     Expectation:
         If the input is bool and True, config success.
-        If the input is bool and False, except NotImplementedError.
+        If the input is bool and False, except ValueError.
         If the input is not bool, except TypeError.
     """
 
@@ -289,7 +289,7 @@ def test_set_weight_symmetric():
     lsq.set_weight_symmetric(True)
     assert lsq._config.weight_symmetric
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_weight_symmetric(False)
     assert "Learned step size quantization only support `weight_symmetric` is True currently" in str(e.value)
 
@@ -307,7 +307,7 @@ def test_set_act_narrow_range():
     Description: Feed data `act_narrow_range` into set_act_narrow_range() functional interface.
     Expectation:
         If the input is bool and True, config success.
-        If the input is bool and False, except NotImplementedError.
+        If the input is bool and False, except ValueError.
         If the input is not bool, except TypeError.
     """
 
@@ -315,7 +315,7 @@ def test_set_act_narrow_range():
     lsq.set_act_narrow_range(True)
     assert lsq._config.act_narrow_range
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_act_narrow_range(False)
     assert "Learned step size quantization only support `act_narrow_range` is True currently" in str(e.value)
 
@@ -333,7 +333,7 @@ def test_set_weight_narrow_range():
     Description: Feed data `weight_narrow_range` into set_weight_narrow_range() functional interface.
     Expectation:
         If the input is bool and True, config success.
-        If the input is bool and False, except NotImplementedError.
+        If the input is bool and False, except ValueError.
         If the input is not bool, except TypeError.
     """
 
@@ -341,7 +341,7 @@ def test_set_weight_narrow_range():
     lsq.set_weight_narrow_range(True)
     assert lsq._config.weight_narrow_range
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_weight_narrow_range(False)
     assert "Learned step size quantization only support `weight_narrow_range` is True currently" in str(e.value)
 
@@ -359,7 +359,7 @@ def test_set_freeze_bn():
     Description: Feed data `freeze_bn` into set_freeze_bn() functional interface.
     Expectation:
         If the input is int and 0, config success.
-        If the input is int but not 0, except NotImplementedError.
+        If the input is int but not 0, except ValueError.
         If the input is not int, except TypeError.
     """
 
@@ -367,7 +367,7 @@ def test_set_freeze_bn():
     lsq.set_freeze_bn(0)
     assert lsq._config.freeze_bn == 0
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_freeze_bn(100)
     assert "Learned step size quantization only support `freeze_bn` is 0 currently" in str(e.value)
 
