@@ -8,7 +8,9 @@ mindspore_gs.quantization.SlbQuantAwareTraining
     参数：
         - **config** (dict) - 以字典的形式存放用于量化训练的属性，下面列出了受支持的属性：
 
-          - **quant_dtype** (QuantDtype) - 权重量化的数据类型，当前支持1、2、4比特。默认值：QuantDtype.INT1。
+          - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于量化权重和激活的数据类型。第一个元素表示激活，第二个元素表示权重。在实际量化推理场景中需要考虑硬件器件的精度支持。当前权重量化支持1、2、4比特，激活量化支持8比特。默认值：(QuantDtype.INT8, QuantDtype.INT1)。
+          - **enable_act_quant** (bool) - 在训练中是否开启激活量化。默认值：False。
+          - **enable_bn_calibration** (bool) - 在训练中是否开启BN层矫正功能。默认值：False。
           - **epoch_size** (int) - 训练的总epoch数。
           - **has_trained_epoch** (int) - 预训练的epoch数。
           - **t_start_val** (float) - 温度初始值。默认值：1.0。
@@ -17,9 +19,11 @@ mindspore_gs.quantization.SlbQuantAwareTraining
           - **t_factor** (float) - 温度变化因子。默认值：1.2。
 
     异常：
-        - **TypeError** - `quant_dtype` 不是QuantDtype。
-        - **TypeError** - `epoch_size` 或 `has_trained_epoch` 不是int。
-        - **TypeError** - `t_start_val` 、 `t_start_time`、 `t_end_time` 或 `t_factor` 不是float。
+        - **TypeError** - `quant_dtype` 的数据类型不是 `QuantDtype` ，或者 `quant_dtype` 存在不是 `QuantDtype` 的元素。
+        - **TypeError** - `enable_act_quant` 或者 `enable_bn_calibration` 的数据类型不是bool。
+        - **ValueError** - `quant_dtype` 的长度大于2。
+        - **TypeError** - `epoch_size` 或 `has_trained_epoch` 的数据类型不是int。
+        - **TypeError** - `t_start_val` 、 `t_start_time`、 `t_end_time` 或 `t_factor` 的数据类型不是float。
         - **ValueError** - `epoch_size` 小于等于0。
         - **ValueError** - `has_trained_epoch` 小于0。
         - **ValueError** - `t_start_val` 或 `t_factor` 小于等于0.0。
@@ -34,8 +38,39 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **weight_quant_dtype** (QuantDtype) - 权重量化的数据类型。默认值：QuantDtype.INT1。
 
         异常：
-            - **TypeError** - `weight_quant_dtype` 不是QuantDtype。
-            - **TypeError** - `weight_quant_dtype` 不是 `QuantDtype.INT1` 、 `QuantDtype.INT2` 和 `QuantDtype.INT4` 中的一种。
+            - **TypeError** - `weight_quant_dtype` 的数据类型不是QuantDtype。
+            - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT1` 、 `QuantDtype.INT2` 和 `QuantDtype.INT4` 中的一种。
+
+    .. py:method:: set_act_quant_dtype(act_quant_dtype)
+
+        设置激活量化的数据类型。
+
+        参数：
+            - **act_quant_dtype** (QuantDtype) - 激活量化的数据类型。默认值：QuantDtype.INT8。
+
+        异常：
+            - **TypeError** - `act_quant_dtype` 的数据类型不是QuantDtype。
+            - **ValueError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
+
+    .. py:method:: set_enable_act_quant(enable_act_quant)
+
+        设置是否开启激活量化。
+
+        参数：
+            - **enable_act_quant** (bool) - 在训练中是否开启激活量化。默认值：False。
+
+        异常：
+            - **TypeError** - `enable_act_quant` 的数据类型不是bool。
+
+    .. py:method:: set_enable_bn_calibration(enable_bn_calibration)
+
+        设置是否开启BatchNorm层矫正功能。
+
+        参数：
+            - **enable_bn_calibration** (bool) - 在训练中是否开启BatchNorm层矫正功能。默认值：False。
+
+        异常：
+            - **TypeError** - `enable_bn_calibration` 的数据类型不是bool。
 
     .. py:method:: set_epoch_size(epoch_size)
 
@@ -45,7 +80,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **epoch_size** (int) - 训练的总epoch数。
 
         异常：
-            - **TypeError** - `epoch_size` 不是int。
+            - **TypeError** - `epoch_size` 的数据类型不是int。
             - **ValueError** - `epoch_size` 小于等于0。
 
     .. py:method:: set_has_trained_epoch(has_trained_epoch)
@@ -56,7 +91,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **has_trained_epoch** (int) - 预训练的epoch数。
 
         异常：
-            - **TypeError** - `has_trained_epoch` 不是int。
+            - **TypeError** - `has_trained_epoch` 的数据类型不是int。
             - **ValueError** - `has_trained_epoch` 小于0。
 
     .. py:method:: set_t_start_val(t_start_val)
@@ -67,7 +102,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **t_start_val** (float) - 温度初始值。默认值：1.0。
 
         异常：
-            - **TypeError** - `t_start_val` 不是float。
+            - **TypeError** - `t_start_val` 的数据类型不是float。
             - **ValueError** - `t_start_val` 小于等于0.0。
 
     .. py:method:: set_t_start_time(t_start_time)
@@ -78,7 +113,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **t_start_time** (float) - 温度开始变化时间。默认值：0.2。
 
         异常：
-            - **TypeError** - `t_start_time` 不是float。
+            - **TypeError** - `t_start_time` 的数据类型不是float。
             - **ValueError** - `t_start_time` 小于0.0或大于1.0。
 
     .. py:method:: set_t_end_time(t_end_time)
@@ -89,7 +124,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **t_end_time** (float) - 温度停止变化时间。默认值：0.6。
 
         异常：
-            - **TypeError** - `t_end_time` 不是float。
+            - **TypeError** - `t_end_time` 的数据类型不是float。
             - **ValueError** - `t_end_time` 小于0.0或大于1.0。
 
     .. py:method:: set_t_factor(t_factor)
@@ -100,22 +135,24 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **t_factor** (float) - 温度变化因子。默认值：1.2。
 
         异常：
-            - **TypeError** - `t_factor` 不是float。
+            - **TypeError** - `t_factor` 的数据类型不是float。
             - **ValueError** - `t_factor` 小于等于0.0。
 
-    .. py:method:: callbacks(model)
+    .. py:method:: callbacks(model, dataset)
 
         定义SLB量化算法特有的一些callbacks，其中包括用于调节温度因子的callback。
 
         参数：
             - **model** (Model) - 经过算法修改后的网络构造的mindspore的Model对象。
+            - **dataset** (Dataset) - 加载了特定数据集的Dataset对象。
 
         异常：
             - **RuntimeError** - `epoch_size` 没有初始化。
             - **RuntimeError** - `has_trained_epoch` 没有初始化。
             - **ValueError** - `epoch_size` 小于等于 `has_trained_epoch` 。
             - **ValueError** - `t_end_time` 小于 `t_start_time` 。
-            - **TypeError** - `model` 不是Model。
+            - **TypeError** - `model` 的数据类型不是mindspore.Model。
+            - **TypeError** - `dataset` 的数据类型不是mindspore.dataset.Dataset。
 
         返回：
             SLB量化算法特有的一些callbacks的列表。
