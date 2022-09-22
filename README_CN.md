@@ -139,4 +139,4 @@ import mindspore_gs
 
 ## 许可证
 
-[Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
+[Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/r0.2/LICENSE)
