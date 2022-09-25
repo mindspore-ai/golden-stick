@@ -21,6 +21,7 @@ from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 import mindspore.context as context
+from mindspore_gs.quantization.simulated_quantization import ops as custom_ops
 from ..fake_quantizer import FakeQuantizer
 
 
@@ -42,6 +43,9 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
         self._min_max_update_func = Q.MinMaxUpdatePerLayer(ema=self._ema, ema_decay=self._ema_decay)
         self._is_ascend = context.get_context("device_target") == "Ascend"
         quant_func = Q.FakeQuantPerLayer
+        if context.get_context("device_target") == "GPU":
+            self._min_max_update_func = custom_ops.MinMaxUpdatePerLayer(ema=self._ema, ema_decay=self._ema_decay)
+            quant_func = custom_ops.FakeQuantPerLayer
         self._init_fake_quant_func(quant_func)
         self._float_min = Parameter(Tensor(np.array([-6]).astype(np.float32), mindspore.float32),
                                     name="float_min", requires_grad=False)
@@ -102,10 +106,16 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
                                     name="float_min", requires_grad=False)
         self._float_max = Parameter(Tensor(np.array([6] * self._num_channels).astype(np.float32), mindspore.float32),
                                     name="float_max", requires_grad=False)
-        quant_func = partial(Q.FakeQuantPerChannel, channel_axis=self._channel_axis)
-        self._init_fake_quant_func(quant_func)
         self._min_max_update_func = Q.MinMaxUpdatePerChannel(channel_axis=self._channel_axis, ema=self._ema,
                                                              ema_decay=self._ema_decay)
+        quant_func = partial(Q.FakeQuantPerChannel, channel_axis=self._channel_axis)
+        self._is_ascend = context.get_context("device_target") == "Ascend"
+        if context.get_context("device_target") == "GPU":
+            self._min_max_update_func = custom_ops.MinMaxUpdatePerChannel(channel_axis=self._channel_axis,
+                                                                          ema=self._ema,
+                                                                          ema_decay=self._ema_decay)
+            quant_func = partial(custom_ops.FakeQuantPerChannel, channel_axis=self._channel_axis)
+        self._init_fake_quant_func(quant_func)
 
     def extend_repr(self):
         """Display instance object as string."""
