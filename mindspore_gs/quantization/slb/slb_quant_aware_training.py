@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Basic implementation of slb quantization method, this algorithm regards the discrete weights
-in an arbitrary quantized neural network as searchable variables, and utilize a differential method
-to search them accurately. In particular, each weight is represented as a probability distribution
-over the discrete value set. The probabilities are optimized during training and the values
-with the highest probability are selected to establish the desired quantized network.
-See more details in `Searching for Low-Bit Weights in Quantized Neural Networks
-<https://arxiv.org/pdf/2009.08695.pdf>`. """
+"""SlbQuantAwareTraining."""
 
+from mindspore.dataset import Dataset
 from mindspore import Model
 from mindspore.nn import Cell
 from mindspore.train.callback import Callback
@@ -32,15 +27,27 @@ from .slb_quant_config import SlbQuantConfig
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
     """
-    Derived class of GoldenStick. SLB(Searching for Low-Bit Weights) QAT-algorithm.
+    Basic implementation of slb quantization method, this algorithm regards the discrete weights
+    in an arbitrary quantized neural network as searchable variables, and utilize a differential method
+    to search them accurately. In particular, each weight is represented as a probability distribution
+    over the discrete value set. The probabilities are optimized during training and the values
+    with the highest probability are selected to establish the desired quantized network.
+    See more details in `Searching for Low-Bit Weights in Quantized Neural Networks
+    <https://arxiv.org/pdf/2009.08695.pdf>`.
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
 
-            - quant_dtype (QuantDtype): Datatype used to quantize weights, weights quantization
-              support int4|int2|int1 now.
-              Default: QuantDtype.INT1.
+            - quant_dtype (Union[QuantDtype, list, tuple]): Datatype used to quantize weights and activations. The first
+              element represents activations and the second element represents weights. It is necessary to consider the
+              precision support of hardware devices in the practical quantization infer scenaries.
+              Weights quantization support int4|int2|int1, and activations quantization support int8 now.
+              Default: (QuantDtype.INT8, QuantDtype.INT1).
+            - enable_act_quant (bool): Whether apply activation quantization while training.
+              Default: False.
+            - enable_bn_calibration (bool): Whether apply batchnorm calibration while training.
+              Default: False.
             - epoch_size (int): Total training epochs.
             - has_trained_epoch (int): The trained epochs.
             - t_start_val (float): Initial value of temperature hyperparameters. Default: 1.
@@ -52,7 +59,9 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
               Default: 1.2.
 
     Raises:
-        TypeError: If `quant_dtype` is not `QuantDtype`.
+        TypeError: If `quant_dtype` is not `QuantDtype`, or every element of `quant_dtype` is not `QuantDtype`.
+        TypeError: If `enable_act_quant` or `enable_bn_calibration` is not bool.
+        ValueError: If the length of `quant_dtype` is greater than 2.
         TypeError: If `epoch_size` or `has_trained_epoch` is not an int.
         TypeError: If `t_start_val`, `t_start_time`, `t_end_time` or `t_factor` is not float.
         ValueError: If `epoch_size` is not greater than 0.
@@ -87,20 +96,29 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> ## 3.1) set_weight_quant_dtype is used to set the weight quantization bit, and support QuantDtype.INT4, QuantDtype.INT2,
         >>> ## QuantDtype.INT1 now.
         >>> slb_quantization.set_weight_quant_dtype(QuantDtype.INT1)
-        >>> ## 3.2) set_epoch_size is used to set the epoch size of training.
+        >>> ## 3.2) set_act_quant_dtype is used to set the activation quantization bit, and support QuantDtype.INT8 now.
+        >>> slb_quantization.set_act_quant_dtype(QuantDtype.INT8)
+        >>> ## 3.3) set_enable_act_quant is used to set whether apply activation quantization.
+        >>> slb_quantization.set_enable_act_quant(True)
+        >>> ## 3.4) set_enable_bn_calibration is used to set whether apply batchnorm calibration.
+        >>> slb_quantization.set_enable_bn_calibration(True)
+        >>> ## 3.5) set_epoch_size is used to set the epoch size of training.
         >>> slb_quantization.set_epoch_size(100)
-        >>> ## 3.3) set_has_trained_epoch is used to set the trained epoch size of training.
+        >>> ## 3.6) set_has_trained_epoch is used to set the trained epoch size of training.
         >>> slb_quantization.set_has_trained_epoch(0)
-        >>> ## 3.4) set_t_start_val is used to set the initial value of temperature hyperparameters.
+        >>> ## 3.7) set_t_start_val is used to set the initial value of temperature hyperparameters.
         >>> slb_quantization.set_t_start_val(1.0)
-        >>> ## 3.5) set_t_start_time is used to set the fraction of epochs after which temperature hyperparameters starting changing.
+        >>> ## 3.8) set_t_start_time is used to set the fraction of epochs after which temperature hyperparameters starting changing.
         >>> slb_quantization.set_t_start_time(0.2)
-        >>> ## 3.6) set_t_end_time is used to set the fraction of epochs after which temperature hyperparameters stopping changing.
+        >>> ## 3.9) set_t_end_time is used to set the fraction of epochs after which temperature hyperparameters stopping changing.
         >>> slb_quantization.set_t_end_time(0.6)
-        >>> ## 3.7) set_t_factor is used to set the multiplicative factor of temperature hyperparameters changing.
+        >>> ## 3.10) set_t_factor is used to set the multiplicative factor of temperature hyperparameters changing.
         >>> slb_quantization.set_t_factor(1.2)
         >>> ## 4) Print SLB QAT-Algorithm object and check the config setting result
         >>> ## Since we set weight_quant_dtype to be QuantDtype.INT1, the value of the attribute weight_quant_dtype is INT1
+        >>> ## Since we set act_quant_dtype to be QuantDtype.INT8, the value of the attribute weight_quant_dtype is INT8
+        >>> ## Since we set enable_act_quant to be True, the value of the attribute enable_act_quant is True
+        >>> ## Since we set enable_bn_calibration to be True, the value of the attribute enable_bn_calibration is True
         >>> ## Since we set epoch_size to be 100, the value of the attribute epoch_size is 100
         >>> ## Since we set has_trained_epoch to be 0, the value of the attribute has_trained_epoch is 0
         >>> ## Since we set t_start_val to be 1.0, the value of the attribute t_start_val is 1.0
@@ -108,7 +126,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> ## Since we set t_end_time to be 0.6, the value of the attribute t_end_time is 0.6
         >>> ## Since we set t_factor to be 1.2, the value of the attribute t_factor is 1.2
         >>> print(slb_quantization)
-        SlbQuantAwareTraining<weight_quant_dtype=INT1, epoch_size=100, has_trained_epoch=0, t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2>
+        SlbQuantAwareTraining<weight_quant_dtype=INT1, act_quant_dtype=INT8, enable_act_quant=True, enable_bn_calibration=True, epoch_size=100, has_trained_epoch=0, t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2>
         >>> ## 5) Apply SLB QAT-algorithm to origin network
         >>> net_qat = slb_quantization.apply(net)
         >>> ## 6) Print network and check the result. Conv2d should be transformed to QuantizeWrapperCells.
@@ -126,6 +144,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
               in_channels=1, out_channels=6, kernel_size=(5, 5), weight_bit_num=1, stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
               (fake_quant_weight): SlbFakeQuantizerPerLayer<bit_num=1>
               >
+            (_input_quantizer): SlbActQuantizer<bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900>
+            (_output_quantizer): SlbActQuantizer<bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900>
             >
           >
     """
@@ -147,26 +167,73 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_weight_quant_dtype(self, weight_quant_dtype):
         """
-        Set value of weight_quant_dtype of `_config`
+        Set value of weight_quant_dtype of quantization aware training `config`
 
         Args:
             weight_quant_dtype (QuantDtype): Datatype used to quantize weights. Default: QuantDtype.INT1.
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
-            TypeError: Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, `QuantDtype.INT2`
+            ValueError: Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, `QuantDtype.INT2`
                 or `QuantDtype.INT4` yet.
         """
-        weight_quant_dtype = Validator.check_isinstance("weight quant dtype", weight_quant_dtype, QuantDtype)
+        if not isinstance(weight_quant_dtype, QuantDtype):
+            raise TypeError("The parameter `weight quant dtype` must be isinstance of QuantDtype, "
+                            "but got {}.".format(weight_quant_dtype))
         if weight_quant_dtype not in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4]:
-            raise TypeError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
-                            "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
-                            "But got {}".format(weight_quant_dtype))
+            raise ValueError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
+                             "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
+                             "But got {}.".format(weight_quant_dtype))
         self._config.weight_quant_dtype = weight_quant_dtype
+
+    def set_act_quant_dtype(self, act_quant_dtype):
+        """
+        Set value of act_quant_dtype of quantization aware training `config`
+
+        Args:
+            act_quant_dtype (QuantDtype): Datatype used to quantize activations. Default: QuantDtype.INT8.
+
+        Raises:
+            TypeError: If `act_quant_dtype` is not QuantDtype.
+            ValueError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
+        """
+        if not isinstance(act_quant_dtype, QuantDtype):
+            raise TypeError("The parameter `act quant dtype` must be isinstance of QuantDtype, "
+                            "but got {}.".format(act_quant_dtype))
+        if act_quant_dtype not in [QuantDtype.INT8]:
+            raise ValueError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` " \
+                             "yet. But got {}.".format(act_quant_dtype))
+        self._config.act_quant_dtype = act_quant_dtype
+
+    def set_enable_act_quant(self, enable_act_quant):
+        """
+        Set value of enable_act_quant of quantization aware training `config`
+
+        Args:
+            enable_act_quant (bool): Whether apply activation quantization while training, default is False.
+
+        Raises:
+            TypeError: If `enable_act_quant` is not bool.
+        """
+        enable_act_quant = Validator.check_bool(enable_act_quant, "enable_act_quant", self.__class__.__name__)
+        self._config.enable_act_quant = enable_act_quant
+
+    def set_enable_bn_calibration(self, enable_bn_calibration):
+        """
+        Set value of enable_bn_calibration of quantization aware training `config`
+
+        Args:
+            enable_bn_calibration (bool): Whether apply batchnorm calibration while training, default is False.
+
+        Raises:
+            TypeError: If `enable_bn_calibration` is not bool.
+        """
+        enable_bn_calibration = Validator.check_bool(enable_bn_calibration, "enable_bn_calibration", self.__class__.__name__)
+        self._config.enable_bn_calibration = enable_bn_calibration
 
     def set_epoch_size(self, epoch_size):
         """
-        Set value of epoch_size of `_config`
+        Set value of epoch_size of quantization aware training `config`
 
         Args:
             epoch_size (int): the epoch size of training.
@@ -180,7 +247,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_has_trained_epoch(self, has_trained_epoch):
         """
-        Set value of has_trained_epoch of `_config`
+        Set value of has_trained_epoch of quantization aware training `config`
 
         Args:
             has_trained_epoch (int): the trained epochs of training.
@@ -194,7 +261,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_t_start_val(self, t_start_val):
         """
-        Set value of t_start_val of `_config`
+        Set value of t_start_val of quantization aware training `config`
 
         Args:
             t_start_val (float): Initial value of temperature hyperparameters, default: 1.0.
@@ -208,7 +275,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_t_start_time(self, t_start_time):
         """
-        Set value of t_start_time of `_config`
+        Set value of t_start_time of quantization aware training `config`
 
         Args:
             t_start_time (float): Fraction of epochs after which temperature hyperparameters starting changing, default: 0.2.
@@ -223,7 +290,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_t_end_time(self, t_end_time):
         """
-        Set value of t_end_time of `_config`
+        Set value of t_end_time of quantization aware training `config`
 
         Args:
             t_end_time (float): Fraction of epochs after which temperature hyperparameters stopping changing, default: 0.6.
@@ -238,7 +305,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_t_factor(self, t_factor):
         """
-        Set value of t_factor of `_config`
+        Set value of t_factor of quantization aware training `config`
 
         Args:
             t_factor (float): Multiplicative factor of temperature hyperparameters changing, default: 1.2.
@@ -250,14 +317,30 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         t_factor = Validator.check_positive_float(t_factor, "t_factor", self.__class__.__name__)
         self._config.t_factor = t_factor
 
+    @staticmethod
+    def _convert2list(name, value):
+        if not isinstance(value, list) and not isinstance(value, tuple):
+            value = [value, value]
+        elif len(value) == 1:
+            value = value + value
+        elif len(value) > 2:
+            raise ValueError("The length of input `{}` should not be greater than 2.".format(name))
+        return value
+
     def _init_net_policy(self, config):
         return SlbNetPolicy(config)
 
     def _create_qconfig_by_dict(self, config: dict):
         """Create `_config` from a dict"""
         self._config = SlbQuantConfig()
-        self.set_weight_quant_dtype(config.get("quant_dtype", QuantDtype.INT1))
+        quant_dtype_list = SlbQuantAwareTraining.\
+            _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT1]))
 
+        self.set_act_quant_dtype(quant_dtype_list[0])
+        self.set_weight_quant_dtype(quant_dtype_list[-1])
+
+        self.set_enable_act_quant(config.get("enable_act_quant", False))
+        self.set_enable_bn_calibration(config.get("enable_bn_calibration", False))
         if "epoch_size" in config:
             self.set_epoch_size(config["epoch_size"])
         if "has_trained_epoch" in config:
@@ -267,19 +350,21 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         self.set_t_end_time(config.get("t_end_time", 0.6))
         self.set_t_factor(config.get("t_factor", 1.2))
 
-    def callbacks(self, model: Model) -> [Callback]:
+    def callbacks(self, model: Model, dataset: Dataset) -> [Callback]:
         """
         Define TemperatureScheduler callback for SLB QAT-algorithm.
 
         Args:
             model (Model): Model to be used.
+            dataset (Dataset): Dataset to be used.
 
         Raises:
             RuntimeError: If `epoch_size` is not initialized!
             RuntimeError: If `has_trained_epoch` is not initialized!
             ValueError: If `epoch_size` is not greater than `has_trained_epoch`.
             ValueError: If `t_end_time` is less than `t_start_time`.
-            TypeError: If `model` is not Model.
+            TypeError: If `model` is not mindspore.Model.
+            TypeError: If `dataset` is not mindspore.dataset.Dataset.
 
         Returns:
             List of instance of Callbacks.
@@ -295,12 +380,22 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if self._config.t_end_time < self._config.t_start_time:
             raise ValueError("The `t_end_time` should not be less than `t_start_time`.")
 
-        model = Validator.check_isinstance("model", model, Model)
+        if not isinstance(model, Model):
+            raise TypeError(f'The parameter `model` must be isinstance of mindspore.Model, '
+                            f'but got {model}.')
+
+        if not isinstance(dataset, Dataset):
+            raise TypeError(f'The parameter `dataset` must be isinstance of mindspore.dataset.Dataset, '
+                            f'but got {dataset}.')
 
         cb = []
         cb.append(TemperatureScheduler(model, self._config.epoch_size, self._config.has_trained_epoch,
                                        self._config.t_start_val, self._config.t_start_time,
                                        self._config.t_end_time, self._config.t_factor))
+
+        if self._config.enable_bn_calibration:
+            cb.append(BNCalibrationCallback(model, dataset, self._config.epoch_size,
+                                            self._config.has_trained_epoch, self._config.t_start_time, False))
         return cb
 
     def apply(self, network: Cell) -> Cell:
@@ -325,11 +420,12 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def __repr__(self):
         """Display instance object as string."""
-        s = 'SlbQuantAwareTraining<weight_quant_dtype={}, epoch_size={}, has_trained_epoch={}, t_start_val={}, ' \
-            't_start_time={}, t_end_time={}, t_factor={}>'.format(self._config.weight_quant_dtype, self._config.epoch_size,
-                                                                  self._config.has_trained_epoch, self._config.t_start_val,
-                                                                  self._config.t_start_time, self._config.t_end_time,
-                                                                  self._config.t_factor)
+        s = 'SlbQuantAwareTraining<weight_quant_dtype={}, act_quant_dtype={}, enable_act_quant={}, ' \
+            'enable_bn_calibration={}, epoch_size={}, has_trained_epoch={}, t_start_val={}, t_start_time={}, ' \
+            't_end_time={}, t_factor={}>'.format(self._config.weight_quant_dtype, self._config.act_quant_dtype,
+                                                 self._config.enable_act_quant, self._config.enable_bn_calibration,
+                                                 self._config.epoch_size, self._config.has_trained_epoch, self._config.t_start_val,
+                                                 self._config.t_start_time, self._config.t_end_time, self._config.t_factor)
         return s
 
 
@@ -366,3 +462,29 @@ class TemperatureScheduler(Callback):
                 cell.set_temperature(t)
                 if epoch >= t_end_epoch:
                     cell.set_temperature_end_flag()
+
+
+class BNCalibrationCallback(Callback):
+    '''Update discrete state statistics in BN layers.'''
+    def __init__(self, model, train_set, epoch_size=100, has_trained_epoch=0,
+                 t_start_time=0.2, dataset_sink_mode=False):
+        self.dataset_sink_mode = dataset_sink_mode
+        self.model = model
+        self.train_set = train_set
+        self.epochs = epoch_size
+        self.has_trained_epoch = has_trained_epoch
+        self.t_start_time = t_start_time
+
+    def epoch_end(self, run_context):
+        """
+        Epoch_end.
+        """
+        cb_params = run_context.original_args()
+        epoch = cb_params.cur_epoch_num + self.has_trained_epoch
+        t_start_epoch = int(self.epochs*self.t_start_time)
+        if epoch > t_start_epoch:
+            # make BN update for train and BNCalibration
+            for _, cell in self.model.train_network.cells_and_names():
+                if cell.cls_name == 'BatchNorm2d':
+                    cell.use_batch_statistics = True
+            self.model.eval(self.train_set, dataset_sink_mode=self.dataset_sink_mode)

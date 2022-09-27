@@ -14,8 +14,11 @@
 # ============================================================================
 """SlbFakeQuantizer."""
 
+from functools import partial
 import numpy as np
 import mindspore
+import mindspore.context as context
+from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
@@ -104,3 +107,65 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         """Display instance object as string."""
         s = 'bit_num={}'.format(self.num_bits)
         return s
+
+
+class SlbActQuantizer(FakeQuantizer):
+    """
+    Implement of SlbActQuantizer.
+    1. statistic the min max value passing through this op
+    2. run fake quant execution to simulate the quantize loss
+    """
+
+    def __init__(self, ema=False, ema_decay=0.999, symmetric=False, narrow_range=False, num_bits=8, quant_delay=900):
+        super(SlbActQuantizer, self).__init__()
+        self._ema = ema
+        self._ema_decay = ema_decay
+        self._symmetric = symmetric
+        self._num_bits = num_bits
+        self._quant_delay = quant_delay
+        self._narrow_range = narrow_range
+        self._min_max_update_func = Q.MinMaxUpdatePerLayer(ema=self._ema, ema_decay=self._ema_decay)
+        self._is_ascend = context.get_context("device_target") == "Ascend"
+        quant_func = Q.FakeQuantPerLayer
+        self._init_fake_quant_func(quant_func)
+        self._float_min = Parameter(Tensor(np.array([-6]).astype(np.float32), mindspore.float32),
+                                    name="float_min", requires_grad=False)
+        self._float_max = Parameter(Tensor(np.array([6]).astype(np.float32), mindspore.float32),
+                                    name="float_max", requires_grad=False)
+
+    def _init_fake_quant_func(self, quant_func):
+        """
+        Define fake quant function according to device
+        """
+        if self._is_ascend:
+            self._fake_quant_train = quant_func(num_bits=self._num_bits,
+                                                symmetric=self._symmetric,
+                                                narrow_range=self._narrow_range,
+                                                quant_delay=self._quant_delay)
+            self._fake_quant_infer = self._fake_quant_train
+        else:
+            quant_func = partial(quant_func,
+                                 ema=self._ema,
+                                 ema_decay=self._ema_decay,
+                                 num_bits=self._num_bits,
+                                 symmetric=self._symmetric,
+                                 narrow_range=self._narrow_range,
+                                 quant_delay=self._quant_delay)
+            self._fake_quant_train = quant_func(training=True)
+            self._fake_quant_infer = quant_func(training=False)
+
+    def extend_repr(self):
+        """Display instance object as string."""
+        s = 'bit_num={}, symmetric={}, narrow_range={}, ema={}({}), per_channel={}, ' \
+            'quant_delay={}'.format(self._num_bits, self._symmetric, self._narrow_range,
+                                    self._ema, self._ema_decay, False, self._quant_delay)
+        return s
+
+    def construct(self, x):
+        if self.training:
+            self._float_min, self._float_max = \
+                self._min_max_update_func(x, self._float_min, self._float_max)
+            out = self._fake_quant_train(x, self._float_min, self._float_max)
+        else:
+            out = self._fake_quant_infer(x, self._float_min, self._float_max)
+        return out

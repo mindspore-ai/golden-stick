@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""test qat."""
+"""test slb qat."""
 
 import os
 import sys
@@ -22,7 +22,7 @@ import pytest
 import numpy as np
 import mindspore
 from mindspore import nn, context
-from mindspore.train import Model
+from mindspore import Model
 from mindspore.nn.metrics import Accuracy
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.constant import QuantDtype
@@ -49,8 +49,9 @@ class NetToQuant(nn.Cell):
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
-def test_set_config(quant_bit):
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [True, False])
+def test_set_config(quant_bit, enable_bn_calibration):
     """
     Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set functions.
     Description: Apply SlbQuantAwareTraining on lenet.
@@ -59,12 +60,18 @@ def test_set_config(quant_bit):
 
     network = NetToQuant()
     qat = SlbQAT()
-    if quant_bit == "W4":
+    if "W4" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT4)
-    elif quant_bit == "W2":
+    elif "W2" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT2)
-    elif quant_bit == "W1":
+    elif "W1" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT1)
+    if "A8" in quant_bit:
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+        qat.set_enable_act_quant(True)
+    else:
+        qat.set_enable_act_quant(False)
+    qat.set_enable_bn_calibration(enable_bn_calibration)
     qat.set_epoch_size(100)
     qat.set_has_trained_epoch(0)
     qat.set_t_start_val(1.0)
@@ -80,6 +87,7 @@ def test_set_config(quant_bit):
     conv_handler = conv_quant._handler
     weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
+    assert qat._config.enable_bn_calibration == enable_bn_calibration
     assert qat._config.epoch_size == 100
     assert qat._config.has_trained_epoch == 0
     assert qat._config.t_start_val == 1.0
@@ -93,15 +101,15 @@ def test_set_config(quant_bit):
 @pytest.mark.env_onecard
 def test_set_weight_quant_dtype_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_weight_quant_dtype().
+    Feature: set_weight_quant_dtype api of SLB.
     Description: Feed int type `weight_quant_dtype` into set_weight_quant_dtype() functional interface.
-    Expectation: Except ValueError.
+    Expectation: Except TypeError.
     """
 
     qat = SlbQAT()
     try:
         qat.set_weight_quant_dtype(weight_quant_dtype=3)
-    except ValueError:
+    except TypeError:
         return
     assert False
 
@@ -111,15 +119,15 @@ def test_set_weight_quant_dtype_type():
 @pytest.mark.env_onecard
 def test_set_weight_quant_dtype_range():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_weight_quant_dtype().
+    Feature: set_weight_quant_dtype api of SLB.
     Description: Feed QuantDtype type `weight_quant_dtype` into set_weight_quant_dtype() functional interface.
-    Expectation: Except TypeError.
+    Expectation: Except ValueError.
     """
 
     qat = SlbQAT()
     try:
         qat.set_weight_quant_dtype(weight_quant_dtype=QuantDtype.INT8)
-    except TypeError:
+    except ValueError:
         return
     assert False
 
@@ -127,9 +135,76 @@ def test_set_weight_quant_dtype_range():
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
+def test_set_act_quant_dtype_type():
+    """
+    Feature: set_act_quant_dtype api of SLB.
+    Description: Feed int type `act_quant_dtype` into set_act_quant_dtype() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_act_quant_dtype(act_quant_dtype=3)
+    except TypeError:
+        return
+    assert False
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_act_quant_dtype_range():
+    """
+    Feature: set_act_quant_dtype api of SLB.
+    Description: Feed QuantDtype type `act_quant_dtype` into set_act_quant_dtype() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    qat = SlbQAT()
+    try:
+        qat.set_act_quant_dtype(act_quant_dtype=QuantDtype.INT1)
+    except ValueError:
+        return
+    assert False
+
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_enable_act_quant():
+    """
+    Feature: set_enable_act_quant api of SlbQAT.
+    Description: Check default value of enable_act_quant and value after called set_enable_act_quant.
+    Expectation: Config success.
+    """
+    qat = SlbQAT()
+    assert not qat._config.enable_act_quant
+    qat.set_enable_act_quant(True)
+    assert qat._config.enable_act_quant
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_enable_bn_calibration():
+    """
+    Feature: set_enable_bn_calibration api of SlbQAT.
+    Description: Check default value of enable_bn_calibration and value after called set_enable_bn_calibration.
+    Expectation: Config success.
+    """
+    qat = SlbQAT()
+    assert not qat._config.enable_bn_calibration
+    qat.set_enable_bn_calibration(True)
+    assert qat._config.enable_bn_calibration
+
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_set_epoch_size_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_epoch_size().
+    Feature: set_epoch_size api of SlbQAT.
     Description: Feed float type `epoch_size` into set_epoch_size() functional interface.
     Expectation: Except TypeError.
     """
@@ -147,7 +222,7 @@ def test_set_epoch_size_type():
 @pytest.mark.env_onecard
 def test_set_epoch_size_range():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_epoch_size().
+    Feature: set_epoch_size api of SlbQAT.
     Description: Feed int type `epoch_size` into set_epoch_size() functional interface.
     Expectation: Except ValueError.
     """
@@ -165,7 +240,7 @@ def test_set_epoch_size_range():
 @pytest.mark.env_onecard
 def test_set_has_trained_epoch_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_has_trained_epoch().
+    Feature: set_has_trained_epoch api of SlbQAT.
     Description: Feed float type `has_trained_epoch` into set_has_trained_epoch() functional interface.
     Expectation: Except TypeError.
     """
@@ -183,7 +258,7 @@ def test_set_has_trained_epoch_type():
 @pytest.mark.env_onecard
 def test_set_has_trained_epoch_range():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_has_trained_epoch().
+    Feature: set_has_trained_epoch api of SlbQAT.
     Description: Feed int type `has_trained_epoch` into set_has_trained_epoch() functional interface.
     Expectation: Except ValueError.
     """
@@ -201,7 +276,7 @@ def test_set_has_trained_epoch_range():
 @pytest.mark.env_onecard
 def test_set_t_start_val_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_val().
+    Feature: set_t_start_val api of SlbQAT.
     Description: Feed int type `t_start_val` into set_t_start_val() functional interface.
     Expectation: Except TypeError.
     """
@@ -219,7 +294,7 @@ def test_set_t_start_val_type():
 @pytest.mark.env_onecard
 def test_set_t_start_val_range():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_val().
+    Feature: set_t_start_val api of SlbQAT.
     Description: Feed float type `t_start_val` into set_t_start_val() functional interface.
     Expectation: Except ValueError.
     """
@@ -237,7 +312,7 @@ def test_set_t_start_val_range():
 @pytest.mark.env_onecard
 def test_set_t_start_time_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_time().
+    Feature: set_t_start_time api of SlbQAT.
     Description: Feed int type `t_start_time` into set_t_start_time() functional interface.
     Expectation: Except TypeError.
     """
@@ -255,7 +330,7 @@ def test_set_t_start_time_type():
 @pytest.mark.env_onecard
 def test_set_t_start_time_range():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_start_time().
+    Feature: set_t_start_time api of SlbQAT.
     Description: Feed float type `t_start_time` into set_t_start_time() functional interface.
     Expectation: Except ValueError.
     """
@@ -273,7 +348,7 @@ def test_set_t_start_time_range():
 @pytest.mark.env_onecard
 def test_set_t_end_time_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_end_time().
+    Feature: set_t_end_time api of SlbQAT.
     Description: Feed int type `t_end_time` into set_t_end_time() functional interface.
     Expectation: Except TypeError.
     """
@@ -291,7 +366,7 @@ def test_set_t_end_time_type():
 @pytest.mark.env_onecard
 def test_set_t_end_time_range():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_end_time().
+    Feature: set_t_end_time api of SlbQAT.
     Description: Feed float type `t_end_time` into set_t_end_time() functional interface.
     Expectation: Except ValueError.
     """
@@ -309,7 +384,7 @@ def test_set_t_end_time_range():
 @pytest.mark.env_onecard
 def test_set_t_factor_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_factor().
+    Feature: set_t_factor api of SlbQAT.
     Description: Feed int type `t_factor` into set_t_factor() functional interface.
     Expectation: Except TypeError.
     """
@@ -327,7 +402,7 @@ def test_set_t_factor_type():
 @pytest.mark.env_onecard
 def test_set_t_factor_range():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm set function set_t_factor().
+    Feature: set_t_factor api of SlbQAT.
     Description: Feed float type `t_factor` into set_t_factor() functional interface.
     Expectation: Except ValueError.
     """
@@ -341,35 +416,45 @@ def test_set_t_factor_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_epoch_initial():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Feature: callbacks api of SlbQAT.
     Description: Not feed `epoch_size` and `has_trained_epoch`.
     Expectation: Except RuntimeError.
     """
+
+    from lenet.src.dataset import create_dataset as create_mnist_ds
+    context.set_context(mode=context.GRAPH_MODE)
+    data_path = "/home/workspace/mindspore_dataset/mnist/train"
+    ds_train = create_mnist_ds(data_path, 32, 1)
 
     network = NetToQuant()
     qat = SlbQAT()
     new_network = qat.apply(network)
     model = Model(new_network)
     try:
-        qat.callbacks(model=model)
+        qat.callbacks(model=model, dataset=ds_train)
     except RuntimeError:
         return
     assert False
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_epoch_range_compare():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Feature: callbacks api of SlbQAT.
     Description: Feed incorrect `epoch_size` and `has_trained_epoch`.
     Expectation: Except ValueError.
     """
+
+    from lenet.src.dataset import create_dataset as create_mnist_ds
+    context.set_context(mode=context.GRAPH_MODE)
+    data_path = "/home/workspace/mindspore_dataset/mnist/train"
+    ds_train = create_mnist_ds(data_path, 32, 1)
 
     network = NetToQuant()
     qat = SlbQAT()
@@ -378,21 +463,26 @@ def test_callbacks_epoch_range_compare():
     try:
         qat.set_epoch_size(epoch_size=100)
         qat.set_has_trained_epoch(has_trained_epoch=120)
-        qat.callbacks(model=model)
+        qat.callbacks(model=model, dataset=ds_train)
     except ValueError:
         return
     assert False
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_time_range_compare():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Feature: callbacks api of SlbQAT.
     Description: Feed incorrect `t_start_time` and `t_end_time`.
     Expectation: Except ValueError.
     """
+
+    from lenet.src.dataset import create_dataset as create_mnist_ds
+    context.set_context(mode=context.GRAPH_MODE)
+    data_path = "/home/workspace/mindspore_dataset/mnist/train"
+    ds_train = create_mnist_ds(data_path, 32, 1)
 
     network = NetToQuant()
     qat = SlbQAT()
@@ -403,21 +493,26 @@ def test_callbacks_time_range_compare():
         qat.set_has_trained_epoch(has_trained_epoch=0)
         qat.set_t_start_time(t_start_time=0.7)
         qat.set_t_end_time(t_end_time=0.4)
-        qat.callbacks(model=model)
+        qat.callbacks(model=model, dataset=ds_train)
     except ValueError:
         return
     assert False
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_model_type():
     """
-    Feature: SLB(Searching for Low-Bit Weights) QAT-algorithm function callbacks().
+    Feature: callbacks api of SlbQAT.
     Description: Feed int type `model` into callbacks() functional interface.
-    Expectation: Except ValueError.
+    Expectation: Except TypeError.
     """
+
+    from lenet.src.dataset import create_dataset as create_mnist_ds
+    context.set_context(mode=context.GRAPH_MODE)
+    data_path = "/home/workspace/mindspore_dataset/mnist/train"
+    ds_train = create_mnist_ds(data_path, 32, 1)
 
     qat = SlbQAT()
     try:
@@ -425,8 +520,33 @@ def test_callbacks_model_type():
         qat.set_has_trained_epoch(has_trained_epoch=0)
         qat.set_t_start_time(t_start_time=0.2)
         qat.set_t_end_time(t_end_time=0.6)
-        qat.callbacks(model=10)
-    except ValueError:
+        qat.callbacks(model=10, dataset=ds_train)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_callbacks_dataset_type():
+    """
+    Feature: callbacks api of SlbQAT.
+    Description: Feed int type `dataset` into callbacks() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    network = NetToQuant()
+    qat = SlbQAT()
+    new_network = qat.apply(network)
+    model = Model(new_network)
+    try:
+        qat.set_epoch_size(epoch_size=100)
+        qat.set_has_trained_epoch(has_trained_epoch=0)
+        qat.set_t_start_time(t_start_time=0.2)
+        qat.set_t_end_time(t_end_time=0.6)
+        qat.callbacks(model=model, dataset=5)
+    except TypeError:
         return
     assert False
 
@@ -434,8 +554,9 @@ def test_callbacks_model_type():
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
-def test_lenet(quant_bit):
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [True, False])
+def test_lenet(quant_bit, enable_bn_calibration):
     """
     Feature: slb quantization algorithm.
     Description: Apply slb qat on lenet.
@@ -445,17 +566,36 @@ def test_lenet(quant_bit):
     from lenet.src.lenet import LeNet5
     network = LeNet5(10)
     if quant_bit == "W4":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT4, "epoch_size": 100,
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
                       "has_trained_epoch": 0, "t_start_val": 1.0,
-                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 1.2})
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     elif quant_bit == "W2":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT2, "epoch_size": 100,
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
                       "has_trained_epoch": 0, "t_start_val": 1.0,
-                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 1.2})
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     elif quant_bit == "W1":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT1, "epoch_size": 100,
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
                       "has_trained_epoch": 0, "t_start_val": 1.0,
-                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 1.2})
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W4A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W2A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W1A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
     assert cells.get("Conv2dSlbQuant", None) is not None
@@ -464,26 +604,27 @@ def test_lenet(quant_bit):
     conv_handler = conv_quant._handler
     weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
-    assert qat._config.epoch_size == 100
+    assert qat._config.enable_bn_calibration == enable_bn_calibration
+    assert qat._config.epoch_size == 10
     assert qat._config.has_trained_epoch == 0
     assert qat._config.t_start_val == 1.0
     assert qat._config.t_start_time == 0.2
     assert qat._config.t_end_time == 0.6
-    assert qat._config.t_factor == 1.2
-
+    assert qat._config.t_factor == 3.2
 
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [True])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
-def test_lenet_accuracy(quant_bit, run_mode):
+def test_lenet_accuracy_bnon(quant_bit, enable_bn_calibration, run_mode):
     """
     Feature: test accuracy of slb qat work on lenet5.
     Description: Apply slb qat on lenet5 and test accuracy.
-    Expectation: accuracy is larger than 0.98.
+    Expectation: accuracy is larger than 0.95.
     """
 
     from lenet.src.lenet import LeNet5
@@ -496,15 +637,33 @@ def test_lenet_accuracy(quant_bit, run_mode):
 
     # convert network to quantization aware network
     if quant_bit == "W4":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT4, "epoch_size": 10,
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
                       "has_trained_epoch": 0, "t_start_val": 1.0,
                       "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     elif quant_bit == "W2":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT2, "epoch_size": 10,
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
                       "has_trained_epoch": 0, "t_start_val": 1.0,
                       "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     elif quant_bit == "W1":
-        qat = SlbQAT({"quant_dtype": QuantDtype.INT1, "epoch_size": 10,
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W4A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W2A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W1A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
                       "has_trained_epoch": 0, "t_start_val": 1.0,
                       "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
     new_network = qat.apply(network)
@@ -518,7 +677,7 @@ def test_lenet_accuracy(quant_bit, run_mode):
     model = Model(new_network, net_loss, net_opt, metrics={"Accuracy": Accuracy()})
 
     print("============== Starting Training ==============")
-    model.train(10, ds_train, callbacks=qat.callbacks(model))
+    model.train(10, ds_train, callbacks=qat.callbacks(model, ds_train))
     print("============== End Training ==============")
 
     ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
@@ -533,9 +692,85 @@ def test_lenet_accuracy(quant_bit, run_mode):
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [False])
+@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
+def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
+    """
+    Feature: test accuracy of slb qat work on lenet5.
+    Description: Apply slb qat on lenet5 and test accuracy.
+    Expectation: accuracy is larger than 0.95.
+    """
+
+    from lenet.src.lenet import LeNet5
+    from lenet.src.dataset import create_dataset as create_mnist_ds
+    context.set_context(mode=run_mode)
+    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
+    data_path = os.path.join(mnist_path, "train")
+    ds_train = create_mnist_ds(data_path, 32, 1)
+    network = LeNet5(10)
+
+    # convert network to quantization aware network
+    if quant_bit == "W4":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W2":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W1":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": False,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W4A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W2A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT2], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    elif quant_bit == "W1A8":
+        qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": True,
+                      "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
+                      "has_trained_epoch": 0, "t_start_val": 1.0,
+                      "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2})
+    new_network = qat.apply(network)
+
+    # define network loss
+    net_loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction="mean")
+    # define network optimization
+    net_opt = nn.Momentum(new_network.trainable_params(), 0.01, 0.9)
+
+    # define model
+    model = Model(new_network, net_loss, net_opt, metrics={"Accuracy": Accuracy()})
+
+    print("============== Starting Training ==============")
+    model.train(10, ds_train, callbacks=qat.callbacks(model, ds_train))
+    print("============== End Training ==============")
+
+    ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
+
+    print("============== Starting Testing ==============")
+    acc = model.eval(ds_eval)
+    print("============== {} ==============".format(acc))
+    assert acc['Accuracy'] > 0.95
+
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [True, False])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
-def test_resnet(quant_bit, run_mode):
+def test_resnet(quant_bit, enable_bn_calibration, run_mode):
     """
     Feature: slb quantization algorithm.
     Description: Apply slb qat on resnet.
@@ -550,13 +785,18 @@ def test_resnet(quant_bit, run_mode):
 
     network = resnet18(10)
     qat = SlbQAT()
-
-    if quant_bit == "W4":
+    if "W4" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT4)
-    elif quant_bit == "W2":
+    elif "W2" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT2)
-    elif quant_bit == "W1":
+    elif "W1" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT1)
+    if "A8" in quant_bit:
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+        qat.set_enable_act_quant(True)
+    else:
+        qat.set_enable_act_quant(False)
+    qat.set_enable_bn_calibration(enable_bn_calibration)
     qat.set_epoch_size(100)
     qat.set_has_trained_epoch(0)
     qat.set_t_start_val(1.0)
@@ -572,6 +812,7 @@ def test_resnet(quant_bit, run_mode):
     conv_handler = conv_quant._handler
     weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
+    assert qat._config.enable_bn_calibration == enable_bn_calibration
     assert qat._config.epoch_size == 100
     assert qat._config.has_trained_epoch == 0
     assert qat._config.t_start_val == 1.0
@@ -582,7 +823,7 @@ def test_resnet(quant_bit, run_mode):
 
 
 
-def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
+def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=context.GRAPH_MODE):
     """
     Create model lr dataset for resnet slbqat accuracy test.
     Merge into test_resnet_accuracy after pynative bug is fixed.
@@ -679,12 +920,18 @@ def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
 
     # apply golden-stick algo
     qat = SlbQAT()
-    if quant_bit == "W4":
+    if "W4" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT4)
-    elif quant_bit == "W2":
+    elif "W2" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT2)
-    elif quant_bit == "W1":
+    elif "W1" in quant_bit:
         qat.set_weight_quant_dtype(QuantDtype.INT1)
+    if "A8" in quant_bit:
+        qat.set_act_quant_dtype(QuantDtype.INT8)
+        qat.set_enable_act_quant(True)
+    else:
+        qat.set_enable_act_quant(False)
+    qat.set_enable_bn_calibration(enable_bn_calibration)
     qat.set_epoch_size(100)
     qat.set_has_trained_epoch(0)
     qat.set_t_start_val(1.0)
@@ -705,16 +952,17 @@ def _create_resnet_accuracy_model(quant_bit, run_mode=context.GRAPH_MODE):
 
     metrics = {"acc"}
     metrics.clear()
-    model = mindspore.Model(net, loss_fn=loss, optimizer=opt, loss_scale_manager=loss_scale, metrics=metrics,
-                            keep_batchnorm_fp32=False)
+    model = Model(net, loss_fn=loss, optimizer=opt, loss_scale_manager=loss_scale, metrics=metrics,
+                  keep_batchnorm_fp32=False)
     return model, lr, dataset, qat
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1"])
-def test_resnet_accuracy_graph(quant_bit):
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [True])
+def test_resnet_accuracy_graph_bnon(quant_bit, enable_bn_calibration):
     """
     Feature: slb quantization algorithm.
     Description: Apply slb qat on resnet and test accuracy
@@ -729,11 +977,11 @@ def test_resnet_accuracy_graph(quant_bit):
     epoch_size = 1
 
     mindspore.context.set_context(mode=context.GRAPH_MODE, device_target=target)
-    model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.GRAPH_MODE)
+    model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, context.GRAPH_MODE)
 
     # define callbacks
     monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
-    callbacks = [monitor] + qat.callbacks(model)
+    callbacks = [monitor] + qat.callbacks(model, dataset)
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")
@@ -746,7 +994,45 @@ def test_resnet_accuracy_graph(quant_bit):
     assert avg_step_loss <= expect_avg_step_loss
 
 
-def test_resnet_accuracy_pynative(quant_bit):
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [False])
+def test_resnet_accuracy_graph_bnoff(quant_bit, enable_bn_calibration):
+    """
+    Feature: slb quantization algorithm.
+    Description: Apply slb qat on resnet and test accuracy
+    Expectation: Loss of first epoch is smaller than 2.5.
+    """
+
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    from loss_monitor import LossMonitor
+
+    step_threshold = 20
+    target = "GPU"
+    epoch_size = 1
+
+    mindspore.context.set_context(mode=context.GRAPH_MODE, device_target=target)
+    model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, context.GRAPH_MODE)
+
+    # define callbacks
+    monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
+    callbacks = [monitor] + qat.callbacks(model, dataset)
+    # train model
+    dataset_sink_mode = target != "CPU"
+    print("============== Starting Training ==============")
+    model.train(epoch_size, dataset, callbacks=callbacks, sink_size=dataset.get_dataset_size(),
+                dataset_sink_mode=dataset_sink_mode)
+    print("============== End Training ==============")
+    expect_avg_step_loss = 2.5
+    avg_step_loss = np.mean(np.array(monitor.losses))
+    print("average step loss:{}".format(avg_step_loss))
+    assert avg_step_loss <= expect_avg_step_loss
+
+
+def test_resnet_accuracy_pynative(quant_bit, enable_bn_calibration):
     """
     Feature: Simulated quantization algorithm.
     Description: Apply simulated_quantization on resnet and test accuracy
@@ -760,10 +1046,10 @@ def test_resnet_accuracy_pynative(quant_bit):
     epoch_size = 1
 
     mindspore.context.set_context(mode=context.PYNATIVE_MODE, device_target=target)
-    model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, context.PYNATIVE_MODE)
+    model, lr, dataset, qat = _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, context.PYNATIVE_MODE)
     # define callbacks
     monitor = LossMonitor(lr_init=lr.asnumpy(), step_threshold=step_threshold)
-    callbacks = [monitor] + qat.callbacks(model)
+    callbacks = [monitor] + qat.callbacks(model, dataset)
     # train model
     dataset_sink_mode = target != "CPU"
     print("============== Starting Training ==============")

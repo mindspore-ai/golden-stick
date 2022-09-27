@@ -22,7 +22,10 @@ class SlbQuantConfig:
     See more details in slb_quant_aware_training.py
     """
     def __init__(self):
+        self.act_quant_dtype = QuantDtype.INT8
         self.weight_quant_dtype = QuantDtype.INT1
+        self.enable_act_quant = False
+        self.enable_bn_calibration = False
         self.epoch_size = -1
         self.has_trained_epoch = -1
         self.t_start_val = 1.0
