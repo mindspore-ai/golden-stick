@@ -29,7 +29,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
     Basic implementation of simulated quantization aware training, this algorithm adopts fake quantizer to simulate
     the loss of quantization calculation, and network parameters are updated through backpropagation, so that the
     network parameters can better adapt to the loss caused by quantization. See more details in `A White Paper on
-    Neural Network Quantization <https://arxiv.org/pdf/2106.08295.pdf>`.
+    Neural Network Quantization <https://arxiv.org/pdf/2106.08295.pdf>_`.
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
