@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick pruner module.
-"""
+"""MindSpore golden stick pruner module."""
 
 from .scop import PrunerFtCompressAlgo, PrunerKfCompressAlgo
+from .uni_pruning import UniPruner
 
-__all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo"]
+__all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo", "UniPruner"]
