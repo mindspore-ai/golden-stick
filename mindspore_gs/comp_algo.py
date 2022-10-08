@@ -56,6 +56,21 @@ class CompAlgo:
 
         return []
 
+    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
+        """
+        Define how to convert a compressed network to a standard network before exporting to MindIR.
+
+        Args:
+            net_opt (Cell): Network to be converted which is transformed by `CompAlgo.apply`.
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
+                checkpoint file to `net_opt`.
+
+        Returns:
+            An instance of Cell represents converted network.
+        """
+
+        return net_opt
+
     def loss(self, loss_fn: callable) -> callable:
         """
         Define how to adjust loss-function for algorithm. Subclass is not need to overridden this method if current
