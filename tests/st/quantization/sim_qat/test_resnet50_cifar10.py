@@ -99,7 +99,7 @@ def test_resnet_apply(run_mode):
     assert res_block_conv_act_fake_quant._quant_delay == 900
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_single
 def test_gpu_accuracy_graph():
@@ -128,7 +128,7 @@ def test_gpu_accuracy_graph():
     assert acc > acc_thres
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_single
 def test_gpu_accuracy_pynative():
@@ -158,7 +158,7 @@ def test_gpu_accuracy_pynative():
     assert acc > acc_thres
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_single
 def test_gpu_continue_train():
