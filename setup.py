@@ -17,6 +17,7 @@
 """setup package."""
 import os
 import stat
+import shutil
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
@@ -71,8 +72,21 @@ class BuildPy(build_py):
                 file_fullpath = os.path.join(dirpath, filename)
                 os.chmod(file_fullpath, stat.S_IREAD | stat.S_IWRITE)
 
+    @staticmethod
+    def _copy_ops_files():
+        """Copy ops files to pkg."""
+        src_path = os.path.join(pwd, 'mindspore_gs')
+        for dirpath, dirnames, _ in os.walk(src_path):
+            if 'ccsrc' in dirnames:
+                src_dir_path = os.path.join(dirpath, 'ccsrc')
+                dst_dir_path = os.path.join(pkg_dir, 'mindspore_gs', dirpath.split('mindspore_gs/')[-1], 'ccsrc')
+                if os.path.exists(dst_dir_path):
+                    shutil.rmtree(dst_dir_path)
+                shutil.copytree(src_dir_path, dst_dir_path)
+
     def run(self):
         super().run()
+        BuildPy._copy_ops_files()
         BuildPy._write_extra_info()
 
 

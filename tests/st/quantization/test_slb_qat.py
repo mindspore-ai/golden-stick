@@ -23,7 +23,7 @@ import numpy as np
 import mindspore
 from mindspore import nn, context
 from mindspore import Model
-from mindspore.nn.metrics import Accuracy
+from mindspore.train.metrics import Accuracy
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.constant import QuantDtype
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
@@ -149,6 +149,7 @@ def test_set_act_quant_dtype_type():
         return
     assert False
 
+
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
@@ -165,7 +166,6 @@ def test_set_act_quant_dtype_range():
     except ValueError:
         return
     assert False
-
 
 
 @pytest.mark.level0
@@ -196,7 +196,6 @@ def test_set_enable_bn_calibration():
     assert not qat._config.enable_bn_calibration
     qat.set_enable_bn_calibration(True)
     assert qat._config.enable_bn_calibration
-
 
 
 @pytest.mark.level0
@@ -613,7 +612,6 @@ def test_lenet(quant_bit, enable_bn_calibration):
     assert qat._config.t_factor == 3.2
 
 
-
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
@@ -686,7 +684,6 @@ def test_lenet_accuracy_bnon(quant_bit, enable_bn_calibration, run_mode):
     acc = model.eval(ds_eval)
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.95
-
 
 
 @pytest.mark.level0
@@ -763,7 +760,6 @@ def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
     assert acc['Accuracy'] > 0.95
 
 
-
 @pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
@@ -820,7 +816,6 @@ def test_resnet(quant_bit, enable_bn_calibration, run_mode):
     assert qat._config.t_end_time == 0.6
     assert qat._config.t_factor == 1.2
     print("============== test resnet slbqat success ==============")
-
 
 
 def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=context.GRAPH_MODE):
@@ -992,7 +987,6 @@ def test_resnet_accuracy_graph_bnon(quant_bit, enable_bn_calibration):
     avg_step_loss = np.mean(np.array(monitor.losses))
     print("average step loss:{}".format(avg_step_loss))
     assert avg_step_loss <= expect_avg_step_loss
-
 
 
 @pytest.mark.level1
