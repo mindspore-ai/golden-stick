@@ -18,6 +18,10 @@ MindSpore golden stick module.
 
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
+from .version import __version__, mindspore_version_check
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
            "PrunerFtCompressAlgo", "UniPruner"]
+__all__.extend(__version__)
+
+mindspore_version_check()
