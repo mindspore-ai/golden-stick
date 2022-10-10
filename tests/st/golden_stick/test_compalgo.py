@@ -15,7 +15,11 @@
 """test CompAlgo."""
 
 import pytest
-from mindspore_gs.comp_algo import CompAlgo
+import numpy as np
+
+from mindspore_gs.comp_algo import CompAlgo, ExportMindIRCallBack
+import mindspore
+from mindspore import Tensor
 
 
 @pytest.mark.level0
@@ -30,3 +34,22 @@ def test_init():
 
     algo = CompAlgo({})
     assert algo
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_callback():
+    """
+    Feature: CompAlgo callback export.
+    Description: Initialize a CompAlgo and set export MindIR automatically after training.
+    Expectation: Success.
+    """
+
+    algo = CompAlgo({})
+    algo.set_save_mindir(save_mindir=True)
+    algo.set_save_mindir_path(save_mindir_path="test")
+    algo.set_save_mindir_inputs(Tensor(np.ones(1), mindspore.float32))
+    cb = algo.callbacks()
+    assert cb
+    assert isinstance(cb[0], ExportMindIRCallBack)

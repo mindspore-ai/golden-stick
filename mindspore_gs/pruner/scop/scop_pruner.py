@@ -215,6 +215,7 @@ class KfCallback(Callback):
     """
     Define konockoff data callback for scop algorithm.
     """
+
     def step_begin(self, run_context):
         """
         Step_begin.
@@ -284,6 +285,7 @@ class PrunerKfCompressAlgo(CompAlgo):
         """Callback."""
         cb = []
         cb.append(KfCallback())
+        cb.extend(super(PrunerKfCompressAlgo, self).callbacks())
         return cb
 
     def _tranform(self, net):
@@ -318,6 +320,7 @@ class PrunerKfCompressAlgo(CompAlgo):
                         modules[keys[ik + 1]] = nn.SequentialCell()
                 elif (not isinstance(modules[k], KfConv2d)) and modules[k]._cells:
                     _inject(modules[k]._cells)
+
         _inject(net._cells)
         return net
 
