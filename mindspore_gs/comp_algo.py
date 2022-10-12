@@ -13,9 +13,11 @@
 # limitations under the License.
 # ============================================================================
 """GoldenStick."""
+import os.path
 
 from mindspore.nn.cell import Cell
 from mindspore.train.callback import Callback
+from mindspore import export
 
 
 class CompAlgo:
@@ -28,6 +30,9 @@ class CompAlgo:
 
     def __init__(self, config):
         self._config = config
+        self._save_mindir = False
+        self._save_mindir_path = ""
+        self._save_mindir_inputs = None
 
     def apply(self, network: Cell) -> Cell:
         """
@@ -44,7 +49,7 @@ class CompAlgo:
 
     def callbacks(self, *args, **kwargs) -> [Callback]:
         """
-        Define what task need to be done when training.
+        Define what task need to be done when training. Must be called at the end of child callbacks.
 
         Args:
             args (Union[list, tuple, optional]): Arguments passed to the function.
@@ -54,7 +59,59 @@ class CompAlgo:
             List of instance of Callbacks.
         """
 
-        return []
+        cb = []
+        if self._save_mindir:
+            cb.append(ExportMindIRCallBack(self, self._save_mindir_path, self._save_mindir_inputs))
+        return cb
+
+    def set_save_mindir(self, save_mindir: bool):
+        """
+        Set whether to automatically export MindIR after training.
+
+        Args:
+            save_mindir (bool): If true, export MindIR automatically after training, else not.
+
+        Raises:
+            TypeError: If `need_save` is not bool.
+        """
+        if not isinstance(save_mindir, bool):
+            raise TypeError("Input `need_save` should be bool.")
+        self._save_mindir = save_mindir
+
+    def set_save_mindir_path(self, save_mindir_path: str):
+        """
+        Set the path to export MindIR, only takes effect if `save_mindir` is True.
+
+        Args:
+            save_mindir_path (str): The path to export MindIR, the path includes the directory and file name, which can
+                be a relative path or an absolute path, the user needs to ensure write permission.
+
+        Raises:
+            TypeError: if `save_mindir_path` is not str.
+        """
+        if not isinstance(save_mindir_path, str):
+            raise TypeError("Input `save_mindir_path` should be str.")
+        if not self._save_mindir:
+            return
+        self._save_mindir_path = os.path.realpath(save_mindir_path)
+
+    def set_save_mindir_inputs(self, inputs):
+        """
+        Takes effect when `save_mindir` is True, set inputs for exporting MindIR.
+
+        Args:
+            inputs (Union[Tensor, Dataset, List, Tuple, Number, Bool]): It represents the inputs
+                 of the `net`, if the network has multiple inputs, set them together. While its type is Dataset,
+                 it represents the preprocess behavior of the `net`, data preprocess operations will be serialized.
+                 In second situation, you should adjust batch size of dataset script manually which will impact on
+                 the batch size of 'net' input. Only supports parse "image" column from dataset currently.
+
+        Raises:
+            ValueError: If `inputs` is None.
+        """
+        if inputs is None:
+            raise ValueError("Inputs is None.")
+        self._save_mindir_inputs = inputs
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """
@@ -84,3 +141,39 @@ class CompAlgo:
         """
 
         return loss_fn
+
+
+class ExportMindIRCallBack(Callback):
+    """Export MindIR after training automatically."""
+
+    def __init__(self, algo: CompAlgo, save_mindir_path: str, inputs):
+        """
+        Init callback.
+
+        Args:
+            algo (CompAlgo): Mindspore Golden stick algorithm.
+            save_mindir_path (str): The path to export MindIR, the path includes the directory and file name, which can
+                be a relative path or an absolute path, the user needs to ensure write permission.
+            inputs (Union[Tensor, Dataset, List, Tuple, Number, Bool]): It represents the inputs
+                 of the `net`, if the network has multiple inputs, set them together. While its type is Dataset,
+                 it represents the preprocess behavior of the `net`, data preprocess operations will be serialized.
+                 In second situation, you should adjust batch size of dataset script manually which will impact on
+                 the batch size of 'net' input. Only supports parse "image" column from dataset currently.
+
+        Raises:
+            RuntimeError: If `save_mindir_path` is not set.
+            ValueError: If `inputs` is None.
+        """
+        self._algo = algo
+        if not save_mindir_path:
+            raise RuntimeError("Save MindIR path is not set when creating ExportMindIRCallBack.")
+        self._save_mindir_path = save_mindir_path
+        if inputs is None:
+            raise ValueError("Inputs is none when creating ExportMindIRCallBack.")
+        self._inputs = inputs
+
+    def on_train_end(self, run_context):
+        """Called on train end, convert net and export MindIR."""
+        cb_params = run_context.original_args()
+        net_deploy = self._algo.convert(cb_params.network)
+        export(net_deploy, self._inputs, file_name=self._save_mindir_path, file_format="MINDIR")
