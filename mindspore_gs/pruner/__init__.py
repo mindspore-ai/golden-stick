@@ -18,7 +18,7 @@ from .scop import PrunerFtCompressAlgo, PrunerKfCompressAlgo
 from .uni_pruning import UniPruner
 from ..version import __version__, mindspore_version_check
 
-__all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo"]
+__all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo", "UniPruner"]
 __all__.extend(__version__)
 
 mindspore_version_check()
