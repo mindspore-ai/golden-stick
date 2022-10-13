@@ -21,7 +21,7 @@ from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 from .version import __version__, mindspore_version_check
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
-           "PrunerFtCompressAlgo"]
+           "PrunerFtCompressAlgo", "UniPruner"]
 __all__.extend(__version__)
 
 mindspore_version_check()
