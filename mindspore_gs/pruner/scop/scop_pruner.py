@@ -389,11 +389,11 @@ class PrunerFtCompressAlgo(CompAlgo):
 
     def __init__(self, config=None):
         super(PrunerFtCompressAlgo, self).__init__(config)
-        if config.prune_rate:
-            self.prune_rate = Validator.check_float_range(config.prune_rate, 0.0,
-                                                          1.0, Rel.INC_NEITHER)
-        else:
-            self.prune_rate = 0.0
+        if config is None:
+            config = {}
+        Validator.check_value_type("config", config, [dict], self.__class__.__name__)
+        prune_rate = config.get("prune_rate", 0.0)
+        self.set_prune_rate(prune_rate)
 
     def set_prune_rate(self, prune_rate):
         """
