@@ -224,7 +224,7 @@ class KfCallback(Callback):
         cur_data = cb_params.train_dataset_element
         kf = cur_data[0]
         kf_label = cur_data[1]
-        idx = ops.Randperm(max_length=kf.shape[0])(ms.Tensor([kf.shape[0]], dtype=mstype.int32))
+        idx = ops.Randperm(max_length=kf.shape[0])(mindspore.Tensor([kf.shape[0]], dtype=mstype.int32))
         kf_input = kf[idx, :].view(kf.shape)
         kf_input_label = kf_label[idx].view(kf_label.shape)
         cur_data[0] = ops.Concat(axis=0)((cur_data[0], kf_input))
@@ -387,9 +387,13 @@ class PrunerFtCompressAlgo(CompAlgo):
           >
     """
 
-    def __init__(self, prune_rate=0):
-        super(PrunerFtCompressAlgo, self).__init__(config=None)
-        self.prune_rate = prune_rate
+    def __init__(self, config=None):
+        super(PrunerFtCompressAlgo, self).__init__(config)
+        if config.prune_rate:
+            self.prune_rate = Validator.check_float_range(config.prune_rate, 0.0,
+                                                          1.0, Rel.INC_NEITHER)
+        else:
+            self.prune_rate = 0.0
 
     def set_prune_rate(self, prune_rate):
         """
