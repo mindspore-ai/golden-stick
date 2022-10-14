@@ -21,9 +21,66 @@ import pytest
 import numpy as np
 import mindspore
 from mindspore import nn, context
-from mindspore_gs.pruner.scop.scop_pruner import PrunerKfCompressAlgo, KfConv2d
+from mindspore_gs.pruner.scop.scop_pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, KfConv2d
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_constructor():
+    """
+    Feature: SCOP algorithm.
+    Description: Call constructor of SCOP and check config.
+    Expectation: prune_rate is updated according to argument `config` of constructor.
+    """
+
+    scop = PrunerFtCompressAlgo({"prune_rate": 0.8})
+    assert scop.prune_rate == 0.8
+
+    scop = PrunerFtCompressAlgo(None)
+    assert scop.prune_rate == 0.0
+
+    scop = PrunerFtCompressAlgo({})
+    assert scop.prune_rate == 0.0
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_constructor_error():
+    """
+    Feature: SCOP algorithm.
+    Description: Feed invalid config to constructor of SCOP and except error.
+    Expectation: Except error.
+    """
+
+    has_error = False
+    config = {"prune_rate": 1}
+    try:
+        PrunerFtCompressAlgo(config)
+        has_error = True
+    except TypeError:
+        pass
+    assert not has_error
+
+    config = 1
+    try:
+        PrunerFtCompressAlgo(config)
+        has_error = True
+    except TypeError:
+        pass
+    assert not has_error
+
+    has_error = False
+    config = {"prune_rate": 1.1}
+    try:
+        PrunerFtCompressAlgo(config)
+        has_error = True
+    except ValueError:
+        pass
+    assert not has_error
 
 
 @pytest.mark.level0
