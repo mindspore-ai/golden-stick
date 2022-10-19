@@ -17,8 +17,6 @@ import os
 import sys
 from collections import OrderedDict
 import pytest
-import numpy as np
-import mindspore
 from mindspore import nn
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
@@ -307,14 +305,56 @@ def test_convert():
     Expectation: convert success and structure of network as expect.
     """
     network = NetToQuant()
-    config = {"quant_delay": (100, 100), "quant_dtype": (QuantDtype.INT8, QuantDtype.INT8),
-              "per_channel": (False, True), "symmetric": (True, False), "narrow_range": (True, False),
-              "enable_fusion": True, "freeze_bn": 100, "bn_fold": True, "one_conv_fold": False}
-    qat = SimQAT(config)
+    qat = SimQAT()
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
-    data_in = mindspore.Tensor(np.ones([1, 5, 32, 32]), mindspore.float32)
-    file_name = "./conv.mindir"
-    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
-    graph = mindspore.load(file_name)
-    mindspore.nn.GraphCell(graph)
+
+    cells: OrderedDict = new_network.name_cells()
+    assert cells.get("Conv2dQuant", None) is not None
+    conv: QuantizeWrapperCell = cells.get("Conv2dQuant")
+    assert isinstance(conv, QuantizeWrapperCell)
+    act_fake_quant = conv._output_quantizer
+    assert not isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
+
+
+class Conv2dBnActToQuant(nn.Cell):
+    """
+    Network with Conv2dBnAct to be quanted
+    """
+
+    def __init__(self):
+        super(Conv2dBnActToQuant, self).__init__()
+        self.conv = nn.Conv2dBnAct(5, 6, 5, pad_mode='valid', has_bn=True)
+
+    def construct(self, x):
+        x = self.conv(x)
+        return x
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_convert_error():
+    """
+    Feature: simulated quantization convert function.
+    Description: Feed invalid type of bn_fold to convert function.
+    Expectation: Except TypeError.
+    """
+    network = Conv2dBnActToQuant()
+    qat = SimQAT()
+    new_network = qat.apply(network)
+    with pytest.raises(TypeError) as e:
+        qat.convert(100)
+    assert "The parameter `net_opt` must be isinstance of Cell" in str(e.value)
+
+    with pytest.raises(TypeError) as e:
+        qat.convert(new_network, 100)
+    assert "The parameter `ckpt_path` must be isinstance of str" in str(e.value)
+
+    with pytest.raises(ValueError) as e:
+        qat.convert(new_network, "file_path")
+    assert "The parameter `ckpt_path` can only be empty or a valid file" in str(e.value)
+
+    with pytest.raises(ValueError) as e:
+        qat.convert(new_network)
+    assert "Please set `enable_fusion` to False for SimulatedQuantizationAwareTraining" in str(e.value)
