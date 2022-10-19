@@ -197,6 +197,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         异常：
             - **TypeError** - `net_opt` 数据类型不是Cell。
             - **TypeError** - `ckpt_path` 数据类型不是str。
+            - **ValueError** - `ckpt_path` 非空但不是有效路径。
 
         返回：
             转换后的网络。

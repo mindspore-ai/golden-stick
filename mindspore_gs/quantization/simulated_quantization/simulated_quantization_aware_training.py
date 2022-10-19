@@ -462,6 +462,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Raises:
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.
+            ValueError: If `ckpt_path` is not empty and invalid.
 
         Returns:
             An instance of Cell represents converted network.
@@ -472,10 +473,14 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         if not isinstance(ckpt_path, str):
             raise TypeError(
                 f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
-        ckpt_path = os.path.realpath(ckpt_path)
-        if os.path.isfile(ckpt_path):
-            param_dict = load_checkpoint(ckpt_path)
-            load_param_into_net(net_opt, param_dict)
+        real_path = os.path.realpath(ckpt_path)
+        if ckpt_path != "":
+            if os.path.isfile(real_path):
+                param_dict = load_checkpoint(ckpt_path)
+                load_param_into_net(net_opt, param_dict)
+            else:
+                raise ValueError(
+                    f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
         self._visit_cell(net_opt)
         return net_opt
 
@@ -503,7 +508,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
                         quant_handle, **quant_params)
                     sub_cell.insert_child_to_cell("_handler", dense)
                 else:
-                    raise NotImplementedError(f"Not supported {type(quant_handle)} for convert api yet. \
+                    raise ValueError(f"Not supported {type(quant_handle)} for convert api yet. \
                         Please set `enable_fusion` to False for SimulatedQuantizationAwareTraining.")
                 identity = IdentityCell()
                 sub_cell.insert_child_to_cell("_input_quantizer", identity)

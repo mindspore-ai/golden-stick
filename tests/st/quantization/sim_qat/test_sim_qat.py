@@ -309,6 +309,13 @@ def test_convert():
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
 
+    cells: OrderedDict = new_network.name_cells()
+    assert cells.get("Conv2dQuant", None) is not None
+    conv: QuantizeWrapperCell = cells.get("Conv2dQuant")
+    assert isinstance(conv, QuantizeWrapperCell)
+    act_fake_quant = conv._output_quantizer
+    assert not isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
+
 
 class Conv2dBnActToQuant(nn.Cell):
     """
@@ -344,6 +351,10 @@ def test_convert_error():
         qat.convert(new_network, 100)
     assert "The parameter `ckpt_path` must be isinstance of str" in str(e.value)
 
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(ValueError) as e:
+        qat.convert(new_network, "file_path")
+    assert "The parameter `ckpt_path` can only be empty or a valid file" in str(e.value)
+
+    with pytest.raises(ValueError) as e:
         qat.convert(new_network)
     assert "Please set `enable_fusion` to False for SimulatedQuantizationAwareTraining" in str(e.value)
