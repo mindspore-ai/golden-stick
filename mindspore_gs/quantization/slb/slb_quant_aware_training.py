@@ -14,15 +14,21 @@
 # ============================================================================
 """SlbQuantAwareTraining."""
 
+import os
 from mindspore.dataset import Dataset
 from mindspore import Model
 from mindspore.nn import Cell
 from mindspore.train.callback import Callback
+from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore._checkparam import Validator, Rel
 from ..quantization_aware_training import QuantizationAwareTraining
 from ..constant import QuantDtype
+from ..quantize_wrapper_cell import QuantizeWrapperCell
+from ..quant_utils import IdentityCell
 from .slb_net_policy import SlbNetPolicy
 from .slb_quant_config import SlbQuantConfig
+from .slb_quant import Conv2dSlbQuant
+from .slb_quant_convert import create_conv2d_from_conv2dquant
 
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
@@ -74,9 +80,11 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         ``GPU``
 
     Examples:
+        >>> import mindspore
+        >>> import numpy as np
+        >>> from mindspore import nn
         >>> from mindspore_gs.quantization import SlbQuantAwareTraining
         >>> from mindspore_gs.quantization.constant import QuantDtype
-        >>> from mindspore import nn
         >>> class NetToQuant(nn.Cell):
         ...     def __init__(self, num_channel=1):
         ...         super(NetToQuant, self).__init__()
@@ -136,9 +144,9 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         NetToQuantOpt<
           (_handler): NetToQuant<
             (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
-            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter (name=bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9, gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.]), beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.])>
             >
-          (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter (name=bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
+          (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9, gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.]), beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.])>
           (Conv2dSlbQuant): QuantizeWrapperCell<
             (_handler): Conv2dSlbQuant<
               in_channels=1, out_channels=6, kernel_size=(5, 5), weight_bit_num=1, stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
@@ -148,6 +156,13 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             (_output_quantizer): SlbActQuantizer<bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900>
             >
           >
+        >>> ## 7) convert a compressed network to a standard network before exporting to MindIR.
+        >>> net_qat = slb_quantization.convert(net_qat)
+        >>> data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
+        >>> file_name = "./conv.mindir"
+        >>> mindspore.export(net_qat, data_in, file_name=file_name, file_format="MINDIR")
+        >>> graph = mindspore.load(file_name)
+        >>> mindspore.nn.GraphCell(graph)
     """
 
     def __init__(self, config=None):
@@ -228,8 +243,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Raises:
             TypeError: If `enable_bn_calibration` is not bool.
         """
-        enable_bn_calibration = Validator.check_bool(enable_bn_calibration, "enable_bn_calibration",
-                                                     self.__class__.__name__)
+        enable_bn_calibration = Validator.check_bool(enable_bn_calibration, "enable_bn_calibration", self.__class__.__name__)
         self._config.enable_bn_calibration = enable_bn_calibration
 
     def set_epoch_size(self, epoch_size):
@@ -257,8 +271,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             TypeError: If `has_trained_epoch` is not int.
             ValueError: If `has_trained_epoch` is less than 0.
         """
-        has_trained_epoch = Validator.check_int(has_trained_epoch, 0, Rel.GE, "has_trained_epoch",
-                                                self.__class__.__name__)
+        has_trained_epoch = Validator.check_int(has_trained_epoch, 0, Rel.GE, "has_trained_epoch", self.__class__.__name__)
         self._config.has_trained_epoch = has_trained_epoch
 
     def set_t_start_val(self, t_start_val):
@@ -335,7 +348,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
     def _create_qconfig_by_dict(self, config: dict):
         """Create `_config` from a dict"""
         self._config = SlbQuantConfig()
-        quant_dtype_list = SlbQuantAwareTraining. \
+        quant_dtype_list = SlbQuantAwareTraining.\
             _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT1]))
 
         self.set_act_quant_dtype(quant_dtype_list[0])
@@ -421,16 +434,81 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         self._qat_policy.build()
         return super(SlbQuantAwareTraining, self).apply(network)
 
+    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
+        """
+        Define how to convert a SLB network to a standard network before exporting to MindIR.
+
+        Args:
+            net_opt (Cell): SLB network to be converted.
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
+                checkpoint file to `net_opt`.
+
+        Raises:
+            TypeError: If `net_opt` is not Cell.
+            TypeError: If `ckpt_path` is not string.
+            ValueError: If `ckpt_path` is not empty and invalid.
+            RuntimeError: If `ckpt_path` is a valid file and load checkpoint file failed.
+
+        Returns:
+            An instance of Cell represents converted network.
+        """
+
+        if not isinstance(net_opt, Cell):
+            raise TypeError(f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
+        if not isinstance(ckpt_path, str):
+            raise TypeError(f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
+        if ckpt_path != "" and not os.path.isfile(ckpt_path):
+            raise ValueError(f'The parameter `ckpt_path` can only be empty or a valid file, but got {os.path.realpath(ckpt_path)}.')
+        ckpt_path = os.path.realpath(ckpt_path)
+        if os.path.isfile(ckpt_path):
+            param_dict = load_checkpoint(ckpt_path)
+            not_load_param = load_param_into_net(net_opt, param_dict)
+            if not_load_param:
+                raise RuntimeError("Load param into net fail.")
+        self._visit_cell(net_opt)
+        return net_opt
+
+    def _visit_cell(self, network: Cell):
+        """Visit the whole network."""
+        cells = network.name_cells()
+        for _, sub_cell in cells.items():
+            if sub_cell == network:
+                continue
+            if isinstance(sub_cell, QuantizeWrapperCell):
+                quant_handle = sub_cell.get_handler()
+                quant_params = {'weight_num_bits': self._config.weight_quant_dtype.num_bits,
+                                'weight_scale': 1., 'weight_zp': 0.}
+                if sub_cell.get_input_quantizer() is not None:
+                    _, _, input_scale, input_zp = sub_cell.get_input_quantizer().extract_quant_param()
+                    quant_params['input_scale'] = input_scale
+                    quant_params['input_zp'] = input_zp
+                if sub_cell.get_output_quantizer() is not None:
+                    _, _, output_scale, output_zp = sub_cell.get_output_quantizer().extract_quant_param()
+                    quant_params['output_scale'] = output_scale
+                    quant_params['output_zp'] = output_zp
+                if isinstance(quant_handle, Conv2dSlbQuant):
+                    conv = create_conv2d_from_conv2dquant(
+                        quant_handle, **quant_params)
+                    sub_cell.insert_child_to_cell("_handler", conv)
+                else:
+                    raise TypeError(f"Not supported {type(quant_handle)} for convert api yet.")
+
+                identity = IdentityCell()
+                if sub_cell.get_input_quantizer() is not None:
+                    sub_cell.insert_child_to_cell("_input_quantizer", identity)
+                if sub_cell.get_output_quantizer() is not None:
+                    sub_cell.insert_child_to_cell("_output_quantizer", identity)
+            else:
+                self._visit_cell(sub_cell)
+
     def __repr__(self):
         """Display instance object as string."""
         s = 'SlbQuantAwareTraining<weight_quant_dtype={}, act_quant_dtype={}, enable_act_quant={}, ' \
             'enable_bn_calibration={}, epoch_size={}, has_trained_epoch={}, t_start_val={}, t_start_time={}, ' \
             't_end_time={}, t_factor={}>'.format(self._config.weight_quant_dtype, self._config.act_quant_dtype,
                                                  self._config.enable_act_quant, self._config.enable_bn_calibration,
-                                                 self._config.epoch_size, self._config.has_trained_epoch,
-                                                 self._config.t_start_val,
-                                                 self._config.t_start_time, self._config.t_end_time,
-                                                 self._config.t_factor)
+                                                 self._config.epoch_size, self._config.has_trained_epoch, self._config.t_start_val,
+                                                 self._config.t_start_time, self._config.t_end_time, self._config.t_factor)
         return s
 
 
@@ -438,7 +516,6 @@ class TemperatureScheduler(Callback):
     """
     Define TemperatureScheduler callback for SLB QAT-algorithm.
     """
-
     def __init__(self, model, epoch_size=100, has_trained_epoch=0,
                  t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2):
         super().__init__()
@@ -461,10 +538,10 @@ class TemperatureScheduler(Callback):
         t_start_epoch = int(self.epochs * self.t_start_time)
         t_end_epoch = int(self.epochs * self.t_end_time)
         if epoch > t_start_epoch:
-            t *= self.t_factor ** (min(epoch, t_end_epoch) - t_start_epoch)
+            t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
         # Assign new value to temperature parameter
         for _, cell in self.model.train_network.cells_and_names():
-            if cell.cls_name == 'SlbFakeQuantizerPerLayer':  # for SLB
+            if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
                 cell.set_temperature(t)
                 if epoch >= t_end_epoch:
                     cell.set_temperature_end_flag()
@@ -472,7 +549,6 @@ class TemperatureScheduler(Callback):
 
 class BNCalibrationCallback(Callback):
     '''Update discrete state statistics in BN layers.'''
-
     def __init__(self, model, train_set, epoch_size=100, has_trained_epoch=0,
                  t_start_time=0.2, dataset_sink_mode=False):
         self.dataset_sink_mode = dataset_sink_mode
@@ -488,7 +564,7 @@ class BNCalibrationCallback(Callback):
         """
         cb_params = run_context.original_args()
         epoch = cb_params.cur_epoch_num + self.has_trained_epoch
-        t_start_epoch = int(self.epochs * self.t_start_time)
+        t_start_epoch = int(self.epochs*self.t_start_time)
         if epoch > t_start_epoch:
             # make BN update for train and BNCalibration
             for _, cell in self.model.train_network.cells_and_names():
