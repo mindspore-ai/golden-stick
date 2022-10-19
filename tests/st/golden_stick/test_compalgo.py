@@ -53,3 +53,91 @@ def test_callback():
     cb = algo.callbacks()
     assert cb
     assert isinstance(cb[0], ExportMindIRCallBack)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_callback_error():
+    """
+    Feature: CompAlgo callback export.
+    Description: Initialize a CompAlgo and set export MindIR automatically after training.
+    Expectation: Expect error.
+    """
+
+    algo = CompAlgo({})
+    algo.set_save_mindir(save_mindir=True)
+    has_error = False
+    try:
+        _ = algo.callbacks()
+        has_error = True
+    except RuntimeError:
+        pass
+    assert not has_error
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_save_mindir():
+    """
+    Feature: set_save_mindir api of CompAlgo.
+    Description: Input invalid value and expect error.
+    Expectation: Expect error.
+    """
+    qat = CompAlgo({})
+    has_error = False
+    try:
+        qat.set_save_mindir(1)
+        has_error = True
+    except TypeError:
+        pass
+    assert not has_error
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_save_mindir_path():
+    """
+    Feature: set_save_mindir_path api of CompAlgo.
+    Description: Input invalid value and expect error.
+    Expectation: Expect error.
+    """
+    qat = CompAlgo({})
+    has_error = False
+    try:
+        qat.set_save_mindir(save_mindir=True)
+        qat.set_save_mindir_path(1)
+        has_error = True
+    except TypeError:
+        pass
+    assert not has_error
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_set_save_mindir_inputs():
+    """
+    Feature: set_save_mindir_inputs api of CompAlgo.
+    Description: Input invalid value and expect error.
+    Expectation: Expect error.
+    """
+    qat = CompAlgo({})
+    has_error = False
+    try:
+        qat.set_save_mindir(save_mindir=True)
+        qat.set_save_mindir_inputs(None)
+        has_error = True
+    except RuntimeError:
+        pass
+    assert not has_error
+
+    try:
+        qat.set_save_mindir(save_mindir=True)
+        qat.set_save_mindir_inputs({"a": 1})
+        has_error = True
+    except RuntimeError:
+        pass
+    assert not has_error
