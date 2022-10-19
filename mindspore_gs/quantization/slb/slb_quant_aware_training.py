@@ -74,7 +74,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         ``GPU``
 
     Examples:
-        >>> from mindspore_gs.quantization.slb import SlbQuantAwareTraining
+        >>> from mindspore_gs.quantization import SlbQuantAwareTraining
         >>> from mindspore_gs.quantization.constant import QuantDtype
         >>> from mindspore import nn
         >>> class NetToQuant(nn.Cell):
