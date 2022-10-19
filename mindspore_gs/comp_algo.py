@@ -25,7 +25,7 @@ class CompAlgo:
     Base class of algorithms in GoldenStick.
 
     Args:
-        config (Dict): User config for network compression. Config specification is default by derived class.
+        config (dict): User config for network compression. Config specification is default by derived class.
     """
 
     def __init__(self, config):
@@ -73,6 +73,25 @@ class CompAlgo:
 
         Raises:
             TypeError: If `need_save` is not bool.
+
+        Examples:
+            >>> from mindspore import Tensor, nn
+            >>> from mindspore_gs.comp_algo import CompAlgo
+            >>> import numpy as np
+            >>> ## 1) Define network to be trained
+            >>> network = LeNet(10)
+            >>> ## 2) Define MindSpore Golden Stick Algorithm, here we use base algorithm.
+            >>> algo = CompAlgo({})
+            >>> ## 3) Enable automatically export MindIR after training.
+            >>> algo.set_save_mindir(save_mindir=True)
+            >>> ## 4) Set MindIR output path.
+            >>> algo.set_save_mindir_path(save_mindir_path="./lenet")
+            >>> ## 5) Set the inputs of the net for exoprting MindIR.
+            >>> input_tensor = Tensor(np.ones([1, 1, 32, 32]).astype(np.float32))
+            >>> algo.set_save_mindir_inputs(input_tensor)
+            >>> ## 6) Apply MindSpore Golden Stick algorithm to origin network.
+            >>> network = algo.apply(network)
+            >>> ## 7) Then you can start training and MindIR with be exported automatically after training ends.
         """
         if not isinstance(save_mindir, bool):
             raise TypeError("Input `need_save` should be bool.")
@@ -107,7 +126,10 @@ class CompAlgo:
                  the batch size of 'net' input. Only supports parse "image" column from dataset currently.
 
         Raises:
-            ValueError: If `inputs` is None.
+            RuntimeError: If `inputs` is None.
+            RuntimeError: If `inputs` has more than one Dataset.
+            RuntimeError: If `inputs` is Dataset but the column is not "image".
+            RuntimeError: If type of `inputs` is not in [Tensor, Dataset, List, Tuple, Number, Bool].
         """
         if inputs is None:
             raise ValueError("Inputs is None.")
@@ -124,6 +146,21 @@ class CompAlgo:
 
         Returns:
             An instance of Cell represents converted network.
+
+        Examples:
+            >>> from mindspore_gs.comp_algo import CompAlgo
+            >>> ## 1) Define network to be trained
+            >>> network = LeNet(10)
+            >>> ## 2) Define MindSpore Golden Stick Algorithm, here we use base algorithm.
+            >>> algo = CompAlgo({})
+            >>> ## 3) Apply MindSpore Golden Stick algorithm to origin network.
+            >>> network = algo.apply(network)
+            >>> ## 4) Then you can start training, after which you can convert a compressed network to a standard
+            >>> ##    network, there are two ways to do that.
+            >>> ## 4.1) Convert without checkpoint.
+            >>> net_deploy = algo.convert(network)
+            >>> ## 4.2) Convert with checkpoint.
+            >>> net_deploy = algo.convert(network, ckpt_path)
         """
 
         return net_opt
