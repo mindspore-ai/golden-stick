@@ -246,7 +246,7 @@ class PrunerKfCompressAlgo(CompAlgo):
         ``Ascend`` ``GPU``
 
     Examples:
-        >>> from mindspore_gs import PrunerKfCompressAlgo
+        >>> from mindspore_gs.pruner import PrunerKfCompressAlgo
         >>> from models.resnet import resnet50
         >>> class NetToPrune(nn.Cell):
         ...     def __init__(self, num_channel=1):
@@ -351,7 +351,7 @@ class PrunerFtCompressAlgo(CompAlgo):
         ``Ascend`` ``GPU``
 
     Examples:
-        >>> from mindspore_gs import PrunerKfCompressAlgo, PrunerFtCompressAlgo
+        >>> from mindspore_gs.pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo
         >>> from models.resnet import resnet50
         >>> class NetToPrune(nn.Cell):
         ...     def __init__(self, num_channel=1):
