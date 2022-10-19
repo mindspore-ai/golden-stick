@@ -17,13 +17,14 @@
 import os
 import sys
 import random
+from datetime import datetime
 from collections import OrderedDict
 import pytest
 import numpy as np
 import mindspore
 from mindspore import nn, context
 from mindspore import Model
-from mindspore.train.metrics import Accuracy
+from mindspore.nn.metrics import Accuracy
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.constant import QuantDtype
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
@@ -37,12 +38,14 @@ class NetToQuant(nn.Cell):
     Network with single conv2d to be quanted.
     """
 
-    def __init__(self):
+    def __init__(self, num_channel=1):
         super(NetToQuant, self).__init__()
-        self.conv = nn.Conv2d(5, 6, 5, pad_mode='valid')
+        self.conv = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
+        self.bn = nn.BatchNorm2d(6)
 
     def construct(self, x):
         x = self.conv(x)
+        x = self.bn(x)
         return x
 
 
@@ -99,6 +102,32 @@ def test_set_config(quant_bit, enable_bn_calibration):
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
+@pytest.mark.parametrize("enable_act_quant", [True, False])
+def test_convert(enable_act_quant):
+    """
+    Feature: SLB convert function.
+    Description: convert a compressed network to a standard network before exporting to MindIR.
+    Expectation: convert success and structure of network as expect.
+    """
+
+    network = NetToQuant()
+    config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": enable_act_quant,
+              "enable_bn_calibration": False, "epoch_size": 10,
+              "has_trained_epoch": 0, "t_start_val": 1.0,
+              "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2}
+    qat = SlbQAT(config)
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+    data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
+    file_name = "./conv.mindir"
+    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    graph = mindspore.load(file_name)
+    mindspore.nn.GraphCell(graph)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_set_weight_quant_dtype_type():
     """
     Feature: set_weight_quant_dtype api of SLB.
@@ -148,7 +177,6 @@ def test_set_act_quant_dtype_type():
     except TypeError:
         return
     assert False
-
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
@@ -551,6 +579,66 @@ def test_callbacks_dataset_type():
 
 
 @pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_convert_network_type():
+    """
+    Feature: convert api of SlbQAT.
+    Description: Feed int type `net_opt` into convert() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    network = NetToQuant()
+    qat = SlbQAT()
+    new_network = qat.apply(network)
+    try:
+        new_network = qat.convert(net_opt=10)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_convert_ckpt_path_type():
+    """
+    Feature: convert api of SlbQAT.
+    Description: Feed int type `ckpt_path` into convert() functional interface.
+    Expectation: Except TypeError.
+    """
+
+    network = NetToQuant()
+    qat = SlbQAT()
+    new_network = qat.apply(network)
+    try:
+        new_network = qat.convert(net_opt=new_network, ckpt_path=5)
+    except TypeError:
+        return
+    assert False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_convert_ckpt_path_value():
+    """
+    Feature: convert api of SlbQAT.
+    Description: Feed incorrect `ckpt_path` into convert() functional interface.
+    Expectation: Except ValueError.
+    """
+
+    network = NetToQuant()
+    qat = SlbQAT()
+    new_network = qat.apply(network)
+    try:
+        new_network = qat.convert(net_opt=new_network, ckpt_path="an_invalid_test_path")
+    except ValueError:
+        return
+    assert False
+
+
+@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
@@ -613,9 +701,39 @@ def test_lenet(quant_bit, enable_bn_calibration):
 
 
 @pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("enable_act_quant", [True, False])
+@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
+def test_lenet_convert(run_mode, enable_act_quant):
+    """
+    Feature: SLB convert function.
+    Description: convert a compressed network to a standard network before exporting to MindIR.
+    Expectation: convert success and structure of network as expect.
+    """
+
+    from lenet.src.lenet import LeNet5
+    context.set_context(mode=run_mode)
+    network = LeNet5(10)
+    config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": enable_act_quant,
+              "enable_bn_calibration": False, "epoch_size": 10,
+              "has_trained_epoch": 0, "t_start_val": 1.0,
+              "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 3.2}
+    qat = SlbQAT(config)
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+    data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
+    time_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = "./lenet_{}.mindir".format(time_tag)
+    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    graph = mindspore.load(file_name)
+    mindspore.nn.GraphCell(graph)
+
+
+@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])
 @pytest.mark.parametrize("enable_bn_calibration", [True])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
 def test_lenet_accuracy_bnon(quant_bit, enable_bn_calibration, run_mode):
@@ -686,10 +804,11 @@ def test_lenet_accuracy_bnon(quant_bit, enable_bn_calibration, run_mode):
     assert acc['Accuracy'] > 0.95
 
 
+
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])
 @pytest.mark.parametrize("enable_bn_calibration", [False])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
 def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
@@ -760,6 +879,7 @@ def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
     assert acc['Accuracy'] > 0.95
 
 
+
 @pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
@@ -818,11 +938,46 @@ def test_resnet(quant_bit, enable_bn_calibration, run_mode):
     print("============== test resnet slbqat success ==============")
 
 
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("enable_act_quant", [True, False])
+@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
+def test_resnet_convert(run_mode, enable_act_quant):
+    """
+    Feature: SLB convert function.
+    Description: convert a compressed network to a standard network before exporting to MindIR.
+    Expectation: convert success and structure of network as expect.
+    """
+
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    from models.resnet import resnet18
+    context.set_context(mode=run_mode)
+
+    network = resnet18(10)
+    config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": enable_act_quant,
+              "enable_bn_calibration": False, "epoch_size": 100,
+              "has_trained_epoch": 0, "t_start_val": 1.0,
+              "t_start_time": 0.2, "t_end_time": 0.6, "t_factor": 1.2}
+    qat = SlbQAT(config)
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+    data_in = mindspore.Tensor(np.ones([1, 3, 32, 32]), mindspore.float32)
+    time_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = "./resnet_{}.mindir".format(time_tag)
+    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    graph = mindspore.load(file_name)
+    mindspore.nn.GraphCell(graph)
+
+
 def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=context.GRAPH_MODE):
     """
     Create model lr dataset for resnet slbqat accuracy test.
     Merge into test_resnet_accuracy after pynative bug is fixed.
     """
+
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     import mindspore.dataset as ds
@@ -955,7 +1110,7 @@ def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=con
 @pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])
 @pytest.mark.parametrize("enable_bn_calibration", [True])
 def test_resnet_accuracy_graph_bnon(quant_bit, enable_bn_calibration):
     """
@@ -989,10 +1144,11 @@ def test_resnet_accuracy_graph_bnon(quant_bit, enable_bn_calibration):
     assert avg_step_loss <= expect_avg_step_loss
 
 
+
 @pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])
 @pytest.mark.parametrize("enable_bn_calibration", [False])
 def test_resnet_accuracy_graph_bnoff(quant_bit, enable_bn_calibration):
     """
@@ -1028,10 +1184,11 @@ def test_resnet_accuracy_graph_bnoff(quant_bit, enable_bn_calibration):
 
 def test_resnet_accuracy_pynative(quant_bit, enable_bn_calibration):
     """
-    Feature: Simulated quantization algorithm.
+    Feature: slb quantization algorithm.
     Description: Apply simulated_quantization on resnet and test accuracy
     Expectation: Loss of first epoch is smaller than 2.8.
     """
+
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
     from loss_monitor import LossMonitor
 
