@@ -171,3 +171,20 @@ mindspore_gs.quantization.SlbQuantAwareTraining
 
         返回：
             在原网络定义的基础上，修改需要量化的网络层后生成带有伪量化节点的网络。
+
+    .. py:method:: convert(net_opt, ckpt_path)
+
+        定义将SLB量化网络转换成适配MindIR的标准网络的具体实现。
+
+        参数：
+            - **net_opt** (Cell) - 经过SLB量化算法量化后的网络。
+            - **ckpt_path** (str) - checkpoint文件的存储路径，为空时不加载，默认值为空。
+
+        异常：
+            - **TypeError** - `net_opt` 的数据类型不是mindspore.nn.Cell。
+            - **TypeError** - `ckpt_path` 的数据类型不是str。
+            - **ValueError** - `ckpt_path` 不为空，但不是有效文件。
+            - **RuntimeError** - `ckpt_path` 是有效文件，但加载失败。
+
+        返回：
+            能适配MindIR的标准网络。
