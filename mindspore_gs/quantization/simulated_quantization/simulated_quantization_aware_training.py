@@ -82,7 +82,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         ``GPU``
 
     Examples:
-        >>> from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining
+        >>> from mindspore_gs.quantization import SimulatedQuantizationAwareTraining
         >>> from mindspore import nn
         ... class NetToQuant(nn.Cell):
         ...     def __init__(self, num_channel=1):
