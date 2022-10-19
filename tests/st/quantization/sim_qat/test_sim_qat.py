@@ -293,3 +293,57 @@ def test_apply():
     assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not act_fake_quant._symmetric
     assert act_fake_quant._quant_delay == 900
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_convert():
+    """
+    Feature: simulated quantization convert function.
+    Description: convert a compressed network to a standard network before exporting to MindIR.
+    Expectation: convert success and structure of network as expect.
+    """
+    network = NetToQuant()
+    qat = SimQAT()
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+
+
+class Conv2dBnActToQuant(nn.Cell):
+    """
+    Network with Conv2dBnAct to be quanted
+    """
+
+    def __init__(self):
+        super(Conv2dBnActToQuant, self).__init__()
+        self.conv = nn.Conv2dBnAct(5, 6, 5, pad_mode='valid', has_bn=True)
+
+    def construct(self, x):
+        x = self.conv(x)
+        return x
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_convert_error():
+    """
+    Feature: simulated quantization convert function.
+    Description: Feed invalid type of bn_fold to convert function.
+    Expectation: Except TypeError.
+    """
+    network = Conv2dBnActToQuant()
+    qat = SimQAT()
+    new_network = qat.apply(network)
+    with pytest.raises(TypeError) as e:
+        qat.convert(100)
+    assert "The parameter `net_opt` must be isinstance of Cell" in str(e.value)
+
+    with pytest.raises(TypeError) as e:
+        qat.convert(new_network, 100)
+    assert "The parameter `ckpt_path` must be isinstance of str" in str(e.value)
+
+    with pytest.raises(NotImplementedError) as e:
+        qat.convert(new_network)
+    assert "Please set `enable_fusion` to False for SimulatedQuantizationAwareTraining" in str(e.value)

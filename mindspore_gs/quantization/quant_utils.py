@@ -18,18 +18,29 @@ import numpy as np
 from mindspore._checkparam import Validator
 from mindspore.nn.layer.quant import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
     Conv2dQuant, DenseQuant
+from mindspore.nn import Cell
+from mindspore import ops
 from .fake_quantizer import FakeQuantizer
 
-__all__ = ["load_nonquant_param_into_quant_net", "query_quant_layers", "compute_kl_threshold",
-           "scale_zp_max_min_from_fake_quant_cell", "fold_batchnorm", "without_fold_batchnorm",
+__all__ = ["query_quant_layers", "compute_kl_threshold",
+           "scale_zp_max_min_from_fake_quant_cell", "fold_batchnorm", "cal_quantization_params",
            "get_quant_min_max", "weight2int"]
+
+
+class IdentityCell(Cell):
+    def __init__(self):
+        super(IdentityCell, self).__init__()
+        self.identity = ops.Identity()
+
+    def construct(self, x):
+        x = self.identity(x)
+        return x
 
 
 def cal_quantization_params(input_min,
                             input_max,
                             quant_min,
                             quant_max,
-                            data_type,
                             symmetric=False):
     r"""
     Calculate quantization params for scale and zero point.
@@ -39,7 +50,6 @@ def cal_quantization_params(input_min,
         input_max (numpy.ndarray): The dimension of channel or 1.
         quant_min (int): The minimum quantization integer.
         quant_max (int): The maximum quantization integer.
-        data_type (numpy type) : Can be numpy int8, numpy uint8.
         symmetric (bool): Whether the quantization algorithm is symmetric or not. Default: False.
 
     Returns:
@@ -65,7 +75,7 @@ def cal_quantization_params(input_min,
     scale = (input_max - input_min) / (quant_max - quant_min)
 
     # calculate zero point
-    if data_type == np.int8 and symmetric:
+    if symmetric:
         zp = np.zeros(input_min.shape)
     else:
         zp_double = quant_min - input_min / scale
@@ -74,16 +84,14 @@ def cal_quantization_params(input_min,
     return scale, zp
 
 
-def get_quant_min_max(data_type, num_bits=8, narrow_range=False):
+def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
     """Calculate quantization params for minimum/maximum quantization integer"""
-    if data_type == np.int8:
+    if signed:
         quant_min = 0 - 2 ** (num_bits - 1)
         quant_max = 2 ** (num_bits - 1) - 1
-    elif data_type == np.uint8:
+    else:
         quant_min = 0
         quant_max = 2 ** num_bits - 1
-    else:
-        raise ValueError("Unsupported datatype({})".format(data_type))
     if narrow_range:
         quant_min = quant_min + 1
     return quant_min, quant_max
@@ -131,18 +139,15 @@ def weight2int(data, scale, zero_point, quant_min, quant_max):
     return weight_int
 
 
-def scale_zp_max_min_from_fake_quant_cell(cell, data_type):
+def scale_zp_max_min_from_fake_quant_cell(cell, signed):
     """Get calculate quantization params for scale, zero point, max and min from `FakeQuantizer`."""
     minq = cell._float_min.data.asnumpy()
     maxq = cell._float_max.data.asnumpy()
 
-    quant_min, quant_max = get_quant_min_max(data_type, num_bits=getattr(cell, "_num_bits", 8),
+    quant_min, quant_max = get_quant_min_max(num_bits=getattr(cell, "_num_bits", 8), signed=signed,
                                              narrow_range=cell._narrow_range)
     symmetric = cell._symmetric
-    scale, zp = cal_quantization_params(
-        minq, maxq,
-        quant_min, quant_max, data_type,
-        symmetric=symmetric)
+    scale, zp = cal_quantization_params(minq, maxq, quant_min, quant_max, symmetric)
     return scale, zp, maxq, minq
 
 

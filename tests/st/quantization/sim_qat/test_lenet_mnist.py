@@ -17,6 +17,8 @@
 import os
 from collections import OrderedDict
 import pytest
+import numpy as np
+import mindspore
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
@@ -71,6 +73,28 @@ def test_lenet_apply():
     assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not act_fake_quant._symmetric
     assert act_fake_quant._quant_delay == 900
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_lenet_convert():
+    """
+    Feature: simulated quantization convert function.
+    Description: convert a compressed network to a standard network, export to MindIR.
+    Expectation: convert success and export MindIR to specified path.
+    """
+
+    from ....models.official.cv.lenet.src.lenet import LeNet5
+    network = LeNet5(10)
+    qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+    data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
+    file_name = "./lenet.mindir"
+    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    graph = mindspore.load(file_name)
+    mindspore.nn.GraphCell(graph)
 
 
 @pytest.mark.level0
