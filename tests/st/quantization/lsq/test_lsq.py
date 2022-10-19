@@ -211,7 +211,7 @@ def test_set_act_quant_dtype():
     lsq.set_act_quant_dtype(QuantDtype.INT8)
     assert lsq._config.act_quant_dtype == QuantDtype.INT8
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_act_quant_dtype(QuantDtype.INT4)
     assert "Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet." in str(e.value)
 
@@ -237,7 +237,7 @@ def test_set_weight_quant_dtype():
     lsq.set_weight_quant_dtype(QuantDtype.INT8)
     assert lsq._config.weight_quant_dtype == QuantDtype.INT8
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(ValueError) as e:
         lsq.set_weight_quant_dtype(QuantDtype.INT4)
     assert "Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet." in str(e.value)
 
@@ -272,9 +272,9 @@ def test_set_act_symmetric():
     assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'act_symmetric' must be a bool" in str(e.value)
 
 
-@ pytest.mark.level0
-@ pytest.mark.platform_x86_cpu
-@ pytest.mark.env_onecard
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_set_weight_symmetric():
     """
     Feature: LSQ(Learned Step Size Quantization) set function set_weight_symmetric().
@@ -298,9 +298,9 @@ def test_set_weight_symmetric():
     assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'weight_symmetric' must be a bool" in str(e.value)
 
 
-@ pytest.mark.level0
-@ pytest.mark.platform_x86_cpu
-@ pytest.mark.env_onecard
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_set_act_narrow_range():
     """
     Feature: LSQ(Learned Step Size Quantization) set function set_act_narrow_range().
@@ -324,9 +324,9 @@ def test_set_act_narrow_range():
     assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'act_narrow_range' must be a bool" in str(e.value)
 
 
-@ pytest.mark.level0
-@ pytest.mark.platform_x86_cpu
-@ pytest.mark.env_onecard
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_set_weight_narrow_range():
     """
     Feature: LSQ(Learned Step Size Quantization) set function set_weight_narrow_range().
@@ -350,9 +350,9 @@ def test_set_weight_narrow_range():
     assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'weight_narrow_range' must be a bool" in str(e.value)
 
 
-@ pytest.mark.level0
-@ pytest.mark.platform_x86_cpu
-@ pytest.mark.env_onecard
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_set_freeze_bn():
     """
     Feature: LSQ(Learned Step Size Quantization) set function set_freeze_bn().
@@ -376,9 +376,9 @@ def test_set_freeze_bn():
     assert "For 'LearnedStepSizeQuantizationAwareTraining', the type of 'freeze_bn' must be int" in str(e.value)
 
 
-@ pytest.mark.level0
-@ pytest.mark.platform_x86_cpu
-@ pytest.mark.env_onecard
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_set_enable_fusion():
     """
     Feature: LSQ(Learned Step Size Quantization) set function set_enable_fusion().

@@ -42,22 +42,22 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             values are attribute values. supported attribute are listed below:
 
             - quant_delay (Union[int, list, tuple]): Number of steps after which weights and activations are quantized
-              during train and eval. The first element represents data flow and the second element represents weights.
+              during train and eval. The first element represents activations and the second element represents weights.
               Default: (0, 0).
             - quant_dtype (Union[QuantDtype, list, tuple]): Datatype used to quantize weights and activations. The first
-              element represents data flow and the second element represents weights. It is necessary to consider the
+              element represents activations and the second element represents weights. It is necessary to consider the
               precision support of hardware devices in the practical quantization infer scenaries.
               Default: (QuantDtype.INT8, QuantDtype.INT8).
             - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If True
-              then base on per channel, otherwise base on per layer. The first element represents data flow and the
+              then base on per channel, otherwise base on per layer. The first element represents activations and the
               second element represents weights, and the first element must be False now.
               Default: (False, False).
             - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If True
-              then base on symmetric, otherwise base on asymmetric. The first element represents data flow and the
+              then base on symmetric, otherwise base on asymmetric. The first element represents activations and the
               second element represents weights.
               Default: (False, False).
             - narrow_range (Union[bool, list, tuple]): Whether the quantization algorithm uses narrow range or not.
-              The first element represents data flow and the second element represents weights.
+              The first element represents activations and the second element represents weights.
               Default: (False, False).
             - enable_fusion (bool): Whether apply fusion before applying quantization.
               Default: False.
@@ -77,10 +77,10 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         TypeError: If `symmetric` is not bool, or every element of `symmetric` is not bool.
         TypeError: If `narrow_range` is not bool, or every element of `narrow_range` is not bool.
         ValueError: If `freeze_bn` is less than 0.
-        ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is not
-            less than 2.
+        ValueError: If the length of `quant_delay`, `quant_dtype`, `per_channel`, `symmetric` or `narrow_range` is more
+            than 2.
         ValueError: If `quant_delay` is less than 0, or any element of `quant_delay` is less than 0.
-        TypeError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
+        ValueError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
             `QuantDtype.INT8`.
         ValueError: If `per_channel` is True, or the first element of `per_channel` is True.
 
@@ -269,13 +269,13 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `act_quant_dtype` is not QuantDtype.
-            TypeError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
+            ValueError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
         """
         if not isinstance(act_quant_dtype, QuantDtype):
             raise TypeError(f'The parameter `act quant dtype` must be isinstance of QuantDtype, '
                             f'but got {act_quant_dtype}.')
         if act_quant_dtype != QuantDtype.INT8:
-            raise TypeError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
+            raise ValueError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.act_quant_dtype = act_quant_dtype
 
     def set_weight_quant_dtype(self, weight_quant_dtype):
@@ -287,13 +287,13 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
-            TypeError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
+            ValueError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
         """
         if not isinstance(weight_quant_dtype, QuantDtype):
             raise TypeError(f'The parameter `weight quant dtype` must be isinstance of QuantDtype, '
                             f'but got {weight_quant_dtype}.')
         if weight_quant_dtype != QuantDtype.INT8:
-            raise TypeError("Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.")
+            raise ValueError("Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.weight_quant_dtype = weight_quant_dtype
 
     def set_act_symmetric(self, act_symmetric):
@@ -389,7 +389,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         if not isinstance(value, list) and not isinstance(value, tuple):
             value = [value]
         elif len(value) > 2:
-            raise ValueError("input `{}` len should less then 2".format(name))
+            raise ValueError("input `{}` len should be less than 3".format(name))
         return value
 
     def _init_net_policy(self, config):
