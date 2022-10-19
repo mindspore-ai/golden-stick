@@ -14,14 +14,20 @@
 # ============================================================================
 """SimulatedQuantizationAwareTraining."""
 
+import os
 from mindspore.nn import Cell
 from mindspore._checkparam import Validator, Rel
 from mindspore import context
 from mindspore import log as logger
+from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant
+from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from ..quantization_aware_training import QuantizationAwareTraining
 from ..constant import QuantDtype
+from ..quantize_wrapper_cell import QuantizeWrapperCell
+from ..quant_utils import IdentityCell
 from .simulated_quantization_net_policy import SimulatedNetPolicy
 from .simulated_quantization_config import SimulatedQuantizationConfig
+from .simulated_quantization_convert import create_conv2d_from_conv2dquant, create_dense_from_densequant
 
 
 class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
@@ -443,3 +449,65 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         """
         self._qat_policy.build()
         return super(SimulatedQuantizationAwareTraining, self).apply(network)
+
+    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
+        """
+        Define how to convert a SimQAT network to a standard network before exporting to MindIR.
+
+        Args:
+            net_opt (Cell): SimQAT network to be converted.
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
+                checkpoint file to `net_opt`.
+
+        Raises:
+            TypeError: If `net_opt` is not Cell.
+            TypeError: If `ckpt_path` is not string.
+            ValueError: If `ckpt_path` is not file or doesn't exist.
+
+        Returns:
+            An instance of Cell represents converted network.
+        """
+        if not isinstance(net_opt, Cell):
+            raise TypeError(
+                f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
+        if not isinstance(ckpt_path, str):
+            raise TypeError(
+                f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
+        ckpt_path = os.path.realpath(ckpt_path)
+        if os.path.isfile(ckpt_path):
+            param_dict = load_checkpoint(ckpt_path)
+            load_param_into_net(net_opt, param_dict)
+        self._visit_cell(net_opt)
+        return net_opt
+
+    def _visit_cell(self, network: Cell):
+        """
+        Visit sub_cell of network recursively, replace Simulated Quantization OP with standard OP.
+        """
+        cells = network.name_cells()
+        for _, sub_cell in cells.items():
+            if sub_cell == network:
+                continue
+            if isinstance(sub_cell, QuantizeWrapperCell):
+                quant_handle = sub_cell.get_handler()
+                _, _, weight_scale, weight_zp = quant_handle.fake_quant_weight.extract_quant_param()
+                _, _, input_scale, input_zp = sub_cell.get_input_quantizer().extract_quant_param()
+                _, _, output_scale, output_zp = sub_cell.get_output_quantizer().extract_quant_param()
+                quant_params = {'weight_scale': weight_scale, 'weight_zp': weight_zp, 'input_scale': input_scale,
+                                'input_zp': input_zp, 'output_scale': output_scale, 'output_zp': output_zp}
+                if isinstance(quant_handle, Conv2dQuant):
+                    conv = create_conv2d_from_conv2dquant(
+                        quant_handle, **quant_params)
+                    sub_cell.insert_child_to_cell("_handler", conv)
+                elif isinstance(quant_handle, DenseQuant):
+                    dense = create_dense_from_densequant(
+                        quant_handle, **quant_params)
+                    sub_cell.insert_child_to_cell("_handler", dense)
+                else:
+                    raise TypeError(f"Not supported {type(quant_handle)} for convert api yet. \
+                        Please set `enable_fusion` to False for SimulatedQuantizationAwareTraining.")
+                identity = IdentityCell()
+                sub_cell.insert_child_to_cell("_input_quantizer", identity)
+                sub_cell.insert_child_to_cell("_output_quantizer", identity)
+            else:
+                self._visit_cell(sub_cell)

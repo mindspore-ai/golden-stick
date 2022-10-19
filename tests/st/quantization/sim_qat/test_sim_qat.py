@@ -17,6 +17,8 @@ import os
 import sys
 from collections import OrderedDict
 import pytest
+import numpy as np
+import mindspore
 from mindspore import nn
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
@@ -293,3 +295,26 @@ def test_apply():
     assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not act_fake_quant._symmetric
     assert act_fake_quant._quant_delay == 900
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_convert():
+    """
+    Feature: simulated quantization convert function.
+    Description: convert a compressed network to a standard network before exporting to MindIR.
+    Expectation: convert success and structure of network as expect.
+    """
+    network = NetToQuant()
+    config = {"quant_delay": (100, 100), "quant_dtype": (QuantDtype.INT8, QuantDtype.INT8),
+              "per_channel": (False, True), "symmetric": (True, False), "narrow_range": (True, False),
+              "enable_fusion": True, "freeze_bn": 100, "bn_fold": True, "one_conv_fold": False}
+    qat = SimQAT(config)
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+    data_in = mindspore.Tensor(np.ones([1, 5, 32, 32]), mindspore.float32)
+    file_name = "./conv.mindir"
+    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    graph = mindspore.load(file_name)
+    mindspore.nn.GraphCell(graph)

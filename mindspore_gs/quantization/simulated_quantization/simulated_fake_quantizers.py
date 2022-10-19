@@ -23,6 +23,7 @@ from mindspore.common.tensor import Tensor
 import mindspore.context as context
 from mindspore_gs.quantization.simulated_quantization import ops as custom_ops
 from ..fake_quantizer import FakeQuantizer
+from ..quant_utils import get_quant_min_max, cal_quantization_params
 
 
 class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
@@ -80,6 +81,14 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
                                     self._ema, self._ema_decay, False, self._quant_delay)
         return s
 
+    def extract_quant_param(self):
+        quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._symmetric,
+                                                 narrow_range=self._narrow_range)
+        input_min = self._float_min.data.asnumpy()
+        input_max = self._float_max.data.asnumpy()
+        scale, zp = cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=self._symmetric)
+        return input_min, input_max, scale, zp
+
     def construct(self, x):
         if self.training:
             self._float_min, self._float_max = \
@@ -116,6 +125,14 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
                                                                           ema_decay=self._ema_decay)
             quant_func = partial(custom_ops.FakeQuantPerChannel, channel_axis=self._channel_axis)
         self._init_fake_quant_func(quant_func)
+
+    def extract_quant_param(self):
+        quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._symmetric,
+                                                 narrow_range=self._narrow_range)
+        input_min = self._float_min.data.asnumpy()
+        input_max = self._float_max.data.asnumpy()
+        scale, zp = cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=self._symmetric)
+        return input_min, input_max, scale, zp
 
     def extend_repr(self):
         """Display instance object as string."""

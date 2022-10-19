@@ -220,7 +220,7 @@ class Converter:
 
     def __get_weight_bias(self, cell_core, scale_a_in, scale_w, zp_w):
         """Get weight and bias for quantizaiton"""
-        np_type = mstype.dtype_to_nptype(self.data_type)
+        signed = self.data_type in mstype.int_type
         weight = cell_core.weight.data.asnumpy()
         bias = None
         if isinstance(cell_core, (quant.DenseQuant, quant.Conv2dQuant)):
@@ -233,7 +233,7 @@ class Converter:
         weight_b = weight
         bias_b = bias
         # apply the quant
-        quant_min, quant_max = get_quant_min_max(np_type, cell_core.fake_quant_weight._num_bits,
+        quant_min, quant_max = get_quant_min_max(cell_core.fake_quant_weight._num_bits, signed,
                                                  cell_core.fake_quant_weight._narrow_range)
         weight = weight2int(weight, scale_w, zp_w, quant_min, quant_max)
         if bias is not None:
@@ -250,16 +250,16 @@ class Converter:
             return weight_tensor, bias, weight_b_tensor, bias_b_tensor
         return weight_tensor, bias, weight_b_tensor, None
 
-    def _get_input_quant_param(self, fake_quant_a_in, np_type, param_dict):
+    def _get_input_quant_param(self, fake_quant_a_in, signed, param_dict):
         """get input quant parameter for quant block"""
         scale_a_in, zp_a_in, param_dict["input_maxq"], param_dict["input_minq"] = \
-            scale_zp_max_min_from_fake_quant_cell(fake_quant_a_in, np_type)
+            scale_zp_max_min_from_fake_quant_cell(fake_quant_a_in, signed)
         param_dict["input_narrow_range"] = fake_quant_a_in._narrow_range
         return scale_a_in, zp_a_in
 
     def __get_quant_param(self, cell_core, fake_quant_a_out, node):
         """get parameter for quant block"""
-        np_type = mstype.dtype_to_nptype(self.data_type)
+        signed = self.data_type in mstype.int_type
         param_dict = dict()
         param_dict["filter_maxq"] = None
         param_dict["filter_minq"] = None
@@ -277,17 +277,17 @@ class Converter:
         param_dict["weight_num_bits"] = cell_core.fake_quant_weight._num_bits
 
         scale_w, zp_w, param_dict["filter_maxq"], param_dict["filter_minq"] = \
-            scale_zp_max_min_from_fake_quant_cell(cell_core.fake_quant_weight, np_type)
+            scale_zp_max_min_from_fake_quant_cell(cell_core.fake_quant_weight, signed)
         if fake_quant_a_out is not None:
             _, _, param_dict["output_maxq"], param_dict["output_minq"] = \
-                scale_zp_max_min_from_fake_quant_cell(fake_quant_a_out, np_type)
+                scale_zp_max_min_from_fake_quant_cell(fake_quant_a_out, signed)
             param_dict["output_narrow_range"] = fake_quant_a_out._narrow_range
 
         # convert input fq to quantization params
         inputs = node.get_inputs()
         if inputs and inputs[0].get_instance_type() == QuantizeWrapperCell:
             scale_a_in, zp_a_in = self._get_input_quant_param(inputs[0].get_instance().get_output_quantizer(),
-                                                              np_type, param_dict)
+                                                              signed, param_dict)
         elif not inputs:
             scale_a_in, zp_a_in, param_dict["input_maxq"], param_dict["input_minq"] = \
                 (1 / self.std_dev), round(self.mean), 'None', 'None'
