@@ -185,3 +185,19 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `weight_symmetric` 数据类型不是bool。
+
+   .. py:method:: convert(net_opt, ckpt_path＝"")
+
+        将量化网络｀net_opt｀转换为标准网络，后续导出成MindIR用于部署。
+
+        参数：
+            - **net_opt** (Cell) - 经过量化算法apply之后的网络。
+            - **ckpt_path** (str) - 网络的checkpoint file文件路径，默认值为空，表示不加载。
+
+        异常：
+            - **TypeError** - `net_opt` 数据类型不是Cell。
+            - **TypeError** - `ckpt_path` 数据类型不是str。
+            - **ValueError** - `ckpt_path` 非空但不是有效路径。
+
+        返回：
+            转换后的网络。
