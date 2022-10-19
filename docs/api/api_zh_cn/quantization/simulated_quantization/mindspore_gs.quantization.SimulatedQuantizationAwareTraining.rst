@@ -8,11 +8,11 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
     参数：
         - **config** (dict) - 存储用于量化感知训练的属性，键是属性名称，值是属性值。下面列出了支持的属性：
 
-          - **quant_delay** (Union[int, list, tuple]) - 在训练和评估期间权重和激活量化后的步数。第一个元素表示数据流，第二个元素表示权重。默认值：(0, 0)。
-          - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于量化权重和激活的数据类型。第一个元素表示数据流，第二个元素表示权重。在实际量化推理场景中需要考虑硬件器件的精度支持。默认值：(QuantDtype.INT8, QuantDtype.INT8)。
-          - **per_channel** (Union[bool, list, tuple]) - 基于层或通道的量化粒度。如果为True，则基于每个通道，否则基于每个层。第一个元素表示数据流，第二个元素表示权重，第一个元素现在必须为 False。默认值：(False, Fasle)。
-          - **symmetric** (Union[bool, list, tuple]) - 量化算法是否对称。如果为True，则基于对称，否则基于不对称。第一个元素表示数据流，第二个元素表示权重。默认值：(False, Fasle)。
-          - **narrow_range** (Union[bool, list, tuple]) - 量化算法是否使用窄范围。第一个元素表示数据流，第二个元素表示权重。默认值：(False, Fasle)。
+          - **quant_delay** (Union[int, list, tuple]) - 在训练和评估期间权重和激活量化后的步数。第一个元素表示激活，第二个元素表示权重。默认值：(0, 0)。
+          - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于量化权重和激活的数据类型。第一个元素表示激活，第二个元素表示权重。在实际量化推理场景中需要考虑硬件器件的精度支持。默认值：(QuantDtype.INT8, QuantDtype.INT8)。
+          - **per_channel** (Union[bool, list, tuple]) - 基于层或通道的量化粒度。如果为True，则基于每个通道，否则基于每个层。第一个元素表示激活，第二个元素表示权重，第一个元素现在必须为 False。默认值：(False, Fasle)。
+          - **symmetric** (Union[bool, list, tuple]) - 量化算法是否对称。如果为True，则基于对称，否则基于不对称。第一个元素表示激活，第二个元素表示权重。默认值：(False, Fasle)。
+          - **narrow_range** (Union[bool, list, tuple]) - 量化算法是否使用窄范围。第一个元素表示激活，第二个元素表示权重。默认值：(False, Fasle)。
           - **enable_fusion** (bool) - 在应用量化之前是否应用融合。默认值：False。
           - **freeze_bn** (int) - `BatchNorm OP` 参数固定为全局均值和方差之后的步数。默认值：10000000。
           - **bn_fold** (bool) - 是否使用 `bn fold` 算子进行模拟推理操作。默认值：False。
@@ -27,9 +27,9 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         - **TypeError** - `symmetric` 的数据类型不是bool，或者 `symmetric` 存在不是bool的元素。
         - **TypeError** - `narrow_range` 的数据类型不是bool，或者 `narrow_range` 存在不是bool的元素。
         - **ValueError** - `freeze_bn` 小于0。
-        - **ValueError** - `quant_delay` ， `quant_dtype` ， `per_channel` ， `symmetric` 或者 `narrow_range` 的长度不小于2。
+        - **ValueError** - `quant_delay` ， `quant_dtype` ， `per_channel` ， `symmetric` 或者 `narrow_range` 的长度大于2。
         - **ValueError** - `quant_delay` 小于0，或者 `quant_delay` 存在小于0的元素。
-        - **TypeError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
+        - **ValueError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
         - **ValueError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为True。
 
     .. py:method:: apply(network: Cell)
@@ -91,7 +91,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `act_quant_dtype` 数据类型不是QuantDtype。
-            - **TypeError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
+            - **ValueError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
 
     .. py:method:: set_act_symmetric(act_symmetric)
 
@@ -174,7 +174,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `weight_quant_dtype` 数据类型不是QuantDtype。
-            - **TypeError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
+            - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
 
     .. py:method:: set_weight_symmetric(weight_symmetric)
 
