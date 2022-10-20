@@ -24,6 +24,7 @@ from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
 from mindspore._checkparam import Validator
 from ..fake_quantizer import FakeQuantizer
+from ..quant_utils import get_quant_min_max, cal_quantization_params
 
 
 class SlbFakeQuantizerPerLayer(FakeQuantizer):
@@ -160,6 +161,14 @@ class SlbActQuantizer(FakeQuantizer):
             'quant_delay={}'.format(self._num_bits, self._symmetric, self._narrow_range,
                                     self._ema, self._ema_decay, False, self._quant_delay)
         return s
+
+    def extract_quant_param(self):
+        quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._symmetric,
+                                                 narrow_range=self._narrow_range)
+        input_min = self._float_min.data.asnumpy()
+        input_max = self._float_max.data.asnumpy()
+        scale, zp = cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=self._symmetric)
+        return input_min, input_max, scale, zp
 
     def construct(self, x):
         if self.training:
