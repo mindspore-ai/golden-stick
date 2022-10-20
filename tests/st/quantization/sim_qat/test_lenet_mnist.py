@@ -25,7 +25,6 @@ from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers 
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 from tests.st import test_utils as utils
 
-
 cur_path = os.path.dirname(os.path.abspath(__file__))
 model_name = "lenet"
 config_name = "lenet_mnist_config.yaml"
@@ -118,9 +117,6 @@ def test_gpu_accuracy_graph():
     assert acc > 0.98
 
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
 def test_gpu_accuracy_pynative():
     """
     Feature: test accuracy of sim_qat on lenet5, mnist in PyNative mode.

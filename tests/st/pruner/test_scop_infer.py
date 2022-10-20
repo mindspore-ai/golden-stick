@@ -50,8 +50,7 @@ def test_scop_infer():
     new_network = PrunerFtCompressAlgo({'prune_rate': 0.4}).apply(new_network)
     inputs = mindspore.Tensor(np.ones([3, 3, 224, 224]), mindspore.float32)
     mindspore.export(new_network, inputs, file_name="ResNet_SCOP", file_format='MINDIR')
-    #load mindir
+    # load mindir
     graph = mindspore.load('./ResNet_SCOP.mindir')
     net = nn.GraphCell(graph)
-    res = net(inputs)
-    assert res
+    _ = net(inputs)
