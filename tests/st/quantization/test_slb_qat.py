@@ -17,7 +17,6 @@
 import os
 import sys
 import random
-from datetime import datetime
 from collections import OrderedDict
 import pytest
 import numpy as np
@@ -723,8 +722,7 @@ def test_lenet_convert(run_mode, enable_act_quant):
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
-    time_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_name = "./lenet_{}.mindir".format(time_tag)
+    file_name = "./lenet_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)
@@ -965,8 +963,7 @@ def test_resnet_convert(run_mode, enable_act_quant):
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(np.ones([1, 3, 32, 32]), mindspore.float32)
-    time_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_name = "./resnet_{}.mindir".format(time_tag)
+    file_name = "./resnet_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)
