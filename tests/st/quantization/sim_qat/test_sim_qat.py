@@ -204,7 +204,7 @@ def test_constructor_error():
     try:
         SimQAT(config)
         has_error = True
-    except TypeError:
+    except ValueError:
         pass
     assert not has_error
 
