@@ -406,7 +406,7 @@ class PrunerFtCompressAlgo(CompAlgo):
             TypeError: If `prune_rate` is not float.
             ValueError: If `prune_rate` is less than 0. or greater than 1.
         """
-        prune_rate = Validator.check_float_range(prune_rate, 0.0, 1.0, Rel.INC_BOTH, \
+        prune_rate = Validator.check_float_range(prune_rate, 0.0, 1.0, Rel.INC_LEFT, \
                                                  "prune_rate", self.__class__.__name__)
         self.prune_rate = prune_rate
 
