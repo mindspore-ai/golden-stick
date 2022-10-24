@@ -1,5 +1,5 @@
-mindspore_gs.CompAlgo
-=====================
+mindspore_gs
+==============
 
 .. py:class:: mindspore_gs.CompAlgo(config)
 
