@@ -234,8 +234,8 @@ class KfCallback(Callback):
 
 class PrunerKfCompressAlgo(CompAlgo):
     """
-    Derived class of GoldenStick. Scop-algorithm. Construct effective knockoff counterparts.
-
+    `PrunerKfCompressAlgo` is a subclass of CompAlgo, which implements the use of high imitation data to learn and
+    discover redundant convolution kernels in the SCOP algorithm.
 
     Args:
         config (Dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
@@ -350,8 +350,8 @@ class PrunerKfCompressAlgo(CompAlgo):
 
 class PrunerFtCompressAlgo(CompAlgo):
     """
-    Derived class of GoldenStick. Scop-algorithm.
-    FineTune for recover net.
+    `PrunerFtCompressAlgo` is a subclass of CompAlgo that implements the ability to remove redundant convolution kernels
+    and fully train the network.
 
     Args:
         config (Dict): Configuration of `PrunerFtCompressAlgo`, keys are attribute names,
