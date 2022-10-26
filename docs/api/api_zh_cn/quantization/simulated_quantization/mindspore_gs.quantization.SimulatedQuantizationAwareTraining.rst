@@ -6,7 +6,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
     模拟量化感知训练的基本实现，该算法在训练时使用伪量化节点来模拟量化计算的损失，并通过反向传播更新网络参数，使得网络参数更好地适应量化带来的损失。更多详细信息见 `神经网络量化白皮书 <https://arxiv.org/pdf/2106.08295.pdf>`_。
 
     参数：
-        - **config** (dict) - 存储用于量化感知训练的属性，键是属性名称，值是属性值。下面列出了支持的属性：
+        - **config** (dict) - 存储用于量化感知训练的属性，键是属性名称，值是属性值。默认值为None，下面列出了支持的属性：
 
           - **quant_delay** (Union[int, list, tuple]) - 在训练和评估期间权重和激活量化后的步数。第一个元素表示激活，第二个元素表示权重。默认值：(0, 0)。
           - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于量化权重和激活的数据类型。第一个元素表示激活，第二个元素表示权重。在实际量化推理场景中需要考虑硬件器件的精度支持。默认值：(QuantDtype.INT8, QuantDtype.INT8)。
