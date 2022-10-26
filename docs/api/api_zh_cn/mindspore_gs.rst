@@ -47,20 +47,7 @@ mindspore_gs
             - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径，也可以是绝对路径，用户需要保证写入权限。
 
         异常：
-            - **TypeError** - `save_mindir_path` 数据类型不是str。
-
-    .. py:method:: set_save_mindir_inputs(inputs)
-
-        设置导出MindIR时网络的输入，仅当 `save_mindir` 为True时才生效。
-
-        参数：
-            - **inputs** (Union[Tensor, Dataset, List, Tuple, Number, Bool]) - 它表示网络的输入，如果网络有多个输入，会将它们组合在一起。当类型为Dataset时，它表示网络的预处理行为，数据预处理操作将被序列化执行。在第二种情况下，您应该手动调整数据集的批大小，这将影响网络输入的批大小。目前仅支持解析数据集中的 `image` 列。
-
-        异常：
-            - **RuntimeError** - `inputs` 为None。
-            - **RuntimeError** - `inputs` 中有多个 `Dataset` 。
-            - **RuntimeError** - `inputs` 为 `Dataset` 但含非 `image` 列。
-            - **RuntimeError** - `inputs` 不为Tensor、 `Dataset` 、 list、 tuple、 `Number` 或者bool。
+            - **ValueError** - `save_mindir_path` 不是非空字符串。
 
     .. py:method:: convert(net_opt: Cell, ckpt_path="")
 
