@@ -39,7 +39,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
-            values are attribute values. supported attribute are listed below:
+            values are attribute values. The Default value is None, supported attribute are listed below:
 
             - quant_delay (Union[int, list, tuple]): Number of steps after which weights and activations are quantized
               during train and eval. The first element represents activations and the second element represents weights.
