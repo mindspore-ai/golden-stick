@@ -43,12 +43,14 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
-            values are attribute values. Supported attribute are listed below:
+            values are attribute values. Default: None. Supported attribute are listed below:
 
-            - quant_dtype (Union[QuantDtype, list, tuple]): Datatype used to quantize weights and activations. The first
-              element represents activations and the second element represents weights. It is necessary to consider the
-              precision support of hardware devices in the practical quantization infer scenaries.
-              Weights quantization support int4|int2|int1, and activations quantization support int8 now.
+            - quant_dtype (Union[QuantDtype, list(QuantDtype), tuple(QuantDtype)]): Datatype used to quantize weights and
+              activations. The type is a QuantDtype, a list of two QuantDtype or a tuple of two QuantDtype. If quant_dtype is a
+              QuantDtype, it will be duplicated to a list of two QuantDtype. The first element represents the type of activations
+              and the second element represents the type of weights. It is necessary to consider the precision support of
+              hardware devices in the practical quantization infer scenaries. Weights quantization support int4|int2|int1,
+              and activations quantization support int8 now.
               Default: (QuantDtype.INT8, QuantDtype.INT1).
             - enable_act_quant (bool): Whether apply activation quantization while training.
               Default: False.
@@ -63,6 +65,10 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
               Default: 0.6.
             - t_factor (float): Multiplicative factor of temperature hyperparameters changing.
               Default: 1.2.
+
+    Note:
+        This method will call other set functions to set special values, please refer to the set function about the error.
+            For example, `quant_dtype` need refer to `set_weight_quant_dtype` and `set_act_quant_dtype`.
 
     Raises:
         TypeError: If `quant_dtype` is not `QuantDtype`, or every element of `quant_dtype` is not `QuantDtype`.
@@ -180,7 +186,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if "custom_policies" in config.keys():
             self._custom_layer_policy_map = config["custom_policies"]
 
-    def set_weight_quant_dtype(self, weight_quant_dtype):
+    def set_weight_quant_dtype(self, weight_quant_dtype=QuantDtype.INT1):
         """
         Set value of weight_quant_dtype of quantization aware training `config`
 
@@ -197,11 +203,10 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
                             "but got {}.".format(weight_quant_dtype))
         if weight_quant_dtype not in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4]:
             raise ValueError("Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, " \
-                             "`QuantDtype.INT2` or `QuantDtype.INT4` yet. " \
-                             "But got {}.".format(weight_quant_dtype))
+                             "`QuantDtype.INT2` or `QuantDtype.INT4` yet.")
         self._config.weight_quant_dtype = weight_quant_dtype
 
-    def set_act_quant_dtype(self, act_quant_dtype):
+    def set_act_quant_dtype(self, act_quant_dtype=QuantDtype.INT8):
         """
         Set value of act_quant_dtype of quantization aware training `config`
 
@@ -216,11 +221,10 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             raise TypeError("The parameter `act quant dtype` must be isinstance of QuantDtype, "
                             "but got {}.".format(act_quant_dtype))
         if act_quant_dtype not in [QuantDtype.INT8]:
-            raise ValueError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` " \
-                             "yet. But got {}.".format(act_quant_dtype))
+            raise ValueError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
         self._config.act_quant_dtype = act_quant_dtype
 
-    def set_enable_act_quant(self, enable_act_quant):
+    def set_enable_act_quant(self, enable_act_quant=False):
         """
         Set value of enable_act_quant of quantization aware training `config`
 
@@ -233,7 +237,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         enable_act_quant = Validator.check_bool(enable_act_quant, "enable_act_quant", self.__class__.__name__)
         self._config.enable_act_quant = enable_act_quant
 
-    def set_enable_bn_calibration(self, enable_bn_calibration):
+    def set_enable_bn_calibration(self, enable_bn_calibration=False):
         """
         Set value of enable_bn_calibration of quantization aware training `config`
 
@@ -274,7 +278,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         has_trained_epoch = Validator.check_int(has_trained_epoch, 0, Rel.GE, "has_trained_epoch", self.__class__.__name__)
         self._config.has_trained_epoch = has_trained_epoch
 
-    def set_t_start_val(self, t_start_val):
+    def set_t_start_val(self, t_start_val=1.0):
         """
         Set value of t_start_val of quantization aware training `config`
 
@@ -288,7 +292,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         t_start_val = Validator.check_positive_float(t_start_val, "t_start_val", self.__class__.__name__)
         self._config.t_start_val = t_start_val
 
-    def set_t_start_time(self, t_start_time):
+    def set_t_start_time(self, t_start_time=0.2):
         """
         Set value of t_start_time of quantization aware training `config`
 
@@ -303,7 +307,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
                                                    "t_start_time", self.__class__.__name__)
         self._config.t_start_time = t_start_time
 
-    def set_t_end_time(self, t_end_time):
+    def set_t_end_time(self, t_end_time=0.6):
         """
         Set value of t_end_time of quantization aware training `config`
 
@@ -318,7 +322,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
                                                  "t_end_time", self.__class__.__name__)
         self._config.t_end_time = t_end_time
 
-    def set_t_factor(self, t_factor):
+    def set_t_factor(self, t_factor=1.2):
         """
         Set value of t_factor of quantization aware training `config`
 
