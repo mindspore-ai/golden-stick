@@ -10,7 +10,7 @@ mindspore_gs.quantization
 Simulated Quantization算法
 --------------------------
 
-.. mscnautosummary::
+.. autosummary::
     :toctree: quantization
     :nosignatures:
     :template: classtemplate.rst
@@ -20,7 +20,7 @@ Simulated Quantization算法
 SLB量化算法
 -----------
 
-.. mscnautosummary::
+.. autosummary::
     :toctree: quantization
     :nosignatures:
     :template: classtemplate.rst
