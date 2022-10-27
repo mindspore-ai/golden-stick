@@ -16,10 +16,11 @@
 
 import os
 import sys
-import pytest
 
+import pytest
 import numpy as np
 
+import mindspore
 from mindspore import context, Tensor, nn
 from mindspore.train import Model
 from mindspore.train.metrics import Accuracy
@@ -53,8 +54,6 @@ def test_lenet_export_mindir(run_mode):
     algo.set_save_mindir(save_mindir=True)
     mindir_path = os.path.join(os.path.dirname(__file__), "lenet")
     algo.set_save_mindir_path(save_mindir_path=mindir_path)
-    input_tensor = Tensor(np.ones([1, 1, 32, 32]).astype(np.float32))
-    algo.set_save_mindir_inputs(input_tensor)
 
     network = algo.apply(network)
     net_loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction="mean")
@@ -64,4 +63,10 @@ def test_lenet_export_mindir(run_mode):
     model = Model(network, net_loss, net_opt, metrics={"Accuracy": Accuracy()})
     model.train(1, ds_train, callbacks=algo.callbacks())
 
-    assert os.path.exists(mindir_path + ".mindir")
+    mindir_file_path = mindir_path + ".mindir"
+    assert os.path.exists(mindir_file_path)
+
+    input_tensor = Tensor(np.ones([32, 1, 32, 32]).astype(np.float32))
+    graph = mindspore.load(mindir_file_path)
+    net = nn.GraphCell(graph)
+    _ = net(input_tensor)
