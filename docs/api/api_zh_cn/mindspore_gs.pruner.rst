@@ -10,7 +10,7 @@ mindspore_gs.pruner
 SCOP剪枝算法
 ------------
 
-.. mscnautosummary::
+.. autosummary::
     :toctree: pruner
     :nosignatures:
     :template: classtemplate.rst

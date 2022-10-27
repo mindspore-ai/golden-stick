@@ -15,5 +15,5 @@ SCOP Algorithm
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.pruner.scop.PrunerKfCompressAlgo
-    mindspore_gs.pruner.scop.PrunerFtCompressAlgo
+    mindspore_gs.pruner.PrunerKfCompressAlgo
+    mindspore_gs.pruner.PrunerFtCompressAlgo
