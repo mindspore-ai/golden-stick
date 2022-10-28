@@ -354,7 +354,3 @@ def test_convert_error():
     with pytest.raises(ValueError) as e:
         qat.convert(new_network, "file_path")
     assert "The parameter `ckpt_path` can only be empty or a valid file" in str(e.value)
-
-    with pytest.raises(ValueError) as e:
-        qat.convert(new_network)
-    assert "Please set `enable_fusion` to False for SimulatedQuantizationAwareTraining" in str(e.value)
