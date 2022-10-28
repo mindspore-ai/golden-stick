@@ -18,6 +18,7 @@ import numpy as np
 from mindspore._checkparam import Validator
 from mindspore.nn.layer.quant import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
     Conv2dQuant, DenseQuant
+from mindspore.ops.operations import _quant_ops as Q
 from mindspore.nn import Cell
 from mindspore import ops
 from .fake_quantizer import FakeQuantizer
@@ -28,12 +29,41 @@ __all__ = ["query_quant_layers", "compute_kl_threshold",
 
 
 class IdentityCell(Cell):
+    """
+    Identity layer.
+    """
+
     def __init__(self):
         super(IdentityCell, self).__init__()
         self.identity = ops.Identity()
 
     def construct(self, x):
         x = self.identity(x)
+        return x
+
+
+class LinearFakeQuantCell(Cell):
+    """
+    Fake quant layer with mindspore standard operator.
+    """
+
+    def __init__(self, quant_dtype, scale, zero_point, is_per_channel):
+        super(LinearFakeQuantCell, self).__init__()
+        self._quant_dtype = quant_dtype
+        self._scale = scale
+        self._zero_point = zero_point
+        self._is_per_channel = is_per_channel
+        self.fake_quant = Q.FakeQuantParam.linear_quant_param(quant_dtype=quant_dtype, scale=scale, zp=zero_point,
+                                                              is_per_channel=is_per_channel)
+
+    def extend_repr(self):
+        """Display instance object as string."""
+        s = 'quant_dtype={}, scale={}, zero_point={}, is_per_channel={}'.format(self._quant_dtype, self._scale,
+                                                                                self._zero_point, self._is_per_channel)
+        return s
+
+    def construct(self, x):
+        x = self.fake_quant(x)
         return x
 
 

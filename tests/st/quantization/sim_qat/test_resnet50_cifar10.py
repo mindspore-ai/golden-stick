@@ -17,6 +17,7 @@
 import os
 import sys
 from collections import OrderedDict
+import numpy
 import pytest
 import mindspore
 from mindspore import nn, context
@@ -97,6 +98,33 @@ def test_resnet_apply(run_mode):
     assert isinstance(res_block_conv_act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not res_block_conv_act_fake_quant._symmetric
     assert res_block_conv_act_fake_quant._quant_delay == 900
+
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+def test_resnet_convert():
+    """
+    Feature: simulated quantization convert function.
+    Description: convert a compressed network to a standard network, export to MindIR.
+    Expectation: convert success and export MindIR to specified path.
+    """
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.st.models.resnet import resnet50
+
+    mindspore.context.set_context(device_target="GPU")
+    network = resnet50(10)
+    qat = create_simqat()
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+    data_in = mindspore.Tensor(numpy.ones([1, 3, 224, 224]), mindspore.float32)
+    file_name = "./resnet50.mindir"
+    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    graph = mindspore.load(file_name)
+    mindspore.nn.GraphCell(graph)
 
 
 @pytest.mark.level1

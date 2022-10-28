@@ -20,10 +20,10 @@ import mindspore
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
+from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
-from mindspore_gs.quantization.simulated_quantization import ops as custom_ops
 from ..fake_quantizer import FakeQuantizer
-from ..quant_utils import get_quant_min_max, cal_quantization_params
+from ..quant_utils import get_quant_min_max, cal_quantization_params, LinearFakeQuantCell
 
 
 class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
@@ -45,8 +45,8 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
         self._is_ascend = context.get_context("device_target") == "Ascend"
         quant_func = Q.FakeQuantPerLayer
         if context.get_context("device_target") == "GPU":
-            self._min_max_update_func = custom_ops.MinMaxUpdatePerLayer(ema=self._ema, ema_decay=self._ema_decay)
-            quant_func = custom_ops.FakeQuantPerLayer
+            self._min_max_update_func = Q.MinMaxUpdatePerLayer(ema=self._ema, ema_decay=self._ema_decay)
+            quant_func = Q.FakeQuantPerLayer
         self._init_fake_quant_func(quant_func)
         self._float_min = Parameter(Tensor(np.array([-6]).astype(np.float32), mindspore.float32),
                                     name="float_min", requires_grad=False)
@@ -98,6 +98,15 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
             out = self._fake_quant_infer(x, self._float_min, self._float_max)
         return out
 
+    def convert_to_fakequantparam(self):
+        if self._num_bits != 8:
+            raise TypeError("Only support int8 simulate quantization now!"
+                            "Please set quant_dtype=QuantDtype.INT8 for SimulatedQuantizationAwareTraining.")
+        quant_dtype = QuantDtype.INT8
+        _, _, scale, zero_point = self.extract_quant_param()
+        new_subcell = LinearFakeQuantCell(quant_dtype=quant_dtype, scale=tuple(scale), zero_point=tuple(zero_point),
+                                          is_per_channel=False)
+        return new_subcell
 
 class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
     """
@@ -120,10 +129,10 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
         quant_func = partial(Q.FakeQuantPerChannel, channel_axis=self._channel_axis)
         self._is_ascend = context.get_context("device_target") == "Ascend"
         if context.get_context("device_target") == "GPU":
-            self._min_max_update_func = custom_ops.MinMaxUpdatePerChannel(channel_axis=self._channel_axis,
-                                                                          ema=self._ema,
-                                                                          ema_decay=self._ema_decay)
-            quant_func = partial(custom_ops.FakeQuantPerChannel, channel_axis=self._channel_axis)
+            self._min_max_update_func = Q.MinMaxUpdatePerChannel(channel_axis=self._channel_axis,
+                                                                 ema=self._ema,
+                                                                 ema_decay=self._ema_decay)
+            quant_func = partial(Q.FakeQuantPerChannel, channel_axis=self._channel_axis)
         self._init_fake_quant_func(quant_func)
 
     def extract_quant_param(self):
@@ -141,3 +150,13 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
                                     self._ema, self._ema_decay, True,
                                     self._channel_axis, self._num_channels, self._quant_delay)
         return s
+
+    def convert_to_fakequantparam(self):
+        if self._num_bits != 8:
+            raise TypeError("Only support int8 simulate quantization now!"
+                            "Please set quant_dtype=QuantDtype.INT8 for SimulatedQuantizationAwareTraining.")
+        quant_dtype = QuantDtype.INT8
+        _, _, scale, zero_point = self.extract_quant_param()
+        new_subcell = LinearFakeQuantCell(quant_dtype=quant_dtype, scale=tuple(scale), zero_point=tuple(zero_point),
+                                          is_per_channel=True)
+        return new_subcell
