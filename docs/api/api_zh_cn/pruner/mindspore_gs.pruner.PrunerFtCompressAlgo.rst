@@ -4,13 +4,15 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
 .. py:class:: mindspore_gs.pruner.PrunerFtCompressAlgo(config)
 
     `PrunerFtCompressAlgo` 是CompAlgo的子类，实现了删除冗余卷积核并对网络进行完整训练的能力。
-
-    .. note::
-        - 针对入参 `config` ，目前 `PrunerFtCompressAlgo` 是没有可选的配置项，但为了兼容性，`config` 被保留，在初始化时以空字典代替。如 `kf_pruning = PrunerFtCompressAlgo({})` 。
-
+    
     参数：
-        - **config** (dict) - 算法配置参数。
-
+        - **config** (dict) - 以字典的形式存放用于剪枝训练的配置，下面列出了受支持的属性：
+          
+          - **prune_rate** (float) - 默认值：[0.0, 1.0)。
+    
+    异常：
+        - **TypeError** - `prune_rate` 的数据类型不是`float`。
+        - **ValueError** - `prune_rate` 小于0或者大于等于1。
 
     .. py:method:: apply(net)
 
@@ -24,3 +26,14 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
 
         异常：
             - **TypeError** - `net` 不是Cell。
+
+    .. py:method:: set_prune_rate(prune_rate)
+
+        设置剪枝率。
+
+        参数：
+            - **prune_rate** (float) - 剪掉网络的大小。
+
+        异常：
+            - **TypeError** - `prune_rate` 不是float。
+            - **ValueError** - `prune_rate` 小于0或者大于等于1。
