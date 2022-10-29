@@ -14,7 +14,6 @@
 # ============================================================================
 """Test MinmaxUpdatePerChannel ops."""
 import numpy as np
-import pytest
 
 from mindspore import context, Tensor
 from mindspore.nn import Cell
@@ -51,9 +50,6 @@ class MSNet(Cell):
         return res[0] + res[1]
 
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
 def test_mupc_gpu():
     """
     Feature: Test ops MinMaxUpdatePerChannel.

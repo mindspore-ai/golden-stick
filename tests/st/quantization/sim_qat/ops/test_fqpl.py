@@ -14,7 +14,6 @@
 # ============================================================================
 """Test FakeQuantPerLayer ops."""
 import numpy as np
-import pytest
 
 from mindspore import context, Tensor
 from mindspore.nn import Cell
@@ -49,9 +48,6 @@ class MSNet(Cell):
         return self.program(x, min_val, max_val)
 
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
 def test_fqpl_gpu():
     """
     Feature: Test ops FakeQuantPerLayer.
