@@ -25,10 +25,6 @@ from mindspore_gs.pruner.uni_pruning import UniPruner
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
 
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
 def test_resnet(run_mode):
     """
     Feature: UniPruning algorithm.
@@ -88,10 +84,7 @@ def test_callback(run_mode):
     assert algo.callback() is not None
     print("============== test uni pruning callback success ==============")
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
+
 def test_resnet_convert(run_mode):
     """
     Feature: UniPruning algorithm.
@@ -138,9 +131,6 @@ def test_resnet_convert(run_mode):
     print("============== test resnet convert uni pruning success ==============")
 
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
 def test_resnet_accuracy_graph():
     """
     Feature: UniPruning algorithm.
@@ -277,9 +267,7 @@ def test_resnet_accuracy_graph():
     assert acc >= 0.3
     print("============== End Test ==============")
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
+
 def test_resnet_accuracy_pynative():
     """
     Feature: UniPruning algorithm.
