@@ -24,7 +24,7 @@ from mindspore.train.callback import Callback
 from mindspore import Tensor
 from mindspore.ops import constexpr
 from mindspore import Parameter
-from ...comp_algo import CompAlgo
+from ...comp_algo import CompAlgo, CompAlgoConfig
 
 
 @constexpr
@@ -292,6 +292,15 @@ class PrunerKfCompressAlgo(CompAlgo):
          >
     """
 
+    def __init__(self, config=None):
+        super(PrunerKfCompressAlgo, self).__init__(config)
+        self._config = None
+        self._create_pconfig_by_dict(config)
+
+    def _create_pconfig_by_dict(self, config: dict):
+        self._config = CompAlgoConfig()
+        super(PrunerKfCompressAlgo, self)._update_commom_config(config)
+
     def callbacks(self, *args, **kwargs):
         """Callback."""
         cb = []
@@ -416,10 +425,16 @@ class PrunerFtCompressAlgo(CompAlgo):
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        prune_rate = config.get("prune_rate", 0.0)
-        self.set_prune_rate(prune_rate)
+        self._config = None
+        self._create_pconfig_by_dict(config)
 
-    def set_prune_rate(self, prune_rate):
+    def _create_pconfig_by_dict(self, config: dict):
+        """Create prune `config` from a dict"""
+        self._config = PrunerFtCompressConfig()
+        super(PrunerFtCompressAlgo, self)._update_commom_config(config)
+        self.set_prune_rate(config.get("prune_rate", 0.0))
+
+    def set_prune_rate(self, prune_rate: float):
         """
         Set value of prune_rate of `_config`
 
@@ -430,9 +445,9 @@ class PrunerFtCompressAlgo(CompAlgo):
             TypeError: If `prune_rate` is not float.
             ValueError: If `prune_rate` is less than 0. or greater than 1.
         """
-        prune_rate = Validator.check_float_range(prune_rate, 0.0, 1.0, Rel.INC_LEFT, \
+        prune_rate = Validator.check_float_range(prune_rate, 0.0, 1.0, Rel.INC_LEFT,
                                                  "prune_rate", self.__class__.__name__)
-        self.prune_rate = prune_rate
+        self._config.prune_rate = prune_rate
 
     def _recover(self, net):
         """Recover."""
@@ -447,7 +462,7 @@ class PrunerFtCompressAlgo(CompAlgo):
                 module.score = module.bn.gamma.data.abs() * ops.Squeeze()(
                     module.kfscale.data - (1 - module.kfscale.data))
         for kfconv in kfconv_list:
-            kfconv.prune_rate = self.prune_rate
+            kfconv.prune_rate = self._config.prune_rate
         for _, (_, module) in enumerate(net.cells_and_names()):
             if isinstance(module, KfConv2d):
                 _, index = ops.Sort()(module.score)
@@ -507,3 +522,11 @@ class PrunerFtCompressAlgo(CompAlgo):
             Pruned network.
         """
         return self._recover(network)
+
+
+class PrunerFtCompressConfig(CompAlgoConfig):
+    """Config for PrunerFtCompress."""
+
+    def __init__(self):
+        super(PrunerFtCompressConfig, self).__init__()
+        self.prune_rate = 0.0

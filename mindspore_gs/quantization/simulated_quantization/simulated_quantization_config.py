@@ -14,15 +14,18 @@
 # ============================================================================
 """Config for aware-training-quantization."""
 
+from ...comp_algo import CompAlgoConfig
 from ..constant import QuantDtype
 
 
-class SimulatedQuantizationConfig:
+class SimulatedQuantizationConfig(CompAlgoConfig):
     """
     Config for simulated quantization aware training.
     See more details in simulated_quantization_aware_training.py
     """
+
     def __init__(self):
+        super(SimulatedQuantizationConfig, self).__init__()
         self.bn_fold = False
         self.freeze_bn = 10000000
         self.act_quant_delay = 0

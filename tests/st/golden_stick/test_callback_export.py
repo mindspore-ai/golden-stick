@@ -22,11 +22,20 @@ import numpy as np
 
 import mindspore
 from mindspore import context, Tensor, nn
+from mindspore.nn import Cell
 from mindspore.train import Model
 from mindspore.train.metrics import Accuracy
-from mindspore_gs.comp_algo import CompAlgo
+from mindspore_gs import CompAlgo
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
+
+
+class ExampleAlgo(CompAlgo):
+    """ExampleAlgo."""
+
+    def apply(self, network: Cell) -> Cell:
+        """apply."""
+        return network
 
 
 @pytest.mark.level0
@@ -50,7 +59,7 @@ def test_lenet_export_mindir(run_mode):
         raise ValueError("Please check dataset size > 0 and batch_size <= dataset size")
     network = LeNet5(10)
 
-    algo = CompAlgo({})
+    algo = ExampleAlgo()
     algo.set_save_mindir(save_mindir=True)
     mindir_path = os.path.join(os.path.dirname(__file__), "lenet")
     algo.set_save_mindir_path(save_mindir_path=mindir_path)

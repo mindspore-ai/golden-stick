@@ -173,7 +173,6 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._config = None
         self._create_qconfig_by_dict(config)
         self._qat_policy = self._init_net_policy(self._config)
         self._custom_transforms = {}
@@ -244,7 +243,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Raises:
             TypeError: If `enable_bn_calibration` is not bool.
         """
-        enable_bn_calibration = Validator.check_bool(enable_bn_calibration, "enable_bn_calibration", self.__class__.__name__)
+        enable_bn_calibration = Validator.check_bool(enable_bn_calibration, "enable_bn_calibration",
+                                                     self.__class__.__name__)
         self._config.enable_bn_calibration = enable_bn_calibration
 
     def set_epoch_size(self, epoch_size):
@@ -272,7 +272,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             TypeError: If `has_trained_epoch` is not int.
             ValueError: If `has_trained_epoch` is less than 0.
         """
-        has_trained_epoch = Validator.check_int(has_trained_epoch, 0, Rel.GE, "has_trained_epoch", self.__class__.__name__)
+        has_trained_epoch = Validator.check_int(has_trained_epoch, 0, Rel.GE, "has_trained_epoch",
+                                                self.__class__.__name__)
         self._config.has_trained_epoch = has_trained_epoch
 
     def set_t_start_val(self, t_start_val=1.0):
@@ -349,7 +350,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
     def _create_qconfig_by_dict(self, config: dict):
         """Create `_config` from a dict"""
         self._config = SlbQuantConfig()
-        quant_dtype_list = SlbQuantAwareTraining.\
+        super(SlbQuantAwareTraining, self)._update_commom_config(config)
+        quant_dtype_list = SlbQuantAwareTraining. \
             _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT1]))
 
         self.set_act_quant_dtype(quant_dtype_list[0])
@@ -459,7 +461,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if not isinstance(ckpt_path, str):
             raise TypeError(f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
         if ckpt_path != "" and not os.path.isfile(ckpt_path):
-            raise ValueError(f'The parameter `ckpt_path` can only be empty or a valid file, but got {os.path.realpath(ckpt_path)}.')
+            raise ValueError(
+                f'The parameter `ckpt_path` can only be empty or a valid file, but got {os.path.realpath(ckpt_path)}.')
         ckpt_path = os.path.realpath(ckpt_path)
         if os.path.isfile(ckpt_path):
             param_dict = load_checkpoint(ckpt_path)
@@ -469,15 +472,15 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         exporter = ConvertToQuantInferNetwork(net_opt, self._config.weight_quant_dtype.num_bits)
         return exporter.run()
 
-
     def __repr__(self):
         """Display instance object as string."""
         s = 'SlbQuantAwareTraining<weight_quant_dtype={}, act_quant_dtype={}, enable_act_quant={}, ' \
             'enable_bn_calibration={}, epoch_size={}, has_trained_epoch={}, t_start_val={}, t_start_time={}, ' \
             't_end_time={}, t_factor={}>'.format(self._config.weight_quant_dtype, self._config.act_quant_dtype,
                                                  self._config.enable_act_quant, self._config.enable_bn_calibration,
-                                                 self._config.epoch_size, self._config.has_trained_epoch, self._config.t_start_val,
-                                                 self._config.t_start_time, self._config.t_end_time, self._config.t_factor)
+                                                 self._config.epoch_size, self._config.has_trained_epoch,
+                                                 self._config.t_start_val, self._config.t_start_time,
+                                                 self._config.t_end_time, self._config.t_factor)
         return s
 
 
@@ -485,6 +488,7 @@ class TemperatureScheduler(Callback):
     """
     Define TemperatureScheduler callback for SLB QAT-algorithm.
     """
+
     def __init__(self, model, epoch_size=100, has_trained_epoch=0,
                  t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2):
         super().__init__()
@@ -507,10 +511,10 @@ class TemperatureScheduler(Callback):
         t_start_epoch = int(self.epochs * self.t_start_time)
         t_end_epoch = int(self.epochs * self.t_end_time)
         if epoch > t_start_epoch:
-            t *= self.t_factor**(min(epoch, t_end_epoch) - t_start_epoch)
+            t *= self.t_factor ** (min(epoch, t_end_epoch) - t_start_epoch)
         # Assign new value to temperature parameter
         for _, cell in self.model.train_network.cells_and_names():
-            if cell.cls_name == 'SlbFakeQuantizerPerLayer': # for SLB
+            if cell.cls_name == 'SlbFakeQuantizerPerLayer':  # for SLB
                 cell.set_temperature(t)
                 if epoch >= t_end_epoch:
                     cell.set_temperature_end_flag()
@@ -518,6 +522,7 @@ class TemperatureScheduler(Callback):
 
 class BNCalibrationCallback(Callback):
     '''Update discrete state statistics in BN layers.'''
+
     def __init__(self, model, train_set, epoch_size=100, has_trained_epoch=0,
                  t_start_time=0.2, dataset_sink_mode=False):
         self.dataset_sink_mode = dataset_sink_mode
@@ -533,7 +538,7 @@ class BNCalibrationCallback(Callback):
         """
         cb_params = run_context.original_args()
         epoch = cb_params.cur_epoch_num + self.has_trained_epoch
-        t_start_epoch = int(self.epochs*self.t_start_time)
+        t_start_epoch = int(self.epochs * self.t_start_time)
         if epoch > t_start_epoch:
             # make BN update for train and BNCalibration
             for _, cell in self.model.train_network.cells_and_names():

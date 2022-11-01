@@ -381,6 +381,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
     def _create_qconfig_by_dict(self, config: dict):
         self._config = LsqConfig()
+        super(LearnedStepSizeQuantizationAwareTraining, self)._update_commom_config(config)
         quant_dtype_list = SimQAT._convert2list("quant dtype",
                                                 config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
         per_channel_list = SimQAT._convert2list("per channel", config.get("per_channel", [False, True]))
