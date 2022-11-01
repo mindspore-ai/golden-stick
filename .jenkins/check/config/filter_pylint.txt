@@ -35,6 +35,7 @@
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
 "golden-stick/tests/st/models/resnet.py"                                                                 "unused-argument"
 "golden-stick/tests/st/models/resnet.py"                                                                 "missing-docstring"
+"golden-stick/tests/st/pruner/test_scop.py"                                                               "protected-access"
 "golden-stick/tests/st/quantization/sim_qat/test_sim_qat.py"                                             "protected-access"
 "golden-stick/tests/st/quantization/sim_qat/test_lenet_mnist.py"                                         "protected-access"
 "golden-stick/tests/st/quantization/sim_qat/test_resnet50_cifar10.py"                                    "protected-access"

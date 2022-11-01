@@ -17,7 +17,6 @@
 import os
 from mindspore.nn import Cell
 from mindspore._checkparam import Validator, Rel
-from mindspore import context
 from mindspore import log as logger
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from ..quantization_aware_training import QuantizationAwareTraining
@@ -148,12 +147,8 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def __init__(self, config=None):
         super(SimulatedQuantizationAwareTraining, self).__init__(config)
-        self._is_cpu = context.get_context('device_target') == "CPU"
         if config is None:
             config = {}
-        Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._config = None
-        self._create_qconfig_by_dict(config)
         self._qat_policy = self._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
@@ -392,9 +387,12 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
     def _init_net_policy(self, config):
         return SimulatedNetPolicy(config)
 
-    def _create_qconfig_by_dict(self, config: dict):
-        """Create quantization aware training `config` from a dict"""
+    def _create_config(self):
+        """Create SimulatedQuantizationConfig."""
         self._config = SimulatedQuantizationConfig()
+
+    def _update_config_from_dict(self, config: dict):
+        """Create quantization aware training `config` from a dict"""
         quant_delay_list = SimulatedQuantizationAwareTraining._convert2list("quant delay",
                                                                             config.get("quant_delay", [0, 0]))
         quant_dtype_list = SimulatedQuantizationAwareTraining. \
