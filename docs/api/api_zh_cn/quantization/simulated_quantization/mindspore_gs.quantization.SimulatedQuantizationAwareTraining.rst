@@ -118,7 +118,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         设置量化感知训练参数 `config` 的enable_fusion值。
 
         参数：
-            - **enable_fusion** (bool) - 是否在量化之前进行融合，默认值为 False。
+            - **enable_fusion** (bool) - 是否在量化之前进行融合。
 
         异常：
             - **TypeError** - `enable_fusion` 数据类型不是bool。
