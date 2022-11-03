@@ -14,14 +14,18 @@
 # ============================================================================
 """Config for aware-training-quantization."""
 
+from ...comp_algo import CompAlgoConfig
 from ..constant import QuantDtype
 
-class SlbQuantConfig:
+
+class SlbQuantConfig(CompAlgoConfig):
     """
     Config for SLB(Searching for Low-Bit Weights) QAT-algorithm.
     See more details in slb_quant_aware_training.py
     """
+
     def __init__(self):
+        super(SlbQuantConfig, self).__init__()
         self.act_quant_dtype = QuantDtype.INT8
         self.weight_quant_dtype = QuantDtype.INT1
         self.enable_act_quant = False

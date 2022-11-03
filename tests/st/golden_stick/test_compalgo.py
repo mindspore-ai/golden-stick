@@ -16,21 +16,36 @@
 
 import pytest
 
-from mindspore_gs.comp_algo import CompAlgo, ExportMindIRCallBack
+from mindspore.nn import Cell
+from mindspore_gs.comp_algo import ExportMindIRCallBack
+from mindspore_gs import CompAlgo
+
+
+class ExampleAlgo(CompAlgo):
+    """ExampleAlgo."""
+
+    def apply(self, network: Cell) -> Cell:
+        """apply."""
+        return network
 
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-def test_init():
+def test_comp_algo_error():
     """
-    Feature: CompAlgo init algorithm.
-    Description: Initialize a CompAlgo.
-    Expectation: Success.
+    Feature: CompAlgo.
+    Description: Try to init a CompAlgo and raise error.
+    Expectation: Expect Error.
     """
 
-    algo = CompAlgo({})
-    assert algo
+    has_error = False
+    try:
+        _ = CompAlgo()
+        has_error = True
+    except TypeError:
+        pass
+    assert not has_error
 
 
 @pytest.mark.level0
@@ -43,7 +58,7 @@ def test_callback():
     Expectation: Success.
     """
 
-    algo = CompAlgo({})
+    algo = ExampleAlgo()
     algo.set_save_mindir(save_mindir=True)
     algo.set_save_mindir_path(save_mindir_path="test")
     cb = algo.callbacks()
@@ -60,7 +75,7 @@ def test_set_save_mindir():
     Description: Input invalid value and expect error.
     Expectation: Expect error.
     """
-    qat = CompAlgo({})
+    qat = ExampleAlgo()
     has_error = False
     try:
         qat.set_save_mindir(1)
@@ -79,7 +94,7 @@ def test_set_save_mindir_path():
     Description: Input invalid value and expect error.
     Expectation: Expect error.
     """
-    qat = CompAlgo({})
+    qat = ExampleAlgo()
     has_error = False
     try:
         qat.set_save_mindir(save_mindir=True)
