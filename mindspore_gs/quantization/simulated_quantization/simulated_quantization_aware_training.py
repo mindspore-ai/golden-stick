@@ -369,7 +369,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of enable_fusion of quantization aware training `config`
 
         Args:
-            enable_fusion (bool): Whether apply fusion before applying quantization, default is False.
+            enable_fusion (bool): Whether apply fusion before applying quantization.
 
         Raises:
             TypeError: If `enable_fusion` is not bool.
