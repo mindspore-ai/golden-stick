@@ -19,7 +19,7 @@ import os.path
 
 from mindspore.nn.cell import Cell
 from mindspore.train.callback import Callback
-from mindspore import export
+from mindspore import export, context
 from mindspore._checkparam import Validator
 from mindspore import log as logger
 
@@ -42,12 +42,23 @@ class CompAlgo(abc.ABC):
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
+        self._is_cpu = context.get_context('device_target') == "CPU"
+        self._config = None
+        self._create_config()
+        self._update_common_config(config)
+        self._update_config_from_dict(config)
+
+    def _create_config(self):
+        """Create base config. If derived class has extra attributes, Should be over-writed."""
         self._config = CompAlgoConfig()
 
-    def _update_commom_config(self, config: dict):
+    def _update_common_config(self, config: dict):
         """Create base config from a dict."""
         self.set_save_mindir(config.get("save_mindir", False))
         self.set_save_mindir_path(config.get("save_mindir_path", "./network"))
+
+    def _update_config_from_dict(self, config: dict):
+        """Update config for specific algo. If derived class has extra attributes, Should be over-writed."""
 
     @abc.abstractmethod
     def apply(self, network: Cell) -> Cell:
