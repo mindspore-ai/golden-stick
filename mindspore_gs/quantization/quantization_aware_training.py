@@ -32,8 +32,6 @@ class QuantizationAwareTraining(CompAlgo):
 
     def __init__(self, config=None):
         super(QuantizationAwareTraining, self).__init__(config)
-        if config is None:
-            config = {}
         self._qat_policy = None
         self._custom_transforms = None
         self._custom_layer_policy_map = None

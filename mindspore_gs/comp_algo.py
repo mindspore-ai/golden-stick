@@ -14,31 +14,53 @@
 # ============================================================================
 """GoldenStick."""
 
+import abc
 import os.path
 
 from mindspore.nn.cell import Cell
 from mindspore.train.callback import Callback
-from mindspore import export
+from mindspore import export, context
 from mindspore._checkparam import Validator
 from mindspore import log as logger
 
 
-class CompAlgo:
+class CompAlgo(abc.ABC):
     """
     Base class of algorithms in GoldenStick.
 
     Args:
-        config (dict): User config for network compression. Config specification is default by derived class.
+        config (dict): User config for network compression, default is None. Algorithm config specification is default
+            by derived class, base attributes are listed below:
+
+            - save_mindir (bool): If true, export MindIR automatically after training, else not. Default: False.
+            - save_mindir_path (str): The path to export MindIR, the path includes the directory and file name, which
+              can be a relative path or an absolute path, the user needs to ensure write permission.
+              Default: './network'.
     """
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         if config is None:
             config = {}
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._config = config
-        self._save_mindir = False
-        self._save_mindir_path = "./network"
+        self._is_cpu = context.get_context('device_target') == "CPU"
+        self._config = None
+        self._create_config()
+        self._update_common_config(config)
+        self._update_config_from_dict(config)
 
+    def _create_config(self):
+        """Create base config. If derived class has extra attributes, Should be over-writed."""
+        self._config = CompAlgoConfig()
+
+    def _update_common_config(self, config: dict):
+        """Create base config from a dict."""
+        self.set_save_mindir(config.get("save_mindir", False))
+        self.set_save_mindir_path(config.get("save_mindir_path", "./network"))
+
+    def _update_config_from_dict(self, config: dict):
+        """Update config for specific algo. If derived class has extra attributes, Should be over-writed."""
+
+    @abc.abstractmethod
     def apply(self, network: Cell) -> Cell:
         """
         Define how to compress input `network`. This method must be overridden by all subclasses.
@@ -50,7 +72,7 @@ class CompAlgo:
             Compressed network.
         """
 
-        return network
+        raise NotImplementedError
 
     def callbacks(self, *args, **kwargs) -> [Callback]:
         """
@@ -65,8 +87,8 @@ class CompAlgo:
         """
 
         cb = []
-        if self._save_mindir:
-            cb.append(ExportMindIRCallBack(self, os.path.realpath(self._save_mindir_path)))
+        if self._config.save_mindir:
+            cb.append(ExportMindIRCallBack(self, os.path.realpath(self._config.save_mindir_path)))
         return cb
 
     def set_save_mindir(self, save_mindir: bool):
@@ -81,12 +103,12 @@ class CompAlgo:
 
         Examples:
             >>> import mindspore as ms
-            >>> from mindspore_gs.comp_algo import CompAlgo
+            >>> from mindspore_gs.quantization import SimulatedQuantizationAwareTraining as SimQAT
             >>> import numpy as np
             >>> ## 1) Define network to be trained
             >>> network = LeNet(10)
             >>> ## 2) Define MindSpore Golden Stick Algorithm, here we use base algorithm.
-            >>> algo = CompAlgo({})
+            >>> algo = SimQAT()
             >>> ## 3) Enable automatically export MindIR after training.
             >>> algo.set_save_mindir(save_mindir=True)
             >>> ## 4) Set MindIR output path.
@@ -102,7 +124,7 @@ class CompAlgo:
             >>> model.train(1, train_dataset, callbacks=algo.callbacks())
         """
         Validator.check_bool(save_mindir, "save_mindir", self.__class__.__name__)
-        self._save_mindir = save_mindir
+        self._config.save_mindir = save_mindir
 
     def set_save_mindir_path(self, save_mindir_path: str):
         """
@@ -115,13 +137,13 @@ class CompAlgo:
         Raises:
             ValueError: if `save_mindir_path` is not Non-empty str.
         """
-        if not self._save_mindir:
+        if not self._config.save_mindir:
             logger.warning("When you want to export MindIR automatically, 'save_mindir' should be set True before "
                            "setting MindIR path")
         if save_mindir_path is None or not isinstance(save_mindir_path, str) or save_mindir_path.strip() == "":
             raise ValueError(f"For {self.__class__.__name__}, 'save_mindir_path' should be Non-empty string but got"
                              f" {save_mindir_path}.")
-        self._save_mindir_path = os.path.realpath(save_mindir_path)
+        self._config.save_mindir_path = os.path.realpath(save_mindir_path)
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """
@@ -136,11 +158,11 @@ class CompAlgo:
             An instance of Cell represents converted network.
 
         Examples:
-            >>> from mindspore_gs.comp_algo import CompAlgo
+            >>> from mindspore_gs.quantization import SimulatedQuantizationAwareTraining as SimQAT
             >>> ## 1) Define network to be trained
             >>> network = LeNet(10)
             >>> ## 2) Define MindSpore Golden Stick Algorithm, here we use base algorithm.
-            >>> algo = CompAlgo({})
+            >>> algo = SimQAT()
             >>> ## 3) Apply MindSpore Golden Stick algorithm to origin network.
             >>> network = algo.apply(network)
             >>> ## 4) Then you can start training, after which you can convert a compressed network to a standard
@@ -166,6 +188,17 @@ class CompAlgo:
         """
 
         return loss_fn
+
+
+class CompAlgoConfig:
+    """
+    Config for CompAlgo.
+    """
+
+    def __init__(self):
+        """Init with default value."""
+        self.save_mindir = False
+        self.save_mindir_path = "./network"
 
 
 class ExportMindIRCallBack(Callback):

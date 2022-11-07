@@ -37,13 +37,13 @@ def test_constructor():
     """
 
     scop = PrunerFtCompressAlgo({"prune_rate": 0.8})
-    assert scop.prune_rate == 0.8
+    assert scop._config.prune_rate == 0.8
 
     scop = PrunerFtCompressAlgo(None)
-    assert scop.prune_rate == 0.0
+    assert scop._config.prune_rate == 0.0
 
     scop = PrunerFtCompressAlgo({})
-    assert scop.prune_rate == 0.0
+    assert scop._config.prune_rate == 0.0
 
 
 @pytest.mark.level0

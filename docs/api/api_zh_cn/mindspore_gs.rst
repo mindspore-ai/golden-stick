@@ -1,12 +1,15 @@
 mindspore_gs
 =============
 
-.. py:class:: mindspore_gs.CompAlgo(config)
+.. py:class:: mindspore_gs.CompAlgo(config=None)
 
     金箍棒中算法的基类。
 
     参数：
-        - **config** (dict) - 模型压缩的用户配置。配置规范由派生类规定。
+        - **config** (dict) - 模型压缩的用户配置,默认值为None。算法相关配置由派生类设置，基类属性列举如下：
+
+          - **save_mindir** (bool) - 如果为 true，则在训练后自动导出 MindIR，否则不导出。 默认值：否。
+          - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径或绝对路径，用户需要保证写入权限。默认值：'./network'。
 
     .. py:method:: apply(network: Cell)
 
