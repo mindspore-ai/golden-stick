@@ -172,8 +172,6 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         super(SlbQuantAwareTraining, self).__init__(config)
         if config is None:
             config = {}
-        Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._create_qconfig_by_dict(config)
         self._qat_policy = self._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
@@ -316,7 +314,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             TypeError: If `t_end_time` is not float.
             ValueError: If `t_end_time` is less than 0. or greater than 1.
         """
-        t_end_time = Validator.check_float_range(t_end_time, 0.0, 1.0, Rel.INC_BOTH, \
+        t_end_time = Validator.check_float_range(t_end_time, 0.0, 1.0, Rel.INC_BOTH,
                                                  "t_end_time", self.__class__.__name__)
         self._config.t_end_time = t_end_time
 
@@ -347,10 +345,12 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
     def _init_net_policy(self, config):
         return SlbNetPolicy(config)
 
-    def _create_qconfig_by_dict(self, config: dict):
-        """Create `_config` from a dict"""
+    def _create_config(self):
+        """Create SlbQuantConfig."""
         self._config = SlbQuantConfig()
-        super(SlbQuantAwareTraining, self)._update_commom_config(config)
+
+    def _update_config_from_dict(self, config: dict):
+        """Update `_config` from a dict"""
         quant_dtype_list = SlbQuantAwareTraining. \
             _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT1]))
 

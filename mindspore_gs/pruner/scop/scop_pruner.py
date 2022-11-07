@@ -292,15 +292,6 @@ class PrunerKfCompressAlgo(CompAlgo):
          >
     """
 
-    def __init__(self, config=None):
-        super(PrunerKfCompressAlgo, self).__init__(config)
-        self._config = None
-        self._create_pconfig_by_dict(config)
-
-    def _create_pconfig_by_dict(self, config: dict):
-        self._config = CompAlgoConfig()
-        super(PrunerKfCompressAlgo, self)._update_commom_config(config)
-
     def callbacks(self, *args, **kwargs):
         """Callback."""
         cb = []
@@ -420,18 +411,12 @@ class PrunerFtCompressAlgo(CompAlgo):
         >
     """
 
-    def __init__(self, config=None):
-        super(PrunerFtCompressAlgo, self).__init__(config)
-        if config is None:
-            config = {}
-        Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._config = None
-        self._create_pconfig_by_dict(config)
-
-    def _create_pconfig_by_dict(self, config: dict):
-        """Create prune `config` from a dict"""
+    def _create_config(self):
+        """Create PrunerFtCompressConfig."""
         self._config = PrunerFtCompressConfig()
-        super(PrunerFtCompressAlgo, self)._update_commom_config(config)
+
+    def _update_config_from_dict(self, config: dict):
+        """Update prune `config` from a dict"""
         self.set_prune_rate(config.get("prune_rate", 0.0))
 
     def set_prune_rate(self, prune_rate: float):

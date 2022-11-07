@@ -379,9 +379,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
     def _init_net_policy(self, config):
         return LsqNetPolicy(config)
 
-    def _create_qconfig_by_dict(self, config: dict):
+    def _create_config(self):
+        """Create LsqConfig."""
         self._config = LsqConfig()
-        super(LearnedStepSizeQuantizationAwareTraining, self)._update_commom_config(config)
+
+    def _update_config_from_dict(self, config: dict):
         quant_dtype_list = SimQAT._convert2list("quant dtype",
                                                 config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
         per_channel_list = SimQAT._convert2list("per channel", config.get("per_channel", [False, True]))
