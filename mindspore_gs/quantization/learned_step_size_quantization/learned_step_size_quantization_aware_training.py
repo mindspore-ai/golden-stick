@@ -15,7 +15,7 @@
 """lsq algorithm"""
 from mindspore.nn import Cell
 from mindspore._checkparam import Validator
-from ..constant import QuantDtype
+from mindspore.common.dtype import QuantDtype
 from ..simulated_quantization.simulated_quantization_aware_training import SimulatedQuantizationAwareTraining as SimQAT
 from .learned_step_size_quantization_net_policy import LearnedStepSizeQuantizationNetPolicy as LsqNetPolicy
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig as LsqConfig

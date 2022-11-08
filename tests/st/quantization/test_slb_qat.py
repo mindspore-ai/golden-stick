@@ -24,9 +24,9 @@ import mindspore
 from mindspore import nn, context
 from mindspore import Model
 from mindspore.nn.metrics import Accuracy
+from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbActQuantizer
-from mindspore_gs.quantization.constant import QuantDtype
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 

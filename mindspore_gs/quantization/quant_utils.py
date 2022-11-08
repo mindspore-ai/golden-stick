@@ -19,28 +19,14 @@ import numpy as np
 from mindspore._checkparam import Validator
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.nn import Cell
-from mindspore import ops
+from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ops.nn import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
     Conv2dQuant, DenseQuant
 from .fake_quantizer import FakeQuantizer
 
-__all__ = ["query_quant_layers", "compute_kl_threshold",
+__all__ = ["get_quant_dtype_num_bits", "query_quant_layers", "compute_kl_threshold",
            "scale_zp_max_min_from_fake_quant_cell", "fold_batchnorm", "cal_quantization_params",
            "get_quant_min_max", "weight2int"]
-
-
-class IdentityCell(Cell):
-    """
-    Identity layer.
-    """
-
-    def __init__(self):
-        super(IdentityCell, self).__init__()
-        self.identity = ops.Identity()
-
-    def construct(self, x):
-        x = self.identity(x)
-        return x
 
 
 class LinearFakeQuantCell(Cell):
@@ -66,6 +52,14 @@ class LinearFakeQuantCell(Cell):
     def construct(self, x):
         x = self.fake_quant(x)
         return x
+
+
+def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
+    if 0 <= quant_dtype.value() <= 15:
+        return quant_dtype.value() + 1
+    if 100 <= quant_dtype.value() <= 115:
+        return quant_dtype.value() - 99
+    raise ValueError("Unsupported QuantDtype.")
 
 
 def cal_quantization_params(input_min,

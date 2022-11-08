@@ -18,62 +18,15 @@ import numpy as np
 
 from mindspore.nn import Cell
 from mindspore.common import Tensor
-from mindspore.nn.layer import Conv2d
 from mindspore.ops import operations as P
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common import dtype as mstype
-from mindspore.compression.quant import quant_utils
 from mindspore.common.dtype import QuantDtype
-from mindspore._extends import cell_attr_register
 from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
 from ..quantize_wrapper_cell import QuantizeWrapperCell
+from ..quant_utils import fold_batchnorm, without_fold_batchnorm
 from .simulated_fake_quantizers import SimulatedFakeQuantizerPerChannel
-
-
-class Conv2dWithFQWeight(Conv2d):
-    """
-    2D convolution layer with fake quantization weight.
-    """
-    @cell_attr_register
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 stride=1,
-                 pad_mode='same',
-                 padding=0,
-                 dilation=1,
-                 group=1,
-                 weight_init='normal',
-                 weight_name='',
-                 has_bias=False,
-                 bias_name='',
-                 bias_init='zeros'):
-        super(Conv2dWithFQWeight, self).__init__(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride,
-            pad_mode,
-            padding,
-            dilation,
-            group,
-            has_bias,
-            weight_init,
-            bias_init)
-        self.identity = P.Identity()
-        self.weight.name = weight_name
-        if self.bias is not None:
-            self.bias.name = bias_name
-
-    def construct(self, x):
-        """construct function"""
-        weight = self.identity(self.weight)
-        output = self.conv2d(x, weight)
-        if self.has_bias:
-            output = self.bias_add(output, self.bias)
-        return output
 
 
 class CellBlockWithFakeWeight(Cell):
@@ -191,10 +144,9 @@ class ConvertToQuantInferNetwork:
             if cell_core.has_bias:
                 bias = cell_core.bias.data.asnumpy()
         elif isinstance(cell_core, (Conv2dBnFoldQuant, Conv2dBnFoldQuantOneConv)):
-            weight, bias = quant_utils.fold_batchnorm(weight, cell_core)
+            weight, bias = fold_batchnorm(weight, cell_core)
         elif isinstance(cell_core, Conv2dBnWithoutFoldQuant):
-            weight, bias = quant_utils.without_fold_batchnorm(
-                weight, cell_core)
+            weight, bias = without_fold_batchnorm(weight, cell_core)
 
         if isinstance(cell_core, DenseQuant):
             weight = np.transpose(weight)
