@@ -30,7 +30,13 @@ class NetTransformer:
     def __init__(self, net: Cell, symbol_tree: SymbolTree = None):
         if symbol_tree is None:
             self._net = net
-            self._symbol_tree = SymbolTree.create(net)
+            try:
+                self._symbol_tree = SymbolTree.create(net)
+            except (RuntimeError, ValueError, TypeError, NotImplementedError):
+                raise RuntimeError(f"For MindSpore Golden Stick, input network type '{type(net).__name__}' "
+                                   f"is not supported right now.")
+            except Exception:
+                raise Exception("For MindSpore Golden Stick, analysis input network fail.")
             return
         self._symbol_tree = symbol_tree
 
