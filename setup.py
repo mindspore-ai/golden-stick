@@ -76,10 +76,12 @@ class BuildPy(build_py):
     def _copy_ops_files():
         """Copy ops files to pkg."""
         src_path = os.path.join(pwd, 'mindspore_gs')
+        target_dir_name = 'gpu'
         for dirpath, dirnames, _ in os.walk(src_path):
-            if 'ccsrc' in dirnames:
-                src_dir_path = os.path.join(dirpath, 'ccsrc')
-                dst_dir_path = os.path.join(pkg_dir, 'mindspore_gs', dirpath.split('mindspore_gs/')[-1], 'ccsrc')
+            if target_dir_name in dirnames:
+                src_dir_path = os.path.join(dirpath, target_dir_name)
+                dst_dir_path = os.path.join(pkg_dir, 'mindspore_gs',
+                                            dirpath.split('mindspore_gs/')[-1], target_dir_name)
                 if os.path.exists(dst_dir_path):
                     shutil.rmtree(dst_dir_path)
                 shutil.copytree(src_dir_path, dst_dir_path)

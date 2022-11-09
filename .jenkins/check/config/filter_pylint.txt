@@ -15,10 +15,10 @@
 "golden-stick/mindspore_gs/quantization/simulated_quantization/simulated_quantization_aware_training.py"                 "line-too-long"
 
 # SimQAT OPS
-"golden-stick/mindspore_gs/quantization/simulated_quantization/ops/fake_quant_perchannel.py"                             "unused-argument"
-"golden-stick/mindspore_gs/quantization/simulated_quantization/ops/fake_quant_perlayer.py"                               "unused-argument"
-"golden-stick/mindspore_gs/quantization/simulated_quantization/ops/min_max_update_perchannel.py"                         "unused-argument"
-"golden-stick/mindspore_gs/quantization/simulated_quantization/ops/min_max_update_perlayer.py"                           "unused-argument"
+"golden-stick/mindspore_gs/ops/operations/fake_quant_perchannel.py"                             "unused-argument"
+"golden-stick/mindspore_gs/ops/operations/fake_quant_perlayer.py"                               "unused-argument"
+"golden-stick/mindspore_gs/ops/operations/min_max_update_perchannel.py"                         "unused-argument"
+"golden-stick/mindspore_gs/ops/operations/min_max_update_perlayer.py"                           "unused-argument"
 
 # SLB
 "golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                                                 "line-too-long"

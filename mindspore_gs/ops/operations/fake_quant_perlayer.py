@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick simulated-quantization ops FakeQuantPerChannel.
+MindSpore golden stick simulated-quantization ops FakeQuantPerLayer.
 """
 
 import os
@@ -28,39 +28,36 @@ from mindspore._checkparam import Validator as validator
 from mindspore._checkparam import Rel
 
 
-class FakeQuantPerChannel(Custom):
+class FakeQuantPerLayer(Custom):
     r"""
-    Simulates the quantize and dequantize operations in training time base on per channel.
+    Simulates the quantize and dequantize operations in training time.
 
     Args:
-        num_bits (int) : Number bits to quantilization. Default: 8.
-        ema (bool): Uses EMA algorithm update tensor min and tensor max. Default: False.
+        num_bits (int) : Number bits for quantization aware. Default: 8.
+        ema (bool): Uses EMA algorithm update value min and max. Default: False.
         ema_decay (int) : EMA algorithm decay parameter. Default: 0.999.
-        quant_delay (int): Quantilization delay  parameter. Before delay step in training time not
-            update the weight data to simulate quantize operation. After delay step in training time
-            begin simulate the quantize operation. Default: 0.
+        quant_delay (int): Quantilization delay parameter. Before delay step in training time not update
+            simulate quantization aware function. After delay step in training time begin simulate the aware
+            quantize function. Default: 0.
         symmetric (bool): Whether the quantization algorithm is symmetric or not. Default: False.
         narrow_range (bool): Whether the quantization algorithm uses narrow range or not. Default: False.
         training (bool): Training the network or not. Default: True.
-        channel_axis (int): Quantization by channel axis. Ascend backend only supports 0 or 1. Default: 1.
 
     Inputs:
-        - **x** (Tensor) : 4-D float32 Tensor representing the shape of the output tensor.
-        - **min** (int, float) : Value of the min range of the input data.
-        - **max** (int, float) : Value of the max range of the input data.
+        - **x** (Tensor) : float32 Tensor representing the shape of the output tensor.
+        - **min** (Tensor) : Value of the min range of the input data x.
+        - **max** (Tensor) : Value of the max range of the input data x.
 
     Outputs:
-        - Tensor, has the same type as input.
+        - Tensor: Simulates quantize tensor of x.
 
     Examples:
-        >>> fake_quant = FakeQuantPerChannel()
-        >>> input_x = Tensor(np.array([3, 4, 5, -2, -3, -1]).reshape(3, 2), mindspore.float32)
-        >>> _min = Tensor(np.linspace(-2, 2, 12).reshape(3, 2, 2), mindspore.float32)
-        >>> _max = Tensor(np.linspace(8, 12, 12).reshape(3, 2, 2), mindspore.float32)
-        >>> result = fake_quant(input_x, _min, _max)
+        >>> input_tensor = Tensor(np.random.rand(3, 16, 5, 5), mstype.float32)
+        >>> min_tensor = Tensor(np.array([-6]), mstype.float32)
+        >>> max_tensor = Tensor(np.array([6]), mstype.float32)
+        >>> output_tensor = FakeQuantPerLayer(num_bits=8)(input_tensor, min_tensor, max_tensor)
     """
     support_quant_bit = [4, 7, 8]
-    ascend_support_x_rank = [2, 4]
 
     def __init__(self,
                  num_bits=8,
@@ -69,15 +66,14 @@ class FakeQuantPerChannel(Custom):
                  quant_delay=0,
                  symmetric=False,
                  narrow_range=False,
-                 training=True,
-                 channel_axis=1):
-        """Initialize FakeQuantPerChannel OP"""
+                 training=True):
+        """Initialize FakeQuantPerLayer OP"""
         name = self.__class__.__name__
         if not context.get_context('device_target') == "GPU":
-            raise NotImplementedError("For 'FakeQuantPerChannel', it is only supported on GPU right now.")
+            raise NotImplementedError("For 'FakeQuantPerLayer', it is only supported on GPU right now.")
         if num_bits not in self.support_quant_bit:
             raise ValueError(
-                f"For '{name}' Attr \'num_bits\' is not support.")
+                f"For '{name}' attr \'num_bits\' is not support.")
         if ema and not ema_decay:
             raise ValueError(
                 f"For '{name}' attr \'ema\' and \'ema_decay\' should set together.")
@@ -87,15 +83,13 @@ class FakeQuantPerChannel(Custom):
             'symmetric', symmetric, (bool,), name)
         narrow_range = validator.check_value_type(
             'narrow_range', narrow_range, (bool,), name)
-        training = validator.check_value_type(
-            'training', training, (bool,), name)
+        training = validator.check_value_type('training', training, (bool,), name)
         ema_decay = validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', name)
         num_bits = validator.check_positive_int(num_bits, 'num_bits', name)
         quant_delay = validator.check_non_negative_int(quant_delay, 'quant_delay', name)
-        channel_axis = validator.check_non_negative_int(channel_axis, 'channel_axis', name)
 
-        init_args = FakeQuantPerChannel._init_aot_custom_ops((num_bits, quant_delay, symmetric, narrow_range, training))
-        super(FakeQuantPerChannel, self).__init__(
+        init_args = FakeQuantPerLayer._init_aot_custom_ops((num_bits, quant_delay, symmetric, narrow_range, training))
+        super(FakeQuantPerLayer, self).__init__(
             func=init_args['func'],
             out_shape=init_args['shape'],
             out_dtype=init_args['type'],
@@ -109,21 +103,21 @@ class FakeQuantPerChannel(Custom):
         """Register ops."""
         num_bits, quant_delay, symmetric, narrow_range, training = args
 
-        fake_quant_per_channel_gpu_info = CustomRegOp("fake_quant_per_channel_impl_kernel") \
+        fake_quant_per_layer_gpu_info = CustomRegOp("fake_quant_per_layer_impl_kernel") \
             .input(0, "x") \
             .input(1, "min_val") \
             .input(2, "max_val") \
             .output(0, "y") \
             .dtype_format(DataType.F32_Default, DataType.F32_Default, DataType.F32_Default, DataType.F32_Default) \
-            .attr("num_bits", "required", "float", value=float(num_bits)) \
-            .attr("quant_delay", "required", "float", value=float(quant_delay)) \
+            .attr("num_bits", "required", "int", value=num_bits) \
+            .attr("quant_delay", "required", "int", value=quant_delay) \
             .attr("symmetric", "required", "bool", value=symmetric) \
             .attr("narrow_range", "required", "bool", value=narrow_range) \
             .attr("training", "required", "bool", value=training) \
             .target("GPU") \
             .get_op_info()
 
-        fake_quant_per_channel_bprop_gpu_info = CustomRegOp("fake_quant_per_channel_grad_impl_kernel") \
+        fake_quant_per_layer_bprop_gpu_info = CustomRegOp("fake_quant_per_layer_grad_impl_kernel") \
             .input(0, "gradient") \
             .input(1, "x") \
             .input(2, "min_val") \
@@ -131,34 +125,34 @@ class FakeQuantPerChannel(Custom):
             .output(0, "output") \
             .dtype_format(DataType.F32_Default, DataType.F32_Default,
                           DataType.F32_Default, DataType.F32_Default, DataType.F32_Default) \
-            .attr("num_bits", "required", "float", value=float(num_bits)) \
-            .attr("quant_delay", "required", "float", value=float(quant_delay)) \
+            .attr("num_bits", "required", "int", value=num_bits) \
+            .attr("quant_delay", "required", "int", value=quant_delay) \
             .attr("symmetric", "required", "bool", value=symmetric) \
             .attr("narrow_range", "required", "bool", value=narrow_range) \
             .target("GPU") \
             .get_op_info()
 
         dir_path = os.path.dirname(os.path.abspath(__file__))
-        func_path_bprop = os.path.join(dir_path, "ccsrc", "fake_quant_perchannel_grad_impl.cu")
-        fqperchannel_bprop = ops.Custom(
-            func_path_bprop + ":CustomFQPerChannelGrad",
+        func_path_bprop = os.path.join(dir_path, "../kernel/gpu", "fake_quant_perlayer_grad_impl.cu")
+        fqperlayer_bprop = ops.Custom(
+            func_path_bprop + ":CustomFQPerLayerGrad",
             lambda dx, x, x_min, x_max: x,
             mstype.float32,
             "aot",
-            reg_info=fake_quant_per_channel_bprop_gpu_info
+            reg_info=fake_quant_per_layer_bprop_gpu_info
         )
 
         def bprop(x, x_min, x_max, out, dout):
             """Bprop func."""
-            dx = fqperchannel_bprop(dout, x, x_min, x_max)
+            dx = fqperlayer_bprop(dout, x, x_min, x_max)
             return dx, zeros_like(x_min), zeros_like(x_max)
 
-        func_path = os.path.join(dir_path, "ccsrc", "fake_quant_perchannel_impl.cu")
+        func_path = os.path.join(dir_path, "../kernel/gpu", "fake_quant_perlayer_impl.cu")
         return_args = {
-            'func': func_path + ":CustomFakeQuantPerChannel",
+            'func': func_path + ":CustomFakeQuantPerLayer",
             'shape': lambda x, x_min, x_max: x,
             'type': mstype.float32,
             'bprop': bprop,
-            'reg_info': fake_quant_per_channel_gpu_info
+            'reg_info': fake_quant_per_layer_gpu_info
         }
         return return_args
