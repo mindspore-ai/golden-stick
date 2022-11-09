@@ -61,25 +61,23 @@ void CalFakeQuantPerChannel(const float *input, float *output, const int total_s
 
 class FQPerChannelKernelAttr : public AotKernelData {
  public:
-  float num_bits;
+  int num_bits;
   bool training;
   bool symmetric;
   bool narrow_range;
-  float quant_delay;
+  int quant_delay;
 };
-
-void foo_destroy(void *kernel_ptr) { delete static_cast<FQPerChannelKernelAttr *>(kernel_ptr); }
 
 extern "C" int CustomFakeQuantPerChannelInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
   size_t num_channels = static_cast<size_t>(shapes[0][0]);
   extra->SetWorkSpace({num_channels * sizeof(float), num_channels * sizeof(float), num_channels * sizeof(float)});
 
   FQPerChannelKernelAttr *kernel_ptr = new FQPerChannelKernelAttr;
-  kernel_ptr->num_bits = extra->Attr<float>("num_bits");
+  kernel_ptr->num_bits = static_cast<int>(extra->Attr<int64_t>("num_bits"));
   kernel_ptr->training = extra->Attr<bool>("training");
   kernel_ptr->symmetric = extra->Attr<bool>("symmetric");
   kernel_ptr->narrow_range = extra->Attr<bool>("narrow_range");
-  kernel_ptr->quant_delay = extra->Attr<float>("quant_delay");
+  kernel_ptr->quant_delay = static_cast<int>(extra->Attr<int64_t>("quant_delay"));
   extra->SetKernelData(kernel_ptr);
 
   return 0;
@@ -118,14 +116,14 @@ extern "C" int CustomFakeQuantPerChannel(int nparam, void **params, int *ndims, 
 
   AotExtra *extra = static_cast<AotExtra *>(extra_void);
   auto kernel_ptr = static_cast<FQPerChannelKernelAttr *>(extra->KernelData());
-  int num_bits = static_cast<int>(kernel_ptr->num_bits);
+  int num_bits = kernel_ptr->num_bits;
   if (num_bits <= 2 || num_bits >= 16) {
     return 3;
   }
   bool training = kernel_ptr->training;
   bool symmetric = kernel_ptr->symmetric;
   bool narrow_range = kernel_ptr->narrow_range;
-  int quant_delay = static_cast<int>(kernel_ptr->quant_delay);
+  int quant_delay = kernel_ptr->quant_delay;
   if (quant_delay < 0) {
     return 3;
   }

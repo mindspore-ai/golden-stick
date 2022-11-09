@@ -12,23 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Test MinmaxUpdatePerChannel ops."""
+"""Test MinmaxUpdateLayer ops."""
+import pytest
 import numpy as np
 
 from mindspore import context, Tensor
 from mindspore.nn import Cell
 import mindspore.ops as ops
 from mindspore.ops.operations import _quant_ops as ms_Q
-import mindspore_gs.quantization.simulated_quantization.ops as Q
+import mindspore_gs.ops.operations as custom_Q
 
 
-class MinmaxUpdatePerChannelNet(Cell):
+class MinmaxUpdateLayerNet(Cell):
     """Net."""
 
     def __init__(self):
         """Init."""
-        super(MinmaxUpdatePerChannelNet, self).__init__()
-        self.program = Q.MinMaxUpdatePerChannel()
+        super(MinmaxUpdateLayerNet, self).__init__()
+        self.program = custom_Q.MinMaxUpdatePerLayer()
 
     def construct(self, x, min_val, max_val):
         """Construct."""
@@ -42,7 +43,7 @@ class MSNet(Cell):
     def __init__(self):
         """Init."""
         super(MSNet, self).__init__()
-        self.program = ms_Q.MinMaxUpdatePerChannel()
+        self.program = ms_Q.MinMaxUpdatePerLayer()
 
     def construct(self, x, min_val, max_val):
         """Construct."""
@@ -50,21 +51,25 @@ class MSNet(Cell):
         return res[0] + res[1]
 
 
-def test_mupc_gpu():
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [context.GRAPH_MODE])
+def test_mupl_gpu(mode):
     """
-    Feature: Test ops MinMaxUpdatePerChannel.
-    Description: Test ops MinMaxUpdatePerChannel.
+    Feature: Test ops MinMaxUpdatePerLayer.
+    Description: Test ops MinMaxUpdatePerLayer.
     Expectation: Success.
     """
-    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+    context.set_context(mode=mode, device_target='GPU')
     x = np.array([-0.1, 0.0, 63.75, 63.8]).astype(np.float32)
-    min_val = np.array([-0.1, -0.1, -0.1, -0.1]).astype(np.float32)
-    max_val = np.array([63.65, 63.65, 63.65, 63.65]).astype(np.float32)
-    sens = np.array([1.0, 1.0, 1.0, 1.0]).astype(np.float32)
-    out = MinmaxUpdatePerChannelNet()(Tensor(x), Tensor(min_val), Tensor(max_val))
+    min_val = np.array([-0.1]).astype(np.float32)
+    max_val = np.array([63.65]).astype(np.float32)
+    sens = np.array([1.0]).astype(np.float32)
+    out = MinmaxUpdateLayerNet()(Tensor(x), Tensor(min_val), Tensor(max_val))
     out_expect = MSNet()(Tensor(x), Tensor(min_val), Tensor(max_val))
     assert np.allclose(out.asnumpy(), out_expect.asnumpy(), 0.00001, 0.00001)
-    net = MinmaxUpdatePerChannelNet()
+    net = MinmaxUpdateLayerNet()
     ms_net = MSNet()
     out_x, out_min, out_max = ops.GradOperation(sens_param=True, get_all=True)(net)(
         Tensor(x), Tensor(min_val), Tensor(max_val), Tensor(sens))
