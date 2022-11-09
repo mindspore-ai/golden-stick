@@ -14,12 +14,10 @@
 # ============================================================================
 """Simulated Quantization Convert Utils."""
 
-
 import numpy as np
+
 from mindspore.nn import Cell
 from mindspore.common import Tensor
-from mindspore.nn.layer.quant import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
-    Conv2dBnFoldQuant
 from mindspore.nn.layer import Conv2d
 from mindspore.ops import operations as P
 from mindspore.ops.operations import _quant_ops as Q
@@ -27,6 +25,8 @@ from mindspore.common import dtype as mstype
 from mindspore.compression.quant import quant_utils
 from mindspore.common.dtype import QuantDtype
 from mindspore._extends import cell_attr_register
+from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
+    Conv2dBnFoldQuant
 from ..quantize_wrapper_cell import QuantizeWrapperCell
 from .simulated_fake_quantizers import SimulatedFakeQuantizerPerChannel
 

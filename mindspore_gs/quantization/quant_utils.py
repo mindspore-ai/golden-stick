@@ -15,12 +15,13 @@
 """Quantization utils."""
 
 import numpy as np
+
 from mindspore._checkparam import Validator
-from mindspore.nn.layer.quant import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
-    Conv2dQuant, DenseQuant
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.nn import Cell
 from mindspore import ops
+from mindspore_gs.ops.nn import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
+    Conv2dQuant, DenseQuant
 from .fake_quantizer import FakeQuantizer
 
 __all__ = ["query_quant_layers", "compute_kl_threshold",

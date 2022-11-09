@@ -17,7 +17,7 @@
 from typing import Optional
 from functools import partial
 from mindspore.nn import Cell
-from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
+from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
 from ..layer_policy import LayerPolicy
 from ..quantize_wrapper_cell import QuantizeWrapperCell
 from ..fake_quantizer import FakeQuantizer
