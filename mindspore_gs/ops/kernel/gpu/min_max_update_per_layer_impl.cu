@@ -63,7 +63,7 @@ class minmax_update_perlayer_kernel_attr : public AotKernelData {
   bool ema;
 };
 
-extern "C" int MinmaxUpdatePerLayerInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
+extern "C" int CustomMinMaxUpdatePerLayerInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
   minmax_update_perlayer_kernel_attr *kernel_ptr = new minmax_update_perlayer_kernel_attr;
   kernel_ptr->ema = extra->Attr<bool>("ema");
   kernel_ptr->ema_decay = extra->Attr<float>("ema_decay");
@@ -72,8 +72,8 @@ extern "C" int MinmaxUpdatePerLayerInit(int *ndims, int64_t **shapes, const char
   return 0;
 }
 
-extern "C" int MinmaxUpdatePerLayer(int nparam, void **params, int *ndims, int64_t **shapes, const char **dtypes,
-                                    void *stream, void *extra_void) {
+extern "C" int CustomMinMaxUpdatePerLayer(int nparam, void **params, int *ndims, int64_t **shapes, const char **dtypes,
+                                          void *stream, void *extra_void) {
   constexpr int TOTAL_PARAM_NUM = 3 + 2;  // input 3, output 2
   constexpr int INPUT_INDEX = 0;
   constexpr int IO_NUM = 5;

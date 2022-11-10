@@ -46,7 +46,7 @@ class FQPerChannelGradKernelAttr : public AotKernelData {
   int quant_delay;
 };
 
-extern "C" int CustomFQPerChannelGradInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
+extern "C" int CustomFakeQuantPerChannelGradInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
   size_t num_channels = static_cast<size_t>(shapes[0][0]);
   extra->SetWorkSpace({num_channels * sizeof(float), num_channels * sizeof(float), num_channels * sizeof(float)});
 
@@ -62,8 +62,8 @@ extern "C" int CustomFQPerChannelGradInit(int *ndims, int64_t **shapes, const ch
 
 int global_step = 0;
 
-extern "C" int CustomFQPerChannelGrad(int nparam, void **params, int *ndims, int64_t **shapes, const char **dtypes,
-                                      void *stream, void *extra_void) {
+extern "C" int CustomFakeQuantPerChannelGrad(int nparam, void **params, int *ndims, int64_t **shapes,
+                                             const char **dtypes, void *stream, void *extra_void) {
   constexpr int TOTAL_PARAM_NUM = 4 + 1 + 3;  // input 4, output 1, workspace 3
   constexpr int IO_NUM = 5;
   constexpr int OUTPUT_INDEX = 4;
