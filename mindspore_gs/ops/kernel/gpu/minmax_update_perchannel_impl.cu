@@ -58,8 +58,6 @@ class minmax_update_perchannel_kernel_attr : public AotKernelData {
   bool ema;
 };
 
-void foo_destroy(void *kernel_ptr) { delete static_cast<minmax_update_perchannel_kernel_attr *>(kernel_ptr); }
-
 extern "C" int MinmaxUpdatePerChannelInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
   minmax_update_perchannel_kernel_attr *kernel_ptr = new minmax_update_perchannel_kernel_attr;
   kernel_ptr->ema = extra->Attr<bool>("ema");

@@ -13,13 +13,14 @@
 # limitations under the License.
 # ============================================================================
 """Test FakeQuantPerChannel ops."""
+import pytest
 import numpy as np
 
 from mindspore import context, Tensor
 from mindspore.nn import Cell
 import mindspore.ops as ops
 from mindspore.ops.operations import _quant_ops as ms_Q
-import mindspore_gs.quantization.simulated_quantization.ops as Q
+import mindspore_gs.ops.operations as custom_Q
 
 
 class FakeQuantPerChannelNet(Cell):
@@ -28,7 +29,7 @@ class FakeQuantPerChannelNet(Cell):
     def __init__(self):
         """Init."""
         super(FakeQuantPerChannelNet, self).__init__()
-        self.program = Q.FakeQuantPerChannel()
+        self.program = custom_Q.FakeQuantPerChannel()
 
     def construct(self, x, min_val, max_val):
         """Construct."""
@@ -48,13 +49,17 @@ class MSNet(Cell):
         return self.program(x, min_val, max_val)
 
 
-def test_fqpc_gpu():
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [context.GRAPH_MODE])
+def test_fqpc_gpu(mode):
     """
     Feature: Test ops FakeQuantPerChannel.
     Description: Test ops FakeQuantPerChannel.
     Expectation: Success.
     """
-    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+    context.set_context(mode=mode, device_target='GPU')
     x = np.array([10.0, 10.0, 20.0, 20.0]).astype(np.float32)
     min_val = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float32)
     max_val = np.array([25.0, 25.0, 25.0, 25.0]).astype(np.float32)

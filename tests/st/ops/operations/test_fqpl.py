@@ -13,13 +13,14 @@
 # limitations under the License.
 # ============================================================================
 """Test FakeQuantPerLayer ops."""
+import pytest
 import numpy as np
 
 from mindspore import context, Tensor
 from mindspore.nn import Cell
 import mindspore.ops as ops
 from mindspore.ops.operations import _quant_ops as ms_Q
-import mindspore_gs.quantization.simulated_quantization.ops as Q
+import mindspore_gs.ops.operations as custom_Q
 
 
 class FakeQuantPerLayerNet(Cell):
@@ -28,7 +29,7 @@ class FakeQuantPerLayerNet(Cell):
     def __init__(self):
         """Init."""
         super(FakeQuantPerLayerNet, self).__init__()
-        self.program = Q.FakeQuantPerLayer()
+        self.program = custom_Q.FakeQuantPerLayer()
 
     def construct(self, x, min_val, max_val):
         """Construct."""
@@ -48,13 +49,17 @@ class MSNet(Cell):
         return self.program(x, min_val, max_val)
 
 
-def test_fqpl_gpu():
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [context.GRAPH_MODE])
+def test_fqpl_gpu(mode):
     """
     Feature: Test ops FakeQuantPerLayer.
     Description: Test ops FakeQuantPerLayer.
     Expectation: Success.
     """
-    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+    context.set_context(mode=mode, device_target='GPU')
     x = np.array([10.0, 10.0, 10.0, 20.0, 20.0, 20.0]).reshape(2, 3).astype(np.float32)
     min_val = np.array([0.0]).reshape(1).astype(np.float32)
     max_val = np.array([30]).reshape(1).astype(np.float32)
