@@ -23,12 +23,9 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore._checkparam import Validator, Rel
 from ..quantization_aware_training import QuantizationAwareTraining
 from ..constant import QuantDtype
-from ..quantize_wrapper_cell import QuantizeWrapperCell
-from ..quant_utils import IdentityCell
 from .slb_net_policy import SlbNetPolicy
 from .slb_quant_config import SlbQuantConfig
-from .slb_quant import Conv2dSlbQuant
-from .slb_quant_convert import create_conv2d_from_conv2dquant
+from .slb_quant_convert import ConvertToQuantInferNetwork
 
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
@@ -442,10 +439,10 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """
-        Define how to convert a SLB network to a standard network before exporting to MindIR.
+        Define how to convert a compressed network to a standard network before exporting to MindIR.
 
         Args:
-            net_opt (Cell): SLB network to be converted.
+            net_opt (Cell): Network to be converted which is transformed by `SlbQuantAwareTraining.apply`.
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
                 checkpoint file to `net_opt`.
 
@@ -464,49 +461,16 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if not isinstance(ckpt_path, str):
             raise TypeError(f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
         if ckpt_path != "" and not os.path.isfile(ckpt_path):
-            raise ValueError(
-                f'The parameter `ckpt_path` can only be empty or a valid file, but got {os.path.realpath(ckpt_path)}.')
+            raise ValueError(f'The parameter `ckpt_path` can only be empty or a valid file, but got {os.path.realpath(ckpt_path)}.')
         ckpt_path = os.path.realpath(ckpt_path)
         if os.path.isfile(ckpt_path):
             param_dict = load_checkpoint(ckpt_path)
             not_load_param = load_param_into_net(net_opt, param_dict)
             if not_load_param:
                 raise RuntimeError("Load param into net fail.")
-        self._visit_cell(net_opt)
-        return net_opt
+        exporter = ConvertToQuantInferNetwork(net_opt, self._config.weight_quant_dtype.num_bits)
+        return exporter.run()
 
-    def _visit_cell(self, network: Cell):
-        """Visit the whole network."""
-        cells = network.name_cells()
-        for _, sub_cell in cells.items():
-            if sub_cell == network:
-                continue
-            if isinstance(sub_cell, QuantizeWrapperCell):
-                quant_handle = sub_cell.get_handler()
-                quant_params = {'weight_num_bits': self._config.weight_quant_dtype.num_bits,
-                                'weight_scale': 1., 'weight_zp': 0.}
-                if sub_cell.get_input_quantizer() is not None:
-                    _, _, input_scale, input_zp = sub_cell.get_input_quantizer().extract_quant_param()
-                    quant_params['input_scale'] = input_scale
-                    quant_params['input_zp'] = input_zp
-                if sub_cell.get_output_quantizer() is not None:
-                    _, _, output_scale, output_zp = sub_cell.get_output_quantizer().extract_quant_param()
-                    quant_params['output_scale'] = output_scale
-                    quant_params['output_zp'] = output_zp
-                if isinstance(quant_handle, Conv2dSlbQuant):
-                    conv = create_conv2d_from_conv2dquant(
-                        quant_handle, **quant_params)
-                    sub_cell.insert_child_to_cell("_handler", conv)
-                else:
-                    raise TypeError(f"Not supported {type(quant_handle)} for convert api yet.")
-
-                identity = IdentityCell()
-                if sub_cell.get_input_quantizer() is not None:
-                    sub_cell.insert_child_to_cell("_input_quantizer", identity)
-                if sub_cell.get_output_quantizer() is not None:
-                    sub_cell.insert_child_to_cell("_output_quantizer", identity)
-            else:
-                self._visit_cell(sub_cell)
 
     def __repr__(self):
         """Display instance object as string."""
