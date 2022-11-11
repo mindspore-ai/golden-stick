@@ -95,7 +95,7 @@ class MinMaxUpdatePerLayer(Custom):
             return zeros_like(x), zeros_like(x_min), zeros_like(x_max)
 
         dir_path = os.path.dirname(os.path.abspath(__file__))
-        func_path = os.path.join(dir_path, "ccsrc", "minmax_update_perlayer_impl.cu")
+        func_path = os.path.join(dir_path, "../kernel/gpu", "minmax_update_perlayer_impl.cu")
         return_args = {
             'func': func_path + ":MinmaxUpdatePerLayer",
             'shape': lambda x, x_min, x_max: (x_min, x_max),

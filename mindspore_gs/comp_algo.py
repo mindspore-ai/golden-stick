@@ -55,7 +55,8 @@ class CompAlgo(abc.ABC):
     def _update_common_config(self, config: dict):
         """Create base config from a dict."""
         self.set_save_mindir(config.get("save_mindir", False))
-        self.set_save_mindir_path(config.get("save_mindir_path", "./network"))
+        if self._config.save_mindir:
+            self.set_save_mindir_path(config.get("save_mindir_path", "./network"))
 
     def _update_config_from_dict(self, config: dict):
         """Update config for specific algo. If derived class has extra attributes, Should be over-writed."""
