@@ -23,8 +23,9 @@ from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
 from mindspore._checkparam import Validator
+from mindspore.common.dtype import QuantDtype
 from ..fake_quantizer import FakeQuantizer
-from ..quant_utils import get_quant_min_max, cal_quantization_params
+from ..quant_utils import get_quant_min_max, cal_quantization_params, LinearFakeQuantCell
 
 
 class SlbFakeQuantizerPerLayer(FakeQuantizer):
@@ -178,3 +179,12 @@ class SlbActQuantizer(FakeQuantizer):
         else:
             out = self._fake_quant_infer(x, self._float_min, self._float_max)
         return out
+
+    def convert_to_fakequantparam(self):
+        if self._num_bits != 8:
+            raise ValueError("Only support int8 activation quant now!")
+        quant_dtype = QuantDtype.INT8
+        _, _, scale, zero_point = self.extract_quant_param()
+        new_subcell = LinearFakeQuantCell(quant_dtype=quant_dtype, scale=tuple(scale), zero_point=tuple(zero_point),
+                                          is_per_channel=False)
+        return new_subcell

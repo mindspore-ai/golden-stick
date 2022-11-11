@@ -25,6 +25,7 @@ from mindspore import nn, context
 from mindspore import Model
 from mindspore.nn.metrics import Accuracy
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
+from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbActQuantizer
 from mindspore_gs.quantization.constant import QuantDtype
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
@@ -117,11 +118,13 @@ def test_convert(enable_act_quant):
     qat = SlbQAT(config)
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
-    data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
-    file_name = "./conv.mindir"
-    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
-    graph = mindspore.load(file_name)
-    mindspore.nn.GraphCell(graph)
+
+    cells: OrderedDict = new_network.name_cells()
+    assert cells.get("Conv2dSlbQuant", None) is not None
+    conv: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
+    assert isinstance(conv, QuantizeWrapperCell)
+    act_fake_quant = conv._output_quantizer
+    assert not isinstance(act_fake_quant, SlbActQuantizer)
 
 
 @pytest.mark.level0
@@ -722,7 +725,7 @@ def test_lenet_convert(run_mode, enable_act_quant):
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
-    file_name = "./lenet_{}_{}.mindir".format(run_mode, enable_act_quant)
+    file_name = "./lenet_convert_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)
@@ -963,7 +966,7 @@ def test_resnet_convert(run_mode, enable_act_quant):
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(np.ones([1, 3, 32, 32]), mindspore.float32)
-    file_name = "./resnet_{}_{}.mindir".format(run_mode, enable_act_quant)
+    file_name = "./resnet_convert_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)
