@@ -18,12 +18,12 @@ from typing import Optional
 from functools import partial
 
 from mindspore.nn import Cell
+from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
 from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
 from ..layer_policy import LayerPolicy
 from ..quantize_wrapper_cell import QuantizeWrapperCell
-from ..constant import QuantDtype
 from ..fake_quantizer import FakeQuantizer
 from .simulated_fake_quantizers import SimulatedFakeQuantizerPerChannel, SimulatedFakeQuantizerPerLayer
 from .simulated_quantization_config import SimulatedQuantizationConfig

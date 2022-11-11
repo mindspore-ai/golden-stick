@@ -18,11 +18,11 @@ import sys
 from collections import OrderedDict
 import pytest
 from mindspore import nn
+from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
-from mindspore_gs.quantization.constant import QuantDtype
 from mindspore_gs.quantization.simulated_quantization.simulated_quantization_config import SimulatedQuantizationConfig
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))

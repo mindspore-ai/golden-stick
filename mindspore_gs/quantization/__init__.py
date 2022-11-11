@@ -18,7 +18,6 @@ MindSpore golden stick quantization module.
 
 from .simulated_quantization import SimulatedQuantizationAwareTraining
 from .slb import SlbQuantAwareTraining
-from .converter import Converter
 from ..version import __version__, mindspore_version_check
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining"]
