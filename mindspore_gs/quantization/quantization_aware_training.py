@@ -61,7 +61,7 @@ class QuantizationAwareTraining(CompAlgo):
             if layer_policy is None:
                 layer_policy = layer_policy_map.get(node.get_instance_type())
             if isinstance(layer_policy, LayerPolicy):
-                new_layer_policy = copy.copy(layer_policy)
+                new_layer_policy = copy.deepcopy(layer_policy)
                 new_layer_policy.set_input_number(len(node.get_inputs()))
                 node.set_attribute(layer_policy_key, new_layer_policy)
 
@@ -90,30 +90,25 @@ class QuantizationAwareTraining(CompAlgo):
             # cur-node has no quant policy, so no fq will insert into its inputs
             if cur_policy is None:
                 continue
+            cur_in_quantizer = cur_policy.get_input_quantizer()
+            # cur-node's input quantizer is None, so no fq will insert into its inputs
+            if cur_in_quantizer is None:
+                continue
             input_nodes = node.get_inputs()
             for i in range(0, len(input_nodes)):
-                cur_in_quantizer = cur_policy.get_input_quantizer()
-                # cur-node's input quantizer is None, so no fq will insert into its inputs
-                if cur_in_quantizer is None:
-                    continue
                 input_node: Node = input_nodes[i]
                 pre_policy: LayerPolicy = input_node.get_attribute(layer_policy_key)
                 # pre-node has no quant policy, so no fq will insert into its outputs
                 if pre_policy is None:
                     continue
-                output_nodes_of_input_node = input_node.get_targets()
-                for j in range(0, len(output_nodes_of_input_node)):
-                    output_node_of_input_node = output_nodes_of_input_node[j]
-                    if output_node_of_input_node is not node:
-                        continue
-                    pre_out_quantizer = pre_policy.get_output_quantizer()
-                    # pre-node's output quantizer is None, so no fq will insert into its outputs
-                    # or input fq of cur-node and output fq of pre-node are different
-                    if type(pre_out_quantizer) is not type(cur_in_quantizer):
-                        continue
-                    # input fq of cur-node and output fq of pre-node are same type
-                    # so we mark input fq of cur-node as redundant
-                    cur_policy.set_input_not_insert_fq(i)
+                pre_out_quantizer = pre_policy.get_output_quantizer()
+                # pre-node's output quantizer is None, so no fq will insert into its outputs
+                # or input fq of cur-node and output fq of pre-node are different
+                if type(pre_out_quantizer) is not type(cur_in_quantizer):
+                    continue
+                # input fq of cur-node and output fq of pre-node are same type
+                # so we mark input fq of cur-node as redundant
+                cur_policy.set_input_not_insert_fq(i)
 
     def _apply_fuse_patterns(self, net_transformer: NetTransformer):
         """

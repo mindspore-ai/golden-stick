@@ -317,20 +317,6 @@ def test_convert():
     assert not isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
 
 
-class Conv2dBnActToQuant(nn.Cell):
-    """
-    Network with Conv2dBnAct to be quanted
-    """
-
-    def __init__(self):
-        super(Conv2dBnActToQuant, self).__init__()
-        self.conv = nn.Conv2dBnAct(5, 6, 5, pad_mode='valid', has_bn=True)
-
-    def construct(self, x):
-        x = self.conv(x)
-        return x
-
-
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
@@ -340,7 +326,7 @@ def test_convert_error():
     Description: Feed invalid type of bn_fold to convert function.
     Expectation: Except TypeError.
     """
-    network = Conv2dBnActToQuant()
+    network = NetToQuant()
     qat = SimQAT()
     new_network = qat.apply(network)
     with pytest.raises(TypeError) as e:

@@ -17,11 +17,12 @@
 from typing import Optional
 from functools import partial
 from mindspore.nn import Cell
+from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
+    Conv2dBnFoldQuant
 from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer, \
     LearnedStepSizeFakeQuantizePerChannel
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig
-from ..simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy, ConvLayerPolicy, \
-    DenseLayerPolicy, ConvBnLayerPolicy
+from ..simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
 from ..fake_quantizer import FakeQuantizer
 from ..quantize_wrapper_cell import QuantizeWrapperCell
 
@@ -68,7 +69,7 @@ class LearnedStepSizeQuantizationConvLayerPolicy(LearnedStepSizeQuantizationLaye
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        conv_quant = ConvLayerPolicy.create_conv2dquant_from_conv(handler, self.get_quant_config())
+        conv_quant = Conv2dQuant.from_conv2d(handler, self.get_quant_config())
         return QuantizeWrapperCell(conv_quant, self)
 
 
@@ -78,7 +79,7 @@ class LearnedStepSizeQuantizationDenseLayerPolicy(LearnedStepSizeQuantizationLay
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        dense_quant = DenseLayerPolicy.create_densequant_from_dense(handler, self.get_quant_config())
+        dense_quant = DenseQuant.from_dense(handler, self.get_quant_config())
         return QuantizeWrapperCell(dense_quant, self)
 
 
@@ -88,12 +89,15 @@ class LearnedStepSizeQuantizationConvBnLayerPolicy(LearnedStepSizeQuantizationLa
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        if self._config.bn_fold:
-            if self._config.one_conv_fold:
-                conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquantoneconv(handler, self.get_quant_config())
+        if handler.has_bn:
+            if self._config.bn_fold:
+                if self._config.one_conv_fold:
+                    conv_quant = Conv2dBnFoldQuantOneConv.from_convbn(handler, self.get_quant_config())
+                else:
+                    conv_quant = Conv2dBnFoldQuant.from_convbn(handler, self.get_quant_config(),
+                                                               {"freeze_bn": self._config.freeze_bn})
             else:
-                conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnfoldquant(handler, self.get_quant_config(),
-                                                                           {"freeze_bn": self._config.freeze_bn})
+                conv_quant = Conv2dBnWithoutFoldQuant.from_convbn(handler, self.get_quant_config())
         else:
-            conv_bn_quant = ConvBnLayerPolicy.create_conv2dbnwithoutfoldquant(handler, self.get_quant_config())
-        return QuantizeWrapperCell(conv_bn_quant, self)
+            conv_quant = Conv2dQuant.from_convbn(handler, self.get_quant_config())
+        return QuantizeWrapperCell(conv_quant, self)

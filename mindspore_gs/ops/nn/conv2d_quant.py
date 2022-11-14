@@ -22,6 +22,7 @@ from mindspore._checkparam import Validator, twice
 from mindspore.compression.common import QuantDtype
 from mindspore.nn.cell import Cell
 from mindspore.nn.layer.conv import Conv2d
+from ...quantization.simulated_quantization.combined import Conv2dBn
 from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
 
 
@@ -153,35 +154,47 @@ class Conv2dQuant(Cell):
                                                      num_channels=out_channels)
 
     @classmethod
-    def from_float(cls, conv: Conv2d, quant_config: QuantConfig):
+    def from_conv2d(cls, conv: Conv2d, quant_config: QuantConfig):
         """
-        A class method to create `Conv2dQuant` from a `Conv2d`
+        A class method to create `Conv2dQuant` from `Conv2d`
+        """
+        conv_quant = cls(in_channels=conv.in_channels,
+                         out_channels=conv.out_channels,
+                         kernel_size=conv.kernel_size,
+                         stride=conv.stride,
+                         pad_mode=conv.pad_mode,
+                         padding=conv.padding,
+                         dilation=conv.dilation,
+                         group=conv.group,
+                         has_bias=conv.has_bias,
+                         bias_init=conv.bias_init,
+                         weight_init=conv.weight_init,
+                         quant_config=quant_config)
+        conv_quant.weight = conv.weight
+        if conv.has_bias:
+            conv_quant.bias = conv.bias
+        return conv_quant
 
-        Examples:
-            >>> from mindspore import nn
-            >>> from mindspore_gs.ops.nn import FakeQuantWithMinMaxObserver
-            >>> ic = 10
-            >>> oc = 100
-            >>> kernel_size = 3
-            >>> conv_op = nn.Conv2d(ic, oc, kernel_size)
-            >>> # when apply QAT on `conv_op`, QAT need to create a quant conv2d whose weight is fake-quanted
-            >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
-            ...                                         activation=FakeQuantWithMinMaxObserver.partial_init())
-            >>> conv_quant = nn.Conv2dQuant.from_float(conv_op, quant_config)
+    @classmethod
+    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig):
         """
-        conv_quant = cls(
-            conv.in_channels,
-            conv.out_channels,
-            kernel_size=conv.kernel_size,
-            stride=conv.stride,
-            pad_mode=conv.pad_mode,
-            padding=conv.padding,
-            dilation=conv.dilation,
-            group=conv.group,
-            has_bias=conv.has_bias,
-            bias_init=conv.bias_init,
-            weight_init=conv.weight_init,
-            quant_config=quant_config)
+        A class method to create `Conv2dQuant` from `Conv2dBn`
+        """
+        conv_quant = cls(in_channels=convbn.conv.in_channels,
+                         out_channels=convbn.conv.out_channels,
+                         kernel_size=convbn.conv.kernel_size,
+                         stride=convbn.conv.stride,
+                         pad_mode=convbn.conv.pad_mode,
+                         padding=convbn.conv.padding,
+                         dilation=convbn.conv.dilation,
+                         group=convbn.conv.group,
+                         has_bias=convbn.conv.has_bias,
+                         bias_init=convbn.conv.bias_init,
+                         weight_init=convbn.conv.weight_init,
+                         quant_config=quant_config)
+        conv_quant.weight = convbn.conv.weight
+        if convbn.conv.has_bias:
+            conv_quant.bias = convbn.conv.bias
         return conv_quant
 
     def construct(self, x):

@@ -20,31 +20,20 @@ from .layer_policy import LayerPolicy
 
 class QuantizeWrapperCell(Cell):
     """
-    Decorator of Activation Cell class for decorate a cell to a quant-cell with fake-quant algorithm.
+    Decorator of normal Cell class for decorate a cell to a quant-cell with fake-quant algorithm.
 
     Args:
-        handler (Cell): normal cell to be wrapped.
-        layer_policy (FakeQuantizer): Define how weight data to be fake-quant.
+        act (Cell): normal cell to be wrapped.
+        layer_policy (FakeQuantizer): Define how input data and output data to be fake-quant.
     """
 
     def __init__(self, handler: Cell, layer_policy: LayerPolicy):
         super().__init__()
         self._handler: Cell = handler
         self._policy = layer_policy
-        self._w_scale = 1.0
-        self._w_zp = 0
-        self._o_scale = 1.0
-        self._o_zp = 0
         self._input_quantizer = self._policy.get_input_quantizer()
         self._output_quantizer = self._policy.get_output_quantizer()
-        self._input_insert_quantizer = self._policy.get_input_need_insert_fq()
-        # fake-quant weight
-        for weight_name, quantizer in self._policy.get_weight_name_and_quantizers():
-            assert weight_name is not None
-            assert quantizer is not None
-            weight = getattr(self._handler, weight_name)
-            fq_data = quantizer(weight)
-            setattr(self._handler, weight_name, fq_data)
+        self._inputs_insert_fq = self._policy.get_input_need_insert_fq()
 
     def get_handler(self):
         return self._handler
@@ -55,15 +44,27 @@ class QuantizeWrapperCell(Cell):
     def get_output_quantizer(self):
         return self._output_quantizer
 
-    def construct(self, *inputs, **kwargs):
+    def construct(self, *inputs):
         """
         Defines the computation of QuantizeWrapperCell to be performed.
 
         Returns:
             Tensor, returns the computed result.
         """
-        # forward handler
-        outputs = self._handler(*inputs, **kwargs)
+        # fake-quant input, forward handler
+        if self._input_quantizer is None:
+            outputs = self._handler(*inputs)
+        else:
+            if len(self._inputs_insert_fq) > len(inputs):
+                raise ValueError("The num of cell inputs is incorrect.")
+            fq_inputs = []
+            for i in range(0, len(self._inputs_insert_fq)):
+                if self._inputs_insert_fq[i]:
+                    ori_input = inputs[i]
+                    fq_inputs.append(self._input_quantizer(ori_input))
+                else:
+                    fq_inputs.append(inputs[i])
+            outputs = self._handler(*fq_inputs)
 
         # fake-quant output
         if self._output_quantizer is None:

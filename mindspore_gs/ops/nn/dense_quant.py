@@ -136,29 +136,20 @@ class DenseQuant(Cell):
                                                      num_channels=out_channels)
 
     @classmethod
-    def from_float(cls, dense: Dense, quant_config: QuantConfig):
+    def from_dense(cls, dense: Dense, quant_config: QuantConfig):
         """
         A class method to create `DenseQuant` from a `Dense`
-
-        Examples:
-            >>> from mindspore import nn
-            >>> from mindspore_gs.ops.nn import FakeQuantWithMinMaxObserver
-            >>> ic = 10
-            >>> oc = 100
-            >>> dense_op = nn.Dense(ic, oc)
-            >>> # when apply QAT on `dense_op`, QAT need to create a quant dense whose weight is fake-quanted
-            >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
-            ...                                         activation=FakeQuantWithMinMaxObserver.partial_init())
-            >>> dense_quant = nn.DenseQuant.from_float(dense_op, quant_config)
         """
-        dense_quant = cls(
-            dense.in_channels,
-            dense.out_channels,
-            dense.weight,
-            dense.bias,
-            dense.has_bias,
-            dense.activation,
-            quant_config=quant_config)
+        dense_quant = cls(in_channels=dense.in_channels,
+                          out_channels=dense.out_channels,
+                          weight_init=dense.weight,
+                          bias_init=dense.bias,
+                          has_bias=dense.has_bias,
+                          activation=dense.activation,
+                          quant_config=quant_config)
+        dense_quant.weight = dense.weight
+        if dense.has_bias:
+            dense_quant.bias = dense.bias
         return dense_quant
 
     def construct(self, x):
