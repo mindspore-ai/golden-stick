@@ -34,27 +34,24 @@ def mindspore_version_check():
         import mindspore as ms
         from mindspore import log as logger
     except (ImportError, ModuleNotFoundError):
-        print("Can not find MindSpore in current environment. Please install "
-              "MindSpore before using MindSpore Golden Stick, by following "
-              "the instruction at https://www.mindspore.cn/install")
+        print("Can not find MindSpore in current environment. Please install MindSpore before using MindSpore Golden "
+              "Stick, by following the instruction at https://www.mindspore.cn/install")
         raise
 
-    ms_msgs_version_match = {'0.1.0': '1.8.0',
-                             '0.2.0': '1.9.0',
-                             '0.3.0': '2.0.0'}
+    ms_msgs_version_match = {'0.1': '1.8',
+                             '0.2': '1.9',
+                             '0.3': '2.0'}
 
-    ms_version = ms.__version__
-    required_mindspore_verision = ms_msgs_version_match[__version__]
+    required_mindspore_verision = ms_msgs_version_match[__version__[:3]]
+    ms_version = ms.__version__[:3]
 
-    if ms_version != required_mindspore_verision:
-        logger.warning("Current version of MindSpore is not compatible with MindSpore Golden Stick. "
-                       "Some functions might not work or even raise error. Please install MindSpore "
-                       "version == {}. For more details about dependency setting, please check "
-                       "the instructions at MindSpore official website https://www.mindspore.cn/install "
-                       "or check the README.md at https://gitee.com/mindspore/golden-stick"
-                       .format(required_mindspore_verision))
+    if required_mindspore_verision != ms_version:
+        logger.warning("Current version of MindSpore is not compatible with MindSpore Golden Stick. Some functions "
+                       "might not work or even raise error. Please install MindSpore version == {}. For more details "
+                       "about dependency setting, please check the instructions at MindSpore official website "
+                       "https://www.mindspore.cn/install or check the README.md at "
+                       "https://gitee.com/mindspore/golden-stick".format(required_mindspore_verision))
         warning_countdown = 3
         for i in range(warning_countdown, 0, -1):
-            logger.warning(
-                f"Please pay attention to the above warning, countdonw: {i}")
+            logger.warning(f"Please pay attention to the above warning, countdonw: {i}")
             time.sleep(1)
