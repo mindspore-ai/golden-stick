@@ -71,11 +71,9 @@ class CellBlockWithFakeWeight(Cell):
 
     def construct(self, x):
         weight = self.fake_weight(self.weight)
+        x = self.core_op(x, weight)
         if self.has_bias:
-            x = self.core_op(x, weight)
             x = self.bias_add(x, self.bias)
-        else:
-            x = self.core_op(x, weight)
         if self.has_act:
             x = self.activation(x)
         return x
@@ -127,8 +125,7 @@ class ConvertToQuantInferNetwork:
             cell_core.fake_quant_weight, SimulatedFakeQuantizerPerChannel)
         quant_params = {"quant_dtype": self.quant_dtype,
                         "is_per_channel": is_per_channel}
-        block = CellBlockWithFakeWeight(op_core, tuple(scale_w), tuple(
-            zp_w), weight, bias, activation, quant_params)
+        block = CellBlockWithFakeWeight(op_core, tuple(scale_w), tuple(zp_w), weight, bias, activation, quant_params)
         return block
 
     def __get_quant_param(self, cell_core):
@@ -164,12 +161,12 @@ class ConvertToQuantInferNetwork:
             return new_subcell
         return None
 
-    def _convert_core_quant_subcell(self, cell_core):
+    def _convert_core_subcell(self, cell_core):
         """Convert subcell for conv and dense."""
-        if isinstance(cell_core, (Conv2dBnFoldQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, Conv2dQuant,
+        if isinstance(cell_core, (Conv2dQuant, Conv2dBnFoldQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant,
                                   DenseQuant)):
             return self._convert_subcell(cell_core)
-        raise ValueError("Unsupported quant cell.")
+        return cell_core
 
     def _convert_quant2deploy(self, network):
         """Convert network's all quant subcell to deploy subcell."""
@@ -179,15 +176,14 @@ class ConvertToQuantInferNetwork:
             if subcell == network:
                 continue
             if isinstance(subcell, QuantizeWrapperCell):
-                quant_cell = subcell.get_handler()
-                new_subcell = self._convert_core_quant_subcell(quant_cell)
+                handler_cell = subcell.get_handler()
+                new_subcell = self._convert_core_subcell(handler_cell)
                 subcell.insert_child_to_cell("_handler", new_subcell)
+
                 fake_quant_input = subcell.get_input_quantizer().convert_to_fakequantparam()
                 fake_quant_output = subcell.get_output_quantizer().convert_to_fakequantparam()
-                subcell.insert_child_to_cell(
-                    "_input_quantizer", fake_quant_input)
-                subcell.insert_child_to_cell(
-                    "_output_quantizer", fake_quant_output)
+                subcell.insert_child_to_cell("_input_quantizer", fake_quant_input)
+                subcell.insert_child_to_cell("_output_quantizer", fake_quant_output)
             else:
                 self._convert_quant2deploy(subcell)
         return network
