@@ -58,7 +58,7 @@ class minmax_update_perchannel_kernel_attr : public AotKernelData {
   bool ema;
 };
 
-extern "C" int MinmaxUpdatePerChannelInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
+extern "C" int CustomMinMaxUpdatePerChannelInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
   minmax_update_perchannel_kernel_attr *kernel_ptr = new minmax_update_perchannel_kernel_attr;
   kernel_ptr->ema = extra->Attr<bool>("ema");
   kernel_ptr->ema_decay = extra->Attr<float>("ema_decay");
@@ -67,8 +67,8 @@ extern "C" int MinmaxUpdatePerChannelInit(int *ndims, int64_t **shapes, const ch
   return 0;
 }
 
-extern "C" int MinmaxUpdatePerChannel(int nparam, void **params, int *ndims, int64_t **shapes, const char **dtypes,
-                                      void *stream, void *extra_void) {
+extern "C" int CustomMinMaxUpdatePerChannel(int nparam, void **params, int *ndims, int64_t **shapes,
+                                            const char **dtypes, void *stream, void *extra_void) {
   constexpr int TOTAL_PARAM_NUM = 3 + 2;  // input 3, output 2
   constexpr int INPUT_INDEX = 0;
   constexpr int IO_NUM = 5;

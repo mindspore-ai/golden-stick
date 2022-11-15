@@ -15,19 +15,14 @@
 """
 MindSpore golden stick simulated-quantization ops MinMaxUpdatePerChannel.
 """
-
-import os
-
-from mindspore import context
-from mindspore.common import dtype as mstype
-from mindspore.ops import Custom
-from mindspore.ops import DataType, CustomRegOp
+from mindspore.ops import DataType
 from mindspore.ops.functional import zeros_like
 from mindspore._checkparam import Validator as validator
 from mindspore._checkparam import Rel
+from mindspore_gs.ops.operations import GSCustom, custom_op_attr_register
 
 
-class MinMaxUpdatePerChannel(Custom):
+class MinMaxUpdatePerChannel(GSCustom):
     r"""
      Updates min and max per channel.
 
@@ -45,6 +40,9 @@ class MinMaxUpdatePerChannel(Custom):
         - Tensor: Simulates quantize tensor of x.
 
     Examples:
+        >>> import numpy as np
+        >>> from mindspore.common import dtype as mstype
+        >>> from mindspore import Tensor
         >>> x = Tensor(np.random.rand(3, 16, 5, 5), mstype.float32)
         >>> min_value = Tensor(np.random.uniform(-1, 1, size=16), mstype.float32)
         >>> max_value = Tensor(np.random.uniform(-1, 1, size=16), mstype.float32)
@@ -53,57 +51,44 @@ class MinMaxUpdatePerChannel(Custom):
     support_quant_bit = [4, 7, 8]
     ascend_support_x_rank = [2, 4]
 
+    @custom_op_attr_register
     def __init__(self, ema=False, ema_decay=0.999, channel_axis=1):
         """Initialize FakeQuantPerChannelUpdate OP for Ascend"""
-        name = self.__class__.__name__
-        if not context.get_context('device_target') == "GPU":
-            raise NotImplementedError("For 'MinMaxUpdatePerChannel', it is only supported on GPU right now.")
+        support_device = ["GPU"]
+        self._check_support_device_target(support_device)
         if ema and not ema_decay:
             raise ValueError(
-                f"For '{name}' attr \'ema\' and \'ema_decay\' should set together.")
+                f"For '{self._get_custom_op_name()}' attr \'ema\' and \'ema_decay\' should set together.")
 
-        ema = validator.check_value_type('ema', ema, (bool,), name)
-        ema_decay = validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', name)
-        channel_axis = validator.check_non_negative_int(channel_axis, 'channel_axis', name)
+        validator.check_value_type('ema', ema, (bool,), self._get_custom_op_name())
+        validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', self._get_custom_op_name())
+        validator.check_non_negative_int(channel_axis, 'channel_axis', self._get_custom_op_name())
 
-        init_args = MinMaxUpdatePerChannel._init_aot_custom_ops((ema, ema_decay))
-        super(MinMaxUpdatePerChannel, self).__init__(
-            func=init_args['func'],
-            out_shape=init_args['shape'],
-            out_dtype=init_args['type'],
-            bprop=init_args['bprop'],
-            reg_info=init_args['reg_info'],
-            func_type='aot'
-        )
+    def _infer_shape(self, x, x_min, x_max):
+        """infer_shape."""
+        return x_min, x_max
 
-    @staticmethod
-    def _init_aot_custom_ops(args):
-        """Register ops."""
-        ema, ema_decay = args
-        minmax_update_per_channel_gpu_info = CustomRegOp("minmax_update_per_channel_impl_kernel") \
-            .input(0, "x") \
-            .input(1, "min_val") \
-            .input(2, "max_val") \
-            .output(0, "min_out") \
-            .output(1, "max_out") \
-            .dtype_format(DataType.F32_Default, DataType.F32_Default,
-                          DataType.F32_Default, DataType.F32_Default, DataType.F32_Default) \
-            .attr("ema", "required", "bool", value=ema) \
-            .attr("ema_decay", "required", "float", value=ema_decay) \
-            .target("GPU") \
-            .get_op_info()
+    def _infer_dtype(self, x, x_min, x_max):
+        """infer_dtype."""
+        return x_min, x_max
+
+    def _get_op_bprop(self):
+        """op_bprop."""
 
         def bprop(x, x_min, x_max, out, dout):
             """bprop."""
             return zeros_like(x), zeros_like(x_min), zeros_like(x_max)
+        return bprop
 
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        func_path = os.path.join(dir_path, "../kernel/gpu", "minmax_update_perchannel_impl.cu")
-        return_args = {
-            'func': func_path + ":MinmaxUpdatePerChannel",
-            'shape': lambda x, x_min, x_max: (x_min, x_max),
-            'type': (mstype.float32, mstype.float32),
-            'bprop': bprop,
-            'reg_info': minmax_update_per_channel_gpu_info
-        }
-        return return_args
+    def _get_op_input_names(self) -> (str,):
+        """set_op_input_names"""
+        return "x", "min_val", "max_val"
+
+    def _get_op_output_names(self) -> (str,):
+        """set_op_output_names"""
+        return "min_out", "max_out"
+
+    def _get_op_dtype_formats(self) -> [[DataType]]:
+        """set_op_dtype_format"""
+        return [[DataType.F32_Default, DataType.F32_Default, DataType.F32_Default, DataType.F32_Default,
+                 DataType.F32_Default]]
