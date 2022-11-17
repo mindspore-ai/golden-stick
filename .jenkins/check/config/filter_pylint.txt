@@ -35,6 +35,9 @@
 # SCOP
 "golden-stick/mindspore_gs/pruner/scop/scop_pruner.py"                                                   "protected-access"
 
+# GHOST
+"golden-stick/mindspore_gs/ghost/ghost.py"                                                   "protected-access"
+
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
 "golden-stick/tests/st/models/resnet.py"                                                                 "unused-argument"
