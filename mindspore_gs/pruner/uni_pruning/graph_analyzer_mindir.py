@@ -288,10 +288,9 @@ class GraphAnalyzer:
     def __parse_mindir(self):
         """Analyze computational graph from .MINDIR."""
         model = mindir_model()
-        phase_name = "predict" if self._net._auto_parallel_mode else "export.mindir"
+        phase_name = "export.mindir"
         graph_id, _ = _executor.compile(self._net, *self._inputs, phase=phase_name,
-                                        do_convert=False,
-                                        auto_parallel_mode=self._net._auto_parallel_mode)
+                                        do_convert=False)
         mindir_stream = _executor._get_func_graph_proto(self._net, graph_id, 'mind_ir')
         model.ParseFromString(mindir_stream)
         self._mindir = model

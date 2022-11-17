@@ -194,7 +194,7 @@ class UniPruner(CompAlgo):
         >>> algo.convert(net, mask, config, tag)
 
     """
-    def __init__(self, config):
+    def __init__(self, config=None):
         super().__init__(config)
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
         self._callback = UniPrunerCallback(exp_name=config["exp_name"],
@@ -230,7 +230,7 @@ class UniPruner(CompAlgo):
         self._callback.graph = self.graph
         return network
 
-    def convert(self, net: Cell, mask, args, tag):
+    def prune_by_mask(self, net: Cell, mask, args, tag):
         """
         Prune network (optional) according to mask, save weights as .ckpt, model as .MINDIR and .AIR
 
@@ -246,15 +246,15 @@ class UniPruner(CompAlgo):
             TypeError: If `args` is not dict.
             TypeError: If `tag` is not string.
         """
-        Validator.check_value_type("mask", mask, [dict], self.__class__.__name__)
+        if mask is not None:
+            Validator.check_value_type("mask", mask, [dict], self.__class__.__name__)
         Validator.check_value_type("tag", tag, [str], self.__class__.__name__)
         if mask is not None:
             prune_net(self.graph.groups, mask)
-        save_path = os.path.join(args.save_checkpoint_path, args.exp_name)
-        save_model_and_mask(net, save_path, f'{args.exp_name}_{tag}_{self._callback.rank}',
+        save_model_and_mask(net, self._callback.output_path, f'{args.exp_name}_{tag}_{self._callback.rank}',
                             args.epoch_size, self._callback.input_size, args.device_target,
                             export_air=True)
 
-    def callback(self):
+    def callbacks(self, *args, **kwargs) -> [Callback]:
         """get UniPruner callback"""
-        return self._callback
+        return [self._callback]
