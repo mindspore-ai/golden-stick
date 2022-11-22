@@ -14,46 +14,69 @@
 # ============================================================================
 
 GS_ALL:
-  mindspore_gs/comp_algo.py
-  mindspore_gs/net_transform.py
-  tests/st/golden_stick
-  tests/st/loss_monitor.py
+    mindspore_gs/version.py
+    mindspore_gs/comp_algo.py
+    mindspore_gs/net_transform.py
+    tests/st/golden_stick
+    tests/st/loss_monitor.py
+    tests/st/test_utils.py
+    tests/st/models
+    build.sh
+    setup.py
+    .gitmodules
+    .jenkins
 
-GS_CI:
-  build.sh
-  setup.py
-  requirements.txt
-  .gitmodules
-  .gitignore
-  .jenkins
-  .gitee
-
+# ignore?
 GS_DOCS:
-  CONTRIBUTING.md
-  LICENSE
-  NOTICE
-  OWNERS
-  README.md
-  README_CN.md
-  RELEASE.md
-  RELEASE_CN.md
-  SECURITY.md
-  Third_Party_Open_Source_Software_Notice
-  docs
+    CONTRIBUTING.md
+    LICENSE
+    NOTICE
+    OWNERS
+    README.md
+    README_CN.md
+    RELEASE.md
+    RELEASE_CN.md
+    SECURITY.md
+    Third_Party_Open_Source_Software_Notice
+    docs
+    requirements.txt
+    .gitee
+    .gitignore
 
+# pytest.mark.qat_simqat
 GS_QAT_SIMQAT:
+    mindspore_gs/ops
     mindspore_gs/quantization/simulated_quantization
     mindspore_gs/quantization/learned_step_size_quantization
-    tests/st/quantization/test_sim_qat.py
+    tests/st/ops
+    tests/st/quantization/sim_qat
 
+# pytest.mark.qat_lsq
 GS_QAT_LSQ:
+    mindspore_gs/ops
     mindspore_gs/quantization/simulated_quantization
     mindspore_gs/quantization/learned_step_size_quantization
+    tests/st/ops
+    tests/st/quantization/lsq
 
+# pytest.mark.qat_slb
 GS_QAT_SLB:
+    mindspore_gs/ops  
     mindspore_gs/quantization/slb
     tests/st/quantization/test_slb_qat.py
+    tests/st/quantization/slb
 
+# pytest.mark.prune_scop
 GS_PRUNER_SCOP:
     mindspore_gs/pruner/scop
-    tests/st/pruner/test_scop.py
+    tests/st/pruner/scop
+
+# pytest.mark.prune_unipruning
+GS_PRUNER_UNIPRUNING:
+    mindspore_gs/pruner/uni_pruning
+    tests/st/pruner/uni_pruning
+
+# pytest.mark.ghost
+GS_GHOST:
+    mindspore_gs/ghost
+    tests/st/ghost
