@@ -32,26 +32,6 @@ mindspore_gs
         返回：
             回调实例的列表。
 
-    .. py:method:: set_save_mindir(save_mindir: bool)
-
-        设置训练后是否自动导出MindIR。
-
-        参数：
-            - **save_mindir** (bool) - 如为真，则在训练后自动导出MindIR，否则不自动导出。
-
-        异常：
-            - **TypeError** - `save_mindir` 数据类型不是bool。
-
-    .. py:method:: set_save_mindir_path(save_mindir_path: str)
-
-        设置导出MindIR的路径，仅当 `save_mindir` 为True时才生效。
-
-        参数：
-            - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径，也可以是绝对路径，用户需要保证写入权限。
-
-        异常：
-            - **ValueError** - `save_mindir_path` 不是非空字符串。
-
     .. py:method:: convert(net_opt: Cell, ckpt_path="")
 
         定义如何在导出到MindIR之前将压缩网络转换为标准网络。
@@ -72,3 +52,23 @@ mindspore_gs
 
         返回：
             调整后的损失函数。
+
+    .. py:method:: set_save_mindir(save_mindir: bool)
+
+        设置训练后是否自动导出MindIR。
+
+        参数：
+            - **save_mindir** (bool) - 如为真，则在训练后自动导出MindIR，否则不自动导出。
+
+        异常：
+            - **TypeError** - `save_mindir` 数据类型不是bool。
+
+    .. py:method:: set_save_mindir_path(save_mindir_path: str)
+
+        设置导出MindIR的路径，仅当 `save_mindir` 为True时才生效。
+
+        参数：
+            - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径，也可以是绝对路径，用户需要保证写入权限。
+
+        异常：
+            - **ValueError** - `save_mindir_path` 不是非空字符串。
