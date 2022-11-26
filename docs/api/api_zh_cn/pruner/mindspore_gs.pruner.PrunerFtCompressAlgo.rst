@@ -11,7 +11,7 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
           - **prune_rate** (float) - 默认值：[0.0, 1.0)。
     
     异常：
-        - **TypeError** - `prune_rate` 的数据类型不是`float`。
+        - **TypeError** - `prune_rate` 的数据类型不是 `float` 。
         - **ValueError** - `prune_rate` 小于0或者大于等于1。
 
     .. py:method:: apply(net)
@@ -27,7 +27,7 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
         异常：
             - **TypeError** - `net` 不是Cell。
 
-    .. py:method:: set_prune_rate(prune_rate)
+    .. py:method:: set_prune_rate(prune_rate: float)
 
         设置剪枝率。
 

@@ -238,7 +238,7 @@ class PrunerKfCompressAlgo(CompAlgo):
     discover redundant convolution kernels in the SCOP algorithm.
 
     Args:
-        config (Dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
+        config (dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
             `PrunerKfCompressAlgo` currently, but for compatibility, the config parameter in the constructor of class A
             is retained.
 

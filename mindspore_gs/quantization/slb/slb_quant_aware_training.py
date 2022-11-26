@@ -41,7 +41,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     Note:
         This method will call other set functions to set special values, please refer to the set function about the error.
-            For example, `quant_dtype` need refer to `set_weight_quant_dtype` and `set_act_quant_dtype`.
+        For example, `quant_dtype` need refer to `set_weight_quant_dtype` and `set_act_quant_dtype`.
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
