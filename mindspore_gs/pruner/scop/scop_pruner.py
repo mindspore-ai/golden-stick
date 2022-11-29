@@ -354,7 +354,7 @@ class PrunerFtCompressAlgo(CompAlgo):
     and fully train the network.
 
     Args:
-        config (Dict): Configuration of `PrunerFtCompressAlgo`, keys are attribute names,
+        config (dict): Configuration of `PrunerFtCompressAlgo`, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
 
             - prune_rate (float): number in [0.0, 1.0)

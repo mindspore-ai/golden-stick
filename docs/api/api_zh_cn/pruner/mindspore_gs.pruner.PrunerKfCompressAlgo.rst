@@ -1,7 +1,7 @@
 mindspore_gs.pruner.PrunerKfCompressAlgo
 ========================================
 
-.. py:class:: mindspore_gs.pruner.PrunerKfCompressAlgo(config)
+.. py:class:: mindspore_gs.pruner.PrunerKfCompressAlgo(config=None)
 
     `PrunerKfCompressAlgo` 是CompAlgo的子类，实现了SCOP算法中利用高仿数据来学习发现冗余卷积核。
 
@@ -18,15 +18,15 @@ mindspore_gs.pruner.PrunerKfCompressAlgo
         返回：
             SCOP剪枝算法的callbacks列表。
 
-    .. py:method:: apply(net)
+    .. py:method:: apply(network)
 
         将网络变成Konckoff网络。
 
         参数：
-            - **net** (Cell) - 原始待剪枝网络。
+            - **network** (Cell) - 原始待剪枝网络。
 
         返回：
             返回变换后的Konckoff网络。
         
         异常：
-            - **TypeError** - `net` 不是Cell。
+            - **TypeError** - `network` 不是Cell。
