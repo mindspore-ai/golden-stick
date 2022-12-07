@@ -43,7 +43,7 @@ class FQPerLayerGradKernelAttr : public AotKernelData {
   int quant_delay;
 };
 
-extern "C" int CustomFQPerLayerGradInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
+extern "C" int CustomFakeQuantPerLayerGradInit(int *ndims, int64_t **shapes, const char **dtypes, AotExtra *extra) {
   extra->SetWorkSpace({sizeof(float), sizeof(float), sizeof(float)});
 
   FQPerLayerGradKernelAttr *kernel_ptr = new FQPerLayerGradKernelAttr;
@@ -58,8 +58,8 @@ extern "C" int CustomFQPerLayerGradInit(int *ndims, int64_t **shapes, const char
 
 int global_step = 0;
 
-extern "C" int CustomFQPerLayerGrad(int nparam, void **params, int *ndims, int64_t **shapes, const char **dtypes,
-                                    void *stream, void *extra_void) {
+extern "C" int CustomFakeQuantPerLayerGrad(int nparam, void **params, int *ndims, int64_t **shapes, const char **dtypes,
+                                           void *stream, void *extra_void) {
   constexpr int TOTAL_PARAM_NUM = 4 + 1 + 3;  // input 4, output 1, workspace 3
   constexpr int IO_NUM = 5;
   constexpr int OUTPUT_INDEX = 4;

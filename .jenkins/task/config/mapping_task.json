@@ -1,0 +1,97 @@
+{
+    "GS_COMMON":{
+        "code": [
+            "mindspore_gs/ops",
+            "mindspore_gs/version.py",
+            "mindspore_gs/comp_algo.py",
+            "mindspore_gs/net_transform.py",
+            "tests/st/golden_stick",
+            "tests/st/loss_monitor.py",
+            "tests/st/test_utils.py",
+            "tests/st/models",
+            "tests/st/ops",
+            "build.sh",
+            "setup.py",
+            ".gitmodules",
+            ".jenkins"
+        ],
+        "testcases": [
+            "tests/st/"
+        ]
+    },
+    "GS_QAT_SIMQAT":{
+        "code": [
+            "mindspore_gs/quantization/simulated_quantization",
+            "tests/st/quantization/sim_qat"
+        ],
+        "testcases": [
+            "tests/st/golden_stick",
+            "tests/st/loss_monitor.py",
+            "tests/st/test_utils.py",
+            "tests/st/ops",
+            "tests/st/quantization/sim_qat"
+        ]
+    },
+    "GS_QAT_LSQ":{
+        "code": [
+            "mindspore_gs/quantization/learned_step_size_quantization",
+            "tests/st/quantization/lsq"
+        ],
+        "testcases": [
+            "tests/st/golden_stick",
+            "tests/st/loss_monitor.py",
+            "tests/st/test_utils.py",
+            "tests/st/ops",
+            "tests/st/quantization/lsq"
+        ]
+    },
+    "GS_QAT_SLB":{
+        "code": [
+            "mindspore_gs/quantization/slb",
+            "tests/st/quantization/slb"
+        ],
+        "testcases": [
+            "tests/st/golden_stick",
+            "tests/st/loss_monitor.py",
+            "tests/st/test_utils.py",
+            "tests/st/ops",
+            "tests/st/quantization/slb"
+        ]
+    },
+    "GS_PRUNER_SCOP":{
+        "code": [
+            "mindspore_gs/pruner/scop",
+            "tests/st/pruner/scop"
+        ],
+        "testcases": [
+            "tests/st/golden_stick",
+            "tests/st/loss_monitor.py",
+            "tests/st/test_utils.py",
+            "tests/st/pruner/scop"
+        ]
+    },
+    "GS_PRUNER_UNIPRUNING":{
+        "code": [
+            "mindspore_gs/pruner/uni_pruning",
+            "tests/st/pruner/uni_pruning"
+        ],
+        "testcases": [
+            "tests/st/golden_stick",
+            "tests/st/loss_monitor.py",
+            "tests/st/test_utils.py",
+            "tests/st/pruner/uni_pruning"
+        ]
+    },
+    "GS_GHOST":{
+        "code": [
+            "mindspore_gs/ghost",
+            "tests/st/ghost"
+        ],
+        "testcases": [
+            "tests/st/golden_stick",
+            "tests/st/loss_monitor.py",
+            "tests/st/test_utils.py",
+            "tests/st/ghost"
+        ]
+    }
+}

@@ -238,7 +238,7 @@ class PrunerKfCompressAlgo(CompAlgo):
     discover redundant convolution kernels in the SCOP algorithm.
 
     Args:
-        config (Dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
+        config (dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
             `PrunerKfCompressAlgo` currently, but for compatibility, the config parameter in the constructor of class A
             is retained.
 
@@ -354,7 +354,7 @@ class PrunerFtCompressAlgo(CompAlgo):
     and fully train the network.
 
     Args:
-        config (Dict): Configuration of `PrunerFtCompressAlgo`, keys are attribute names,
+        config (dict): Configuration of `PrunerFtCompressAlgo`, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
 
             - prune_rate (float): number in [0.0, 1.0)

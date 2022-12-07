@@ -176,6 +176,16 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
             - **TypeError** - `weight_quant_dtype` 数据类型不是QuantDtype。
             - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
 
+    .. py:method:: set_weight_per_channel(weight_per_channel)
+
+        设置量化感知训练参数 `config` 的weight_per_channel值。
+
+        参数：
+            - **weight_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。
+
+        异常：
+            - **TypeError** - `weight_per_channel` 数据类型不是bool。
+
     .. py:method:: set_weight_symmetric(weight_symmetric)
 
         设置量化感知训练参数 `config` 的weight_symmetric值。
@@ -186,9 +196,9 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         异常：
             - **TypeError** - `weight_symmetric` 数据类型不是bool。
 
-   .. py:method:: convert(net_opt, ckpt_path＝"")
+    .. py:method:: convert(net_opt: Cell, ckpt_path="")
 
-        将量化网络｀net_opt｀转换为标准网络，后续导出成MindIR用于部署。
+        将量化网络 `net_opt` 转换为标准网络，后续导出成MindIR用于部署。
 
         参数：
             - **net_opt** (Cell) - 经过量化算法apply之后的网络。

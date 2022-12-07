@@ -24,6 +24,7 @@ from ..fake_quantizer import FakeQuantizer
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer, SlbActQuantizer
 from .slb_quant import Conv2dSlbQuant
 from .slb_quant_config import SlbQuantConfig
+from ..quant_utils import get_quant_dtype_num_bits
 
 
 class SlbLayerPolicy(LayerPolicy):
@@ -36,9 +37,10 @@ class SlbLayerPolicy(LayerPolicy):
     """
 
     def __init__(self, weight_names: [], act_names: [], config: SlbQuantConfig = SlbQuantConfig()):
+        super().__init__()
         self._config = config
-        weight_num_bits = config.weight_quant_dtype.num_bits
-        act_num_bits = config.act_quant_dtype.num_bits
+        weight_num_bits = get_quant_dtype_num_bits(config.weight_quant_dtype)
+        act_num_bits = get_quant_dtype_num_bits(config.act_quant_dtype)
         if weight_num_bits not in [1, 2, 4]:
             raise ValueError("Only support int4|int2|int1 weight quant now!")
         if act_num_bits not in [8]:

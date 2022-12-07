@@ -24,13 +24,13 @@ import mindspore
 from mindspore import nn, context
 from mindspore import Model
 from mindspore.nn.metrics import Accuracy
+from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbActQuantizer
-from mindspore_gs.quantization.constant import QuantDtype
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/'))
 
 
 class NetToQuant(nn.Cell):
@@ -894,8 +894,8 @@ def test_resnet(quant_bit, enable_bn_calibration, run_mode):
     Expectation: Apply success.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from models.resnet import resnet18
 
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
@@ -952,8 +952,8 @@ def test_resnet_convert(run_mode, enable_act_quant):
     Expectation: convert success and structure of network as expect.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from models.resnet import resnet18
     context.set_context(mode=run_mode)
 
@@ -978,8 +978,8 @@ def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=con
     Merge into test_resnet_accuracy after pynative bug is fixed.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     import mindspore.dataset as ds
     from resnet.src.lr_generator import get_lr
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
@@ -1119,7 +1119,7 @@ def test_resnet_accuracy_graph_bnon(quant_bit, enable_bn_calibration):
     Expectation: Loss of first epoch is smaller than 2.5.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from loss_monitor import LossMonitor
 
     step_threshold = 20
@@ -1157,7 +1157,7 @@ def test_resnet_accuracy_graph_bnoff(quant_bit, enable_bn_calibration):
     Expectation: Loss of first epoch is smaller than 2.5.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from loss_monitor import LossMonitor
 
     step_threshold = 20
@@ -1189,7 +1189,7 @@ def test_resnet_accuracy_pynative(quant_bit, enable_bn_calibration):
     Expectation: Loss of first epoch is smaller than 2.8.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from loss_monitor import LossMonitor
 
     step_threshold = 20

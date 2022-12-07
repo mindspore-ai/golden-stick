@@ -38,6 +38,9 @@ class LayerPolicy(abc.ABC):
         Derived class must override `get_weight_name_and_quantizers`, `get_act_name_and_quantizers`,
             `get_output_quantizers` and `wrapper_cell`.
     """
+    def __init__(self):
+        self._input_num = 0
+        self._inputs_insert_fq = []
 
     def get_weight_name_and_quantizers(self) -> [(str, FakeQuantizer)]:
         """
@@ -87,13 +90,20 @@ class LayerPolicy(abc.ABC):
         raise NotImplementedError
 
     def set_input_number(self, input_num: int):
-        pass
+        self._inputs_insert_fq.clear()
+        self._input_num = input_num
+        for _ in range(0, self._input_num):
+            self._inputs_insert_fq.append(True)
 
     def set_input_not_insert_fq(self, index: Optional[int] = None):
-        pass
+        if index is not None:
+            if 0 <= index < self._input_num:
+                self._inputs_insert_fq[index] = False
+            else:
+                raise RuntimeError("Index out of range of input number")
 
     def get_input_need_insert_fq(self) -> list:
-        return []
+        return self._inputs_insert_fq
 
     # only support one-output-quantizer pre layer because we can not get how many outputs a cell would has
     def set_output_not_insert_fq(self, index: Optional[int] = None):

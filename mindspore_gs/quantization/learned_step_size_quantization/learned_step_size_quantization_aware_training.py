@@ -15,7 +15,9 @@
 """lsq algorithm"""
 from mindspore.nn import Cell
 from mindspore._checkparam import Validator
-from ..constant import QuantDtype
+from mindspore.common.dtype import QuantDtype
+from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
+    Conv2dBnFoldQuant
 from ..simulated_quantization.simulated_quantization_aware_training import SimulatedQuantizationAwareTraining as SimQAT
 from .learned_step_size_quantization_net_policy import LearnedStepSizeQuantizationNetPolicy as LsqNetPolicy
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig as LsqConfig
@@ -372,9 +374,11 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
     def _reset_weights_quantization_params(self, network: Cell):
         for _, cell in network.name_cells().items():
             if isinstance(cell, QuantizeWrapperCell):
-                weight_fq = cell.get_handler().fake_quant_weight
-                if isinstance(weight_fq, (LsqFqPerLayer, LsqFqPerChannel)):
-                    weight_fq.compute_quant_param(cell.get_handler().weight)
+                if isinstance(cell.get_handler(), (Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv,
+                                                   Conv2dBnWithoutFoldQuant, Conv2dBnFoldQuant)):
+                    weight_fq = cell.get_handler().fake_quant_weight
+                    if isinstance(weight_fq, (LsqFqPerLayer, LsqFqPerChannel)):
+                        weight_fq.compute_quant_param(cell.get_handler().weight)
 
     def _init_net_policy(self, config):
         return LsqNetPolicy(config)

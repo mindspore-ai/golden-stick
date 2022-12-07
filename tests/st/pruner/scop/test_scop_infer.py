@@ -39,8 +39,8 @@ def test_scop_infer():
     Expectation: apply success and structure of network as expect.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from tests.st.models.resnet import resnet50
 
     mindspore.context.set_context(mode=context.GRAPH_MODE, device_target="GPU")

@@ -141,7 +141,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **TypeError** - `t_factor` 的数据类型不是float。
             - **ValueError** - `t_factor` 小于等于0.0。
 
-    .. py:method:: callbacks(model, dataset)
+    .. py:method:: callbacks(model: Model, dataset: Dataset)
 
         定义SLB量化算法特有的一些callbacks，其中包括用于调节温度因子的callback。
 
@@ -160,7 +160,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         返回：
             SLB量化算法特有的一些callbacks的列表。
 
-    .. py:method:: apply(network)
+    .. py:method:: apply(network: Cell)
 
         按照下面4个步骤对给定网络应用量化算法，得到带有伪量化节点的网络。
 
@@ -175,7 +175,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         返回：
             在原网络定义的基础上，修改需要量化的网络层后生成带有伪量化节点的网络。
 
-    .. py:method:: convert(net_opt, ckpt_path="")
+    .. py:method:: convert(net_opt: Cell, ckpt_path="")
 
         定义将SLB量化网络转换成适配MindIR的标准网络的具体实现。
 
