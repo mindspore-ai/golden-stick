@@ -37,6 +37,7 @@ class SlbLayerPolicy(LayerPolicy):
     """
 
     def __init__(self, weight_names: [], act_names: [], config: SlbQuantConfig = SlbQuantConfig()):
+        super().__init__()
         self._config = config
         weight_num_bits = get_quant_dtype_num_bits(config.weight_quant_dtype)
         act_num_bits = get_quant_dtype_num_bits(config.act_quant_dtype)
