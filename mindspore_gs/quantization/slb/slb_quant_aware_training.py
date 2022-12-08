@@ -21,11 +21,12 @@ from mindspore.nn import Cell
 from mindspore.train.callback import Callback
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore._checkparam import Validator, Rel
+from mindspore.common.dtype import QuantDtype
 from ..quantization_aware_training import QuantizationAwareTraining
-from ..constant import QuantDtype
 from .slb_net_policy import SlbNetPolicy
 from .slb_quant_config import SlbQuantConfig
 from .slb_quant_convert import ConvertToQuantInferNetwork
+from ..quant_utils import get_quant_dtype_num_bits
 
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
@@ -40,7 +41,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     Note:
         This method will call other set functions to set special values, please refer to the set function about the error.
-            For example, `quant_dtype` need refer to `set_weight_quant_dtype` and `set_act_quant_dtype`.
+        For example, `quant_dtype` need refer to `set_weight_quant_dtype` and `set_act_quant_dtype`.
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
@@ -87,7 +88,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> import numpy as np
         >>> from mindspore import nn
         >>> from mindspore_gs.quantization import SlbQuantAwareTraining
-        >>> from mindspore_gs.quantization.constant import QuantDtype
+        >>> from mindspore.common.dtype import QuantDtype
         >>> class NetToQuant(nn.Cell):
         ...     def __init__(self, num_channel=1):
         ...         super(NetToQuant, self).__init__()
@@ -469,7 +470,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             not_load_param = load_param_into_net(net_opt, param_dict)
             if not_load_param:
                 raise RuntimeError("Load param into net fail.")
-        exporter = ConvertToQuantInferNetwork(net_opt, self._config.weight_quant_dtype.num_bits)
+        exporter = ConvertToQuantInferNetwork(net_opt, get_quant_dtype_num_bits(self._config.weight_quant_dtype))
         return exporter.run()
 
     def __repr__(self):

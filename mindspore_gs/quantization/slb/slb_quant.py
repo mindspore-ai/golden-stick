@@ -23,9 +23,10 @@ from mindspore.nn.layer.conv import Conv2d
 from mindspore.common.initializer import initializer
 from mindspore.common import initializer as init
 from mindspore._checkparam import Validator, twice
+from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
-from ..constant import QuantDtype
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer
+from ..quant_utils import get_quant_dtype_num_bits
 
 
 quant_config_slb_default = OpQuantConfig(weight=partial(SlbFakeQuantizerPerLayer, num_bits=1),
@@ -138,7 +139,7 @@ class Conv2dSlbQuant(nn.Cell):
                             f"but got {type(padding).__name__}!")
         self.group = Validator.check_positive_int(group, "group", self.cls_name)
 
-        self._num_bits = quant_dtype.num_bits
+        self._num_bits = get_quant_dtype_num_bits(quant_dtype)
         self._weight_num = 2**self._num_bits
 
         weight_init = init.HeNormal(mode='fan_out', nonlinearity='relu')
@@ -175,7 +176,7 @@ class Conv2dSlbQuant(nn.Cell):
             >>> from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
             >>> from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
             >>> from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
-            >>> from mindspore_gs.quantization.constant import QuantDtype
+            >>> from mindspore.common.dtype import QuantDtype
             >>> ic = 10
             >>> oc = 100
             >>> kernel_size = 3

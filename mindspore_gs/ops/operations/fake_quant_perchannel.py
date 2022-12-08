@@ -15,20 +15,15 @@
 """
 MindSpore golden stick simulated-quantization ops FakeQuantPerChannel.
 """
-
-import os
-
-from mindspore import context
-from mindspore.common import dtype as mstype
-import mindspore.ops as ops
-from mindspore.ops import Custom
-from mindspore.ops import DataType, CustomRegOp
+from mindspore.ops import DataType
 from mindspore.ops.functional import zeros_like
 from mindspore._checkparam import Validator as validator
 from mindspore._checkparam import Rel
+from mindspore_gs.ops.operations import GSCustom, custom_op_attr_register
+from mindspore_gs.ops.operations.grad_operations import FakeQuantPerChannelGrad
 
 
-class FakeQuantPerChannel(Custom):
+class FakeQuantPerChannel(GSCustom):
     r"""
     Simulates the quantize and dequantize operations in training time base on per channel.
 
@@ -53,6 +48,9 @@ class FakeQuantPerChannel(Custom):
         - Tensor, has the same type as input.
 
     Examples:
+        >>> import numpy as np
+        >>> import mindspore
+        >>> from mindspore import Tensor
         >>> fake_quant = FakeQuantPerChannel()
         >>> input_x = Tensor(np.array([3, 4, 5, -2, -3, -1]).reshape(3, 2), mindspore.float32)
         >>> _min = Tensor(np.linspace(-2, 2, 12).reshape(3, 2, 2), mindspore.float32)
@@ -62,6 +60,7 @@ class FakeQuantPerChannel(Custom):
     support_quant_bit = [4, 7, 8]
     ascend_support_x_rank = [2, 4]
 
+    @custom_op_attr_register
     def __init__(self,
                  num_bits=8,
                  ema=False,
@@ -72,93 +71,54 @@ class FakeQuantPerChannel(Custom):
                  training=True,
                  channel_axis=1):
         """Initialize FakeQuantPerChannel OP"""
-        name = self.__class__.__name__
-        if not context.get_context('device_target') == "GPU":
-            raise NotImplementedError("For 'FakeQuantPerChannel', it is only supported on GPU right now.")
+        support_device = ["GPU"]
+        self._check_support_device_target(support_device)
         if num_bits not in self.support_quant_bit:
             raise ValueError(
-                f"For '{name}' Attr \'num_bits\' is not support.")
+                f"For '{self._get_custom_op_name()}' Attr \'num_bits\' is not support.")
         if ema and not ema_decay:
             raise ValueError(
-                f"For '{name}' attr \'ema\' and \'ema_decay\' should set together.")
+                f"For '{self._get_custom_op_name()}' attr \'ema\' and \'ema_decay\' should set together.")
+        validator.check_value_type('ema', ema, (bool,), self._get_custom_op_name())
+        validator.check_value_type('symmetric', symmetric, (bool,), self._get_custom_op_name())
+        validator.check_value_type('narrow_range', narrow_range, (bool,), self._get_custom_op_name())
+        validator.check_value_type('training', training, (bool,), self._get_custom_op_name())
+        validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', self._get_custom_op_name())
+        validator.check_positive_int(num_bits, 'num_bits', self._get_custom_op_name())
+        validator.check_non_negative_int(quant_delay, 'quant_delay', self._get_custom_op_name())
+        validator.check_non_negative_int(channel_axis, 'channel_axis', self._get_custom_op_name())
 
-        ema = validator.check_value_type('ema', ema, (bool,), name)
-        symmetric = validator.check_value_type(
-            'symmetric', symmetric, (bool,), name)
-        narrow_range = validator.check_value_type(
-            'narrow_range', narrow_range, (bool,), name)
-        training = validator.check_value_type(
-            'training', training, (bool,), name)
-        ema_decay = validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', name)
-        num_bits = validator.check_positive_int(num_bits, 'num_bits', name)
-        quant_delay = validator.check_non_negative_int(quant_delay, 'quant_delay', name)
-        channel_axis = validator.check_non_negative_int(channel_axis, 'channel_axis', name)
+    def _infer_shape(self, x, x_min, x_max):
+        """infer_shape."""
+        return x
 
-        init_args = FakeQuantPerChannel._init_aot_custom_ops((num_bits, quant_delay, symmetric, narrow_range, training))
-        super(FakeQuantPerChannel, self).__init__(
-            func=init_args['func'],
-            out_shape=init_args['shape'],
-            out_dtype=init_args['type'],
-            bprop=init_args['bprop'],
-            reg_info=init_args['reg_info'],
-            func_type='aot'
+    def _infer_dtype(self, x, x_min, x_max):
+        """infer_dtype."""
+        return x
+
+    def _get_op_bprop(self):
+        """Bprop func."""
+        fqperchannel_bprop = FakeQuantPerChannelGrad(
+            num_bits=self._get_custom_attr("num_bits"),
+            quant_delay=self._get_custom_attr("quant_delay"),
+            symmetric=self._get_custom_attr("symmetric"),
+            narrow_range=self._get_custom_attr("narrow_range")
         )
 
-    @staticmethod
-    def _init_aot_custom_ops(args):
-        """Register ops."""
-        num_bits, quant_delay, symmetric, narrow_range, training = args
-
-        fake_quant_per_channel_gpu_info = CustomRegOp("fake_quant_per_channel_impl_kernel") \
-            .input(0, "x") \
-            .input(1, "min_val") \
-            .input(2, "max_val") \
-            .output(0, "y") \
-            .dtype_format(DataType.F32_Default, DataType.F32_Default, DataType.F32_Default, DataType.F32_Default) \
-            .attr("num_bits", "required", "int", value=num_bits) \
-            .attr("quant_delay", "required", "int", value=quant_delay) \
-            .attr("symmetric", "required", "bool", value=symmetric) \
-            .attr("narrow_range", "required", "bool", value=narrow_range) \
-            .attr("training", "required", "bool", value=training) \
-            .target("GPU") \
-            .get_op_info()
-
-        fake_quant_per_channel_bprop_gpu_info = CustomRegOp("fake_quant_per_channel_grad_impl_kernel") \
-            .input(0, "gradient") \
-            .input(1, "x") \
-            .input(2, "min_val") \
-            .input(3, "max_val") \
-            .output(0, "output") \
-            .dtype_format(DataType.F32_Default, DataType.F32_Default,
-                          DataType.F32_Default, DataType.F32_Default, DataType.F32_Default) \
-            .attr("num_bits", "required", "int", value=num_bits) \
-            .attr("quant_delay", "required", "int", value=quant_delay) \
-            .attr("symmetric", "required", "bool", value=symmetric) \
-            .attr("narrow_range", "required", "bool", value=narrow_range) \
-            .target("GPU") \
-            .get_op_info()
-
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        func_path_bprop = os.path.join(dir_path, "../kernel/gpu", "fake_quant_perchannel_grad_impl.cu")
-        fqperchannel_bprop = ops.Custom(
-            func_path_bprop + ":CustomFQPerChannelGrad",
-            lambda dx, x, x_min, x_max: x,
-            mstype.float32,
-            "aot",
-            reg_info=fake_quant_per_channel_bprop_gpu_info
-        )
-
-        def bprop(x, x_min, x_max, out, dout):
-            """Bprop func."""
+        def bprop(x, x_min, x_max, _, dout):
+            """bprop."""
             dx = fqperchannel_bprop(dout, x, x_min, x_max)
             return dx, zeros_like(x_min), zeros_like(x_max)
+        return bprop
 
-        func_path = os.path.join(dir_path, "../kernel/gpu", "fake_quant_perchannel_impl.cu")
-        return_args = {
-            'func': func_path + ":CustomFakeQuantPerChannel",
-            'shape': lambda x, x_min, x_max: x,
-            'type': mstype.float32,
-            'bprop': bprop,
-            'reg_info': fake_quant_per_channel_gpu_info
-        }
-        return return_args
+    def _get_op_input_names(self) -> (str,):
+        """set_op_input_names"""
+        return "x", "min_val", "max_val"
+
+    def _get_op_output_names(self) -> (str,):
+        """set_op_output_names"""
+        return ("y",)
+
+    def _get_op_dtype_formats(self) -> [[DataType]]:
+        """set_op_dtype_format"""
+        return [[DataType.F32_Default, DataType.F32_Default, DataType.F32_Default, DataType.F32_Default]]

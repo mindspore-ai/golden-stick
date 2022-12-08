@@ -14,11 +14,12 @@
 # ============================================================================
 """DefaultNetworkPolicy."""
 
-from mindspore.nn.layer import Conv2d, Dense, BatchNorm2d, ReLU, Conv2dBnAct
+from mindspore.nn.layer import Conv2d, Dense, BatchNorm2d, ReLU, ReLU6, Sigmoid, LeakyReLU, HSigmoid, HSwish
 from mindspore.rewrite import PatternEngine
 from ..net_policy import NetPolicy
-from .simulated_quantization_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy
-from .simulated_quantization_transforms import Conv2dBnActFuse, DenseBnActFuse, DenseActFuse
+from .combined import Conv2dBn
+from .simulated_quantization_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy, ActLayerPolicy
+from .simulated_quantization_transforms import Conv2dBnFuse, DenseBnActFuse, DenseActFuse
 from .simulated_quantization_config import SimulatedQuantizationConfig
 
 
@@ -43,13 +44,17 @@ class SimulatedNetPolicy(NetPolicy):
         if self._build:
             return
         if self._config.enable_fusion:
-            self._pattern_engines.append(PatternEngine([Conv2d, BatchNorm2d, ReLU], Conv2dBnActFuse()))
-            self._pattern_engines.append(PatternEngine([Conv2d, BatchNorm2d], Conv2dBnActFuse()))
-            self._pattern_engines.append(PatternEngine([Conv2d, ReLU], Conv2dBnActFuse()))
+            self._pattern_engines.append(PatternEngine([Conv2d, BatchNorm2d], Conv2dBnFuse()))
             self._pattern_engines.append(PatternEngine([Dense, BatchNorm2d, ReLU], DenseBnActFuse()))
             self._pattern_engines.append(PatternEngine([Dense, BatchNorm2d], DenseBnActFuse()))
             self._pattern_engines.append(PatternEngine([Dense, ReLU], DenseActFuse()))
         self._layer_policy_map[Conv2d] = ConvLayerPolicy([], [], self._config)
+        self._layer_policy_map[Conv2dBn] = ConvBnLayerPolicy([], [], self._config)
         self._layer_policy_map[Dense] = DenseLayerPolicy([], [], self._config)
-        self._layer_policy_map[Conv2dBnAct] = ConvBnLayerPolicy([], [], self._config)
+        self._layer_policy_map[ReLU] = ActLayerPolicy([], [], self._config)
+        self._layer_policy_map[ReLU6] = ActLayerPolicy([], [], self._config)
+        self._layer_policy_map[Sigmoid] = ActLayerPolicy([], [], self._config)
+        self._layer_policy_map[LeakyReLU] = ActLayerPolicy([], [], self._config)
+        self._layer_policy_map[HSigmoid] = ActLayerPolicy([], [], self._config)
+        self._layer_policy_map[HSwish] = ActLayerPolicy([], [], self._config)
         self._build = True

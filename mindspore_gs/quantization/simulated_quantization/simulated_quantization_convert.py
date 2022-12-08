@@ -18,62 +18,15 @@ import numpy as np
 
 from mindspore.nn import Cell
 from mindspore.common import Tensor
-from mindspore.nn.layer import Conv2d
 from mindspore.ops import operations as P
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common import dtype as mstype
-from mindspore.compression.quant import quant_utils
 from mindspore.common.dtype import QuantDtype
-from mindspore._extends import cell_attr_register
 from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
 from ..quantize_wrapper_cell import QuantizeWrapperCell
+from ..quant_utils import fold_batchnorm, without_fold_batchnorm
 from .simulated_fake_quantizers import SimulatedFakeQuantizerPerChannel
-
-
-class Conv2dWithFQWeight(Conv2d):
-    """
-    2D convolution layer with fake quantization weight.
-    """
-    @cell_attr_register
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 stride=1,
-                 pad_mode='same',
-                 padding=0,
-                 dilation=1,
-                 group=1,
-                 weight_init='normal',
-                 weight_name='',
-                 has_bias=False,
-                 bias_name='',
-                 bias_init='zeros'):
-        super(Conv2dWithFQWeight, self).__init__(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride,
-            pad_mode,
-            padding,
-            dilation,
-            group,
-            has_bias,
-            weight_init,
-            bias_init)
-        self.identity = P.Identity()
-        self.weight.name = weight_name
-        if self.bias is not None:
-            self.bias.name = bias_name
-
-    def construct(self, x):
-        """construct function"""
-        weight = self.identity(self.weight)
-        output = self.conv2d(x, weight)
-        if self.has_bias:
-            output = self.bias_add(output, self.bias)
-        return output
 
 
 class CellBlockWithFakeWeight(Cell):
@@ -118,11 +71,9 @@ class CellBlockWithFakeWeight(Cell):
 
     def construct(self, x):
         weight = self.fake_weight(self.weight)
+        x = self.core_op(x, weight)
         if self.has_bias:
-            x = self.core_op(x, weight)
             x = self.bias_add(x, self.bias)
-        else:
-            x = self.core_op(x, weight)
         if self.has_act:
             x = self.activation(x)
         return x
@@ -174,8 +125,7 @@ class ConvertToQuantInferNetwork:
             cell_core.fake_quant_weight, SimulatedFakeQuantizerPerChannel)
         quant_params = {"quant_dtype": self.quant_dtype,
                         "is_per_channel": is_per_channel}
-        block = CellBlockWithFakeWeight(op_core, tuple(scale_w), tuple(
-            zp_w), weight, bias, activation, quant_params)
+        block = CellBlockWithFakeWeight(op_core, tuple(scale_w), tuple(zp_w), weight, bias, activation, quant_params)
         return block
 
     def __get_quant_param(self, cell_core):
@@ -191,10 +141,9 @@ class ConvertToQuantInferNetwork:
             if cell_core.has_bias:
                 bias = cell_core.bias.data.asnumpy()
         elif isinstance(cell_core, (Conv2dBnFoldQuant, Conv2dBnFoldQuantOneConv)):
-            weight, bias = quant_utils.fold_batchnorm(weight, cell_core)
+            weight, bias = fold_batchnorm(weight, cell_core)
         elif isinstance(cell_core, Conv2dBnWithoutFoldQuant):
-            weight, bias = quant_utils.without_fold_batchnorm(
-                weight, cell_core)
+            weight, bias = without_fold_batchnorm(weight, cell_core)
 
         if isinstance(cell_core, DenseQuant):
             weight = np.transpose(weight)
@@ -212,12 +161,12 @@ class ConvertToQuantInferNetwork:
             return new_subcell
         return None
 
-    def _convert_core_quant_subcell(self, cell_core):
+    def _convert_core_subcell(self, cell_core):
         """Convert subcell for conv and dense."""
-        if isinstance(cell_core, (Conv2dBnFoldQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, Conv2dQuant,
+        if isinstance(cell_core, (Conv2dQuant, Conv2dBnFoldQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant,
                                   DenseQuant)):
             return self._convert_subcell(cell_core)
-        raise ValueError("Unsupported quant cell.")
+        return cell_core
 
     def _convert_quant2deploy(self, network):
         """Convert network's all quant subcell to deploy subcell."""
@@ -227,15 +176,14 @@ class ConvertToQuantInferNetwork:
             if subcell == network:
                 continue
             if isinstance(subcell, QuantizeWrapperCell):
-                quant_cell = subcell.get_handler()
-                new_subcell = self._convert_core_quant_subcell(quant_cell)
+                handler_cell = subcell.get_handler()
+                new_subcell = self._convert_core_subcell(handler_cell)
                 subcell.insert_child_to_cell("_handler", new_subcell)
+
                 fake_quant_input = subcell.get_input_quantizer().convert_to_fakequantparam()
                 fake_quant_output = subcell.get_output_quantizer().convert_to_fakequantparam()
-                subcell.insert_child_to_cell(
-                    "_input_quantizer", fake_quant_input)
-                subcell.insert_child_to_cell(
-                    "_output_quantizer", fake_quant_output)
+                subcell.insert_child_to_cell("_input_quantizer", fake_quant_input)
+                subcell.insert_child_to_cell("_output_quantizer", fake_quant_output)
             else:
                 self._convert_quant2deploy(subcell)
         return network

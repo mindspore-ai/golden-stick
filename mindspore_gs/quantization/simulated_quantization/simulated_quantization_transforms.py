@@ -16,6 +16,59 @@
 from collections import OrderedDict
 from mindspore.rewrite import Replacement, PatternNode, Node
 from mindspore import nn
+from .combined import Conv2dBn
+
+
+class Conv2dBnFuse(Replacement):
+    """
+    Derived class of Replacement. Define how to build a replacement from a Conv2d-BatchNorm pattern match.
+    """
+
+    def build(self, pattern: PatternNode, is_chain_pattern: bool, matched: OrderedDict) -> [Node]:
+        """
+        Derived from Replacement. Define how to fuse conv+bn.
+        """
+
+        bn_pattern = None
+        conv_pattern = None
+
+        cur_pattern = pattern
+        while cur_pattern:
+            if cur_pattern.type() == nn.BatchNorm2d:
+                if bn_pattern:
+                    raise RuntimeError("Error match, multi-bn!")
+                bn_pattern = cur_pattern
+            if cur_pattern.type() == nn.Conv2d:
+                if conv_pattern:
+                    raise RuntimeError("Error match, multi-conv!")
+                conv_pattern = cur_pattern
+            cur_pattern = cur_pattern.get_inputs()[0] if cur_pattern.get_inputs() else None
+        if conv_pattern is None:
+            raise RuntimeError("Error match, no-conv!")
+
+        bn_node: Node = matched.get(bn_pattern.name()) if bn_pattern else None
+        conv_node: Node = matched.get(conv_pattern.name())
+        kwargs = {'in_channels': conv_node.get_attribute("in_channels"),
+                  'out_channels': conv_node.get_attribute("out_channels"),
+                  'kernel_size': conv_node.get_attribute("kernel_size"),
+                  'stride': conv_node.get_attribute("stride"),
+                  'pad_mode': conv_node.get_attribute("pad_mode"),
+                  'padding': conv_node.get_attribute("padding"),
+                  'dilation': conv_node.get_attribute("dilation"),
+                  'group': conv_node.get_attribute("group"),
+                  'has_bias': conv_node.get_attribute("has_bias"),
+                  }
+        if hasattr(conv_node, "weight_init"):
+            kwargs["weight_init"] = conv_node.get_attribute("weight_init")
+        if hasattr(conv_node, "bias_init"):
+            kwargs["bias_init"] = conv_node.get_attribute("bias_init")
+        if bn_node:
+            kwargs['has_bn'] = True
+            kwargs['eps'] = bn_node.get_attribute("eps")
+            kwargs['momentum'] = bn_node.get_attribute("momentum")
+        conv2d_bn_node = Node.create_call_cell(Conv2dBn(**kwargs), conv_node.get_targets(),
+                                               conv_node.get_args(), conv_node.get_kwargs(), "Conv2dBn")
+        return [conv2d_bn_node]
 
 
 class Conv2dBnActFuse(Replacement):
@@ -25,7 +78,7 @@ class Conv2dBnActFuse(Replacement):
 
     def build(self, pattern: PatternNode, is_chain_pattern: bool, matched: OrderedDict) -> [Node]:
         """
-        Derived from Replacement. Define how to fuse dense+bn+act.
+        Derived from Replacement. Define how to fuse conv+bn+act.
         """
 
         act_pattern = None

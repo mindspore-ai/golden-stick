@@ -13,14 +13,13 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick quantization module.
+MindSpore golden stick grad operations.
 """
 
-from .simulated_quantization import SimulatedQuantizationAwareTraining
-from .slb import SlbQuantAwareTraining
-from ..version import __version__, mindspore_version_check
+from .fake_quant_perlayer_grad import FakeQuantPerLayerGrad
+from .fake_quant_perchannel_grad import FakeQuantPerChannelGrad
 
-__all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining"]
-__all__.extend(__version__)
-
-mindspore_version_check()
+__all__ = [
+    "FakeQuantPerLayerGrad",
+    "FakeQuantPerChannelGrad"
+]

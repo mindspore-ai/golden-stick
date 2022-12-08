@@ -16,7 +16,7 @@
 from collections import OrderedDict
 import pytest
 from mindspore import nn
-from mindspore_gs.quantization.constant import QuantDtype
+from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.learned_step_size_quantization import LearnedStepSizeQuantizationAwareTraining as \
     LearnedQAT
 from mindspore_gs.quantization.learned_step_size_quantization.learned_step_size_quantization_layer_policy import \

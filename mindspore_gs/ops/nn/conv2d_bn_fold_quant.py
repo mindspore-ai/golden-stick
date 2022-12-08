@@ -25,7 +25,7 @@ from mindspore.compression.common import QuantDtype
 import mindspore.context as context
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q
-from mindspore.nn.layer.combined import Conv2dBnAct
+from ...quantization.simulated_quantization.combined import Conv2dBn
 from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
 from .batchnorm_fold_cell import BatchNormFoldCell
 
@@ -216,47 +216,34 @@ class Conv2dBnFoldQuant(Cell):
         self.assignadd = P.AssignAdd()
 
     @classmethod
-    def from_float(cls, convbn: Conv2dBnAct, quant_config: QuantConfig, extra_args: dict):
+    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig, extra_args: dict):
         """
-        A class method to create `Conv2dBnFoldQuantOneConv` from a `Conv2dBnAct`
-
-        Examples:
-            >>> from mindspore import nn
-            >>> from mindspore_gs.ops.nn import FakeQuantWithMinMaxObserver
-            >>> ic = 10
-            >>> oc = 100
-            >>> kernel_size = 3
-            >>> conv_bn_op = nn.Conv2dBnAct(ic, oc, kernel_size)
-            >>> # when apply QAT on `conv_bn_op`, QAT need to create a quant Conv2dBnAct whose weight is fake-quanted
-            >>> quant_config: QuantConfig = QuantConfig(weight=FakeQuantWithMinMaxObserver.partial_init(),
-            ...                                         activation=FakeQuantWithMinMaxObserver.partial_init())
-            >>> extra_args = {"freeze_bn": 100000}
-            >>> conv_bn_quant = nn.Conv2dBnFoldQuant.from_float(conv_bn_op, quant_config, extra_args)
+        A class method to create `Conv2dBnFoldQuant` from a `Conv2dBn`
         """
-
-        kwargs = {'in_channels': convbn.conv.in_channels,
-                  'out_channels': convbn.conv.out_channels,
-                  'kernel_size': convbn.conv.kernel_size,
-                  'stride': convbn.conv.stride,
-                  'pad_mode': convbn.conv.pad_mode,
-                  'padding': convbn.conv.padding,
-                  'dilation': convbn.conv.dilation,
-                  'group': convbn.conv.group,
-                  'has_bias': convbn.conv.has_bias,
-                  'bias_init': convbn.conv.bias_init,
-                  'weight_init': convbn.conv.weight_init,
-                  'quant_config': quant_config,
-                  'fake': True,
-                  }
-        if hasattr(convbn, 'batchnorm'):
-            kwargs['eps'] = convbn.batchnorm.eps
-            kwargs['momentum'] = convbn.batchnorm.momentum
-            kwargs['beta_init'] = convbn.batchnorm.beta_init
-            kwargs['gamma_init'] = convbn.batchnorm.gamma_init
-            kwargs['mean_init'] = convbn.batchnorm.moving_mean_init
-            kwargs['var_init'] = convbn.batchnorm.moving_var_init
-        kwargs = {**kwargs, **extra_args}
-        return cls(**kwargs)
+        conv_quant = cls(in_channels=convbn.conv.in_channels,
+                         out_channels=convbn.conv.out_channels,
+                         kernel_size=convbn.conv.kernel_size,
+                         stride=convbn.conv.stride,
+                         pad_mode=convbn.conv.pad_mode,
+                         padding=convbn.conv.padding,
+                         dilation=convbn.conv.dilation,
+                         group=convbn.conv.group,
+                         eps=convbn.batchnorm.eps,
+                         momentum=convbn.batchnorm.momentum,
+                         has_bias=convbn.conv.has_bias,
+                         bias_init=convbn.conv.bias_init,
+                         weight_init=convbn.conv.weight_init,
+                         quant_config=quant_config,
+                         fake=True,
+                         freeze_bn=extra_args["freeze_bn"])
+        conv_quant.gamma = convbn.batchnorm.gamma
+        conv_quant.beta = convbn.batchnorm.beta
+        conv_quant.moving_mean = convbn.batchnorm.moving_mean
+        conv_quant.moving_variance = convbn.batchnorm.moving_variance
+        conv_quant.weight = convbn.conv.weight
+        if convbn.conv.has_bias:
+            conv_quant.bias = convbn.conv.bias
+        return conv_quant
 
     def extend_repr(self):
         """Display instance object as string."""
