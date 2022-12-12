@@ -22,7 +22,7 @@ from mindspore import nn, context
 import pytest
 from mindspore_gs.pruner.uni_pruning import UniPruner
 
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/'))
 
 
 def test_resnet(run_mode):
@@ -31,7 +31,7 @@ def test_resnet(run_mode):
     Description: Apply computational graph analyzer on resnet.
     Expectation: Apply success.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from models.resnet import resnet50
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
 
@@ -64,7 +64,7 @@ def test_callback(run_mode):
     Description: Return algorithm's callback.
     Expectation: Return not None.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
 
     config = {
@@ -91,7 +91,7 @@ def test_resnet_convert(run_mode):
     Description: Apply conversion.
     Expectation: Apply success.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from models.resnet import resnet50
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
 
@@ -137,11 +137,11 @@ def test_resnet_accuracy_graph():
     Description: Apply UniPruning on resnet and test accuracy
     Expectation: Accuracy of is higher than 0.3.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     import mindspore.dataset as ds
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
     from models.resnet import resnet18
-    from resnet.src.lr_generator import get_lr
+    from ResNet.src.lr_generator import get_lr
 
     # config
     train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
@@ -274,11 +274,11 @@ def test_resnet_accuracy_pynative():
     Description: Apply UniPruning on resnet and test accuracy
     Expectation: Accuracy of is higher than 0.3.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     import mindspore.dataset as ds
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
     from models.resnet import resnet18
-    from resnet.src.lr_generator import get_lr
+    from ResNet.src.lr_generator import get_lr
 
     # config
     train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")

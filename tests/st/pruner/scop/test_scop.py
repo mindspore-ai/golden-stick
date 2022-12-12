@@ -23,7 +23,7 @@ import mindspore
 from mindspore import nn, context
 from mindspore_gs.pruner.scop.scop_pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, KfConv2d
 
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/'))
 
 
 @pytest.mark.level0
@@ -94,8 +94,8 @@ def test_resnet(run_mode):
     Expectation: Apply success.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/ResNet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from models.resnet import resnet50
 
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
@@ -118,10 +118,10 @@ def _create_resnet_accuracy_model(run_mode=context.GRAPH_MODE):
     create model lr dataset for resnet simqat accuracy test.
     merge into test_resnet_accuracy after pynative bug is fixed.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/ResNet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     import mindspore.dataset as ds
-    from resnet.src.lr_generator import get_lr
+    from ResNet.src.lr_generator import get_lr
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
     from models.resnet import resnet50
 
@@ -222,7 +222,7 @@ def test_resnet_accuracy_pynative():
     Description: Apply simulated_quantization on resnet and test accuracy
     Expectation: Loss of first epoch is smaller than 4.52.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from loss_monitor import LossMonitor
 
     step_threshold = 20
@@ -252,7 +252,7 @@ def test_resnet_accuracy_graph():
     Description: Apply simulated_quantization on resnet and test accuracy
     Expectation: Loss of first epoch is smaller than 2.5.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from loss_monitor import LossMonitor
 
     step_threshold = 20

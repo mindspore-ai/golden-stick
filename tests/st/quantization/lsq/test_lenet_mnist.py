@@ -25,7 +25,7 @@ from mindspore_gs.quantization.learned_step_size_quantization.learned_step_size_
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 
 
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/'))
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
 
 
 @pytest.mark.level0
