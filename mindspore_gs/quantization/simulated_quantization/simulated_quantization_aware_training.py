@@ -40,9 +40,9 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             - quant_delay (Union[int, list, tuple]): Number of steps after which weights and activations are quantized
               during train and eval. The first element represents activations and the second element represents weights.
               Default: (0, 0).
-            - quant_dtype (Union[QuantDtype, list, tuple]): Datatype used to quantize weights and activations. The first
-              element represents activations and the second element represents weights. It is necessary to consider the
-              precision support of hardware devices in the practical quantization infer scenaries.
+            - quant_dtype (Union[QuantDtype, list, tuple]): The target data type for quantization. It is necessary to
+              consider the precision support of hardware devices when setting `quant_dtype`. The first element
+              represents activations and the second element represents weights.
               Default: (QuantDtype.INT8, QuantDtype.INT8).
             - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If True
               then base on per channel, otherwise base on per layer. The first element represents activations and the
@@ -453,6 +453,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             net_opt (Cell): Network to be converted which is transformed by `SimulatedQuantizationAwareTraining.apply`.
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
                 checkpoint file to `net_opt`.
+
         Raises:
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.

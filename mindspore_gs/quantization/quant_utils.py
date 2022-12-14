@@ -81,8 +81,6 @@ def cal_quantization_params(input_min,
         scale (numpy.ndarray): quantization param.
         zero point (numpy.ndarray): quantization param.
     """
-    input_max = np.maximum(0.0, input_max)
-    input_min = np.minimum(0.0, input_min)
 
     if input_min.shape != input_max.shape:
         raise ValueError("input min shape should be equal to input max.")
@@ -100,11 +98,8 @@ def cal_quantization_params(input_min,
     scale = (input_max - input_min) / (quant_max - quant_min)
 
     # calculate zero point
-    if symmetric:
-        zp = np.zeros(input_min.shape)
-    else:
-        zp_double = quant_min - input_min / scale
-        zp = np.floor(zp_double + 0.5)
+    zp_double = quant_min - input_min / scale
+    zp = (np.floor(zp_double + 0.5)).astype(np.int)
 
     return scale, zp
 
