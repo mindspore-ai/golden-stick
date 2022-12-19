@@ -50,24 +50,25 @@ class SimulatedLayerPolicy(LayerPolicy):
             self._weight_quantizer_partial = partial(SimulatedFakeQuantizerPerChannel,
                                                      ema=False,
                                                      symmetric=config.weight_symmetric,
+                                                     quant_dtype=config.weight_quant_dtype,
                                                      quant_delay=config.weight_quant_delay,
-                                                     num_bits=self._num_bits,
                                                      narrow_range=config.weight_narrow_range)
         else:
             self._weight_quantizer_partial = partial(SimulatedFakeQuantizerPerLayer, ema=False,
                                                      symmetric=config.weight_symmetric,
-                                                     quant_delay=config.weight_quant_delay, num_bits=self._num_bits,
+                                                     quant_dtype=config.weight_quant_dtype,
+                                                     quant_delay=config.weight_quant_delay,
                                                      narrow_range=config.weight_narrow_range)
         if config.act_per_channel:
             raise NotImplementedError("act quant only support perlayer now!")
         self._act_quantizer: Optional[FakeQuantizer] = SimulatedFakeQuantizerPerLayer(
-            symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=self._num_bits,
+            symmetric=config.act_symmetric, quant_dtype=config.act_quant_dtype, quant_delay=config.act_quant_delay,
             narrow_range=config.act_narrow_range)
         self._input_quantizer: Optional[FakeQuantizer] = SimulatedFakeQuantizerPerLayer(
-            symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=self._num_bits,
+            symmetric=config.act_symmetric, quant_dtype=config.act_quant_dtype, quant_delay=config.act_quant_delay,
             narrow_range=config.act_narrow_range)
         self._output_quantizer: Optional[FakeQuantizer] = SimulatedFakeQuantizerPerLayer(
-            symmetric=config.act_symmetric, quant_delay=config.act_quant_delay, num_bits=self._num_bits,
+            symmetric=config.act_symmetric, quant_dtype=config.act_quant_dtype, quant_delay=config.act_quant_delay,
             narrow_range=config.act_narrow_range)
         self._weight_names = weight_names
         self._act_names = act_names
