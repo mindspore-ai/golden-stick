@@ -377,6 +377,9 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             model (Model): Model to be used.
             dataset (Dataset): Dataset to be used.
 
+        Returns:
+            List of instance of Callbacks.
+
         Raises:
             RuntimeError: If `epoch_size` is not initialized!
             RuntimeError: If `has_trained_epoch` is not initialized!
@@ -384,9 +387,6 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             ValueError: If `t_end_time` is less than `t_start_time`.
             TypeError: If `model` is not mindspore.Model.
             TypeError: If `dataset` is not mindspore.dataset.Dataset.
-
-        Returns:
-            List of instance of Callbacks.
         """
 
         if self._config.epoch_size == -1:
@@ -447,14 +447,14 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
                 checkpoint file to `net_opt`.
 
+        Returns:
+            An instance of Cell represents converted network.
+
         Raises:
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.
             ValueError: If `ckpt_path` is not empty and invalid.
             RuntimeError: If `ckpt_path` is a valid file and load checkpoint file failed.
-
-        Returns:
-            An instance of Cell represents converted network.
         """
 
         if not isinstance(net_opt, Cell):
