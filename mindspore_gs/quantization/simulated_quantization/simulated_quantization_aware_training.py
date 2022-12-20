@@ -454,13 +454,13 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
                 checkpoint file to `net_opt`.
 
+        Returns:
+            An instance of Cell represents converted network.
+
         Raises:
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.
             ValueError: If `ckpt_path` is not empty and invalid.
-
-        Returns:
-            An instance of Cell represents converted network.
         """
         if not isinstance(net_opt, Cell):
             raise TypeError(
