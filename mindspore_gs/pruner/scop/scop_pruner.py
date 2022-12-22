@@ -237,6 +237,11 @@ class PrunerKfCompressAlgo(CompAlgo):
     `PrunerKfCompressAlgo` is a subclass of CompAlgo, which implements the use of high imitation data to learn and
     discover redundant convolution kernels in the SCOP algorithm.
 
+    Note:
+        For the input parameter `config`, there is currently no optional configuration item for `PrunerKfCompressAlgo`,
+        but for compatibility, `config` is reserved and replaced with an empty dictionary during initialization. 
+        Such as `kf_pruning = PrunerKfCompressAlgo({})`.
+
     Args:
         config (dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
             `PrunerKfCompressAlgo` currently, but for compatibility, the config parameter in the constructor of class A
