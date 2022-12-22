@@ -239,7 +239,7 @@ class PrunerKfCompressAlgo(CompAlgo):
 
     Note:
         For the input parameter `config`, there is currently no optional configuration item for `PrunerKfCompressAlgo`,
-        but for compatibility, `config` is reserved and replaced with an empty dictionary during initialization. 
+        but for compatibility, `config` is reserved and replaced with an empty dictionary during initialization.
         Such as `kf_pruning = PrunerKfCompressAlgo({})`.
 
     Args:
@@ -371,7 +371,7 @@ class PrunerFtCompressAlgo(CompAlgo):
             values are attribute values. Supported attribute are listed below:
 
             - prune_rate (float): number in [0.0, 1.0)
-    
+
     Raises:
         TypeError: If `prune_rate` is not float.
         ValueError: If `epoch_size` is less than 0 or greater than or equal to 1.
