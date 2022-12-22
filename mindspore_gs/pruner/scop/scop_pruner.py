@@ -293,7 +293,12 @@ class PrunerKfCompressAlgo(CompAlgo):
     """
 
     def callbacks(self, *args, **kwargs):
-        """Callback."""
+        """
+        Define the callbacks for SCOP algorithm，the callback that generates konockoff data.
+
+        Returns:
+            List of instance of SCOP Callbacks.
+        """
         cb = []
         cb.append(KfCallback())
         cb.extend(super(PrunerKfCompressAlgo, self).callbacks())
