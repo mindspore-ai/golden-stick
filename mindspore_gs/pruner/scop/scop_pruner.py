@@ -354,6 +354,9 @@ class PrunerKfCompressAlgo(CompAlgo):
 
         Returns:
             Knockoff network.
+
+        Raises:
+            ValueError: If `network` is not Cell.
         """
         return self._tranform(network)
 
@@ -368,6 +371,10 @@ class PrunerFtCompressAlgo(CompAlgo):
             values are attribute values. Supported attribute are listed below:
 
             - prune_rate (float): number in [0.0, 1.0)
+    
+    Raises:
+        TypeError: If `prune_rate` is not float.
+        ValueError: If `epoch_size` is less than 0 or greater than or equal to 1.
 
 
     Supported Platforms:
@@ -515,6 +522,9 @@ class PrunerFtCompressAlgo(CompAlgo):
 
         Returns:
             Pruned network.
+
+        Raises:
+            ValueError: If `network` is not Cell.
         """
         return self._recover(network)
 
