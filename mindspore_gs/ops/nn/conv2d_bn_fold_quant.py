@@ -21,7 +21,7 @@ from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.tensor import Tensor
 from mindspore._checkparam import Validator, twice
-from mindspore.compression.common import QuantDtype
+from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q

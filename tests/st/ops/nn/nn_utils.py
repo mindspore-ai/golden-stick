@@ -15,7 +15,7 @@
 """utils for nn cell."""
 from mindspore_gs.ops.nn import FakeQuantWithMinMaxObserver
 from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig
-from mindspore.compression.common import QuantDtype
+from mindspore.common.dtype import QuantDtype
 
 
 def create_quant_config(quant_observer=(FakeQuantWithMinMaxObserver, FakeQuantWithMinMaxObserver),

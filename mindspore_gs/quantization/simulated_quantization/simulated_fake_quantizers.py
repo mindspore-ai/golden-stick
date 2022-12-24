@@ -22,8 +22,9 @@ from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
+from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 from ..fake_quantizer import FakeQuantizer
-from ..quant_utils import get_quant_min_max, get_quant_dtype_num_bits, cal_quantization_params, LinearFakeQuantCell
+from ..quant_utils import get_quant_min_max, cal_quantization_params, LinearFakeQuantCell
 
 
 class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
