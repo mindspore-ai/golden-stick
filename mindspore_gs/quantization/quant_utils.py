@@ -16,17 +16,10 @@
 
 import numpy as np
 
-from mindspore._checkparam import Validator
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.nn import Cell
-from mindspore.common.dtype import QuantDtype
-from mindspore_gs.ops.nn import Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant, \
-    Conv2dQuant, DenseQuant
-from .fake_quantizer import FakeQuantizer
 
-__all__ = ["get_quant_dtype_num_bits", "query_quant_layers", "compute_kl_threshold",
-           "scale_zp_max_min_from_fake_quant_cell", "fold_batchnorm", "cal_quantization_params",
-           "get_quant_min_max", "weight2int"]
+__all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max"]
 
 
 class LinearFakeQuantCell(Cell):
@@ -52,14 +45,6 @@ class LinearFakeQuantCell(Cell):
     def construct(self, x):
         x = self.fake_quant(x)
         return x
-
-
-def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
-    if 0 <= quant_dtype.value() <= 15:
-        return quant_dtype.value() + 1
-    if 100 <= quant_dtype.value() <= 115:
-        return quant_dtype.value() - 99
-    raise ValueError("Unsupported QuantDtype.")
 
 
 def cal_quantization_params(input_min,
@@ -115,60 +100,6 @@ def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
     if narrow_range:
         quant_min = quant_min + 1
     return quant_min, quant_max
-
-
-def weight2int(data, scale, zero_point, quant_min, quant_max):
-    r"""
-    Calculate int8/uint8 weight from fp32. the formula is defined as:
-
-    .. math::
-        int8/uint8 = round(float/scale) + offset
-
-    Args:
-        data (numpy.ndarray): The dimension of channel or 1. Should be NCHW.
-        scale (numpy.ndarray): The dimension of channel or 1.
-        zero_point (numpy.ndarray): The dimension of channel or 1.
-        quant_min (int): The minimum quantization integer.
-        quant_max (int): The maximum quantization integer.
-
-    Returns:
-        weight (numpy.ndarray): The dimension of channel or 1.
-    """
-    if scale.shape != zero_point.shape:
-        raise ValueError("`scale` and `zero_point` should have the same shape.")
-    if scale.shape[0] < 0:
-        raise ValueError("`scale` and `zero_point` shape should be greater than zero.")
-    if len(scale.shape) >= 1 and scale.shape[0] > 1:
-        # for perchannel
-        if scale.shape[0] == data.shape[0]:
-            # `Conv2d` or `Dense` op weight
-            shape_list = [-1] + [1] * len(data.shape[1:])
-            scale = scale.reshape(shape_list)
-            zero_point = zero_point.reshape(shape_list)
-        elif scale.shape[0] == data.shape[1]:
-            # `DepthwiseConv2d` op weight
-            shape_list = [1, -1] + [1] * len(data.shape[2:])
-            scale = scale.reshape(shape_list)
-            zero_point = zero_point.reshape(shape_list)
-        else:
-            raise ValueError("Unsupported weight shape({})".format(data.shape))
-
-    weight_int = np.round((data / scale) + zero_point)
-    weight_int[weight_int > quant_max] = quant_max
-    weight_int[weight_int < quant_min] = quant_min
-    return weight_int
-
-
-def scale_zp_max_min_from_fake_quant_cell(cell, signed):
-    """Get calculate quantization params for scale, zero point, max and min from `FakeQuantizer`."""
-    minq = cell._float_min.data.asnumpy()
-    maxq = cell._float_max.data.asnumpy()
-
-    quant_min, quant_max = get_quant_min_max(num_bits=getattr(cell, "_num_bits", 8), signed=signed,
-                                             narrow_range=cell._narrow_range)
-    symmetric = cell._symmetric
-    scale, zp = cal_quantization_params(minq, maxq, quant_min, quant_max, symmetric)
-    return scale, zp, maxq, minq
 
 
 def fold_batchnorm(weight, cell_quant):
@@ -302,165 +233,3 @@ def compute_kl_threshold(data, bitwidth):
     if threshold < 1e-5:
         threshold = 1e-5
     return threshold
-
-
-def query_quant_layers(network):
-    r"""
-    Query the network's quantization strategy of each quantized layer and print it to the screen, note that all the
-    quantization layers are queried before graph compile optimization in the graph mode, thus, some redundant quantized
-    layers, which not exist in practical execution, may appear.
-
-    Args:
-        network (Cell): input network
-
-    Examples:
-        >>> from mindspore.compression.quant import QuantizationAwareTraining
-        >>> from mindspore.compression.quant.quant_utils import query_quant_layers
-        >>> class LeNet5(nn.Cell):
-        ...     def __init__(self, num_class=10, channel=1):
-        ...         super(LeNet5, self).__init__()
-        ...         self.type = "fusion"
-        ...         self.num_class = num_class
-        ...
-        ...         # change `nn.Conv2d` to `nn.Conv2dBnAct`
-        ...         self.conv1 = nn.Conv2dBnAct(channel, 6, 5, pad_mode='valid', activation='relu')
-        ...         self.conv2 = nn.Conv2dBnAct(6, 16, 5, pad_mode='valid', activation='relu')
-        ...         # change `nn.Dense` to `nn.DenseBnAct`
-        ...         self.fc1 = nn.DenseBnAct(16 * 5 * 5, 120, activation='relu')
-        ...         self.fc2 = nn.DenseBnAct(120, 84, activation='relu')
-        ...         self.fc3 = nn.DenseBnAct(84, self.num_class)
-        ...
-        ...         self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
-        ...         self.flatten = nn.Flatten()
-        ...
-        ...     def construct(self, x):
-        ...         x = self.conv1(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.conv2(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.flatten(x)
-        ...         x = self.fc1(x)
-        ...         x = self.fc2(x)
-        ...         x = self.fc3(x)
-        ...         return x
-        ...
-        >>> net = LeNet5()
-        >>> quantizer = QuantizationAwareTraining(bn_fold=False, per_channel=[True, False], symmetric=[True, False])
-        >>> net_qat = quantizer.quantize(net)
-        >>> query_quant_layers(net_qat)
-        conv1.conv.fake_quant_weight                                       INT8
-        conv1.activation.fake_quant_act                                    INT8
-        conv2.conv.fake_quant_weight                                       INT8
-        conv2.activation.fake_quant_act                                    INT8
-        fc1.dense.fake_quant_weight                                        INT8
-        fc1.activation.fake_quant_act                                      INT8
-        fc2.dense.fake_quant_weight                                        INT8
-        fc2.activation.fake_quant_act                                      INT8
-        fc3.dense.fake_quant_weight                                        INT8
-        fc3.activation.fake_quant_act                                      INT8
-    """
-    network = Validator.check_isinstance("network", network, Cell)
-    tplt = "{0:60}\t{1:10}"
-    for cell_and_name in network.cells_and_names():
-        cell_name = cell_and_name[0]
-        cell = cell_and_name[1]
-        if isinstance(cell, FakeQuantizer):
-            print(tplt.format(cell_name, cell.quant_dtype))
-
-
-def load_nonquant_param_into_quant_net(quant_model, params_dict, quant_new_params=None):
-    r"""
-    Load fp32 model parameters into quantization model.
-
-    Args:
-        quant_model(Cell): Quantization model.
-        params_dict(dict): Parameter dict that stores fp32 parameters.
-        quant_new_params(list): Parameters that exist in quantization network but not in non-quantization
-            network. Default: None.
-
-    Raises:
-        TypeError: If `quant_new_params` is not None and is not list.
-        ValueError: If there are parameters in the `quant_model` that are neither in `params_dict`
-            nor in `quant_new_params`.
-
-    Examples:
-        >>> from mindspore import load_checkpoint
-        >>> from mindspore.compression.quant.quant_utils import load_nonquant_param_into_quant_net
-        >>> class LeNet5(nn.Cell):
-        ...     def __init__(self, num_class=10, channel=1):
-        ...         super(LeNet5, self).__init__()
-        ...         self.type = "fusion"
-        ...         self.num_class = num_class
-        ...
-        ...         # change `nn.Conv2d` to `nn.Conv2dBnAct`
-        ...         self.conv1 = nn.Conv2dBnAct(channel, 6, 5, pad_mode='valid', activation='relu')
-        ...         self.conv2 = nn.Conv2dBnAct(6, 16, 5, pad_mode='valid', activation='relu')
-        ...         # change `nn.Dense` to `nn.DenseBnAct`
-        ...         self.fc1 = nn.DenseBnAct(16 * 5 * 5, 120, activation='relu')
-        ...         self.fc2 = nn.DenseBnAct(120, 84, activation='relu')
-        ...         self.fc3 = nn.DenseBnAct(84, self.num_class)
-        ...
-        ...         self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
-        ...         self.flatten = nn.Flatten()
-        ...
-        ...     def construct(self, x):
-        ...         x = self.conv1(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.conv2(x)
-        ...         x = self.max_pool2d(x)
-        ...         x = self.flatten(x)
-        ...         x = self.fc1(x)
-        ...         x = self.fc2(x)
-        ...         x = self.fc3(x)
-        ...         return x
-        ...
-        >>> net = LeNet5()
-        >>> ckpt_file_name = "./checkpoint/LeNet5_noquant-1_32.ckpt"
-        >>> param_dict = load_checkpoint(ckpt_file_name)
-        >>> load_nonquant_param_into_quant_net(net, param_dict)
-    """
-    if quant_new_params is not None and not isinstance(quant_new_params, list):
-        raise TypeError("quant_new_params must be list or None.")
-    iterable_dict = {
-        'minq': iter(list(filter(lambda item: item[0].endswith('minq'), params_dict.items()))),
-        'maxq': iter(list(filter(lambda item: item[0].endswith('maxq'), params_dict.items()))),
-        'quant_max': iter(list(filter(lambda item: item[0].endswith('quant_max'), params_dict.items())))
-    }
-    for param in params_dict.items():
-        key_name = param[0].split(".")[-1]
-        if key_name not in iterable_dict:
-            iterable_dict[key_name] = iter(list(filter(lambda item, value=key_name: item[0].endswith(value),
-                                                       params_dict.items())))
-
-    for name, param in quant_model.parameters_and_names():
-        key_name = name.split(".")[-1]
-        if key_name not in iterable_dict.keys():
-            if key_name not in quant_new_params:
-                raise ValueError(f"Can't find match parameter in ckpt, param name = {name}")
-            continue
-        value_param = next(iterable_dict[key_name], None)
-        if value_param:
-            param.set_data(value_param[1].data)
-            print(f'init model param {name} with checkpoint param {value_param[0]}')
-
-    # Perform KL_init when learned scale quantization is executed.
-    for cell_and_name in quant_model.cells_and_names():
-        cell = cell_and_name[1]
-        if isinstance(cell, (Conv2dBnFoldQuantOneConv, Conv2dBnFoldQuant, Conv2dBnWithoutFoldQuant,
-                             Conv2dQuant, DenseQuant)) and cell.fake_quant_weight.mode == "LEARNED_SCALE":
-            subcell_weight_para = cell.weight.data.asnumpy()
-            if hasattr(cell, 'gamma'):
-                scale_factor = (cell.gamma.data.asnumpy() /
-                                np.sqrt(cell.moving_variance.data.asnumpy() + 1e-5))
-                subcell_weight_para = subcell_weight_para * scale_factor.reshape(-1, 1, 1, 1)
-
-            if cell.fake_quant_weight.per_channel:
-                max_init = [compute_kl_threshold(weight_para_each, cell.fake_quant_weight.quant_dtype)
-                            for weight_para_each in subcell_weight_para]
-                min_init = [-x for x in max_init]
-            else:
-                max_init = [compute_kl_threshold(subcell_weight_para, cell.fake_quant_weight.quant_dtype)]
-                min_init = [-x for x in max_init]
-
-            cell.fake_quant_weight.reset(quant_dtype=cell.fake_quant_weight.quant_dtype,
-                                         min_init=min_init, max_init=max_init)

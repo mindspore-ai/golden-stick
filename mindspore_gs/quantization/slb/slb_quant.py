@@ -25,8 +25,8 @@ from mindspore.common import initializer as init
 from mindspore._checkparam import Validator, twice
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
+from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer
-from ..quant_utils import get_quant_dtype_num_bits
 
 
 quant_config_slb_default = OpQuantConfig(weight=partial(SlbFakeQuantizerPerLayer, num_bits=1),

@@ -16,7 +16,7 @@
 from __future__ import absolute_import
 
 from mindspore.ops import operations as P
-from mindspore.compression.common import QuantDtype
+from mindspore.common.dtype import QuantDtype
 from mindspore.nn.cell import Cell
 from .fake_quant_with_min_max_observer import quant_config_default
 
