@@ -21,7 +21,7 @@ from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.tensor import Tensor
 from mindspore._checkparam import Validator
-from mindspore.compression.common import QuantDtype
+from mindspore.common.dtype import QuantDtype
 from mindspore.nn.layer.activation import get_activation
 from mindspore.nn.cell import Cell
 from mindspore.nn.layer.basic import Dense

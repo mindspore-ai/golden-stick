@@ -16,7 +16,7 @@
 from __future__ import absolute_import
 
 from mindspore._checkparam import Validator
-from mindspore.compression.common import QuantDtype
+from mindspore.common.dtype import QuantDtype
 from mindspore.nn.cell import Cell
 from mindspore import nn
 from .fake_quant_with_min_max_observer import quant_config_default

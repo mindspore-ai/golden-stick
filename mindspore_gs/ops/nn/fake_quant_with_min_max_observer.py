@@ -23,10 +23,11 @@ from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore._checkparam import Validator
-from mindspore.compression.common import QuantDtype
+from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q
+from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 
 
 def _partial_init(cls_or_self, **kwargs):
@@ -320,7 +321,7 @@ class FakeQuantWithMinMaxObserver(UniformQuantObserver):
         self.min_init = min_init
         self.max_init = max_init
         self.quant_dtype = quant_dtype
-        self.num_bits = quant_dtype.num_bits
+        self.num_bits = get_quant_dtype_num_bits(quant_dtype)
         self.ema = ema
         self.ema_decay = ema_decay
         self.per_channel = per_channel
@@ -359,7 +360,7 @@ class FakeQuantWithMinMaxObserver(UniformQuantObserver):
         """
         if self.mode == "LEARNED_SCALE":
             self.quant_dtype = quant_dtype
-            self.num_bits = quant_dtype.num_bits
+            self.num_bits = get_quant_dtype_num_bits(quant_dtype)
             self._calculate_quant_max()
             if self.neg_trunc:
                 min_init = 0
@@ -396,7 +397,7 @@ class FakeQuantWithMinMaxObserver(UniformQuantObserver):
 
         self.ema_update = ema_fun(ema=self.ema, ema_decay=self.ema_decay)
         if self.is_ascend:
-            self.fake_quant_train = quant_fun(num_bits=self.quant_dtype.num_bits,
+            self.fake_quant_train = quant_fun(num_bits=get_quant_dtype_num_bits(self.quant_dtype),
                                               symmetric=self.symmetric,
                                               narrow_range=self.narrow_range,
                                               quant_delay=self.quant_delay)
@@ -405,7 +406,7 @@ class FakeQuantWithMinMaxObserver(UniformQuantObserver):
             quant_fun = partial(quant_fun,
                                 ema=self.ema,
                                 ema_decay=self.ema_decay,
-                                num_bits=self.quant_dtype.num_bits,
+                                num_bits=get_quant_dtype_num_bits(self.quant_dtype),
                                 symmetric=self.symmetric,
                                 narrow_range=self.narrow_range,
                                 quant_delay=self.quant_delay)

@@ -19,7 +19,7 @@ from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore._checkparam import Validator, twice
-from mindspore.compression.common import QuantDtype
+from mindspore.common.dtype import QuantDtype
 from mindspore.nn.cell import Cell
 from mindspore.nn.layer.conv import Conv2d
 from ...quantization.simulated_quantization.combined import Conv2dBn

@@ -22,11 +22,11 @@ from mindspore.train.callback import Callback
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore._checkparam import Validator, Rel
 from mindspore.common.dtype import QuantDtype
+from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 from ..quantization_aware_training import QuantizationAwareTraining
 from .slb_net_policy import SlbNetPolicy
 from .slb_quant_config import SlbQuantConfig
 from .slb_quant_convert import ConvertToQuantInferNetwork
-from ..quant_utils import get_quant_dtype_num_bits
 
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
