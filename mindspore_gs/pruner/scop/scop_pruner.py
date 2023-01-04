@@ -237,6 +237,11 @@ class PrunerKfCompressAlgo(CompAlgo):
     `PrunerKfCompressAlgo` is a subclass of CompAlgo, which implements the use of high imitation data to learn and
     discover redundant convolution kernels in the SCOP algorithm.
 
+    Note:
+        For the input parameter `config`, there is currently no optional configuration item for `PrunerKfCompressAlgo`,
+        but for compatibility, `config` is reserved and replaced with an empty dictionary during initialization.
+        Such as `kf_pruning = PrunerKfCompressAlgo({})`.
+
     Args:
         config (dict): Configuration of `PrunerKfCompressAlgo`. There are no configurable options for
             `PrunerKfCompressAlgo` currently, but for compatibility, the config parameter in the constructor of class A
@@ -293,7 +298,12 @@ class PrunerKfCompressAlgo(CompAlgo):
     """
 
     def callbacks(self, *args, **kwargs):
-        """Callback."""
+        """
+        Define the callbacks for SCOP algorithm，the callback that generates konockoff data.
+
+        Returns:
+            List of instance of SCOP Callbacks.
+        """
         cb = []
         cb.append(KfCallback())
         cb.extend(super(PrunerKfCompressAlgo, self).callbacks())
@@ -344,6 +354,9 @@ class PrunerKfCompressAlgo(CompAlgo):
 
         Returns:
             Knockoff network.
+
+        Raises:
+            ValueError: If `network` is not Cell.
         """
         return self._tranform(network)
 
@@ -358,6 +371,10 @@ class PrunerFtCompressAlgo(CompAlgo):
             values are attribute values. Supported attribute are listed below:
 
             - prune_rate (float): number in [0.0, 1.0)
+
+    Raises:
+        TypeError: If `prune_rate` is not float.
+        ValueError: If `epoch_size` is less than 0 or greater than or equal to 1.
 
 
     Supported Platforms:
@@ -505,6 +522,9 @@ class PrunerFtCompressAlgo(CompAlgo):
 
         Returns:
             Pruned network.
+
+        Raises:
+            ValueError: If `network` is not Cell.
         """
         return self._recover(network)
 
