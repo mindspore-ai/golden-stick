@@ -22,22 +22,22 @@ from mindspore.train.callback import Callback
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore._checkparam import Validator, Rel
 from mindspore.common.dtype import QuantDtype
+from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 from ..quantization_aware_training import QuantizationAwareTraining
 from .slb_net_policy import SlbNetPolicy
 from .slb_quant_config import SlbQuantConfig
 from .slb_quant_convert import ConvertToQuantInferNetwork
-from ..quant_utils import get_quant_dtype_num_bits
 
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
     """
-    Basic implementation of slb quantization method, this algorithm regards the discrete weights
+    Implementation of slb quantization algorithm, this algorithm regards the discrete weights
     in an arbitrary quantized neural network as searchable variables, and utilize a differential method
     to search them accurately. In particular, each weight is represented as a probability distribution
     over the discrete value set. The probabilities are optimized during training and the values
     with the highest probability are selected to establish the desired quantized network.
-    See more details in `Searching for Low-Bit Weights in Quantized Neural Networks
-    <https://arxiv.org/pdf/2009.08695.pdf>`.
+    See more details in `Searching for Low-Bit Weights in Quantized Neural
+    Networks <https://arxiv.org/pdf/2009.08695.pdf>`_.
 
     Note:
         This method will call other set functions to set special values, please refer to the set function about the error.
@@ -377,6 +377,9 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             model (Model): Model to be used.
             dataset (Dataset): Dataset to be used.
 
+        Returns:
+            List of instance of Callbacks.
+
         Raises:
             RuntimeError: If `epoch_size` is not initialized!
             RuntimeError: If `has_trained_epoch` is not initialized!
@@ -384,9 +387,6 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             ValueError: If `t_end_time` is less than `t_start_time`.
             TypeError: If `model` is not mindspore.Model.
             TypeError: If `dataset` is not mindspore.dataset.Dataset.
-
-        Returns:
-            List of instance of Callbacks.
         """
 
         if self._config.epoch_size == -1:
@@ -447,14 +447,14 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
                 checkpoint file to `net_opt`.
 
+        Returns:
+            An instance of Cell represents converted network.
+
         Raises:
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.
             ValueError: If `ckpt_path` is not empty and invalid.
             RuntimeError: If `ckpt_path` is a valid file and load checkpoint file failed.
-
-        Returns:
-            An instance of Cell represents converted network.
         """
 
         if not isinstance(net_opt, Cell):

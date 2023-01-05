@@ -22,6 +22,7 @@ from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
+from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 from ..fake_quantizer import FakeQuantizer
 from ..quant_utils import get_quant_min_max, cal_quantization_params, LinearFakeQuantCell
 
@@ -33,14 +34,17 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
     2. run fake quant execution to simulate the quantize loss
     """
 
-    def __init__(self, ema=False, ema_decay=0.999, symmetric=False, narrow_range=False, num_bits=8, quant_delay=0):
+    def __init__(self, ema=False, ema_decay=0.999, symmetric=False, narrow_range=False, quant_dtype=QuantDtype.INT8,
+                 quant_delay=0):
         super(SimulatedFakeQuantizerPerLayer, self).__init__()
         self._ema = ema
         self._ema_decay = ema_decay
         self._symmetric = symmetric
-        self._num_bits = num_bits
+        self._quant_dtype = quant_dtype
         self._quant_delay = quant_delay
         self._narrow_range = narrow_range
+        self._num_bits = get_quant_dtype_num_bits(self._quant_dtype)
+        self._signed = self._quant_dtype.value() <= 15
         self._min_max_update_func = Q.MinMaxUpdatePerLayer(ema=self._ema, ema_decay=self._ema_decay)
         self._is_ascend = context.get_context("device_target") == "Ascend"
         quant_func = Q.FakeQuantPerLayer
@@ -82,7 +86,7 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
         return s
 
     def extract_quant_param(self):
-        quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._symmetric,
+        quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._signed,
                                                  narrow_range=self._narrow_range)
         input_min = self._float_min.data.asnumpy()
         input_max = self._float_max.data.asnumpy()
@@ -99,13 +103,12 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
         return out
 
     def convert_to_fakequantparam(self):
-        if self._num_bits != 8:
+        if self._quant_dtype != QuantDtype.INT8:
             raise TypeError("Only support int8 simulate quantization now!"
                             "Please set quant_dtype=QuantDtype.INT8 for SimulatedQuantizationAwareTraining.")
-        quant_dtype = QuantDtype.INT8
         _, _, scale, zero_point = self.extract_quant_param()
-        new_subcell = LinearFakeQuantCell(quant_dtype=quant_dtype, scale=tuple(scale), zero_point=tuple(zero_point),
-                                          is_per_channel=False)
+        new_subcell = LinearFakeQuantCell(quant_dtype=self._quant_dtype, scale=tuple(scale),
+                                          zero_point=tuple(zero_point), is_per_channel=False)
         return new_subcell
 
 class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
@@ -114,9 +117,9 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
     """
 
     def __init__(self, num_channels=1, channel_axis=1, ema=False, ema_decay=0.999, symmetric=False, narrow_range=False,
-                 num_bits=8, quant_delay=0):
+                 quant_dtype=QuantDtype.INT8, quant_delay=0):
         super(SimulatedFakeQuantizerPerChannel, self).__init__(ema=ema, ema_decay=ema_decay, symmetric=symmetric,
-                                                               narrow_range=narrow_range, num_bits=num_bits,
+                                                               narrow_range=narrow_range, quant_dtype=quant_dtype,
                                                                quant_delay=quant_delay)
         self._channel_axis = channel_axis
         self._num_channels = num_channels
@@ -136,7 +139,7 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
         self._init_fake_quant_func(quant_func)
 
     def extract_quant_param(self):
-        quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._symmetric,
+        quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._signed,
                                                  narrow_range=self._narrow_range)
         input_min = self._float_min.data.asnumpy()
         input_max = self._float_max.data.asnumpy()
@@ -152,11 +155,10 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
         return s
 
     def convert_to_fakequantparam(self):
-        if self._num_bits != 8:
+        if self._quant_dtype != QuantDtype.INT8:
             raise TypeError("Only support int8 simulate quantization now!"
                             "Please set quant_dtype=QuantDtype.INT8 for SimulatedQuantizationAwareTraining.")
-        quant_dtype = QuantDtype.INT8
         _, _, scale, zero_point = self.extract_quant_param()
-        new_subcell = LinearFakeQuantCell(quant_dtype=quant_dtype, scale=tuple(scale), zero_point=tuple(zero_point),
-                                          is_per_channel=True)
+        new_subcell = LinearFakeQuantCell(quant_dtype=self._quant_dtype, scale=tuple(scale),
+                                          zero_point=tuple(zero_point), is_per_channel=True)
         return new_subcell

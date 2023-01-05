@@ -23,7 +23,7 @@ from mindspore import nn, context
 from mindspore_gs import PrunerKfCompressAlgo, PrunerFtCompressAlgo
 
 cur_path = os.path.dirname(os.path.abspath(__file__))
-model_name = "resnet"
+model_name = "ResNet"
 config_name = "resnet50_cifar10_config.yaml"
 ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train_parallel", "log")
@@ -39,7 +39,7 @@ def test_scop_infer():
     Expectation: apply success and structure of network as expect.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/ResNet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from tests.st.models.resnet import resnet50
 

@@ -141,7 +141,7 @@ def test_resnet_accuracy_graph():
     import mindspore.dataset as ds
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
     from models.resnet import resnet18
-    from resnet.src.lr_generator import get_lr
+    from ResNet.src.lr_generator import get_lr
 
     # config
     train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
@@ -278,7 +278,7 @@ def test_resnet_accuracy_pynative():
     import mindspore.dataset as ds
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
     from models.resnet import resnet18
-    from resnet.src.lr_generator import get_lr
+    from ResNet.src.lr_generator import get_lr
 
     # config
     train_ds_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")

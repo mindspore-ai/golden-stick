@@ -9,10 +9,10 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         - **config** (dict) - 存储用于量化感知训练的属性，键是属性名称，值是属性值。默认值为None，下面列出了支持的属性：
 
           - **quant_delay** (Union[int, list, tuple]) - 在训练和评估期间权重和激活量化后的步数。第一个元素表示激活，第二个元素表示权重。默认值：(0, 0)。
-          - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于量化权重和激活的数据类型。第一个元素表示激活，第二个元素表示权重。在实际量化推理场景中需要考虑硬件器件的精度支持。默认值：(QuantDtype.INT8, QuantDtype.INT8)。
-          - **per_channel** (Union[bool, list, tuple]) - 基于层或通道的量化粒度。如果为True，则基于每个通道，否则基于每个层。第一个元素表示激活，第二个元素表示权重，第一个元素现在必须为 False。默认值：(False, Fasle)。
-          - **symmetric** (Union[bool, list, tuple]) - 量化算法是否对称。如果为True，则基于对称，否则基于不对称。第一个元素表示激活，第二个元素表示权重。默认值：(False, Fasle)。
-          - **narrow_range** (Union[bool, list, tuple]) - 量化算法是否使用窄范围。第一个元素表示激活，第二个元素表示权重。默认值：(False, Fasle)。
+          - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于指定量化的目标数据类型。在设置`quant_dtype`时，必须考虑硬件设备的精度支持。第一个元素表示激活，第二个元素表示权重。默认值：(QuantDtype.INT8, QuantDtype.INT8)。
+          - **per_channel** (Union[bool, list, tuple]) - 基于层或通道的量化粒度。如果为True，则基于每个通道，否则基于每个层。第一个元素表示激活，第二个元素表示权重，第一个元素现在必须为 False。默认值：(False, False)。
+          - **symmetric** (Union[bool, list, tuple]) - 量化算法是否对称。如果为True，则基于对称，否则基于不对称。第一个元素表示激活，第二个元素表示权重。默认值：(False, False)。
+          - **narrow_range** (Union[bool, list, tuple]) - 量化算法是否使用窄范围。第一个元素表示激活，第二个元素表示权重。默认值：(False, False)。
           - **enable_fusion** (bool) - 在应用量化之前是否应用融合。默认值：False。
           - **freeze_bn** (int) - `BatchNorm OP` 参数固定为全局均值和方差之后的步数。默认值：10000000。
           - **bn_fold** (bool) - 是否使用 `bn fold` 算子进行模拟推理操作。默认值：False。
@@ -50,6 +50,22 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         返回：
             量化后的网络。
 
+    .. py:method:: convert(net_opt: Cell, ckpt_path="")
+
+        将量化网络 `net_opt` 转换为标准网络，后续导出成MindIR用于部署。
+
+        参数：
+            - **net_opt** (Cell) - 经过量化算法apply之后的网络。
+            - **ckpt_path** (str) - 网络的checkpoint file文件路径，默认值为空，表示不加载。
+
+        异常：
+            - **TypeError** - `net_opt` 数据类型不是Cell。
+            - **TypeError** - `ckpt_path` 数据类型不是str。
+            - **ValueError** - `ckpt_path` 非空但不是有效路径。
+
+        返回：
+            转换后的网络。
+
     .. py:method:: set_act_narrow_range(act_narrow_range)
 
         设置量化感知训练参数 `config` 的act_narrow_range值。
@@ -59,7 +75,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         异常：
             - **TypeError** - `act_narrow_range` 数据类型不是bool。
-
+            
     .. py:method:: set_act_per_channel(act_per_channel)
 
         设置量化感知训练参数 `config` 的act_per_channel值。
@@ -152,7 +168,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
             - **weight_narrow_range** (bool) - 量化算法是否使用权重narrow_range。如果为True，则基于narrow_range，否则不基于narrow_range。
 
         异常：
-            - **TypeError** - `weight_narrow_range` 数据类型不是bool。
+            - **TypeError** - `weight_narrow_range` 数据类型不是bool。 
 
     .. py:method:: set_weight_quant_delay(weight_quant_delay)
 
@@ -194,20 +210,4 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
             - **weight_symmetric** (bool) - 量化算法是否使用权重对称。如果为True，则基于对称，否则基于不对称。
 
         异常：
-            - **TypeError** - `weight_symmetric` 数据类型不是bool。
-
-    .. py:method:: convert(net_opt: Cell, ckpt_path="")
-
-        将量化网络 `net_opt` 转换为标准网络，后续导出成MindIR用于部署。
-
-        参数：
-            - **net_opt** (Cell) - 经过量化算法apply之后的网络。
-            - **ckpt_path** (str) - 网络的checkpoint file文件路径，默认值为空，表示不加载。
-
-        异常：
-            - **TypeError** - `net_opt` 数据类型不是Cell。
-            - **TypeError** - `ckpt_path` 数据类型不是str。
-            - **ValueError** - `ckpt_path` 非空但不是有效路径。
-
-        返回：
-            转换后的网络。
+            - **TypeError** - `weight_symmetric` 数据类型不是bool。           

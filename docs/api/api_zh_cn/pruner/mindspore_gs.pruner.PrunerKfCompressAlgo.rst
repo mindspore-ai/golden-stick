@@ -11,13 +11,6 @@ mindspore_gs.pruner.PrunerKfCompressAlgo
     参数：
         - **config** (dict) - 算法配置参数。
 
-    .. py:method:: callbacks()
-
-        定义SCOP剪枝算法特有的callbacks即生成高仿数据的callback。
-
-        返回：
-            SCOP剪枝算法的callbacks列表。
-
     .. py:method:: apply(network)
 
         将网络变成Konckoff网络。
@@ -30,3 +23,10 @@ mindspore_gs.pruner.PrunerKfCompressAlgo
         
         异常：
             - **TypeError** - `network` 不是Cell。
+
+    .. py:method:: callbacks()
+
+        定义SCOP剪枝算法特有的callbacks即生成高仿数据的callback。
+
+        返回：
+            SCOP剪枝算法的callbacks列表。

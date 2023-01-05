@@ -27,7 +27,7 @@ from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 from tests.st import test_utils as utils
 
 cur_path = os.path.dirname(os.path.abspath(__file__))
-model_name = "resnet"
+model_name = "ResNet"
 config_name = "resnet50_cifar10_config.yaml"
 ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train_parallel", "log")
@@ -44,9 +44,9 @@ def test_resnet_apply(run_mode):
     Expectation: apply success and structure of network as expect.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/ResNet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.models.official.cv.ResNet.golden_stick.quantization.simqat.simqat import create_simqat
     from tests.st.models.resnet import resnet50
 
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
@@ -110,9 +110,9 @@ def test_resnet_convert():
     Description: convert a compressed network to a standard network, export to MindIR.
     Expectation: convert success and export MindIR to specified path.
     """
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/resnet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/ResNet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.models.official.cv.ResNet.golden_stick.quantization.simqat.simqat import create_simqat
     from tests.st.models.resnet import resnet50
 
     mindspore.context.set_context(device_target="GPU")

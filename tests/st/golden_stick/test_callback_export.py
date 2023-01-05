@@ -27,7 +27,7 @@ from mindspore.train import Model
 from mindspore.train.metrics import Accuracy
 from mindspore_gs import CompAlgo
 
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/'))
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/research/cv/'))
 
 
 class ExampleAlgo(CompAlgo):
