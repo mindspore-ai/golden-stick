@@ -32,6 +32,152 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         - **ValueError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
         - **ValueError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为True。
 
+    .. py:method:: set_bn_fold(bn_fold)
+
+        设置量化感知训练参数 `config` 的bn_fold值。
+
+        参数：
+            - **bn_fold** (bool) - 量化算法是否使用 `bn_fold` 。
+
+        异常：
+            - **TypeError** - `bn_fold` 数据类型不是bool。
+
+    .. py:method:: set_one_conv_fold(one_conv_fold)
+
+        设置量化感知训练参数 `config` 的one_conv_fold值。
+
+        参数：
+            - **one_conv_fold** (bool) - 量化算法是否使用 `one_conv_fold` 。
+
+        异常：
+            - **TypeError** - `one_conv_fold` 数据类型不是bool。
+
+    .. py:method:: set_act_quant_delay(act_quant_delay)
+
+        设置量化感知训练参数 `config` 的act_quant_delay值。
+
+        参数：
+            - **act_quant_delay** (int) - 在训练和评估期间激活量化后的步数。
+
+        异常：
+            - **TypeError** - `act_quant_delay` 数据类型不是int。
+            - **ValueError** - `act_quant_delay` 小于0。
+
+    .. py:method:: set_weight_quant_delay(weight_quant_delay)
+
+        设置量化感知训练参数 `config` 的weight_quant_delay值。
+
+        参数：
+            - **weight_quant_delay** (int) - 在训练和评估期间权重量化后的步数。
+
+        异常：
+            - **TypeError** - `weight_quant_delay` 数据类型不是int。
+            - **ValueError** - `weight_quant_delay` 小于0。
+
+    .. py:method:: set_act_per_channel(act_per_channel)
+
+        设置量化感知训练参数 `config` 的act_per_channel值。
+
+        参数：
+            - **act_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。当前只支持False。
+
+        异常：
+            - **TypeError** - `act_per_channel` 数据类型不是bool。
+            - **ValueError** - `act_per_channel` 不是False。
+
+    .. py:method:: set_weight_per_channel(weight_per_channel)
+
+        设置量化感知训练参数 `config` 的weight_per_channel值。
+
+        参数：
+            - **weight_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。
+
+        异常：
+            - **TypeError** - `weight_per_channel` 数据类型不是bool。
+
+    .. py:method:: set_act_quant_dtype(act_quant_dtype)
+
+        设置量化感知训练参数 `config` 的act_quant_dtype值。
+
+        参数：
+            - **act_quant_dtype** (QuantDtype) - 激活量化的数据类型。
+
+        异常：
+            - **TypeError** - `act_quant_dtype` 数据类型不是QuantDtype。
+            - **ValueError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
+
+    .. py:method:: set_weight_quant_dtype(weight_quant_dtype)
+
+        设置量化感知训练参数 `config` 的weight_quant_dtype值。
+
+        参数：
+            - **weight_quant_dtype** (QuantDtype) - 权重量化数据类型。
+
+        异常：
+            - **TypeError** - `weight_quant_dtype` 数据类型不是QuantDtype。
+            - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
+
+    .. py:method:: set_act_symmetric(act_symmetric)
+
+        设置量化感知训练参数 `config` 的act_symmetric值。
+
+        参数：
+            - **act_symmetric** (bool) - 量化算法是否使用激活对称。如果为True，则基于对称，否则基于不对称。
+
+        异常：
+            - **TypeError** - `act_symmetric` 数据类型不是bool。
+
+    .. py:method:: set_weight_symmetric(weight_symmetric)
+
+        设置量化感知训练参数 `config` 的weight_symmetric值。
+
+        参数：
+            - **weight_symmetric** (bool) - 量化算法是否使用权重对称。如果为True，则基于对称，否则基于不对称。
+
+        异常：
+            - **TypeError** - `weight_symmetric` 数据类型不是bool。            
+
+    .. py:method:: set_act_narrow_range(act_narrow_range)
+
+        设置量化感知训练参数 `config` 的act_narrow_range值。
+
+        参数：
+            - **act_narrow_range** (bool) - 量化算法是否使用 `act_narrow_range` 。如果为True，则基于narrow_range，否则不基于narrow_range。
+
+        异常：
+            - **TypeError** - `act_narrow_range` 数据类型不是bool。
+
+    .. py:method:: set_weight_narrow_range(weight_narrow_range)
+
+        设置量化感知训练参数 `config` 的weight_narrow_range值。
+
+        参数：
+            - **weight_narrow_range** (bool) - 量化算法是否使用权重narrow_range。如果为True，则基于narrow_range，否则不基于narrow_range。
+
+        异常：
+            - **TypeError** - `weight_narrow_range` 数据类型不是bool。            
+
+    .. py:method:: set_freeze_bn(freeze_bn)
+
+        设置量化感知训练参数 `config` 的freeze_bn值。
+
+        参数：
+            - **freeze_bn** (int) - `BatchNorm OP` 参数固定为全局均值和方差之后的步数。
+
+        异常：
+            - **TypeError** - `freeze_bn` 数据类型不是int。
+            - **ValueError** - `freeze_bn` 小于0。
+
+    .. py:method:: set_enable_fusion(enable_fusion)
+
+        设置量化感知训练参数 `config` 的enable_fusion值。
+
+        参数：
+            - **enable_fusion** (bool) - 是否在量化之前进行融合。
+
+        异常：
+            - **TypeError** - `enable_fusion` 数据类型不是bool。
+
     .. py:method:: apply(network: Cell)
 
         按照以下步骤在 `network` 中应用SimQAT算法，使 `network` 可用于量化感知训练：
@@ -49,152 +195,6 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         返回：
             量化后的网络。
-
-    .. py:method:: set_act_narrow_range(act_narrow_range)
-
-        设置量化感知训练参数 `config` 的act_narrow_range值。
-
-        参数：
-            - **act_narrow_range** (bool) - 量化算法是否使用 `act_narrow_range` 。如果为True，则基于narrow_range，否则不基于narrow_range。
-
-        异常：
-            - **TypeError** - `act_narrow_range` 数据类型不是bool。
-
-    .. py:method:: set_act_per_channel(act_per_channel)
-
-        设置量化感知训练参数 `config` 的act_per_channel值。
-
-        参数：
-            - **act_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。当前只支持False。
-
-        异常：
-            - **TypeError** - `act_per_channel` 数据类型不是bool。
-            - **ValueError** - `act_per_channel` 不是False。
-
-    .. py:method:: set_act_quant_delay(act_quant_delay)
-
-        设置量化感知训练参数 `config` 的act_quant_delay值。
-
-        参数：
-            - **act_quant_delay** (int) - 在训练和评估期间激活量化后的步数。
-
-        异常：
-            - **TypeError** - `act_quant_delay` 数据类型不是int。
-            - **ValueError** - `act_quant_delay` 小于0。
-
-    .. py:method:: set_act_quant_dtype(act_quant_dtype)
-
-        设置量化感知训练参数 `config` 的act_quant_dtype值。
-
-        参数：
-            - **act_quant_dtype** (QuantDtype) - 激活量化的数据类型。
-
-        异常：
-            - **TypeError** - `act_quant_dtype` 数据类型不是QuantDtype。
-            - **ValueError** - `act_quant_dtype` 不是 `QuantDtype.INT8` 。
-
-    .. py:method:: set_act_symmetric(act_symmetric)
-
-        设置量化感知训练参数 `config` 的act_symmetric值。
-
-        参数：
-            - **act_symmetric** (bool) - 量化算法是否使用激活对称。如果为True，则基于对称，否则基于不对称。
-
-        异常：
-            - **TypeError** - `act_symmetric` 数据类型不是bool。
-
-    .. py:method:: set_bn_fold(bn_fold)
-
-        设置量化感知训练参数 `config` 的bn_fold值。
-
-        参数：
-            - **bn_fold** (bool) - 量化算法是否使用 `bn_fold` 。
-
-        异常：
-            - **TypeError** - `bn_fold` 数据类型不是bool。
-
-    .. py:method:: set_enable_fusion(enable_fusion)
-
-        设置量化感知训练参数 `config` 的enable_fusion值。
-
-        参数：
-            - **enable_fusion** (bool) - 是否在量化之前进行融合。
-
-        异常：
-            - **TypeError** - `enable_fusion` 数据类型不是bool。
-
-    .. py:method:: set_freeze_bn(freeze_bn)
-
-        设置量化感知训练参数 `config` 的freeze_bn值。
-
-        参数：
-            - **freeze_bn** (int) - `BatchNorm OP` 参数固定为全局均值和方差之后的步数。
-
-        异常：
-            - **TypeError** - `freeze_bn` 数据类型不是int。
-            - **ValueError** - `freeze_bn` 小于0。
-
-    .. py:method:: set_one_conv_fold(one_conv_fold)
-
-        设置量化感知训练参数 `config` 的one_conv_fold值。
-
-        参数：
-            - **one_conv_fold** (bool) - 量化算法是否使用 `one_conv_fold` 。
-
-        异常：
-            - **TypeError** - `one_conv_fold` 数据类型不是bool。
-
-    .. py:method:: set_weight_narrow_range(weight_narrow_range)
-
-        设置量化感知训练参数 `config` 的weight_narrow_range值。
-
-        参数：
-            - **weight_narrow_range** (bool) - 量化算法是否使用权重narrow_range。如果为True，则基于narrow_range，否则不基于narrow_range。
-
-        异常：
-            - **TypeError** - `weight_narrow_range` 数据类型不是bool。
-
-    .. py:method:: set_weight_quant_delay(weight_quant_delay)
-
-        设置量化感知训练参数 `config` 的weight_quant_delay值。
-
-        参数：
-            - **weight_quant_delay** (int) - 在训练和评估期间权重量化后的步数。
-
-        异常：
-            - **TypeError** - `weight_quant_delay` 数据类型不是int。
-            - **ValueError** - `weight_quant_delay` 小于0。
-
-    .. py:method:: set_weight_quant_dtype(weight_quant_dtype)
-
-        设置量化感知训练参数 `config` 的weight_quant_dtype值。
-
-        参数：
-            - **weight_quant_dtype** (QuantDtype) - 权重量化数据类型。
-
-        异常：
-            - **TypeError** - `weight_quant_dtype` 数据类型不是QuantDtype。
-            - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
-
-    .. py:method:: set_weight_per_channel(weight_per_channel)
-
-        设置量化感知训练参数 `config` 的weight_per_channel值。
-
-        参数：
-            - **weight_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。
-
-        异常：
-            - **TypeError** - `weight_per_channel` 数据类型不是bool。
-
-    .. py:method:: set_weight_symmetric(weight_symmetric)
-
-        设置量化感知训练参数 `config` 的weight_symmetric值。
-
-        参数：
-            - **weight_symmetric** (bool) - 量化算法是否使用权重对称。如果为True，则基于对称，否则基于不对称。
-
-        异常：
-            - **TypeError** - `weight_symmetric` 数据类型不是bool。
 
     .. py:method:: convert(net_opt: Cell, ckpt_path="")
 

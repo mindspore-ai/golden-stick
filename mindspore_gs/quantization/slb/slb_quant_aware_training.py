@@ -31,13 +31,13 @@ from .slb_quant_convert import ConvertToQuantInferNetwork
 
 class SlbQuantAwareTraining(QuantizationAwareTraining):
     """
-    Basic implementation of slb quantization method, this algorithm regards the discrete weights
+    Implementation of slb quantization algorithm, this algorithm regards the discrete weights
     in an arbitrary quantized neural network as searchable variables, and utilize a differential method
     to search them accurately. In particular, each weight is represented as a probability distribution
     over the discrete value set. The probabilities are optimized during training and the values
     with the highest probability are selected to establish the desired quantized network.
-    See more details in `Searching for Low-Bit Weights in Quantized Neural Networks
-    <https://arxiv.org/pdf/2009.08695.pdf>`.
+    See more details in `Searching for Low-Bit Weights in Quantized Neural
+    Networks <https://arxiv.org/pdf/2009.08695.pdf>`_.
 
     Note:
         This method will call other set functions to set special values, please refer to the set function about the error.
