@@ -89,7 +89,7 @@ class NetTransformer:
 
         Args:
             old_node (Node): Node to be replaced.
-            new_nodes (Node): Node to replace
+            new_nodes (list[Node]): Node to replace
         Returns:
             new node.
 
