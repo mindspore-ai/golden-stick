@@ -3,7 +3,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
 
 .. py:class:: mindspore_gs.quantization.SlbQuantAwareTraining(config=None)
 
-    用于定义SLB量化算子的类，通过调用接口apply()，可以在原网络定义的基础上，修改需要量化的网络层，生成带有伪量化节点的网络。
+    SLB(Searching for Low-Bit Weights in Quantized Neural Networks)算法的实现，该算法将量化神经网络中的离散权重作为可搜索的变量，并实现了一种微分方法去精确的实现该搜索。具体来说，是将每个权重表示为在离散值集上的概率分布，通过训练来优化该概率分布，最终具有最高概率的离散值就是搜索的结果，也就是量化的结果。更多详细信息见 `Searching for Low-Bit Weights in Quantized Neural Networks <https://arxiv.org/pdf/2009.08695.pdf>`_。
 
     参数：
         - **config** (dict) - 以字典的形式存放用于量化训练的属性，默认值为None。下面列出了受支持的属性：
