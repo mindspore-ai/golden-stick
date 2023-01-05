@@ -31,18 +31,58 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         - **ValueError** - `has_trained_epoch` 小于0。
         - **ValueError** - `t_start_val` 或 `t_factor` 小于等于0.0。
         - **ValueError** - `t_start_time` 或 `t_end_time` 小于0.0。
-        - **ValueError** - `t_start_time` 或 `t_end_time` 大于1.0。
+        - **ValueError** - `t_start_time` 或 `t_end_time` 大于1.0。       
 
-    .. py:method:: set_weight_quant_dtype(weight_quant_dtype=QuantDtype.INT1)
+    .. py:method:: apply(network: Cell)
 
-        设置权重量化的数据类型。
+        按照下面4个步骤对给定网络应用量化算法，得到带有伪量化节点的网络。
+
+        1. 使用网络策略中定义的模式引擎在给定网络中融合特定的单元。
+        2. 传播通过单元定义的层策略。
+        3. 当量化器冗余时，减少冗余的伪量化器。
+        4. 应用层策略将正常 `Cell` 转换为 `QuantizeWrapperCell` 。
 
         参数：
-            - **weight_quant_dtype** (QuantDtype) - 权重量化的数据类型。默认值：QuantDtype.INT1。
+            - **network** (Cell) - 即将被量化的网络。
+
+        返回：
+            在原网络定义的基础上，修改需要量化的网络层后生成带有伪量化节点的网络。
+
+    .. py:method:: callbacks(model: Model, dataset: Dataset)
+
+        定义SLB量化算法特有的一些callbacks，其中包括用于调节温度因子的callback。
+
+        参数：
+            - **model** (Model) - 经过算法修改后的网络构造的mindspore的Model对象。
+            - **dataset** (Dataset) - 加载了特定数据集的Dataset对象。
 
         异常：
-            - **TypeError** - `weight_quant_dtype` 的数据类型不是QuantDtype。
-            - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT1` 、 `QuantDtype.INT2` 和 `QuantDtype.INT4` 中的一种。
+            - **RuntimeError** - `epoch_size` 没有初始化。
+            - **RuntimeError** - `has_trained_epoch` 没有初始化。
+            - **ValueError** - `epoch_size` 小于等于 `has_trained_epoch` 。
+            - **ValueError** - `t_end_time` 小于 `t_start_time` 。
+            - **TypeError** - `model` 的数据类型不是mindspore.Model。
+            - **TypeError** - `dataset` 的数据类型不是mindspore.dataset.Dataset。
+
+        返回：
+            SLB量化算法特有的一些callbacks的列表。            
+
+    .. py:method:: convert(net_opt: Cell, ckpt_path="")
+
+        定义将SLB量化网络转换成适配MindIR的标准网络的具体实现。
+
+        参数：
+            - **net_opt** (Cell) - 经过SLB量化算法量化后的网络。
+            - **ckpt_path** (str) - checkpoint文件的存储路径，为空时不加载，默认值为空。
+
+        异常：
+            - **TypeError** - `net_opt` 的数据类型不是mindspore.nn.Cell。
+            - **TypeError** - `ckpt_path` 的数据类型不是str。
+            - **ValueError** - `ckpt_path` 不为空，但不是有效文件。
+            - **RuntimeError** - `ckpt_path` 是有效文件，但加载失败。
+
+        返回：
+            能适配MindIR的标准网络。
 
     .. py:method:: set_act_quant_dtype(act_quant_dtype=QuantDtype.INT8)
 
@@ -97,28 +137,6 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **TypeError** - `has_trained_epoch` 的数据类型不是int。
             - **ValueError** - `has_trained_epoch` 小于0。
 
-    .. py:method:: set_t_start_val(t_start_val=1.0)
-
-        设置温度初始值。
-
-        参数：
-            - **t_start_val** (float) - 温度初始值。默认值：1.0。
-
-        异常：
-            - **TypeError** - `t_start_val` 的数据类型不是float。
-            - **ValueError** - `t_start_val` 小于等于0.0。
-
-    .. py:method:: set_t_start_time(t_start_time=0.2)
-
-        设置温度开始变化时间。
-
-        参数：
-            - **t_start_time** (float) - 温度开始变化时间。默认值：0.2。
-
-        异常：
-            - **TypeError** - `t_start_time` 的数据类型不是float。
-            - **ValueError** - `t_start_time` 小于0.0或大于1.0。
-
     .. py:method:: set_t_end_time(t_end_time=0.6)
 
         设置温度停止变化时间。
@@ -141,53 +159,35 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **TypeError** - `t_factor` 的数据类型不是float。
             - **ValueError** - `t_factor` 小于等于0.0。
 
-    .. py:method:: callbacks(model: Model, dataset: Dataset)
+    .. py:method:: set_t_start_time(t_start_time=0.2)
 
-        定义SLB量化算法特有的一些callbacks，其中包括用于调节温度因子的callback。
+        设置温度开始变化时间。
 
         参数：
-            - **model** (Model) - 经过算法修改后的网络构造的mindspore的Model对象。
-            - **dataset** (Dataset) - 加载了特定数据集的Dataset对象。
+            - **t_start_time** (float) - 温度开始变化时间。默认值：0.2。
 
         异常：
-            - **RuntimeError** - `epoch_size` 没有初始化。
-            - **RuntimeError** - `has_trained_epoch` 没有初始化。
-            - **ValueError** - `epoch_size` 小于等于 `has_trained_epoch` 。
-            - **ValueError** - `t_end_time` 小于 `t_start_time` 。
-            - **TypeError** - `model` 的数据类型不是mindspore.Model。
-            - **TypeError** - `dataset` 的数据类型不是mindspore.dataset.Dataset。
+            - **TypeError** - `t_start_time` 的数据类型不是float。
+            - **ValueError** - `t_start_time` 小于0.0或大于1.0。 
 
-        返回：
-            SLB量化算法特有的一些callbacks的列表。
+    .. py:method:: set_t_start_val(t_start_val=1.0)
 
-    .. py:method:: apply(network: Cell)
-
-        按照下面4个步骤对给定网络应用量化算法，得到带有伪量化节点的网络。
-
-        1. 使用网络策略中定义的模式引擎在给定网络中融合特定的单元。
-        2. 传播通过单元定义的层策略。
-        3. 当量化器冗余时，减少冗余的伪量化器。
-        4. 应用层策略将正常 `Cell` 转换为 `QuantizeWrapperCell` 。
+        设置温度初始值。
 
         参数：
-            - **network** (Cell) - 即将被量化的网络。
-
-        返回：
-            在原网络定义的基础上，修改需要量化的网络层后生成带有伪量化节点的网络。
-
-    .. py:method:: convert(net_opt: Cell, ckpt_path="")
-
-        定义将SLB量化网络转换成适配MindIR的标准网络的具体实现。
-
-        参数：
-            - **net_opt** (Cell) - 经过SLB量化算法量化后的网络。
-            - **ckpt_path** (str) - checkpoint文件的存储路径，为空时不加载，默认值为空。
+            - **t_start_val** (float) - 温度初始值。默认值：1.0。
 
         异常：
-            - **TypeError** - `net_opt` 的数据类型不是mindspore.nn.Cell。
-            - **TypeError** - `ckpt_path` 的数据类型不是str。
-            - **ValueError** - `ckpt_path` 不为空，但不是有效文件。
-            - **RuntimeError** - `ckpt_path` 是有效文件，但加载失败。
+            - **TypeError** - `t_start_val` 的数据类型不是float。
+            - **ValueError** - `t_start_val` 小于等于0.0。               
 
-        返回：
-            能适配MindIR的标准网络。
+    .. py:method:: set_weight_quant_dtype(weight_quant_dtype=QuantDtype.INT1)
+
+        设置权重量化的数据类型。
+
+        参数：
+            - **weight_quant_dtype** (QuantDtype) - 权重量化的数据类型。默认值：QuantDtype.INT1。
+
+        异常：
+            - **TypeError** - `weight_quant_dtype` 的数据类型不是QuantDtype。
+            - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT1` 、 `QuantDtype.INT2` 和 `QuantDtype.INT4` 中的一种。 

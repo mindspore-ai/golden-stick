@@ -18,10 +18,9 @@ import os
 import random
 import sys
 from collections import OrderedDict
-
-import mindspore
 import numpy as np
 import pytest
+import mindspore
 from mindspore import Model
 from mindspore import nn, context
 from mindspore.common.dtype import QuantDtype
