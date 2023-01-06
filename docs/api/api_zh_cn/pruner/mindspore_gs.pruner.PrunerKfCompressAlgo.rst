@@ -24,7 +24,7 @@ mindspore_gs.pruner.PrunerKfCompressAlgo
         异常：
             - **TypeError** - `network` 不是Cell。
 
-    .. py:method:: callbacks()
+    .. py:method:: callbacks(*args, **kwargs)
 
         定义SCOP剪枝算法特有的callbacks即生成高仿数据的callback。
 
