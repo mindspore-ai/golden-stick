@@ -168,7 +168,17 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
             - **weight_narrow_range** (bool) - 量化算法是否使用权重narrow_range。如果为True，则基于narrow_range，否则不基于narrow_range。
 
         异常：
-            - **TypeError** - `weight_narrow_range` 数据类型不是bool。 
+            - **TypeError** - `weight_narrow_range` 数据类型不是bool。
+
+    .. py:method:: set_weight_per_channel(weight_per_channel)
+
+        设置量化感知训练参数 `config` 的weight_per_channel值。
+
+        参数：
+            - **weight_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。
+
+        异常：
+            - **TypeError** - `weight_per_channel` 数据类型不是bool。
 
     .. py:method:: set_weight_quant_delay(weight_quant_delay)
 
@@ -191,16 +201,6 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         异常：
             - **TypeError** - `weight_quant_dtype` 数据类型不是QuantDtype。
             - **ValueError** - `weight_quant_dtype` 不是 `QuantDtype.INT8` 。
-
-    .. py:method:: set_weight_per_channel(weight_per_channel)
-
-        设置量化感知训练参数 `config` 的weight_per_channel值。
-
-        参数：
-            - **weight_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。
-
-        异常：
-            - **TypeError** - `weight_per_channel` 数据类型不是bool。
 
     .. py:method:: set_weight_symmetric(weight_symmetric)
 
