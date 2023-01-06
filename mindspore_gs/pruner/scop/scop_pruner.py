@@ -356,7 +356,7 @@ class PrunerKfCompressAlgo(CompAlgo):
             Knockoff network.
 
         Raises:
-            ValueError: If `network` is not Cell.
+            TypeError: If `network` is not Cell.
         """
         return self._tranform(network)
 
@@ -524,7 +524,7 @@ class PrunerFtCompressAlgo(CompAlgo):
             Pruned network.
 
         Raises:
-            ValueError: If `network` is not Cell.
+            TypeError: If `network` is not Cell.
         """
         return self._recover(network)
 
