@@ -27,11 +27,9 @@ class Transformer(PatternEngine):
         self._node_visited_key: str = "is_node_visited"
 
     def _is_node_visited(self, node: Node) -> bool:
-        assert node is not None
         return node.get_attribute(self._node_visited_key)
 
     def _set_node_visited(self, node: Node):
-        assert node is not None
         node.set_attribute(self._node_visited_key, True)
 
     def _get_inputs_of_matched(self, matched_dict):
