@@ -358,6 +358,8 @@ class PrunerKfCompressAlgo(CompAlgo):
         Raises:
             TypeError: If `network` is not Cell.
         """
+        if not isinstance(network, nn.Cell):
+            raise TypeError(f'The parameter `network` must be isinstance of Cell, but got {type(network)}.')
         return self._tranform(network)
 
 
@@ -526,6 +528,8 @@ class PrunerFtCompressAlgo(CompAlgo):
         Raises:
             TypeError: If `network` is not Cell.
         """
+        if not isinstance(network, nn.Cell):
+            raise TypeError(f'The parameter `network` must be isinstance of Cell, but got {type(network)}.')
         return self._recover(network)
 
 
