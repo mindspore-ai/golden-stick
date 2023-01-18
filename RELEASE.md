@@ -16,6 +16,7 @@
 #### Backwards Compatible Change
 
 * The SLB algorithm adds the `set_enable_bn_calibration` interface to enable or disable BatchNorm calibration.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
+* Add `set_save_mindir` interface to the algorithm base class, which is configured to automatically export MindIR after training. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/master/deployment/convert.html#configure-the-algorithm-to-automatically-export-mindir).([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
 
 ### Bug fixes
 
