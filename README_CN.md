@@ -123,7 +123,7 @@ import mindspore_gs
 
 ### 开发者教程
 
-有关安装指南、教程和API的更多详细信息，请参阅[用户文档]。
+有关安装指南、教程和API的更多详细信息，请参阅[用户文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html)。
 
 ## 社区
 

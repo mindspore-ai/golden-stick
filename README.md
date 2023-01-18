@@ -123,7 +123,7 @@ Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/mas
 
 ### Developer Guide
 
-For more details about the installation guide, tutorials, and APIs, see [MindSpore Golden Stick API Docs].
+For more details about the installation guide, tutorials, and APIs, see [MindSpore Golden Stick Docs](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html).
 
 ## Community
 
