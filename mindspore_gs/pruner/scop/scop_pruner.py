@@ -358,6 +358,7 @@ class PrunerKfCompressAlgo(CompAlgo):
         Raises:
             TypeError: If `network` is not Cell.
         """
+        network = Validator.check_isinstance('network', network, nn.Cell)
         return self._tranform(network)
 
 
@@ -526,6 +527,7 @@ class PrunerFtCompressAlgo(CompAlgo):
         Raises:
             TypeError: If `network` is not Cell.
         """
+        network = Validator.check_isinstance('network', network, nn.Cell)
         return self._recover(network)
 
 
