@@ -77,7 +77,8 @@ def test_lenet_apply():
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-def test_lenet_convert():
+@pytest.mark.parametrize("enable_fusion", [True, False])
+def test_lenet_convert(enable_fusion):
     """
     Feature: simulated quantization convert function.
     Description: convert a compressed network to a standard network, export to MindIR.
@@ -86,7 +87,8 @@ def test_lenet_convert():
 
     from ....models.research.cv.lenet.src.lenet import LeNet5
     network = LeNet5(10)
-    qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
+    qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900],
+                  "enable_fusion": enable_fusion})
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
