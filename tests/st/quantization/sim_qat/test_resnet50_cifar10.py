@@ -104,7 +104,10 @@ def test_resnet_apply(run_mode):
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-def test_resnet_convert():
+@pytest.mark.parametrize("enable_fusion", [True, False])
+@pytest.mark.parametrize("bn_fold", [True, False])
+@pytest.mark.parametrize("one_conv_fold", [True, False])
+def test_resnet_convert(enable_fusion, bn_fold, one_conv_fold):
     """
     Feature: simulated quantization convert function.
     Description: convert a compressed network to a standard network, export to MindIR.
@@ -118,6 +121,9 @@ def test_resnet_convert():
     mindspore.context.set_context(device_target="GPU")
     network = resnet50(10)
     qat = create_simqat()
+    qat.set_enable_fusion(enable_fusion=enable_fusion)
+    qat.set_bn_fold(bn_fold=bn_fold)
+    qat.set_one_conv_fold(one_conv_fold=one_conv_fold)
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(numpy.ones([1, 3, 224, 224]), mindspore.float32)
