@@ -160,7 +160,7 @@ class Conv2dBnWithoutFoldQuant(Cell):
         self.batchnorm = BatchNorm2d(out_channels, eps=eps, momentum=momentum)
 
     @classmethod
-    def from_float(cls, convbn: Conv2dBn, quant_config: QuantConfig):
+    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig):
         """
         A class method to create `Conv2dBnWithoutFoldQuant` from`Conv2dBn`
         """
