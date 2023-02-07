@@ -17,9 +17,8 @@
 import os
 import sys
 import numpy as np
-import pytest
 import mindspore
-from mindspore import nn, context
+from mindspore import nn
 from mindspore_gs import PrunerKfCompressAlgo, PrunerFtCompressAlgo
 
 cur_path = os.path.dirname(os.path.abspath(__file__))
@@ -29,10 +28,6 @@ ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train_parallel", "log")
 
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
 def test_scop_infer(run_mode):
     """
     Feature: simulated quantization algorithm.
