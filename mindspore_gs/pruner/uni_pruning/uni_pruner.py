@@ -17,18 +17,20 @@ Implementation of UniPruning algorithm that zeroize model every n epochs accordi
 Pruning mask from the last step and zeroed weights are used to get physically pruned model for inference.
 """
 import os
-import json
 import numpy as np
 from mindspore import Tensor, load_checkpoint, load_param_into_net
 from mindspore import log as logger
 from mindspore._checkparam import Validator
-from mindspore.nn import Cell
+from mindspore.nn import Cell, Conv2d, Dense
 from mindspore.train.callback import Callback
 
 from ...comp_algo import CompAlgo
 from .graph_analyzer_mindir import GraphAnalyzer
 from .utils import do_mask, get_channel_importances, get_mask, prune_net, save_model_and_mask
-#pylint: disable=arguments-differ
+from .unipruning_masked_layer import UniPruningMaskedConv2d, UniPruningMaskedDense
+from ..ops import MaskedCell
+# pylint: disable=arguments-differ
+
 
 class UniPrunerCallback(Callback):
     """
@@ -47,6 +49,7 @@ class UniPrunerCallback(Callback):
         TypeError: If `device_target` is not string.
         TypeError: If `rank` is not int.
     """
+
     def __init__(self, exp_name, output_path, input_size,
                  prune_flag, frequency, target_sparsity,
                  pruning_step, filter_lower_threshold,
@@ -126,6 +129,7 @@ class UniPrunerCallback(Callback):
                             self.mask)
         logger.info(f'UniZeroing ended rank{self.rank}')
 
+
 class UniPruner(CompAlgo):
     """
     Derived class of `CompAlgo`. Base class of UniPruning algorithm.
@@ -192,8 +196,8 @@ class UniPruner(CompAlgo):
         >>> ms.load_checkpoint(config.checkpoint_file_path, net)
         >>> ## 7) Make pruning, save pruned network
         >>> algo.convert(net, mask, config, tag)
-
     """
+
     def __init__(self, config=None):
         super().__init__(config)
         Validator.check_value_type("config", config, [dict], self.__class__.__name__)
@@ -228,6 +232,32 @@ class UniPruner(CompAlgo):
         if not self.graph.analyze():
             raise ValueError('Analyzer for the chosen network does not work')
         self._callback.graph = self.graph
+
+        for name, layer in network.cells_and_names():
+            if isinstance(layer, Conv2d):
+                origin_weight_name = layer.weight.name
+                origin_bias_name = "bias"
+                if layer.has_bias:
+                    origin_bias_name = layer.bias.name
+                new_cell = UniPruningMaskedConv2d(layer)
+                network.insert_child_to_cell(name, new_cell)
+                new_cell.handler.weight.name = "masked_{}".format(origin_weight_name)
+                new_cell.in_mask.name = "{}.in_mask".format(name)
+                new_cell.out_mask.name = "{}.out_mask".format(name)
+                if layer.has_bias:
+                    new_cell.handler.bias.name = "masked_{}".format(origin_bias_name)
+            if isinstance(layer, Dense):
+                origin_weight_name = layer.weight.name
+                origin_bias_name = "bias"
+                if layer.has_bias:
+                    origin_bias_name = layer.bias.name
+                new_cell = UniPruningMaskedDense(layer)
+                network.insert_child_to_cell(name, new_cell)
+                new_cell.handler.weight.name = "masked_{}".format(origin_weight_name)
+                new_cell.in_mask.name = "{}.in_mask".format(name)
+                new_cell.out_mask.name = "{}.out_mask".format(name)
+                if layer.has_bias:
+                    new_cell.handler.bias.name = "masked_{}".format(origin_bias_name)
         return network
 
     def prune_by_mask(self, net: Cell, mask, args, tag):
@@ -255,20 +285,26 @@ class UniPruner(CompAlgo):
                             args.epoch_size, self._callback.input_size, args.device_target,
                             export_air=True)
 
-    def convert(self, **kwargs) -> Cell:
+    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """prune network using checkpoint with zeroed weights and pruning mask saved"""
-        net_opt = kwargs["net_opt"]
-
-        ckpt_path = kwargs["ckpt_path"]
-        ckpt = load_checkpoint(ckpt_path)
-        load_param_into_net(net_opt, ckpt)
-
-        mask_path = kwargs["mask_path"]
-        with open(mask_path, "r") as fp:
-            mask = json.load(fp)
-
-        self.apply(net_opt)
-        prune_net(self.graph.groups, mask)
+        if not isinstance(net_opt, Cell):
+            raise TypeError(
+                f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
+        if not isinstance(ckpt_path, str):
+            raise TypeError(
+                f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
+        real_path = os.path.realpath(ckpt_path)
+        if ckpt_path != "":
+            if os.path.isfile(real_path):
+                param_dict = load_checkpoint(ckpt_path)
+                load_param_into_net(net_opt, param_dict)
+            else:
+                raise ValueError(
+                    f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
+        for name, layer in net_opt.cells_and_names():
+            if not isinstance(layer, MaskedCell):
+                continue
+            net_opt.insert_child_to_cell(name, layer.prune())
         return net_opt
 
     def callbacks(self, *args, **kwargs) -> [Callback]:
