@@ -29,7 +29,6 @@ ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train_parallel", "log")
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_scop_infer():

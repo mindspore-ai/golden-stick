@@ -7,7 +7,7 @@
 ### 主要特性和增强
 
 * [stable] SLB（Searching for Low-Bit Weights in Quantized Neural Networks）感知量化算法支持BatchNorm矫正能力。可以通过`set_enable_bn_calibration`接口来配置使能。对于存在BatchNorm层的网络，BatchNorm矫正能力减少SLB量化算法产生的网络准确率下降。([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
-* [stable] 验证了SimQAT（Simulated Quantization Aware Training）算法和SLB算法在ResNet网络，Imagenet2012数据集上的量化效果，详细效果参见[MindSpore Models仓readme](https://gitee.com/mindspore/models/tree/r2.0/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4)。
+* [stable] 验证了SimQAT（Simulated Quantization Aware Training）算法和SLB算法在ResNet网络，Imagenet2012数据集上的量化效果，详细效果参见[MindSpore Models仓readme](https://gitee.com/mindspore/models/tree/r2.0.0-alpha/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4)。
 * [stable] 打通了SimQAT算法在Lite上的部署流程，并验证了LeNet网络的部署效果，详细效果参见[MindSpore官网SimQAT量化算法推理部署效果](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/quantization/simqat.html#%E9%83%A8%E7%BD%B2%E6%95%88%E6%9E%9C)。
 
 ### API变更
