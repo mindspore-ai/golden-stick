@@ -71,142 +71,111 @@ def test_constructor_error():
     Expectation: Except error.
     """
 
-    has_error = False
     config = {"quant_delay": (True, True)}
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the type of 'act_quant_delay' "
+                                        "must be int, but got 'bool'"):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
+
+    config = {"quant_delay": (1, True)}
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the type of 'weight_quant_delay' "
+                                        "must be int, but got 'bool'"):
+        SimQAT(config)
 
     config = {"per_channel": (1, 1)}
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'act_per_channel' must be a "
+                                        "bool, but got int."):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
+
+    config = {"per_channel": (False, 1)}
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'weight_per_channel' must be a "
+                                        "bool, but got int."):
+        SimQAT(config)
 
     config = {"symmetric": (1, 1)}
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'act_symmetric' must be a bool, "
+                                        "but got int."):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
+
+    config = {"symmetric": (True, 1)}
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'weight_symmetric' must be a "
+                                        "bool, but got int."):
+        SimQAT(config)
 
     config = {"narrow_range": (1, 1)}
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'act_narrow_range' must be a "
+                                        "bool, but got int."):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
 
     config = {"bn_fold": 1}
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'bn_fold' must be a bool, but "
+                                        "got int."):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
 
     config = {"one_conv_fold": 1}
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'one_conv_fold' must be a bool, "
+                                        "but got int."):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
 
     config = {"quant_dtype": [1, 1]}
-    try:
+    with pytest.raises(TypeError, match="The parameter `act quant dtype` must be isinstance of QuantDtype, but got 1."):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
+
+    config = {"quant_dtype": [QuantDtype.INT8, 1]}
+    with pytest.raises(TypeError, match="The parameter `weight quant dtype` must be isinstance of QuantDtype, but got "
+                                        "1."):
+        SimQAT(config)
 
     config = {"freeze_bn": True}
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the type of 'freeze_bn' must be "
+                                        "int, but got 'bool'"):
         SimQAT(config)
-        has_error = True
-    except TypeError:
-        pass
-    assert not has_error
 
     config = {"freeze_bn": -1}
-    try:
+    with pytest.raises(ValueError, match="For 'SimulatedQuantizationAwareTraining', the 'freeze_bn' must be int and "
+                                         "must >= 0, but got '-1' with type 'int'."):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
 
     config = {"quant_delay": [1, 1, 1]}
-    try:
+    with pytest.raises(ValueError, match="input `quant delay` len should be less than 3"):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
 
     config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.INT8, QuantDtype.INT8]}
-    try:
+    with pytest.raises(ValueError, match="input `quant dtype` len should be less than 3"):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
 
     config = {"per_channel": [False, False, False]}
-    try:
+    with pytest.raises(ValueError, match="input `per channel` len should be less than 3"):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
 
     config = {"symmetric": [False, False, False]}
-    try:
+    with pytest.raises(ValueError, match="input `symmetric` len should be less than 3"):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
 
     config = {"narrow_range": [False, False, False]}
-    try:
+    with pytest.raises(ValueError, match="input `narrow range` len should be less than 3"):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
 
     config = {"quant_delay": [-1, -1]}
-    try:
+    with pytest.raises(ValueError, match="For 'SimulatedQuantizationAwareTraining', the 'act_quant_delay' must be int "
+                                         "and must >= 0, but got '-1' with type 'int'."):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
+
+    config = {"quant_delay": [1, -1]}
+    with pytest.raises(ValueError, match="For 'SimulatedQuantizationAwareTraining', the 'weight_quant_delay' must be "
+                                         "int and must >= 0, but got '-1' with type 'int'."):
+        SimQAT(config)
 
     config = {"per_channel": [True, True]}
-    try:
+    with pytest.raises(ValueError, match="Only supported if `act_per_channel` is False yet."):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
 
     config = {"quant_dtype": [QuantDtype.UINT8, QuantDtype.UINT8]}
-    try:
+    with pytest.raises(ValueError, match="Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet."):
         SimQAT(config)
-        has_error = True
-    except ValueError:
-        pass
-    assert not has_error
+
+    config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.UINT8]}
+    with pytest.raises(ValueError, match="Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet."):
+        SimQAT(config)
 
 
 @pytest.mark.level0
@@ -237,11 +206,9 @@ def test_set_bn_fold_type_error():
     """
 
     qat = SimQAT()
-    try:
+    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'bn_fold' must be a bool, but "
+                                        "got int."):
         qat.set_bn_fold(1)
-    except TypeError:
-        return
-    assert False
 
 
 class NetToQuant(nn.Cell):
@@ -329,14 +296,11 @@ def test_convert_error():
     network = NetToQuant()
     qat = SimQAT()
     new_network = qat.apply(network)
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError, match="The parameter `net_opt` must be isinstance of Cell"):
         qat.convert(100)
-    assert "The parameter `net_opt` must be isinstance of Cell" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError, match="The parameter `ckpt_path` must be isinstance of str"):
         qat.convert(new_network, 100)
-    assert "The parameter `ckpt_path` must be isinstance of str" in str(e.value)
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError, match="The parameter `ckpt_path` can only be empty or a valid file"):
         qat.convert(new_network, "file_path")
-    assert "The parameter `ckpt_path` can only be empty or a valid file" in str(e.value)
