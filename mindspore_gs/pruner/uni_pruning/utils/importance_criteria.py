@@ -70,7 +70,7 @@ def choose_channel_group_to_zero(medians, norms, step, filter_num_threshold):
                 if current_median == 0:
                     chosen_key, block_idx, chosen_idx = key, idx, i
                     zero_idx = np.array(norms[block_idx][chosen_key][1]\
-                        [chosen_idx * step : (chosen_idx + 1) * step])
+                        [chosen_idx * step: (chosen_idx + 1) * step])
                     return zero_idx, block_idx
                 ratio = highest_median / (current_median + 1e-5)
                 if ratio > max_ratio:
@@ -81,5 +81,5 @@ def choose_channel_group_to_zero(medians, norms, step, filter_num_threshold):
                 if length * step - cnt <= filter_num_threshold:
                     break
     zero_idx = np.array(norms[block_idx][chosen_key][1]\
-                        [chosen_idx * step : (chosen_idx + 1) * step])
+                        [chosen_idx * step: (chosen_idx + 1) * step])
     return zero_idx, block_idx
