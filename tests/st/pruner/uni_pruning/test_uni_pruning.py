@@ -25,7 +25,8 @@ from mindspore_gs.pruner.uni_pruning import UniPruner
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/'))
 
 
-@pytest.mark.platform_x86_gpu_training
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
 def test_resnet(run_mode):
@@ -36,7 +37,7 @@ def test_resnet(run_mode):
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from models.resnet import resnet50
-    mindspore.context.set_context(mode=run_mode, device_target="GPU")
+    mindspore.context.set_context(mode=run_mode)
 
     network = resnet50(10)
     config = {
@@ -54,11 +55,12 @@ def test_resnet(run_mode):
     algo = UniPruner(config)
     network = algo.apply(network)
 
-    assert algo.graph.groups
+    assert len(algo.graph_anaylzer.groups) == 39
     print("============== test resnet uni pruning success ==============")
 
 
-@pytest.mark.platform_x86_gpu_training
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
 def test_callback(run_mode):
@@ -68,8 +70,10 @@ def test_callback(run_mode):
     Expectation: Return not None.
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
-    mindspore.context.set_context(mode=run_mode, device_target="GPU")
+    from models.resnet import resnet50
+    mindspore.context.set_context(mode=run_mode)
 
+    network = resnet50(10)
     config = {
         "exp_name": 'callback_test',
         "frequency": 1,
@@ -83,7 +87,7 @@ def test_callback(run_mode):
         "device_target": 'GPU'
     }
     algo = UniPruner(config)
-
+    network = algo.apply(network)
     assert algo.callbacks() is not None
     print("============== test uni pruning callback success ==============")
 
@@ -121,7 +125,7 @@ def test_resnet_convert(run_mode):
     args.device_target = "GPU"
     algo = UniPruner(config)
     network = algo.apply(network)
-    for group in algo.graph.groups:
+    for group in algo.graph_anaylzer.groups:
         start = group.ms_starts
         for layer in start.keys():
             if layer == 'conv1':
@@ -129,7 +133,7 @@ def test_resnet_convert(run_mode):
     mask = {'conv1': [0, 1, 2, 3]}
     print(mask)
     algo.convert(network)
-    for group in algo.graph.groups:
+    for group in algo.graph_anaylzer.groups:
         start = group.ms_starts
         for layer in start.keys():
             if layer == 'conv1':

@@ -25,11 +25,10 @@ from mindspore.nn import Cell, Conv2d, Dense
 from mindspore.train.callback import Callback
 
 from ...comp_algo import CompAlgo
-from .graph_analyzer_mindir import GraphAnalyzer
+from .graph_analyzer import GraphAnalyzer
 from .utils import do_mask, get_channel_importances, get_mask, prune_net, save_model_and_mask
 from .unipruning_masked_layer import UniPruningMaskedConv2d, UniPruningMaskedDense
 from ..ops import MaskedCell
-# pylint: disable=arguments-differ
 
 
 class UniPrunerCallback(Callback):
@@ -53,7 +52,7 @@ class UniPrunerCallback(Callback):
     def __init__(self, exp_name, output_path, input_size,
                  prune_flag, frequency, target_sparsity,
                  pruning_step, filter_lower_threshold,
-                 device_target, rank):
+                 device_target: GraphAnalyzer, rank):
         super().__init__()
         Validator.check_value_type("exp_name", exp_name, [str], self.__class__.__name__)
         Validator.check_value_type("output_path", output_path, [str], self.__class__.__name__)
@@ -73,7 +72,7 @@ class UniPrunerCallback(Callback):
         self.pruning_step = pruning_step
         self.filter_lower_threshold = filter_lower_threshold
         self.mask = {}
-        self.graph = {}
+        self.graph_anaylzer = None
         self.prune_flag = prune_flag
         self.rank = rank
         self.device_target = device_target
@@ -116,11 +115,11 @@ class UniPrunerCallback(Callback):
             6. Save zeroed weights and pruning mask.
         """
         # compute channel importances and get pruning mask
-        norms = get_channel_importances(self.graph.groups, self.filter_lower_threshold)
-        self.mask = get_mask(self.graph.groups, norms, self.pruning_step,
+        norms = get_channel_importances(self.graph_anaylzer.groups, self.filter_lower_threshold)
+        self.mask = get_mask(self.graph_anaylzer.groups, norms, self.pruning_step,
                              self.filter_lower_threshold, self._target_sparsity)
         # apply pruning mask -> zero model
-        do_mask(self.graph.groups, self.mask)
+        do_mask(self.graph_anaylzer.groups, self.mask)
         origin_args = run_context.original_args()
         net: Cell = origin_args.network
         cur_epoch_num = origin_args.cur_epoch_num
@@ -211,7 +210,7 @@ class UniPruner(CompAlgo):
                                            prune_flag=config["prune_flag"],
                                            rank=config["rank"],
                                            device_target=config["device_target"])
-        self.graph = {}
+        self.graph_anaylzer = None
 
     def apply(self, network: Cell) -> Cell:
         """
@@ -228,10 +227,8 @@ class UniPruner(CompAlgo):
             ValueError: If network type is not supported by graph analyzer.
         """
         fake_input = Tensor(np.ones(self._callback.input_size).astype(np.float32))
-        self.graph = GraphAnalyzer(network, fake_input)
-        if not self.graph.analyze():
-            raise ValueError('Analyzer for the chosen network does not work')
-        self._callback.graph = self.graph
+        self.graph_anaylzer = GraphAnalyzer(network, fake_input)
+        self._callback.graph_anaylzer = self.graph_anaylzer
 
         for name, layer in network.cells_and_names():
             if isinstance(layer, Conv2d):
@@ -280,7 +277,7 @@ class UniPruner(CompAlgo):
             Validator.check_value_type("mask", mask, [dict], self.__class__.__name__)
         Validator.check_value_type("tag", tag, [str], self.__class__.__name__)
         if mask is not None:
-            prune_net(self.graph.groups, mask)
+            prune_net(self.graph_anaylzer.groups, mask)
         save_model_and_mask(net, self._callback.output_path, f'{args.exp_name}_{tag}_{self._callback.rank}',
                             args.epoch_size, self._callback.input_size, args.device_target,
                             export_air=True)
@@ -309,4 +306,6 @@ class UniPruner(CompAlgo):
 
     def callbacks(self, *args, **kwargs) -> [Callback]:
         """get UniPruner callback"""
+        if self.graph_anaylzer is None:
+            raise RuntimeError("Please call the apply interface first.")
         return [self._callback]

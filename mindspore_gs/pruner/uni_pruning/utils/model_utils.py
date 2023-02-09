@@ -31,13 +31,13 @@ def get_model_size(groups, layer_mask):
             if isinstance(mod, nn.Conv2d):
                 shape = mod.weight.shape
                 size += (shape[0] - layer_mask[layer]['cout']) * \
-                    (shape[1]  - layer_mask[layer]['cin']) * shape[2] * shape[3]
+                    (shape[1] - layer_mask[layer]['cin']) * shape[2] * shape[3]
                 if mod.bias is not None:
                     size += (shape[0] - layer_mask[layer]['cout'])
             if isinstance(mod, nn.Dense):
                 shape = mod.weight.shape
                 size += (shape[0] - layer_mask[layer]['cout']) * \
-                    (shape[1]  - layer_mask[layer]['cin'])
+                    (shape[1] - layer_mask[layer]['cin'])
                 if mod.bias is not None:
                     size += (shape[0] - layer_mask[layer]['cout'])
         for layer in group.ms_middles:
