@@ -2,7 +2,7 @@
 
 [View English](./RELEASE.md)
 
-## MindSpore Golden Stick 0.3.0 Release Notes
+## MindSpore Golden Stick 0.3.0-alpha Release Notes
 
 ### 主要特性和增强
 
@@ -17,8 +17,8 @@
 #### 兼容性变更
 
 * SLB算法新增`set_enable_bn_calibration`接口，用于配置是否需要使能BatchNorm矫正能力。([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
-* 算法基类CompAlgo新增 `convert` 接口，用于在训练后将网络转换为推理网络，推理网络将被导出为MindIR进行推理部署，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/deployment/convert.html#%E8%AE%AD%E7%BB%83%E5%90%8E%E5%AF%BC%E5%87%BAmindir)。([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
-* 算法基类CompAlgo新增 `set_save_mindir` 接口，配置在训练后自动导出MindIR，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/deployment/convert.html#%E9%85%8D%E7%BD%AE%E7%AE%97%E6%B3%95%E8%87%AA%E5%8A%A8%E5%AF%BC%E5%87%BAmindir)。([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
+* 算法基类CompAlgo新增 `convert` 接口，用于在训练后将网络转换为推理网络，推理网络将被导出为MindIR进行推理部署，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E8%AE%AD%E7%BB%83%E5%90%8E%E5%AF%BC%E5%87%BAmindir)。([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
+* 算法基类CompAlgo新增 `set_save_mindir` 接口，配置在训练后自动导出MindIR，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E9%85%8D%E7%BD%AE%E7%AE%97%E6%B3%95%E8%87%AA%E5%8A%A8%E5%AF%BC%E5%87%BAmindir)。([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
 
 ### Bug修复
 

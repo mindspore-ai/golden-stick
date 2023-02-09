@@ -2,7 +2,7 @@
 
 [查看中文](./RELEASE_CN.md)
 
-## MindSpore Golden Stick 0.3.0 Release Notes
+## MindSpore Golden Stick 0.3.0-alpha Release Notes
 
 ### Major Features and Improvements
 
@@ -17,8 +17,8 @@
 #### Backwards Compatible Change
 
 * SLB algorithm adds the `set_enable_bn_calibration` interface to enable or disable BatchNorm calibration.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* Add `convert` interface to the algorithm base class, which is configured to convert training network to inferring network. And the network will be exported to MindIR file for Deployment. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/master/deployment/convert.html#export-mindir-after-training).([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
-* Add `set_save_mindir` interface to the algorithm base class, which is configured to automatically export MindIR after training. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/master/deployment/convert.html#configure-the-algorithm-to-automatically-export-mindir).([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
+* Add `convert` interface to the algorithm base class, which is configured to convert training network to inferring network. And the network will be exported to MindIR file for Deployment. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/r0.3.0-alpha/deployment/convert.html#export-mindir-after-training).([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
+* Add `set_save_mindir` interface to the algorithm base class, which is configured to automatically export MindIR after training. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/r0.3.0-alpha/deployment/convert.html#configure-the-algorithm-to-automatically-export-mindir).([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
 
 ### Bug fixes
 
