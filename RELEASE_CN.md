@@ -12,8 +12,6 @@
 
 ### API变更
 
-#### 非兼容性变更
-
 #### 兼容性变更
 
 * SLB算法新增`set_enable_bn_calibration`接口，用于配置是否需要使能BatchNorm矫正能力。([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
