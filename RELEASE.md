@@ -12,8 +12,6 @@
 
 ### API Change
 
-#### Backwards Incompatible Change
-
 #### Backwards Compatible Change
 
 * SLB algorithm adds the `set_enable_bn_calibration` interface to enable or disable BatchNorm calibration.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
