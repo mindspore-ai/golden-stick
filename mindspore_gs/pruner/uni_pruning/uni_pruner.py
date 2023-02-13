@@ -17,6 +17,7 @@ Implementation of UniPruning algorithm that zeroize model every n epochs accordi
 Pruning mask from the last step and zeroed weights are used to get physically pruned model for inference.
 """
 import os
+from collections import OrderedDict
 import numpy as np
 from mindspore import Tensor, load_checkpoint, load_param_into_net
 from mindspore import log as logger
@@ -233,17 +234,21 @@ class UniPruner(CompAlgo):
             raise ValueError('Analyzer for the chosen network does not work')
         self._callback.graph = self.graph
 
-        for name, layer in network.cells_and_names():
+        name_cells: OrderedDict = network.name_cells()
+        cell_names = name_cells.keys()
+        for name in cell_names:
+            layer = name_cells.get(name)
             if isinstance(layer, Conv2d):
                 origin_weight_name = layer.weight.name
                 origin_bias_name = "bias"
                 if layer.has_bias:
                     origin_bias_name = layer.bias.name
                 new_cell = UniPruningMaskedConv2d(layer)
-                network.insert_child_to_cell(name, new_cell)
+                new_name = name.split('.')[-1]
+                network.insert_child_to_cell(new_name, new_cell)
                 new_cell.handler.weight.name = "masked_{}".format(origin_weight_name)
-                new_cell.in_mask.name = "{}.in_mask".format(name)
-                new_cell.out_mask.name = "{}.out_mask".format(name)
+                new_cell.in_mask.name = "{}.in_mask".format(new_name)
+                new_cell.out_mask.name = "{}.out_mask".format(new_name)
                 if layer.has_bias:
                     new_cell.handler.bias.name = "masked_{}".format(origin_bias_name)
             if isinstance(layer, Dense):
@@ -252,10 +257,11 @@ class UniPruner(CompAlgo):
                 if layer.has_bias:
                     origin_bias_name = layer.bias.name
                 new_cell = UniPruningMaskedDense(layer)
-                network.insert_child_to_cell(name, new_cell)
+                new_name = name.split('.')[-1]
+                network.insert_child_to_cell(new_name, new_cell)
                 new_cell.handler.weight.name = "masked_{}".format(origin_weight_name)
-                new_cell.in_mask.name = "{}.in_mask".format(name)
-                new_cell.out_mask.name = "{}.out_mask".format(name)
+                new_cell.in_mask.name = "{}.in_mask".format(new_name)
+                new_cell.out_mask.name = "{}.out_mask".format(new_name)
                 if layer.has_bias:
                     new_cell.handler.bias.name = "masked_{}".format(origin_bias_name)
         return network
