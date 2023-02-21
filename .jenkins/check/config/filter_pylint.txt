@@ -36,7 +36,7 @@
 "golden-stick/mindspore_gs/pruner/scop/scop_pruner.py"                                                   "protected-access"
 
 # GHOST
-"golden-stick/mindspore_gs/ghost/ghost.py"                                                   "protected-access"
+"golden-stick/mindspore_gs/ghost/ghost.py"                                                               "protected-access"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
@@ -56,3 +56,9 @@
 "golden-stick/tests/st/quantization/sim_qat/ops/test_fake_quant_perlayer_aot.py"                         "unused-argument"
 "golden-stick/tests/st/quantization/sim_qat/ops/test_minmax_update_perchannel_aot.py"                    "unused-argument"
 "golden-stick/tests/st/quantization/sim_qat/ops/test_minmax_update_perlayer_aot.py"                      "unused-argument"
+
+# for version check
+"golden-stick/mindspore_gs/__init__.py"                           "wrong-import-position"
+"golden-stick/mindspore_gs/ghost/__init__.py"                     "wrong-import-position"
+"golden-stick/mindspore_gs/pruner/__init__.py"                    "wrong-import-position"
+"golden-stick/mindspore_gs/quantization/__init__.py"              "wrong-import-position"
