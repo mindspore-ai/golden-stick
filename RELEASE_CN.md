@@ -2,23 +2,21 @@
 
 [View English](./RELEASE.md)
 
-## MindSpore Golden Stick 0.3.0 Release Notes
+## MindSpore Golden Stick 0.3.0-alpha Release Notes
 
 ### 主要特性和增强
 
 * [stable] SLB（Searching for Low-Bit Weights in Quantized Neural Networks）感知量化算法支持BatchNorm矫正能力。可以通过`set_enable_bn_calibration`接口来配置使能。对于存在BatchNorm层的网络，BatchNorm矫正能力减少SLB量化算法产生的网络准确率下降。([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
-* [stable] 验证了SimQAT（Simulated Quantization Aware Training）算法和SLB算法在ResNet网络，Imagenet2012数据集上的量化效果，详细效果参见[MindSpore Models仓readme](https://gitee.com/mindspore/models/tree/r2.0/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4)。
+* [stable] 验证了SimQAT（Simulated Quantization Aware Training）算法和SLB算法在ResNet网络，Imagenet2012数据集上的量化效果，详细效果参见[MindSpore Models仓readme](https://gitee.com/mindspore/models/tree/r2.0.0-alpha/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4)。
 * [stable] 打通了SimQAT算法在Lite上的部署流程，并验证了LeNet网络的部署效果，详细效果参见[MindSpore官网SimQAT量化算法推理部署效果](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/quantization/simqat.html#%E9%83%A8%E7%BD%B2%E6%95%88%E6%9E%9C)。
 
 ### API变更
 
-#### 非兼容性变更
-
 #### 兼容性变更
 
 * SLB算法新增`set_enable_bn_calibration`接口，用于配置是否需要使能BatchNorm矫正能力。([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
-* 算法基类CompAlgo新增 `convert` 接口，用于在训练后将网络转换为推理网络，推理网络将被导出为MindIR进行推理部署，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/deployment/convert.html#%E8%AE%AD%E7%BB%83%E5%90%8E%E5%AF%BC%E5%87%BAmindir)。([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
-* 算法基类CompAlgo新增 `set_save_mindir` 接口，配置在训练后自动导出MindIR，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/deployment/convert.html#%E9%85%8D%E7%BD%AE%E7%AE%97%E6%B3%95%E8%87%AA%E5%8A%A8%E5%AF%BC%E5%87%BAmindir)。([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
+* 算法基类CompAlgo新增 `convert` 接口，用于在训练后将网络转换为推理网络，推理网络将被导出为MindIR进行推理部署，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E8%AE%AD%E7%BB%83%E5%90%8E%E5%AF%BC%E5%87%BAmindir)。([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
+* 算法基类CompAlgo新增 `set_save_mindir` 接口，配置在训练后自动导出MindIR，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E9%85%8D%E7%BD%AE%E7%AE%97%E6%B3%95%E8%87%AA%E5%8A%A8%E5%AF%BC%E5%87%BAmindir)。([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
 
 ### Bug修复
 
