@@ -28,7 +28,7 @@ ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train_parallel", "log")
 
 
-def test_scop_infer(run_mode):
+def test_scop_infer():
     """
     Feature: simulated quantization algorithm.
     Description: apply simulated_quantization on resnet50.

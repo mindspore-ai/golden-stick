@@ -21,7 +21,6 @@ import pytest
 from mindspore import nn, context
 from mindspore import Model
 from mindspore.common.dtype import QuantDtype
-from mindspore.nn.metrics import Accuracy
 
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT

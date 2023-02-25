@@ -21,7 +21,7 @@ mindspore_version_check()
 
 from .comp_algo import CompAlgo
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
-from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
+from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
            "PrunerFtCompressAlgo", "CompAlgo"]
