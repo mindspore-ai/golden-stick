@@ -43,7 +43,7 @@ class KfConv2d(nn.Cell):
         self.out_channels = self.conv.out_channels
         self.kfscale = Parameter(ops.Ones()((1, self.out_channels, 1, 1), mindspore.float32), requires_grad=True,
                                  name=prex + '.kfscale')
-        self.kfscale.data.asnumpy().fill(1.0)
+        self.kfscale.data.asnumpy().fill(0.5)
         self.concat_op = ops.Concat(axis=0)
 
     def construct(self, x):
