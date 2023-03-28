@@ -122,13 +122,7 @@ def test_lenet_convert(run_mode, enable_act_quant):
     mindspore.nn.GraphCell(graph)
 
 
-@pytest.mark.level0
-@pytest.mark.platform_x86_gpu_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])
-@pytest.mark.parametrize("enable_bn_calibration", [True])
-@pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
-def test_lenet_accuracy_bnon(quant_bit, enable_bn_calibration, run_mode):
+def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
     """
     Feature: test accuracy of slb qat work on lenet5.
     Description: Apply slb qat on lenet5 and test accuracy.
@@ -137,7 +131,6 @@ def test_lenet_accuracy_bnon(quant_bit, enable_bn_calibration, run_mode):
 
     from lenet.src.lenet import LeNet5
     from lenet.src.dataset import create_dataset as create_mnist_ds
-    context.set_context(mode=run_mode)
     mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
     data_path = os.path.join(mnist_path, "train")
     ds_train = create_mnist_ds(data_path, 32, 1)
@@ -194,6 +187,36 @@ def test_lenet_accuracy_bnon(quant_bit, enable_bn_calibration, run_mode):
     acc = model.eval(ds_eval)
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.95
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("quant_bit", ["W1", "W4A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [True])
+def test_lenet_accuracy_bnon_graph(quant_bit, enable_bn_calibration):
+    """
+    Feature: test accuracy of slb qat work on lenet5 Graph mode.
+    Description: Apply slb qat on lenet5 and test accuracy.
+    Expectation: accuracy is larger than 0.95.
+    """
+    context.set_context(mode=context.GRAPH_MODE)
+    lenet_accuracy_bnon(quant_bit, enable_bn_calibration)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("quant_bit", ["W4"])
+@pytest.mark.parametrize("enable_bn_calibration", [True])
+def test_lenet_accuracy_bnon_pynative(quant_bit, enable_bn_calibration):
+    """
+    Feature: test accuracy of slb qat work on lenet5 Pynative mode.
+    Description: Apply slb qat on lenet5 and test accuracy.
+    Expectation: accuracy is larger than 0.95.
+    """
+    context.set_context(mode=context.PYNATIVE_MODE)
+    lenet_accuracy_bnon(quant_bit, enable_bn_calibration)
 
 
 @pytest.mark.level0
