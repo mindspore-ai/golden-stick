@@ -53,12 +53,11 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         self.false_tensor = Tensor(0, mindspore.float32)
 
         if self.num_bits == 1:
-            self.w_list = Parameter(Tensor([-1, 1], mindspore.float32).view(1, 1, 1, 1, -1),
-                                    name='w_list', requires_grad=False)
+            self.w_list_init = np.array([-1, 1])
+            self.w_list = Parameter(Tensor(self.w_list_init, mindspore.float32), name='w_list', requires_grad=False)
         else:
             self.w_list_init = np.linspace(-1, 1, 2**self.num_bits)
-            self.w_list = Parameter(Tensor(self.w_list_init, mindspore.float32).view(1, 1, 1, 1, -1),
-                                    name='w_list', requires_grad=False)
+            self.w_list = Parameter(Tensor(self.w_list_init, mindspore.float32), name='w_list', requires_grad=False)
 
         self.temperature = Parameter(Tensor([1], mindspore.float32),
                                      name="temperature", requires_grad=False)
