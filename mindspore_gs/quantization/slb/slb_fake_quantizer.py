@@ -22,8 +22,8 @@ from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
-from mindspore._checkparam import Validator
 from mindspore.common.dtype import QuantDtype
+from mindspore_gs.validator import Validator
 from ..fake_quantizer import FakeQuantizer
 from ..quant_utils import get_quant_min_max, cal_quantization_params, LinearFakeQuantCell
 

@@ -16,7 +16,7 @@
 MindSpore golden stick simulated-quantization ops FakeQuantPerChannelGrad.
 """
 from mindspore.ops import DataType
-from mindspore._checkparam import Validator as validator
+from mindspore_gs.validator import Validator as validator
 from mindspore_gs.ops.operations import GSCustom, custom_op_attr_register
 
 

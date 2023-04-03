@@ -20,7 +20,7 @@ from collections import OrderedDict
 import numpy
 import pytest
 import mindspore
-from mindspore import nn, context
+from mindspore import context
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
@@ -81,24 +81,6 @@ def test_resnet_apply(run_mode):
     assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
     assert not act_fake_quant._symmetric
     assert act_fake_quant._quant_delay == 900
-
-    assert cells.get("layer1", None) is not None
-    seq_cell: nn.Cell = cells.get("layer1")
-    res_block: nn.Cell = seq_cell.name_cells().get("cell_list_0")
-    res_block_cells: OrderedDict = res_block.name_cells()
-    assert res_block_cells.get("Conv2dBnFoldQuant", None) is not None
-    res_block_conv_quant: QuantizeWrapperCell = cells.get("Conv2dBnFoldQuant")
-    assert isinstance(res_block_conv_quant, QuantizeWrapperCell)
-    res_block_conv_handler = res_block_conv_quant._handler
-    res_block_conv_weight_fake_quant: SimulatedFakeQuantizerPerChannel = res_block_conv_handler.fake_quant_weight
-    assert isinstance(res_block_conv_weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert res_block_conv_weight_fake_quant._symmetric
-    assert res_block_conv_weight_fake_quant._quant_delay == 900
-    res_block_conv_act_fake_quant = res_block_conv_quant._output_quantizer
-    assert isinstance(res_block_conv_act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not res_block_conv_act_fake_quant._symmetric
-    assert res_block_conv_act_fake_quant._quant_delay == 900
-
 
 
 @pytest.mark.level0

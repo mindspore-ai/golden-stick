@@ -18,10 +18,10 @@ from __future__ import absolute_import
 from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
-from mindspore._checkparam import Validator, twice
 from mindspore.common.dtype import QuantDtype
 from mindspore.nn.cell import Cell
 from mindspore.nn.layer.conv import Conv2d
+from mindspore_gs.validator import Validator, twice
 from ...quantization.simulated_quantization.combined import Conv2dBn
 from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
 

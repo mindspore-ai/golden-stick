@@ -13,11 +13,11 @@
 # limitations under the License.
 # ============================================================================
 """Class for model's computational graph analysis."""
-from mindspore._checkparam import Validator
 from mindspore.common.api import _cell_graph_executor as _executor
 from mindspore.nn import Cell
 from mindspore.train.mind_ir_pb2 import ModelProto as mindir_model
 
+from mindspore_gs.validator import Validator
 from .graph import Graph
 from .equichannel_group import EquichannelGroup
 from .equichannel_group import prunable_layers

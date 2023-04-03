@@ -15,9 +15,9 @@
 """Combined layer."""
 
 from mindspore import nn
-from mindspore._checkparam import Validator
 from mindspore.nn.layer.normalization import BatchNorm2d
 from mindspore.nn.cell import Cell
+from mindspore_gs.validator import Validator
 
 
 class Conv2dBn(Cell):
