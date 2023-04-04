@@ -20,11 +20,11 @@ from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.tensor import Tensor
-from mindspore._checkparam import Validator, twice
 from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q
+from mindspore_gs.validator import Validator, twice
 from ...quantization.simulated_quantization.combined import Conv2dBn
 from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
 from .batchnorm_fold_cell import BatchNormFoldCell

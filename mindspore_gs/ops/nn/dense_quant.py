@@ -20,11 +20,11 @@ from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.tensor import Tensor
-from mindspore._checkparam import Validator
 from mindspore.common.dtype import QuantDtype
 from mindspore.nn.layer.activation import get_activation
 from mindspore.nn.cell import Cell
 from mindspore.nn.layer.basic import Dense
+from mindspore_gs.validator import Validator
 from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
 
 

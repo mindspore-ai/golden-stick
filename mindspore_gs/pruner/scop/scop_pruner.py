@@ -17,13 +17,13 @@
 import mindspore
 import mindspore.nn as nn
 import mindspore.ops as ops
-from mindspore._checkparam import Validator, Rel
 import mindspore.context as context
 import mindspore.common.dtype as mstype
 from mindspore.train.callback import Callback
 from mindspore import Tensor
 from mindspore.ops import constexpr
 from mindspore import Parameter
+from mindspore_gs.validator import Validator, Rel
 from ...comp_algo import CompAlgo, CompAlgoConfig
 
 
