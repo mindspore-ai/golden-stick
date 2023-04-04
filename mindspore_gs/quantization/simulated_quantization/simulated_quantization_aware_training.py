@@ -16,10 +16,10 @@
 
 import os
 from mindspore.nn import Cell
-from mindspore._checkparam import Validator, Rel
 from mindspore import log as logger
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.common.dtype import QuantDtype
+from mindspore_gs.validator import Validator, Rel
 from ..quantization_aware_training import QuantizationAwareTraining
 from .simulated_quantization_net_policy import SimulatedNetPolicy
 from .simulated_quantization_config import SimulatedQuantizationConfig

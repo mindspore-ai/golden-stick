@@ -15,7 +15,7 @@
 """ActQuant."""
 from __future__ import absolute_import
 
-from mindspore._checkparam import Validator
+from mindspore_gs.validator import Validator
 from mindspore.common.dtype import QuantDtype
 from mindspore.nn.cell import Cell
 from mindspore import nn
