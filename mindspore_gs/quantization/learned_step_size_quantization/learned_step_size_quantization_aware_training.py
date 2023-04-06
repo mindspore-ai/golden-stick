@@ -14,10 +14,10 @@
 # ============================================================================
 """lsq algorithm"""
 from mindspore.nn import Cell
-from mindspore._checkparam import Validator
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
+from mindspore_gs.validator import Validator
 from ..simulated_quantization.simulated_quantization_aware_training import SimulatedQuantizationAwareTraining as SimQAT
 from .learned_step_size_quantization_net_policy import LearnedStepSizeQuantizationNetPolicy as LsqNetPolicy
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig as LsqConfig

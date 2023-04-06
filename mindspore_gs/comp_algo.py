@@ -20,8 +20,8 @@ import os.path
 from mindspore.nn.cell import Cell
 from mindspore.train.callback import Callback
 from mindspore import export, context
-from mindspore._checkparam import Validator
 from mindspore import log as logger
+from mindspore_gs.validator import Validator
 
 
 class CompAlgo(abc.ABC):

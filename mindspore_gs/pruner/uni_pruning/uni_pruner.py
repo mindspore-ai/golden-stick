@@ -21,10 +21,10 @@ from collections import OrderedDict
 import numpy as np
 from mindspore import Tensor, load_checkpoint, load_param_into_net
 from mindspore import log as logger
-from mindspore._checkparam import Validator
 from mindspore.nn import Cell, Conv2d, Dense
 from mindspore.train.callback import Callback
 
+from mindspore_gs.validator import Validator
 from ...comp_algo import CompAlgo
 from .graph_analyzer import GraphAnalyzer
 from .utils import do_mask, get_channel_importances, get_mask, prune_net, save_model_and_mask

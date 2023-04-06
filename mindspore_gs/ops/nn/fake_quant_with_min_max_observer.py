@@ -22,11 +22,11 @@ import numpy as np
 from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
-from mindspore._checkparam import Validator
 from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q
+from mindspore_gs.validator import Validator
 from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 
 
