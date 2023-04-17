@@ -2,6 +2,20 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 0.3.0 Release Notes
+
+### Bug修复
+
+* 修复SCOP剪枝算法训练无法收敛的问题。
+
+### 贡献者
+
+感谢以下人员作出的贡献：
+
+liuzhicheng01, fuzhongqian, hangangqiang, yangruoqi713, kevinkunkun.
+
+欢迎以任意形式对项目提供贡献!
+
 ## MindSpore Golden Stick 0.3.0-alpha Release Notes
 
 ### 主要特性和增强
