@@ -2,6 +2,20 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 0.3.0 Release Notes
+
+### Bug fixes
+
+* Fixed the problem that SCOP algorithm training fails to converge.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+hangangqiang, yangruoqi713, kevinkunkun.
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 0.3.0-alpha Release Notes
 
 ### Major Features and Improvements
