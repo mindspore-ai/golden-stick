@@ -39,30 +39,30 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
             - quant_delay (Union[int, list, tuple]): Number of steps after which weights and activations are quantized
               during train and eval. The first element represents activations and the second element represents weights.
-              Default: (0, 0).
+              Default: ``(0, 0)``.
             - quant_dtype (Union[QuantDtype, list, tuple]): The target data type for quantization. It is necessary to
               consider the precision support of hardware devices when setting `quant_dtype`. The first element
               represents activations and the second element represents weights.
-              Default: (QuantDtype.INT8, QuantDtype.INT8).
-            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If True
+              Default: ``(QuantDtype.INT8, QuantDtype.INT8)``.
+            - per_channel (Union[bool, list, tuple]):  Quantization granularity based on layer or on channel. If ``True``
               then base on per channel, otherwise base on per layer. The first element represents activations and the
-              second element represents weights, and the first element must be False now.
-              Default: (False, False).
-            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If True
+              second element represents weights, and the first element must be ``False`` now.
+              Default: ``(False, False)``.
+            - symmetric (Union[bool, list, tuple]): Whether the quantization algorithm is symmetric or not. If ``True``
               then base on symmetric, otherwise base on asymmetric. The first element represents activations and the
               second element represents weights.
-              Default: (False, False).
+              Default: ``(False, False)``.
             - narrow_range (Union[bool, list, tuple]): Whether the quantization algorithm uses narrow range or not.
               The first element represents activations and the second element represents weights.
-              Default: (False, False).
+              Default: ``(False, False)``.
             - enable_fusion (bool): Whether apply fusion before applying quantization.
-              Default: False.
+              Default: ``False``.
             - freeze_bn (int): Number of steps after which BatchNorm OP parameters fixed to global mean and variance.
-              Default: 10000000.
+              Default: ``10000000``.
             - bn_fold (bool): Whether to use bn fold ops for simulation inference operation.
-              Default: False.
+              Default: ``False``.
             - one_conv_fold (bool): Whether to use one conv bn fold ops for simulation inference operation.
-              Default: True.
+              Default: ``True``.
 
     Raises:
         TypeError: If `bn_fold`, `one_conv_fold` or `enable_fusion` is not bool.
@@ -78,7 +78,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         ValueError: If `quant_delay` is less than 0, or any element of `quant_delay` is less than 0.
         ValueError: If `quant_dtype` is not `QuantDtype.INT8`, or any element of `quant_dtype` is not
             `QuantDtype.INT8`.
-        ValueError: If `per_channel` is True, or the first element of `per_channel` is True.
+        ValueError: If `per_channel` is ``True``, or the first element of `per_channel` is ``True``.
 
     Supported Platforms:
         ``GPU``
@@ -200,7 +200,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `act_quant_delay` is not int.
-            ValueError: act_quant_delay is less than 0.
+            ValueError: `act_quant_delay` is less than 0.
         """
         Validator.check_is_int(act_quant_delay, "act_quant_delay", self.__class__.__name__)
         Validator.check_int(act_quant_delay, 0, Rel.GE, "act_quant_delay", self.__class__.__name__)
@@ -215,7 +215,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Raises:
             TypeError: If `weight_quant_delay` is not int.
-            ValueError: weight_quant_delay is less than 0.
+            ValueError: `weight_quant_delay` is less than 0.
         """
         Validator.check_is_int(weight_quant_delay, "weight_quant_delay", self.__class__.__name__)
         Validator.check_int(weight_quant_delay, 0, Rel.GE, "weight_quant_delay", self.__class__.__name__)
@@ -226,12 +226,12 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of act_per_channel of quantization aware training `config`
 
         Args:
-            act_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
-                per channel, otherwise base on per layer. Only support False now.
+            act_per_channel (bool): Quantization granularity based on layer or on channel. If ``True`` then base on
+                per channel, otherwise base on per layer. Only support ``False`` now.
 
         Raises:
             TypeError: If `act_per_channel` is not bool.
-            ValueError: Only supported if `act_per_channel` is False yet.
+            ValueError: Only supported if `act_per_channel` is ``False`` yet.
         """
         Validator.check_bool(act_per_channel, "act_per_channel", self.__class__.__name__)
         if act_per_channel:
@@ -243,7 +243,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of weight_per_channel of quantization aware training `config`
 
         Args:
-            weight_per_channel (bool): Quantization granularity based on layer or on channel. If True then base on
+            weight_per_channel (bool): Quantization granularity based on layer or on channel. If ``True`` then base on
                 per channel, otherwise base on per layer.
 
         Raises:
@@ -272,7 +272,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_weight_quant_dtype(self, weight_quant_dtype):
         """
-        Set value of weight_quant_dtype of quantization aware training `config`
+        Set value of weight_quant_dtype of quantization aware training `config`.
 
         Args:
             weight_quant_dtype (QuantDtype): Datatype used to quantize weight.
@@ -290,10 +290,10 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
     def set_act_symmetric(self, act_symmetric):
         """
-        Set value of act_symmetric of quantization aware training `config`
+        Set value of act_symmetric of quantization aware training `config`.
 
         Args:
-            act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. If True then base on
+            act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. If ``True`` then base on
                 symmetric, otherwise base on asymmetric.
 
         Raises:
@@ -307,7 +307,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of weight_symmetric of quantization aware training `config`
 
         Args:
-            weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. If True then
+            weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. If ``True`` then
                 base on symmetric, otherwise base on asymmetric.
 
         Raises:
@@ -321,7 +321,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         Set value of act_narrow_range of quantization aware training `config`
 
         Args:
-            act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. If True then
+            act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. If ``True`` then
                 base on narrow_range, otherwise base on not narrow_range.
 
         Raises:
@@ -336,7 +336,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Args:
             weight_narrow_range (bool): Whether the quantization algorithm use weight narrow_range or not. If
-                True then base on narrow_range, otherwise base on not narrow_range.
+                ``True`` then base on narrow_range, otherwise base on not narrow_range.
 
         Raises:
             TypeError: If `weight_narrow_range` is not bool.
@@ -451,7 +451,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Args:
             net_opt (Cell): Network to be converted which is transformed by `SimulatedQuantizationAwareTraining.apply`.
-            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
                 checkpoint file to `net_opt`.
 
         Returns:

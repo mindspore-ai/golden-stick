@@ -6,10 +6,10 @@ mindspore_gs
     金箍棒中算法的基类。
 
     参数：
-        - **config** (dict) - 模型压缩的用户配置,默认值为None。算法相关配置由派生类设置，基类属性列举如下：
+        - **config** (dict) - 模型压缩的用户配置，默认值为 ``None``。算法相关配置由派生类设置，基类属性列举如下：
 
-          - **save_mindir** (bool) - 如果为 true，则在训练后自动导出 MindIR，否则不导出。 默认值：否。
-          - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径或绝对路径，用户需要保证写入权限。默认值：'./network'。
+          - **save_mindir** (bool) - 如果为 ``True``，则在训练后自动导出 MindIR，否则不导出。 默认值：``False``。
+          - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径或绝对路径，用户需要保证写入权限。默认值：``'./network'``。
 
     .. py:method:: apply(network: Cell)
 
@@ -38,7 +38,7 @@ mindspore_gs
 
         参数：
             - **net_opt** (Cell) - 要转换的网络，即 `CompAlgo.apply` 的输出。
-            - **ckpt_path** (str) - `net_opt` 权重文件的路径。默认值为空字符串，表示不将权重文件加载到 `net_opt` 。
+            - **ckpt_path** (str) - `net_opt` 权重文件的路径。默认值为 ``""``，表示不将权重文件加载到 `net_opt` 。
 
         返回：
             转换后的网络实例。

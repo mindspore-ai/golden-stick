@@ -9,17 +9,17 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         - 本方法会调用其它接口来设置参数，所以报错时需要参考其他的接口，比如 `quant_dtype` 要参考 `set_weight_quant_dtype` 和 `set_act_quant_dtype`。
 
     参数：
-        - **config** (dict) - 以字典的形式存放用于量化训练的属性，默认值为None。下面列出了受支持的属性：
+        - **config** (dict) - 以字典的形式存放用于量化训练的属性，默认值为 ``None``。下面列出了受支持的属性：
 
-          - **quant_dtype** (Union[QuantDtype, list(QuantDtype), tuple(QuantDtype)]) - 用于量化权重和激活的数据类型。类型为 `QuantDtype` 或包含两个 `QuantDtype` 的list或者tuple。如果 `quant_dtype` 是一个 `QuantDtype` ，则会被复制成包含两个 `QuantDtype` 的list。第一个元素表示激活的量化数据类型，第二个元素表示权重的量化数据类型。在实际量化推理场景中需要考虑硬件器件的精度支持。当前权重量化支持1、2、4比特，激活量化支持8比特。默认值：(QuantDtype.INT8, QuantDtype.INT1)。
-          - **enable_act_quant** (bool) - 在训练中是否开启激活量化。默认值：False。
-          - **enable_bn_calibration** (bool) - 在训练中是否开启BN层矫正功能。默认值：False。
+          - **quant_dtype** (Union[QuantDtype, list(QuantDtype), tuple(QuantDtype)]) - 用于量化权重和激活的数据类型。类型为 `QuantDtype` 或包含两个 `QuantDtype` 的list或者tuple。如果 `quant_dtype` 是一个 `QuantDtype` ，则会被复制成包含两个 `QuantDtype` 的list。第一个元素表示激活的量化数据类型，第二个元素表示权重的量化数据类型。在实际量化推理场景中需要考虑硬件器件的精度支持。当前权重量化支持1、2、4比特，激活量化支持8比特。默认值：``(QuantDtype.INT8, QuantDtype.INT1)``。
+          - **enable_act_quant** (bool) - 在训练中是否开启激活量化。默认值：``False``。
+          - **enable_bn_calibration** (bool) - 在训练中是否开启BN层矫正功能。默认值：``False``。
           - **epoch_size** (int) - 训练的总epoch数。
           - **has_trained_epoch** (int) - 预训练的epoch数。
-          - **t_start_val** (float) - 温度初始值。默认值：1.0。
-          - **t_start_time** (float) - 温度开始变化时间。默认值：0.2。
-          - **t_end_time** (float) - 温度停止变化时间。默认值：0.6。
-          - **t_factor** (float) - 温度变化因子。默认值：1.2。
+          - **t_start_val** (float) - 温度初始值。默认值：``1.0``。
+          - **t_start_time** (float) - 温度开始变化时间。默认值：``0.2``。
+          - **t_end_time** (float) - 温度停止变化时间。默认值：``0.6``。
+          - **t_factor** (float) - 温度变化因子。默认值：``1.2``。
 
     异常：
         - **TypeError** - `quant_dtype` 的数据类型不是 `QuantDtype` ，或者 `quant_dtype` 存在不是 `QuantDtype` 的元素。
@@ -61,8 +61,8 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **RuntimeError** - `has_trained_epoch` 没有初始化。
             - **ValueError** - `epoch_size` 小于等于 `has_trained_epoch` 。
             - **ValueError** - `t_end_time` 小于 `t_start_time` 。
-            - **TypeError** - `model` 的数据类型不是mindspore.Model。
-            - **TypeError** - `dataset` 的数据类型不是mindspore.dataset.Dataset。
+            - **TypeError** - `model` 的数据类型不是 `mindspore.train.Model`。
+            - **TypeError** - `dataset` 的数据类型不是 `mindspore.dataset.Dataset`。
 
         返回：
             SLB量化算法特有的一些callbacks的列表。            
@@ -73,10 +73,10 @@ mindspore_gs.quantization.SlbQuantAwareTraining
 
         参数：
             - **net_opt** (Cell) - 经过SLB量化算法量化后的网络。
-            - **ckpt_path** (str) - checkpoint文件的存储路径，为空时不加载，默认值为空。
+            - **ckpt_path** (str) - checkpoint文件的存储路径，为空时不加载，默认值为 ``""``。
 
         异常：
-            - **TypeError** - `net_opt` 的数据类型不是mindspore.nn.Cell。
+            - **TypeError** - `net_opt` 的数据类型不是 `mindspore.nn.Cell`。
             - **TypeError** - `ckpt_path` 的数据类型不是str。
             - **ValueError** - `ckpt_path` 不为空，但不是有效文件。
             - **RuntimeError** - `ckpt_path` 是有效文件，但加载失败。
@@ -89,7 +89,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置激活量化的数据类型。
 
         参数：
-            - **act_quant_dtype** (QuantDtype) - 激活量化的数据类型。默认值：QuantDtype.INT8。
+            - **act_quant_dtype** (QuantDtype) - 激活量化的数据类型。默认值：``QuantDtype.INT8``。
 
         异常：
             - **TypeError** - `act_quant_dtype` 的数据类型不是QuantDtype。
@@ -100,7 +100,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置是否开启激活量化。
 
         参数：
-            - **enable_act_quant** (bool) - 在训练中是否开启激活量化。默认值：False。
+            - **enable_act_quant** (bool) - 在训练中是否开启激活量化。默认值：``False``。
 
         异常：
             - **TypeError** - `enable_act_quant` 的数据类型不是bool。
@@ -110,7 +110,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置是否开启BatchNorm层矫正功能。
 
         参数：
-            - **enable_bn_calibration** (bool) - 在训练中是否开启BatchNorm层矫正功能。默认值：False。
+            - **enable_bn_calibration** (bool) - 在训练中是否开启BatchNorm层矫正功能。默认值：``False``。
 
         异常：
             - **TypeError** - `enable_bn_calibration` 的数据类型不是bool。
@@ -142,7 +142,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置温度停止变化时间。
 
         参数：
-            - **t_end_time** (float) - 温度停止变化时间。默认值：0.6。
+            - **t_end_time** (float) - 温度停止变化时间。默认值：``0.6``。
 
         异常：
             - **TypeError** - `t_end_time` 的数据类型不是float。
@@ -153,7 +153,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置温度变化因子。
 
         参数：
-            - **t_factor** (float) - 温度变化因子。默认值：1.2。
+            - **t_factor** (float) - 温度变化因子。默认值：``1.2``。
 
         异常：
             - **TypeError** - `t_factor` 的数据类型不是float。
@@ -164,7 +164,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置温度开始变化时间。
 
         参数：
-            - **t_start_time** (float) - 温度开始变化时间。默认值：0.2。
+            - **t_start_time** (float) - 温度开始变化时间。默认值：``0.2``。
 
         异常：
             - **TypeError** - `t_start_time` 的数据类型不是float。
@@ -175,7 +175,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置温度初始值。
 
         参数：
-            - **t_start_val** (float) - 温度初始值。默认值：1.0。
+            - **t_start_val** (float) - 温度初始值。默认值：``1.0``。
 
         异常：
             - **TypeError** - `t_start_val` 的数据类型不是float。
@@ -186,7 +186,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         设置权重量化的数据类型。
 
         参数：
-            - **weight_quant_dtype** (QuantDtype) - 权重量化的数据类型。默认值：QuantDtype.INT1。
+            - **weight_quant_dtype** (QuantDtype) - 权重量化的数据类型。默认值：``QuantDtype.INT1``。
 
         异常：
             - **TypeError** - `weight_quant_dtype` 的数据类型不是QuantDtype。

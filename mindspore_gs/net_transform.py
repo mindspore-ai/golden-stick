@@ -90,6 +90,7 @@ class NetTransformer:
         Args:
             old_node (Node): Node to be replaced.
             new_nodes (list[Node]): Node to replace
+
         Returns:
             new node.
 
@@ -106,7 +107,7 @@ class NetTransformer:
     def pattern_transform(self, pattern_engine: PatternEngine) -> bool:
         """
         Args:
-            pattern_engine (PatternEngine): Instance of PatternEngine. Apply `pattern_engine` on current network
+            pattern_engine (PatternEngine): Instance of PatternEngine. Apply `pattern_engine` on current network.
 
         Returns:
             a bool value indicating if transform occurred

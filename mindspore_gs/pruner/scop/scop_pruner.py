@@ -371,7 +371,7 @@ class PrunerFtCompressAlgo(CompAlgo):
         config (dict): Configuration of `PrunerFtCompressAlgo`, keys are attribute names,
             values are attribute values. Supported attribute are listed below:
 
-            - prune_rate (float): number in [0.0, 1.0)
+            - prune_rate (float): number in [0.0, 1.0).
 
     Raises:
         TypeError: If `prune_rate` is not float.
