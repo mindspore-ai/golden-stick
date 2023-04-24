@@ -29,13 +29,13 @@ class CompAlgo(abc.ABC):
     Base class of algorithms in GoldenStick.
 
     Args:
-        config (dict): User config for network compression, default is None. Algorithm config specification is default
-            by derived class, base attributes are listed below:
+        config (dict): User config for network compression, default is ``None``. Algorithm config specification
+            is default by derived class, base attributes are listed below:
 
-            - save_mindir (bool): If true, export MindIR automatically after training, else not. Default: False.
+            - save_mindir (bool): If ``True``, export MindIR automatically after training, else not. Default: ``False``.
             - save_mindir_path (str): The path to export MindIR, the path includes the directory and file name, which
               can be a relative path or an absolute path, the user needs to ensure write permission.
-              Default: './network'.
+              Default: ``'./network'``.
     """
 
     def __init__(self, config=None):
@@ -97,7 +97,7 @@ class CompAlgo(abc.ABC):
         Set whether to automatically export MindIR after training.
 
         Args:
-            save_mindir (bool): If true, export MindIR automatically after training, else not.
+            save_mindir (bool): If ``True``, export MindIR automatically after training, else not.
 
         Raises:
             TypeError: If `need_save` is not bool.
@@ -129,7 +129,7 @@ class CompAlgo(abc.ABC):
 
     def set_save_mindir_path(self, save_mindir_path: str):
         """
-        Set the path to export MindIR, only takes effect if `save_mindir` is True.
+        Set the path to export MindIR, only takes effect if `save_mindir` is ``True``.
 
         Args:
             save_mindir_path (str): The path to export MindIR, the path includes the directory and file name, which can
@@ -152,7 +152,7 @@ class CompAlgo(abc.ABC):
 
         Args:
             net_opt (Cell): Network to be converted which is transformed by `CompAlgo.apply`.
-            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
                 checkpoint file to `net_opt`.
 
         Returns:

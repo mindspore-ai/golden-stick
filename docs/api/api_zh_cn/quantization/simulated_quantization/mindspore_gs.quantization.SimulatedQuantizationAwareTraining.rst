@@ -6,17 +6,17 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
     模拟量化感知训练的基本实现，该算法在训练时使用伪量化节点来模拟量化计算的损失，并通过反向传播更新网络参数，使得网络参数更好地适应量化带来的损失。更多详细信息见 `神经网络量化白皮书 <https://arxiv.org/pdf/2106.08295.pdf>`_。
 
     参数：
-        - **config** (dict) - 存储用于量化感知训练的属性，键是属性名称，值是属性值。默认值为None，下面列出了支持的属性：
+        - **config** (dict) - 存储用于量化感知训练的属性，键是属性名称，值是属性值。默认值为 ``None``，下面列出了支持的属性：
 
-          - **quant_delay** (Union[int, list, tuple]) - 在训练和评估期间权重和激活量化后的步数。第一个元素表示激活，第二个元素表示权重。默认值：(0, 0)。
-          - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于指定量化的目标数据类型。在设置`quant_dtype`时，必须考虑硬件设备的精度支持。第一个元素表示激活，第二个元素表示权重。默认值：(QuantDtype.INT8, QuantDtype.INT8)。
-          - **per_channel** (Union[bool, list, tuple]) - 基于层或通道的量化粒度。如果为True，则基于每个通道，否则基于每个层。第一个元素表示激活，第二个元素表示权重，第一个元素现在必须为 False。默认值：(False, False)。
-          - **symmetric** (Union[bool, list, tuple]) - 量化算法是否对称。如果为True，则基于对称，否则基于不对称。第一个元素表示激活，第二个元素表示权重。默认值：(False, False)。
-          - **narrow_range** (Union[bool, list, tuple]) - 量化算法是否使用窄范围。第一个元素表示激活，第二个元素表示权重。默认值：(False, False)。
-          - **enable_fusion** (bool) - 在应用量化之前是否应用融合。默认值：False。
-          - **freeze_bn** (int) - `BatchNorm OP` 参数固定为全局均值和方差之后的步数。默认值：10000000。
-          - **bn_fold** (bool) - 是否使用 `bn fold` 算子进行模拟推理操作。默认值：False。
-          - **one_conv_fold** (bool) - 是否使用 `one conv bn fold` 算子进行模拟推理操作。默认值：True。
+          - **quant_delay** (Union[int, list, tuple]) - 在训练和评估期间权重和激活量化后的步数。第一个元素表示激活，第二个元素表示权重。默认值：``(0, 0)``。
+          - **quant_dtype** (Union[QuantDtype, list, tuple]) - 用于指定量化的目标数据类型。在设置 `quant_dtype` 时，必须考虑硬件设备的精度支持。第一个元素表示激活，第二个元素表示权重。默认值：``(QuantDtype.INT8, QuantDtype.INT8)``。
+          - **per_channel** (Union[bool, list, tuple]) - 基于层或通道的量化粒度。如果为 ``True``，则基于每个通道，否则基于每个层。第一个元素表示激活，第二个元素表示权重，第一个元素现在必须为 ``False``。默认值：``(False, False)``。
+          - **symmetric** (Union[bool, list, tuple]) - 量化算法是否对称。如果为 ``True``，则基于对称，否则基于不对称。第一个元素表示激活，第二个元素表示权重。默认值：``(False, False)``。
+          - **narrow_range** (Union[bool, list, tuple]) - 量化算法是否使用窄范围。第一个元素表示激活，第二个元素表示权重。默认值：``(False, False)``。
+          - **enable_fusion** (bool) - 在应用量化之前是否应用融合。默认值：``False``。
+          - **freeze_bn** (int) - `BatchNorm OP` 参数固定为全局均值和方差之后的步数。默认值：``10000000``。
+          - **bn_fold** (bool) - 是否使用 `bn fold` 算子进行模拟推理操作。默认值：``False``。
+          - **one_conv_fold** (bool) - 是否使用 `one conv bn fold` 算子进行模拟推理操作。默认值：``True``。
 
     异常：
         - **TypeError** - `bn_fold` ， `one_conv_fold` 或者 `enable_fusion` 的元素类型不是bool。
@@ -30,7 +30,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         - **ValueError** - `quant_delay` ， `quant_dtype` ， `per_channel` ， `symmetric` 或者 `narrow_range` 的长度大于2。
         - **ValueError** - `quant_delay` 小于0，或者 `quant_delay` 存在小于0的元素。
         - **ValueError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
-        - **ValueError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为True。
+        - **ValueError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为 ``True``。
 
     .. py:method:: apply(network: Cell)
 
@@ -56,7 +56,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         参数：
             - **net_opt** (Cell) - 经过量化算法apply之后的网络。
-            - **ckpt_path** (str) - 网络的checkpoint file文件路径，默认值为空，表示不加载。
+            - **ckpt_path** (str) - 网络的checkpoint file文件路径，默认值为 ``""``，表示不加载。
 
         异常：
             - **TypeError** - `net_opt` 数据类型不是Cell。
@@ -71,7 +71,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         设置量化感知训练参数 `config` 的act_narrow_range值。
 
         参数：
-            - **act_narrow_range** (bool) - 量化算法是否使用 `act_narrow_range` 。如果为True，则基于narrow_range，否则不基于narrow_range。
+            - **act_narrow_range** (bool) - 量化算法是否使用 `act_narrow_range` 。如果为 ``True``，则基于narrow_range，否则不基于narrow_range。
 
         异常：
             - **TypeError** - `act_narrow_range` 数据类型不是bool。
@@ -81,11 +81,11 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         设置量化感知训练参数 `config` 的act_per_channel值。
 
         参数：
-            - **act_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。当前只支持False。
+            - **act_per_channel** (bool) - 量化算法基于层还是通道。如果为 ``True``，则基于通道，否则基于层。当前只支持 ``False``。
 
         异常：
             - **TypeError** - `act_per_channel` 数据类型不是bool。
-            - **ValueError** - `act_per_channel` 不是False。
+            - **ValueError** - `act_per_channel` 不是 ``False``。
 
     .. py:method:: set_act_quant_delay(act_quant_delay)
 
@@ -114,7 +114,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         设置量化感知训练参数 `config` 的act_symmetric值。
 
         参数：
-            - **act_symmetric** (bool) - 量化算法是否使用激活对称。如果为True，则基于对称，否则基于不对称。
+            - **act_symmetric** (bool) - 量化算法是否使用激活对称。如果为 ``True``，则基于对称，否则基于不对称。
 
         异常：
             - **TypeError** - `act_symmetric` 数据类型不是bool。
@@ -165,7 +165,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         设置量化感知训练参数 `config` 的weight_narrow_range值。
 
         参数：
-            - **weight_narrow_range** (bool) - 量化算法是否使用权重narrow_range。如果为True，则基于narrow_range，否则不基于narrow_range。
+            - **weight_narrow_range** (bool) - 量化算法是否使用权重narrow_range。如果为 ``True``，则基于narrow_range，否则不基于narrow_range。
 
         异常：
             - **TypeError** - `weight_narrow_range` 数据类型不是bool。
@@ -175,7 +175,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         设置量化感知训练参数 `config` 的weight_per_channel值。
 
         参数：
-            - **weight_per_channel** (bool) - 量化算法基于层还是通道。如果为True，则基于通道，否则基于层。
+            - **weight_per_channel** (bool) - 量化算法基于层还是通道。如果为 ``True``，则基于通道，否则基于层。
 
         异常：
             - **TypeError** - `weight_per_channel` 数据类型不是bool。
@@ -207,7 +207,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         设置量化感知训练参数 `config` 的weight_symmetric值。
 
         参数：
-            - **weight_symmetric** (bool) - 量化算法是否使用权重对称。如果为True，则基于对称，否则基于不对称。
+            - **weight_symmetric** (bool) - 量化算法是否使用权重对称。如果为 ``True``，则基于对称，否则基于不对称。
 
         异常：
             - **TypeError** - `weight_symmetric` 数据类型不是bool。           

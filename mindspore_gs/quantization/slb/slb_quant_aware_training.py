@@ -45,7 +45,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
-            values are attribute values. Default: None. Supported attribute are listed below:
+            values are attribute values. Default: ``None``. Supported attribute are listed below:
 
             - quant_dtype (Union[QuantDtype, list(QuantDtype), tuple(QuantDtype)]): Datatype used to quantize weights and
               activations. The type is a QuantDtype, a list of two QuantDtype or a tuple of two QuantDtype. If quant_dtype is a
@@ -53,20 +53,20 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
               and the second element represents the type of weights. It is necessary to consider the precision support of
               hardware devices in the practical quantization infer scenaries. Weights quantization support int4|int2|int1,
               and activations quantization support int8 now.
-              Default: (QuantDtype.INT8, QuantDtype.INT1).
+              Default: ``(QuantDtype.INT8, QuantDtype.INT1)``.
             - enable_act_quant (bool): Whether apply activation quantization while training.
-              Default: False.
+              Default: ``False``.
             - enable_bn_calibration (bool): Whether apply batchnorm calibration while training.
-              Default: False.
+              Default: ``False``.
             - epoch_size (int): Total training epochs.
             - has_trained_epoch (int): The trained epochs.
-            - t_start_val (float): Initial value of temperature hyperparameters. Default: 1.
+            - t_start_val (float): Initial value of temperature hyperparameters. Default: ``1``.
             - t_start_time (float): Fraction of epochs after which temperature hyperparameters starting changing.
-              Default: 0.2.
+              Default: ``0.2``.
             - t_end_time (float): Fraction of epochs after which temperature hyperparameters stopping changing.
-              Default: 0.6.
+              Default: ``0.6``.
             - t_factor (float): Multiplicative factor of temperature hyperparameters changing.
-              Default: 1.2.
+              Default: ``1.2``.
 
     Raises:
         TypeError: If `quant_dtype` is not `QuantDtype`, or every element of `quant_dtype` is not `QuantDtype`.
@@ -186,12 +186,12 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of weight_quant_dtype of quantization aware training `config`
 
         Args:
-            weight_quant_dtype (QuantDtype): Datatype used to quantize weights. Default: QuantDtype.INT1.
+            weight_quant_dtype (QuantDtype): Datatype used to quantize weights. Default: ``QuantDtype.INT1``.
 
         Raises:
             TypeError: If `weight_quant_dtype` is not QuantDtype.
-            ValueError: Only supported if `weight_quant_dtype` is `QuantDtype.INT1`, `QuantDtype.INT2`
-                or `QuantDtype.INT4` yet.
+            ValueError: Only supported if `weight_quant_dtype` is ``QuantDtype.INT1``, ``QuantDtype.INT2``
+                or ``QuantDtype.INT4`` yet.
         """
         if not isinstance(weight_quant_dtype, QuantDtype):
             raise TypeError("The parameter `weight quant dtype` must be isinstance of QuantDtype, "
@@ -206,11 +206,11 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of act_quant_dtype of quantization aware training `config`
 
         Args:
-            act_quant_dtype (QuantDtype): Datatype used to quantize activations. Default: QuantDtype.INT8.
+            act_quant_dtype (QuantDtype): Datatype used to quantize activations. Default: ``QuantDtype.INT8``.
 
         Raises:
             TypeError: If `act_quant_dtype` is not QuantDtype.
-            ValueError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
+            ValueError: Only supported if `act_quant_dtype` is ``QuantDtype.INT8`` yet.
         """
         if not isinstance(act_quant_dtype, QuantDtype):
             raise TypeError("The parameter `act quant dtype` must be isinstance of QuantDtype, "
@@ -224,7 +224,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of enable_act_quant of quantization aware training `config`
 
         Args:
-            enable_act_quant (bool): Whether apply activation quantization while training, default is False.
+            enable_act_quant (bool): Whether apply activation quantization while training, default is ``False``.
 
         Raises:
             TypeError: If `enable_act_quant` is not bool.
@@ -237,7 +237,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of enable_bn_calibration of quantization aware training `config`
 
         Args:
-            enable_bn_calibration (bool): Whether apply batchnorm calibration while training, default is False.
+            enable_bn_calibration (bool): Whether apply batchnorm calibration while training, default is ``False``.
 
         Raises:
             TypeError: If `enable_bn_calibration` is not bool.
@@ -277,10 +277,10 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_t_start_val(self, t_start_val=1.0):
         """
-        Set value of t_start_val of quantization aware training `config`
+        Set value of t_start_val of quantization aware training `config`.
 
         Args:
-            t_start_val (float): Initial value of temperature hyperparameters, default: 1.0.
+            t_start_val (float): Initial value of temperature hyperparameters, default: ``1.0``.
 
         Raises:
             TypeError: If `t_start_val` is not float.
@@ -291,10 +291,11 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
     def set_t_start_time(self, t_start_time=0.2):
         """
-        Set value of t_start_time of quantization aware training `config`
+        Set value of t_start_time of quantization aware training `config`.
 
         Args:
-            t_start_time (float): Fraction of epochs after which temperature hyperparameters starting changing, default: 0.2.
+            t_start_time (float): Fraction of epochs after which temperature hyperparameters starting changing,
+                default: ``0.2``.
 
         Raises:
             TypeError: If `t_start_time` is not float.
@@ -309,7 +310,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of t_end_time of quantization aware training `config`
 
         Args:
-            t_end_time (float): Fraction of epochs after which temperature hyperparameters stopping changing, default: 0.6.
+            t_end_time (float): Fraction of epochs after which temperature hyperparameters stopping changing,
+                default: ``0.6``.
 
         Raises:
             TypeError: If `t_end_time` is not float.
@@ -324,7 +326,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         Set value of t_factor of quantization aware training `config`
 
         Args:
-            t_factor (float): Multiplicative factor of temperature hyperparameters changing, default: 1.2.
+            t_factor (float): Multiplicative factor of temperature hyperparameters changing, default: ``1.2``.
 
         Raises:
             TypeError: If `t_factor` is not float.
@@ -381,11 +383,11 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             List of instance of Callbacks.
 
         Raises:
-            RuntimeError: If `epoch_size` is not initialized!
-            RuntimeError: If `has_trained_epoch` is not initialized!
+            RuntimeError: If `epoch_size` is not initialized.
+            RuntimeError: If `has_trained_epoch` is not initialized.
             ValueError: If `epoch_size` is not greater than `has_trained_epoch`.
             ValueError: If `t_end_time` is less than `t_start_time`.
-            TypeError: If `model` is not mindspore.Model.
+            TypeError: If `model` is not `mindspore.train.Model`.
             TypeError: If `dataset` is not mindspore.dataset.Dataset.
         """
 
@@ -444,7 +446,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
 
         Args:
             net_opt (Cell): Network to be converted which is transformed by `SlbQuantAwareTraining.apply`.
-            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is a empty string which means not loading
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
                 checkpoint file to `net_opt`.
 
         Returns:

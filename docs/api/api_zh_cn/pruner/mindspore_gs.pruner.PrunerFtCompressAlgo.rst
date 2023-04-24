@@ -8,7 +8,7 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
     参数：
         - **config** (dict) - 以字典的形式存放用于剪枝训练的配置，下面列出了受支持的属性：
           
-          - **prune_rate** (float) - 默认值：[0.0, 1.0)。
+          - **prune_rate** (float) - 值的取值范围是[0.0, 1.0)。
     
     异常：
         - **TypeError** - `prune_rate` 的数据类型不是 `float` 。
