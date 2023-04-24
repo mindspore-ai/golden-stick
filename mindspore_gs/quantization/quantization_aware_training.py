@@ -15,7 +15,7 @@
 """Quantize."""
 import copy
 from typing import Optional
-from mindspore.rewrite import Node, NodeType
+from mindspore.rewrite import Node
 from mindspore.nn import Cell
 from .net_policy import NetPolicy
 from .layer_policy import LayerPolicy, layer_policy_key
@@ -50,11 +50,11 @@ class QuantizationAwareTraining(CompAlgo):
         # step1 apply net layer-policy first
         net_layer_policy: Optional[LayerPolicy] = self._qat_policy.get_net_layer_policy()
         if net_layer_policy:
-            for node in net_transformer.nodes():
+            for node in net_transformer.unfolded_nodes():
                 node.set_attribute(layer_policy_key, copy.copy(net_layer_policy))
         # step2 then apply layer-policy map, override policy if need
         layer_policy_map = self._qat_policy.get_layer_policy_map()
-        for node in net_transformer.nodes():
+        for node in net_transformer.unfolded_nodes():
             if not isinstance(node, Node):
                 continue
             layer_policy: LayerPolicy = self._custom_layer_policy_map.get(node.get_instance_type())
@@ -64,11 +64,6 @@ class QuantizationAwareTraining(CompAlgo):
                 new_layer_policy = copy.deepcopy(layer_policy)
                 new_layer_policy.set_input_number(len(node.get_inputs()))
                 node.set_attribute(layer_policy_key, new_layer_policy)
-
-        for node in net_transformer.nodes():
-            if node.get_node_type() == NodeType.Tree:
-                sub_net_trans = NetTransformer.create_from_tree_node(node)
-                self._propagate_layer_policy(sub_net_trans)
 
     @staticmethod
     def _reduce_redundant_fake_quant(net_transformer: NetTransformer):
@@ -80,12 +75,9 @@ class QuantizationAwareTraining(CompAlgo):
             nodes (List[Node]): nodes to be checked between which may find redundant fake-quantizer
         """
 
-        for node in net_transformer.nodes():
+        for node in net_transformer.unfolded_nodes():
             if not isinstance(node, Node):
                 continue
-            if node.get_node_type() == NodeType.Tree:
-                sub_net_trans = NetTransformer.create_from_tree_node(node)
-                QuantizationAwareTraining._reduce_redundant_fake_quant(sub_net_trans)
             cur_policy: LayerPolicy = node.get_attribute(layer_policy_key)
             # cur-node has no quant policy, so no fq will insert into its inputs
             if cur_policy is None:
@@ -147,12 +139,8 @@ class QuantizationAwareTraining(CompAlgo):
         Args:
             net_transformer (NetTransformer): net_transformer is used to transform node according to layer policy.
         """
-        nodes = list(net_transformer.nodes())
+        nodes = list(net_transformer.unfolded_nodes())
         for node in nodes:
-            if node.get_node_type() == NodeType.Tree:
-                sub_net_transformer = NetTransformer.create_from_tree_node(node)
-                QuantizationAwareTraining._apply_layer_policy(sub_net_transformer)
-                continue
             layer_policy = node.get_attribute(layer_policy_key)
             if isinstance(layer_policy, LayerPolicy):
                 wrapped_cell = layer_policy.wrap_cell(node.get_instance())

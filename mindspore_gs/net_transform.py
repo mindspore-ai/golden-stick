@@ -16,7 +16,7 @@
 from typing import Union, Optional
 
 from mindspore.nn.cell import Cell
-from mindspore.rewrite import PatternEngine, SymbolTree, Node, ScopedValue, TreeNodeHelper
+from mindspore.rewrite import PatternEngine, SymbolTree, Node, ScopedValue, TreeNodeHelper, NodeType
 
 
 class NetTransformer:
@@ -50,6 +50,15 @@ class NetTransformer:
 
     def get_code(self):
         return self._symbol_tree.get_code()
+
+    def unfolded_nodes(self) -> {}:
+        """
+        Get a generator to generate unfolded nodes of corresponding network.
+        """
+
+        for node in self._symbol_tree.nodes():
+            for single_node in NodeUnfolder.unfold_nodes(node):
+                yield single_node
 
     def nodes(self) -> {}:
         """
@@ -97,7 +106,8 @@ class NetTransformer:
         Raises:
             RuntimeError: old node is isolated.
         """
-        return self._symbol_tree.replace(old_node, new_nodes)
+        stree = SymbolTree(old_node.get_handler().get_belong_symbol_tree())
+        return stree.replace(old_node, new_nodes)
 
     def dump(self):
         self._symbol_tree.dump()
@@ -113,3 +123,41 @@ class NetTransformer:
             a bool value indicating if transform occurred
         """
         return pattern_engine.apply(self._symbol_tree)
+
+
+class NodeUnfolder:
+    """
+    Unfold nodes from symbol tree.
+    node_type_to_unfold_list: [NodeType.Tree, NodeType.CellContainer]
+    """
+
+    @staticmethod
+    def _get_nodes_from_cell_container(node: Node):
+        cell_container = node.get_handler()
+        for i, sub_node in enumerate(cell_container.nodes()):
+            if i == 0 and not sub_node.get_inputs():
+                sub_node.set_inputs(cell_container.get_inputs())
+            for single_node in NodeUnfolder.unfold_nodes(Node(sub_node)):
+                yield single_node
+
+    @staticmethod
+    def _get_nodes_from_sub_tree(node: Node):
+        sub_tree: SymbolTree = node.get_handler().symbol_tree
+        for sub_node in sub_tree.nodes():
+            for single_node in NodeUnfolder.unfold_nodes(Node(sub_node)):
+                yield single_node
+
+    @staticmethod
+    def unfold_nodes(node: Node):
+        """
+        Unfold cell container or subtree.
+        """
+        node_type: NodeType = node.get_node_type()
+        if node_type == NodeType.CellContainer:
+            for unfolded_node in NodeUnfolder._get_nodes_from_cell_container(node):
+                yield unfolded_node
+        elif node_type == NodeType.Tree:
+            for unfolded_node in NodeUnfolder._get_nodes_from_sub_tree(node):
+                yield unfolded_node
+        else:
+            yield node
