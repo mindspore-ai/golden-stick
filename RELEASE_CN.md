@@ -12,7 +12,7 @@
 
 感谢以下人员作出的贡献：
 
-liuzhicheng01, fuzhongqian, hangangqiang, yangruoqi713, kevinkunkun.
+hangangqiang, yangruoqi713, kevinkunkun
 
 欢迎以任意形式对项目提供贡献!
 
