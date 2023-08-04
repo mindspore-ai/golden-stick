@@ -45,6 +45,11 @@ class NetTransformer:
         modify_tree = TreeNodeHelper.get_sub_tree(node)
         return NetTransformer(None, modify_tree)
 
+    @staticmethod
+    def create_node(cell: Cell, targets: [Union[ScopedValue, str]], args: [ScopedValue] = None,
+                    kwargs: {str: ScopedValue}=None, name: str = "") -> Node:
+        return Node.create_call_cell(cell, targets, args, kwargs, name)
+
     def get_network(self) -> Cell:
         return self._symbol_tree.get_network()
 
@@ -73,11 +78,6 @@ class NetTransformer:
 
     def after(self, node_or_name: Union[Node, str]):
         return self._symbol_tree.after(node_or_name)
-
-    @staticmethod
-    def create_node(cell: Cell, targets: [Union[ScopedValue, str]], args: [ScopedValue] = None,
-                    kwargs: {str: ScopedValue}=None, name: str = "") -> Node:
-        return Node.create_call_cell(cell, targets, args, kwargs, name)
 
     def insert(self, position, node: Node) -> Optional[Node]:
         return self._symbol_tree.insert(position, node)

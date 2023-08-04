@@ -14,6 +14,7 @@
 # ============================================================================
 """GhostNet model define"""
 import math
+
 import mindspore.nn as nn
 from mindspore.ops import operations as P
 from ..comp_algo import CompAlgo
@@ -183,8 +184,16 @@ class GhostAlgo(CompAlgo):
                 for value, param in modules[k].parameters_and_names():
                     prex = param.name.strip(value)
                 if isinstance(modules[k], nn.Conv2d):
-                    if modules[k].kernel_size[0] == 1:
-                        if modules[k].in_channels == modules[k].out_channels and modules[k].stride[0] == 1:
+                    try:
+                        kernel_size_0 = modules[k].kernel_size[0]
+                    except RuntimeError:
+                        raise RuntimeError(f"For GoldenStick Ghost algo, get kernel_size of modules[{k}] failed.")
+                    if kernel_size_0 == 1:
+                        try:
+                            stride_0 = modules[k].stride[0]
+                        except RuntimeError:
+                            raise RuntimeError(f"For GoldenStick Ghost algo, get stride of modules[{k}] failed.")
+                        if modules[k].in_channels == modules[k].out_channels and stride_0 == 1:
                             modules[k] = GhostModule(modules[k].in_channels, modules[k].out_channels,
                                                      kernel_size=modules[k].kernel_size,
                                                      stride=modules[k].stride, padding=modules[k].padding,
@@ -194,7 +203,7 @@ class GhostAlgo(CompAlgo):
                             modules[k] = ConvUnit(modules[k].in_channels, modules[k].out_channels,
                                                   kernel_size=modules[k].kernel_size,
                                                   stride=modules[k].stride,
-                                                  padding=self._get_pad(modules[k].kernel_size[0]), act_type='relu',
+                                                  padding=self._get_pad(kernel_size_0), act_type='relu',
                                                   num_groups=modules[k].out_channels, use_act=False)
                             modules[k].conv.weight.name = prex + modules[k].conv.weight.name
                             modules[k].bn.gamma.name = prex + modules[k].bn.gamma.name
