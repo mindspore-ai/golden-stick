@@ -15,7 +15,6 @@
 """TensorAddQuant."""
 from __future__ import absolute_import
 
-
 from mindspore.ops import operations as P
 from mindspore.common.dtype import QuantDtype
 from mindspore.nn.cell import Cell
