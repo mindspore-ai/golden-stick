@@ -468,7 +468,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if os.path.isfile(ckpt_path):
             param_dict = load_checkpoint(ckpt_path)
             not_load_param = load_param_into_net(net_opt, param_dict)
-            if not_load_param:
+            if not_load_param[0]:
                 raise RuntimeError("Load param into net fail.")
         exporter = ConvertToQuantInferNetwork(net_opt, get_quant_dtype_num_bits(self._config.weight_quant_dtype))
         return exporter.run()
