@@ -300,7 +300,9 @@ class UniPruner(CompAlgo):
         if ckpt_path != "":
             if os.path.isfile(real_path):
                 param_dict = load_checkpoint(ckpt_path)
-                load_param_into_net(net_opt, param_dict)
+                not_load_param = load_param_into_net(net_opt, param_dict)
+                if not_load_param[0]:
+                    raise RuntimeError("Load param into net fail.")
             else:
                 raise ValueError(
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
