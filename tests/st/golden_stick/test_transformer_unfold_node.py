@@ -110,34 +110,31 @@ def test_unfold_nodes():
     Expectation: Net transformer can unfold nodes successfully.
 
     Unfolded nodes are support to be as follows:
-    #0 NodeType.Input
-    #1 NodeType.Python
-    #2 conv
-    #3 bn
-    #4 relu
-    #5 NodeType.Input
-    #6 NodeType.Python
-    #7 NodeType.CallMethod
-    #8 conv
-    #9 bn
-    #10 conv
-    #11 bn
-    #12 NodeType.Python
-    #13 relu
-    #14 NodeType.Output
-    #15 NodeType.Input
-    #16 NodeType.Python
-    #17 NodeType.CallMethod
-    #18 conv
-    #19 bn
-    #20 conv
-    #21 bn
-    #22 NodeType.Python
-    #23 relu
-    #24 NodeType.Output
-    #25 conv
-    #26 bn
-    #27 NodeType.Output
+    # 0  NodeType.Input
+    # 1  conv
+    # 2  bn
+    # 3  relu
+    # 4  NodeType.Input
+    # 5  NodeType.CallMethod
+    # 6  conv
+    # 7  bn
+    # 8  conv
+    # 9  bn
+    # 10 NodeType.MathOps
+    # 11 relu
+    # 12 NodeType.Output
+    # 13 NodeType.Input
+    # 14 NodeType.CallMethod
+    # 15 conv
+    # 16 bn
+    # 17 conv
+    # 18 bn
+    # 19 NodeType.MathOps
+    # 20 relu
+    # 21 NodeType.Output
+    # 22 conv
+    # 23 bn
+    # 24 NodeType.Output
     """
     net_trans = NetTransformer(ResNetSimple())
     node_count = 0
@@ -145,18 +142,18 @@ def test_unfold_nodes():
     bn_count = 0
     relu_count = 0
     for node in net_trans.unfolded_nodes():
-        if node_count in [2, 8, 10, 18, 20, 25]:
+        if node_count in [1, 6, 8, 15, 17, 22]:
             assert node.get_handler().get_instance_type() is nn.Conv2d
             conv_count += 1
-        elif node_count in [3, 9, 11, 19, 21, 26]:
+        elif node_count in [2, 7, 9, 16, 18, 23]:
             assert node.get_handler().get_instance_type() is nn.BatchNorm2d
             bn_count += 1
-        elif node_count in [4, 13, 23]:
+        elif node_count in [3, 11, 20]:
             assert node.get_handler().get_instance_type() is nn.ReLU or \
                    node.get_handler().get_instance_type() is P.ReLU
             relu_count += 1
         node_count += 1
-    assert node_count == 28
+    assert node_count == 25
     assert conv_count == 6
     assert bn_count == 6
     assert relu_count == 3
