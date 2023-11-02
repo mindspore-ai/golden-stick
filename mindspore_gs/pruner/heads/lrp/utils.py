@@ -15,14 +15,15 @@
 """
 concrete gate and pruning heads for the model
 """
+import math
 from itertools import compress
-
-from mindspore import ops
 import mindspore as ms
+from mindspore import ops
 from mindspore import nn
 from mindspore.common.tensor import Tensor
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
+from mindspore.ops import operations as P
 from mindspore_gs.validator import Validator
 
 
@@ -44,7 +45,7 @@ class ConcreteGate(nn.Cell):
     """
 
     def __init__(self, shape, temperature=0.33, stretch_limits=(-0.1, 1.1),
-                 l0_penalty=1.0, eps=1e-6):
+                 l0_penalty=1.0, eps=1e-6, gqa_rep=1):
 
         super(ConcreteGate, self).__init__()
         Validator.check_value_type("shape", shape, [list], self.__class__.__name__)
@@ -59,27 +60,50 @@ class ConcreteGate(nn.Cell):
         self.sigmoid = ops.Sigmoid()
         self.log = ops.Log()
         self.op = ops.ReduceSum()
-        self.uniform_real = ops.UniformReal()
+        self.uniformreal = ops.UniformReal()
+        self.shape = self.log_a.shape
+        low, high = self.stretch_limits
+        assert low < 0.0, "p_gate_closed can be computed only if lower stretch limit is negative"
+        self.bias = Tensor(temperature * math.log(-low / high))
+        self.gqa_rep = gqa_rep
+        if gqa_rep > 1:
+            self.tile_kv = P.Tile()  # Needed only for Grouped Query Attention
+            self.reshape = P.Reshape()
+
+    def _repeat_for_gqa(self, gates):
+        bs, n_kv_head, seqlen, head_dim = gates.shape
+        gates = self.reshape(gates, (bs * n_kv_head, 1, seqlen, head_dim))
+        gates = self.tile_kv(gates, (1, self.gqa_rep, 1, 1))
+        gates = self.reshape(gates, (bs, n_kv_head * self.gqa_rep, seqlen, head_dim))
+        return gates
 
     def construct(self, values, is_train=True):
         """ applies gate to values, if is_train, adds regularizer to reg_collection """
         Validator.check_value_type("is_train", is_train, [bool], self.__class__.__name__)
         is_train = self.training if is_train is None else is_train
         gates = self.get_gates(is_train)
+        if not self.lrp_train:
+            gates = self.zero_gates(gates)
+        if self.gqa_rep > 1:
+            gates = self._repeat_for_gqa(gates)
         return values * gates
+
+    def zero_gates(self, gates):
+        return gates*(gates >= 0.5)
+
 
     def get_gates(self, is_train):
         """ samples gate activations in [0, 1] interval """
         Validator.check_value_type("is_train", is_train, [bool], self.__class__.__name__)
-        low, high = self.stretch_limits
+        concrete = self.sigmoid(self.log_a)
 
         if is_train:
-            shape = self.log_a.shape
-            noise = (1 - 2 * self.eps) * self.uniform_real(shape) + self.eps
-            concrete = self.sigmoid((self.log(noise) - self.log(1 - noise) + self.log_a) / self.temperature)
+            noise = Tensor((1.0 - 2 * self.eps) * self.uniformreal(self.shape)) + self.eps
+            concrete = self.sigmoid((self.log(noise) - self.log(1.0 - noise) + self.log_a) / self.temperature)
         else:
             concrete = self.sigmoid(self.log_a)
 
+        low, high = self.stretch_limits
         stretched_concrete = concrete * (high - low) + low
         clipped_concrete = ops.clip_by_value(stretched_concrete, 0, 1)
         return clipped_concrete
@@ -90,10 +114,8 @@ class ConcreteGate(nn.Cell):
         (usually activations or weights) before they are multiplied by the gate
         Returns the regularizer value that should to be MINIMIZED (negative logprior)
         """
-        low, high = self.stretch_limits
-        assert low < 0.0, "p_gate_closed can be computed only if lower stretch limit is negative"
         # compute p(gate_is_closed) = cdf(stretched_sigmoid < 0)
-        p_open = self.sigmoid(self.log_a - self.temperature * self.log(Tensor(-low) / Tensor(high)))
+        p_open = self.sigmoid(self.log_a - self.bias)
         p_open = ops.clip_by_value(p_open, self.eps, 1.0 - self.eps)
 
         total_reg = self.l0_penalty * self.op(p_open)
