@@ -1,40 +1,11 @@
 # LRP Head Pruning
 
-<!-- TOC -->
+[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/tree/master/mindspore_gs/pruner/heads/lrp/README.md)
 
-* LRP Head Pruning
-    * [Introduction](#introduction)
-        * [Pruning Attention Heads](#pruning-attention-heads)
-        * [LRP method](#lrp-method)
-    * [HeadPruning API](#headpruning-api)
-    * [Run sample](#run-sample)
-
-<!-- /TOC -->
-
-MindSpore Golden Stick LRP model is an implementation of the LRP method for head pruning first presented in the article
+MindSpore Golden Stick LRP module is an implementation of the LRP method for head pruning first presented in the article
 [Analyzing Multi-Head Self-Attention: Specialized Heads Do the Heavy Lifting, the Rest Can Be Pruned](https://www.aclweb.org/anthology/P19-1580) and explained below.
 
-For a complete tutorial of how to use this module please refer to the [tutorial page](tutorial.md).
-
-## Bibtex
-
-```text
-@inproceedings{voita-etal-2019-analyzing,
-    title = "Analyzing Multi-Head Self-Attention: Specialized Heads Do the Heavy Lifting, the Rest Can Be Pruned",
-    author = "Voita, Elena  and
-      Talbot, David  and
-      Moiseev, Fedor  and
-      Sennrich, Rico  and
-      Titov, Ivan",
-    booktitle = "Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics",
-    month = jul,
-    year = "2019",
-    address = "Florence, Italy",
-    publisher = "Association for Computational Linguistics",
-    url = "https://www.aclweb.org/anthology/P19-1580",
-    pages = "5797--5808",
-}
-```
+For a complete tutorial of how to use this module please refer to the [tutorial page](https://www.mindspore.cn/golden_stick/docs/en/master/pruner/lrp_tutorial.html).
 
 ## Introduction
 
@@ -50,32 +21,31 @@ The LRP method starts from a converged model that was not necessarily specially 
 Then, it fine-tunes the model to support head pruning, and at the end of the fine-tuning phase some heads are pruned.
 
 During the fine-tuning, the original Transformer architecture is modified by multiplying the representation computed by each head with a scalar gate.
-That is, when moving from the standard Transformer to the modified one, the representation computed by each `head_i`is multiplied by a scalar gate `g_i` before being concatenated with results of other attention heads in a layer:
+That is, when moving from the standard Transformer to the modified one, the representation computed by each ${\rm head}_i$ is multiplied by a scalar gate $g_i$ before being concatenated with results of other attention heads in a layer:
+${\rm MultiHead}(Q, K, V) = {\rm Concat}_i({\rm head}_i)W^O \rightarrow {\rm Concat}_i(g_i*{\rm head}_i)W^O $
 
-```MultiHead(Q, K, V) = Concat(head_i)W^O``` &rarr; ```MultiHead(Q, K, V) = Concat(g_i * head_i)W^O```
+Note, $g_i$ are parameters specific to heads and are independent of the input (i.e. the sentence).
 
-Note, `g_i` are parameters specific to heads and are independent of the input (i.e. the sentence).
-
-Ideally, the values of the gates are either 1 (“open”) or 0 (“closed”), and the sparsity of the gates is encouraged by applying `L0` regularization to the scalar gates `g_i`.
-The L0 norm equals the number of non-zero components and would push the model to switch off less important heads.
+Ideally, the values of the gates are either 1 (“open”) or 0 (“closed”), and the sparsity of the gates is encouraged by applying $L0$ regularization to the scalar gates $g_i$.
+The $L0$ norm equals the number of non-zero components and would push the model to switch off less important heads.
 
 Unfortunately, a direct implementation of this idea leads to an objective function that is non-differentiable with respect to the added gates.
 So instead, the algorithm uses a stochastic relaxation in which each gate is modeled as a continuous random variable drawn independently of a head-specific
 [Hard Concrete distribution](https://openreview.net/pdf?id=H1Y8hhg0b). The distributions have non-zero probability mass at 0 and 1; look at the illustration.
 
-![concrete](../../../../docs/images/concrete_crop.gif)
+![concrete](https://www.mindspore.cn/golden_stick/docs/en/master/_images/concrete_crop.gif)
 
-The non-differentiable `L0` norm is replaced by the sum of the probabilities of heads being non-zero (`L_C`) as a stochastic relaxation,
+The non-differentiable $L0$ norm is replaced by the sum of the probabilities of heads being non-zero ($L_C$) as a stochastic relaxation,
 and the resulting training objective is
 
-```L = L_xent + λ * L_C.```
+$L = L_{xent} + \lambda L_C$
 
-By varying the coefficient `λ` in the optimized objective, we obtain models with different numbers of retained heads. Below is shown how the probabilities of encoder heads being completely closed (P(g_i)=0) change in training for different values of `λ` (pruning starts from a converged model). 
-White color denotes P(g_i=0) = 1, which means that a head is completely removed from the model.
+By varying the coefficient $\lambda$ in the optimized objective, we obtain models with different numbers of retained heads. Below is shown how the probabilities of encoder heads being completely closed $(P(g_i)=0)$ change in training for different values of $\lambda$ (pruning starts from a converged model). 
+White color denotes $P(g_i=0) = 1$, which means that a head is completely removed from the model.
 
-![enc_head_gif](../../../../docs/images/enc_head_gif_delay7-min.gif)
+![enc_head_gif](https://www.mindspore.cn/golden_stick/docs/en/master/_images/enc_head_gif_delay7-min.gif)
 
-(Gif is for the model trained on EN-RU WMT. For other datasets, values of `λ` can be different.)
+(Gif is for the model trained on EN-RU WMT. For other datasets, values of $\lambda$ can be different.)
 
 Empirically, the model converges to solutions where gates are either almost completely closed or completely open.
 This means that at test time we can treat the model as a standard Transformer and use only a subset of heads.
@@ -92,11 +62,11 @@ Overall, there are 3 main parameters that the user needs to know in order to get
     * A per head parameter indicating the “openness” of the gate associated with the head
     * These parameters are learned by the algorithm in the fine-tuning phase (unlike the previous two parameters that are set by the user)
 
-#### L0_penalty graph
+#### $L$0_penalty graph
 
 (From Differentiable Subset Pruning of Transformer Heads article)
 
-![l0_graph](../../../../docs/images/l0_graph.png)
+![l0_graph](https://www.mindspore.cn/golden_stick/docs/en/master/_images/l0_graph.png)
 
 #### Link to the article
 
@@ -117,7 +87,7 @@ The model parameter 'log_a' (which is introduced by the algorithm) should be def
 
 To define a different learning rate especially for this parameter, use the following script
 
-```python
+```text
 params = network.trainable_params()
 pruning_params = list(filter(lambda x: 'log_a' in x.name, params))
 other_params = list(filter(lambda x: 'log_a' not in x.name, params))
@@ -210,10 +180,11 @@ The function has an option to get another parameter:
  prune_model = pruner.convert(bert_model_gated, save_dir_path)
 ```
 
----
 ## Run sample
 
 ### BERT on MNLI
+
+We provide a code example for LRP pruning of Bert model in [run_sample_bert.py](https://gitee.com/mindspore/golden-stick/tree/master/mindspore_gs/pruner/heads/lrp/bert/samples/run_sample_bert.py) file. It can be run using the following shell command
 
 ```bash
 export DEVICE_TARGET = "GPU"
