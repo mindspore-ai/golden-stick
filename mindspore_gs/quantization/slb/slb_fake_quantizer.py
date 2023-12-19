@@ -15,6 +15,8 @@
 """SlbFakeQuantizer."""
 
 from functools import partial
+from typing import Union
+
 import numpy as np
 import mindspore
 import mindspore.context as context
@@ -24,8 +26,8 @@ from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.validator import Validator
-from ..fake_quantizer import FakeQuantizer
-from ..quant_utils import get_quant_min_max, cal_quantization_params, LinearFakeQuantCell
+from ..fake_quantizer import FakeQuantizer, LinearFakeQuantizer
+from ..quant_utils import get_quant_min_max, cal_quantization_params
 
 
 class SlbFakeQuantizerPerLayer(FakeQuantizer):
@@ -88,7 +90,7 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         SlbFakeQuantizer apply method.
         """
         is_training = self.training
-        if is_training == False:
+        if not is_training:
             # Compute one-hot representation of matrix A's argmax
             weights = self.onehot(self.argmax(x), x.shape[-1], self.true_tensor, self.false_tensor)
         else:
@@ -109,8 +111,28 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         s = 'bit_num={}'.format(self.num_bits)
         return s
 
+    def name(self) -> str:
+        return "SLBQuant"
 
-class SlbActQuantizer(FakeQuantizer):
+    def quant_dtype(self) -> QuantDtype:
+        if self.num_bits == 1:
+            return QuantDtype.INT1
+        if self.num_bits == 2:
+            return QuantDtype.INT2
+        if self.num_bits == 4:
+            return QuantDtype.INT4
+        raise ValueError("Only support 1,2,4 bit weight quantize for slb quantization now!"
+                         "Please set weight_quant_dtype in [QuantDtype.INT1, QuantDtype.INT2, QuantDtype.INT4] for "
+                         "SlbQuantAwareTraining.")
+
+    def is_per_channel(self) -> bool:
+        return False
+
+    def quant_params(self) -> dict:
+        return {"num_bits": self.num_bits}
+
+
+class SlbActQuantizer(LinearFakeQuantizer):
     """
     Implement of SlbActQuantizer.
     1. statistic the min max value passing through this op
@@ -170,6 +192,30 @@ class SlbActQuantizer(FakeQuantizer):
         scale, zp = cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=self._symmetric)
         return input_min, input_max, scale, zp
 
+    def mins(self) -> Union[list, tuple]:
+        return self._float_min.data.asnumpy().tolist()
+
+    def maxs(self) -> Union[list, tuple]:
+        return self._float_max.data.asnumpy().tolist()
+
+    def num_bits(self) -> int:
+        return self._num_bits
+
+    def narrow_range(self) -> bool:
+        return self._narrow_range
+
+    def symmetric(self) -> bool:
+        return self._symmetric
+
+    def quant_dtype(self) -> QuantDtype:
+        if self._num_bits != 8:
+            raise TypeError("Only support int8 feature quantize for slb quantization now!"
+                            "Please set act_quant_dtype=QuantDtype.INT8 for SlbQuantAwareTraining.")
+        return QuantDtype.INT8
+
+    def is_per_channel(self) -> bool:
+        return False
+
     def construct(self, x):
         if self.training:
             self._float_min, self._float_max = \
@@ -178,12 +224,3 @@ class SlbActQuantizer(FakeQuantizer):
         else:
             out = self._fake_quant_infer(x, self._float_min, self._float_max)
         return out
-
-    def convert_to_fakequantparam(self):
-        if self._num_bits != 8:
-            raise ValueError("Only support int8 activation quant now!")
-        quant_dtype = QuantDtype.INT8
-        _, _, scale, zero_point = self.extract_quant_param()
-        new_subcell = LinearFakeQuantCell(quant_dtype=quant_dtype, scale=tuple(scale), zero_point=tuple(zero_point),
-                                          is_per_channel=False)
-        return new_subcell
