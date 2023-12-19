@@ -13,9 +13,92 @@
 # limitations under the License.
 # ============================================================================
 """
-FakeQuantizer.
-FakeQuantizer should be a Cell for automatic-differentiation
+FakeQuantizer, statistic distribute of input x and return quant param.
 """
-from mindspore.nn.cell import Cell
+import abc
+from typing import Union
 
-FakeQuantizer = Cell
+import numpy as np
+from mindspore.nn.cell import Cell
+from mindspore import QuantDtype
+from mindspore.ops.operations._quant_ops import FakeQuantParam
+from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params
+
+
+class FakeQuantParamCell(Cell):
+    def __init__(self, op: FakeQuantParam):
+        super().__init__()
+        if not isinstance(op, FakeQuantParam):
+            raise TypeError("Input ops should be a FakeQuantParam, but got: ", type(op))
+        self._op = op
+
+    def construct(self, x):
+        return self._op(x)
+
+
+class FakeQuantizer(Cell):
+    """
+    Abstract class for cell which statistic distribute of input x and return quant param.
+    """
+    @abc.abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def quant_dtype(self) -> QuantDtype:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def is_per_channel(self) -> bool:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def quant_params(self) -> dict:
+        raise NotImplementedError
+
+    def convert_to_fakequantparam(self) -> FakeQuantParamCell:
+        fq_param = FakeQuantParam(self.quant_dtype(), self.name(), self.is_per_channel(), **self.quant_params())
+        return FakeQuantParamCell(fq_param)
+
+
+class LinearFakeQuantizer(FakeQuantizer):
+    """
+    Abstract class derived from FakeQuantizer, suit for linear quantization.
+    """
+    def name(self) -> str:
+        return FakeQuantParam.attr_value_linear_quant_algo_name
+
+    @abc.abstractmethod
+    def mins(self) -> Union[list, tuple]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def maxs(self) -> Union[list, tuple]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def num_bits(self) -> int:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def narrow_range(self) -> bool:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def symmetric(self) -> bool:
+        raise NotImplementedError
+
+    def get_scale_zp(self):
+        quant_min, quant_max = get_quant_min_max(self.num_bits(), self.symmetric(), self.narrow_range())
+        input_mins = np.array(self.mins(), dtype=np.float32)
+        input_maxs = np.array(self.maxs(), dtype=np.float32)
+        scale, zp = cal_quantization_params(input_mins, input_maxs, quant_min, quant_max, symmetric=self.symmetric())
+        scale = scale.tolist()
+        zp = zp.tolist()
+        return scale, zp
+
+    def quant_params(self) -> dict:
+        scale, zp = self.get_scale_zp()
+        return {"min": self.mins(), "max": self.maxs(), "num_bits": self.num_bits(),
+                "narrow_range": self.narrow_range(), "symmetric": self.symmetric(), "scale": scale,
+                "zero_point": zp}

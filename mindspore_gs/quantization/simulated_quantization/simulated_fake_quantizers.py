@@ -15,6 +15,8 @@
 """Simulated fake quantizers."""
 
 from functools import partial
+from typing import Union
+
 import numpy as np
 import mindspore
 from mindspore.ops.operations import _quant_ops as Q
@@ -23,11 +25,11 @@ from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
 import mindspore.context as context
 from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
-from ..fake_quantizer import FakeQuantizer
-from ..quant_utils import get_quant_min_max, cal_quantization_params, LinearFakeQuantCell
+from ..fake_quantizer import LinearFakeQuantizer
+from ..quant_utils import get_quant_min_max, cal_quantization_params
 
 
-class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
+class SimulatedFakeQuantizerPerLayer(LinearFakeQuantizer):
     """
     Implement of SimFakeQuantizer.
     1. statistic the min max value passing through this op
@@ -85,6 +87,30 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
                                     self._ema, self._ema_decay, False, self._quant_delay)
         return s
 
+    def mins(self) -> Union[list, tuple]:
+        return self._float_min.data.asnumpy().tolist()
+
+    def maxs(self) -> Union[list, tuple]:
+        return self._float_max.data.asnumpy().tolist()
+
+    def num_bits(self) -> int:
+        return self._num_bits
+
+    def narrow_range(self) -> bool:
+        return self._narrow_range
+
+    def symmetric(self) -> bool:
+        return self._symmetric
+
+    def quant_dtype(self) -> QuantDtype:
+        if self._quant_dtype != QuantDtype.INT8:
+            raise TypeError("Only support int8 simulate quantization now!"
+                            "Please set quant_dtype=QuantDtype.INT8 for SimulatedQuantizationAwareTraining.")
+        return self._quant_dtype
+
+    def is_per_channel(self) -> bool:
+        return False
+
     def extract_quant_param(self):
         quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._signed,
                                                  narrow_range=self._narrow_range)
@@ -102,14 +128,6 @@ class SimulatedFakeQuantizerPerLayer(FakeQuantizer):
             out = self._fake_quant_infer(x, self._float_min, self._float_max)
         return out
 
-    def convert_to_fakequantparam(self):
-        if self._quant_dtype != QuantDtype.INT8:
-            raise TypeError("Only support int8 simulate quantization now!"
-                            "Please set quant_dtype=QuantDtype.INT8 for SimulatedQuantizationAwareTraining.")
-        _, _, scale, zero_point = self.extract_quant_param()
-        new_subcell = LinearFakeQuantCell(quant_dtype=self._quant_dtype, scale=tuple(scale),
-                                          zero_point=tuple(zero_point), is_per_channel=False)
-        return new_subcell
 
 class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
     """
@@ -146,6 +164,15 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
         scale, zp = cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=self._symmetric)
         return input_min, input_max, scale, zp
 
+    def mins(self) -> Union[list, tuple]:
+        return self._float_min.data.asnumpy().tolist()
+
+    def maxs(self) -> Union[list, tuple]:
+        return self._float_max.data.asnumpy().tolist()
+
+    def is_per_channel(self) -> bool:
+        return True
+
     def extend_repr(self):
         """Display instance object as string."""
         s = 'bit_num={}, symmetric={}, narrow_range={}, ema={}({}), per_channel={}({}, {}), ' \
@@ -153,12 +180,3 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
                                     self._ema, self._ema_decay, True,
                                     self._channel_axis, self._num_channels, self._quant_delay)
         return s
-
-    def convert_to_fakequantparam(self):
-        if self._quant_dtype != QuantDtype.INT8:
-            raise TypeError("Only support int8 simulate quantization now!"
-                            "Please set quant_dtype=QuantDtype.INT8 for SimulatedQuantizationAwareTraining.")
-        _, _, scale, zero_point = self.extract_quant_param()
-        new_subcell = LinearFakeQuantCell(quant_dtype=self._quant_dtype, scale=tuple(scale),
-                                          zero_point=tuple(zero_point), is_per_channel=True)
-        return new_subcell
