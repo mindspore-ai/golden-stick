@@ -16,21 +16,24 @@
 from __future__ import absolute_import
 
 import mindspore.common.dtype as mstype
+import mindspore.context as context
 from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
-import mindspore.context as context
-from mindspore.nn.cell import Cell
+from mindspore.nn import Cell
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore_gs.validator import Validator, twice
-from ...quantization.simulated_quantization.combined import Conv2dBn
-from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
-from .batchnorm_fold_cell import BatchNormFoldCell
+from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
+from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import quant_config_default, QuantConfig
+from mindspore_gs.ops.nn.batchnorm_fold_cell import BatchNormFoldCell
+from mindspore_gs.quantization.quant_cell import QuantCell
+from mindspore_gs.quantization.quant_utils import fold_batchnorm
 
 
-class Conv2dBnFoldQuant(Cell):
+class Conv2dBnFoldQuant(QuantCell):
     r"""
     2D convolution with Batch Normalization operation folded construct.
 
@@ -116,6 +119,8 @@ class Conv2dBnFoldQuant(Cell):
     """
 
     def __init__(self,
+                 handler: Cell,
+                 policy: LayerPolicy,
                  in_channels,
                  out_channels,
                  kernel_size,
@@ -138,7 +143,7 @@ class Conv2dBnFoldQuant(Cell):
                  quant_dtype=QuantDtype.INT8,
                  freeze_bn=100000):
         """Initialize Conv2dBnFoldQuant layer"""
-        super(Conv2dBnFoldQuant, self).__init__()
+        super(Conv2dBnFoldQuant, self).__init__(handler, policy)
         if context.get_context('device_target') == "CPU":
             raise ValueError(f"For '{self.cls_name}', only the 'Ascend' and 'GPU' platforms"
                              f" are supported, but got {context.get_context('device_target')}.")
@@ -201,7 +206,7 @@ class Conv2dBnFoldQuant(Cell):
                                          requires_grad=False)
 
         # initialize fake ops
-        self.fake_quant_weight = quant_config.weight(channel_axis=channel_axis,
+        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis,
                                                      num_channels=out_channels)
         self.batchnorm_fold = BatchNormFoldCell(epsilon=eps, momentum=momentum, freeze_bn=freeze_bn)
         self.correct_mul = Q.CorrectionMul(channel_axis)
@@ -215,12 +220,17 @@ class Conv2dBnFoldQuant(Cell):
         self.one = Tensor(1, mstype.int32)
         self.assignadd = P.AssignAdd()
 
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
     @classmethod
-    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig, extra_args: dict):
+    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig, extra_args: dict, layer_policy: LayerPolicy):
         """
         A class method to create `Conv2dBnFoldQuant` from a `Conv2dBn`
         """
-        conv_quant = cls(in_channels=convbn.conv.in_channels,
+        conv_quant = cls(handler=convbn,
+                         policy=layer_policy,
+                         in_channels=convbn.conv.in_channels,
                          out_channels=convbn.conv.out_channels,
                          kernel_size=convbn.conv.kernel_size,
                          stride=convbn.conv.stride,
@@ -254,7 +264,24 @@ class Conv2dBnFoldQuant(Cell):
                                                         self.group, self.fake, self.freeze_bn, self.momentum)
         return s
 
-    def construct(self, x):
+    def convert(self):
+        if self.has_bias and self.bias:
+            raise ValueError("Only support conv2d with out bias.")
+        super(Conv2dBnFoldQuant, self).convert()
+        self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+        weight, bias = fold_batchnorm(self.weight.data.asnumpy(), self)
+        weight_tensor = Tensor(weight)
+        bias_tensor = Tensor(bias, mstype.float32)
+        self.weight = Parameter(weight_tensor, name=f"{self.weight.name}_bnfold")
+        if self.has_bias and self.bias:
+            bias_name = f"{self.bias.name}_bnfold"
+        else:
+            bias_name = f"{self.weight.name}_bias_bnfold"
+        self.bias = Parameter(bias_tensor, name=bias_name)
+        self.has_bias = True
+
+    # pylint: disable=arguments-differ
+    def core_construct(self, x):
         """construct."""
         out_conv = self.conv(x, self.weight)
         if self.has_bias:
@@ -267,7 +294,7 @@ class Conv2dBnFoldQuant(Cell):
         # fake weight
         weight = self.correct_mul(self.weight, self.gamma, running_std)
         if self.fake:
-            weight = self.fake_quant_weight(weight)
+            weight = self._weight_quantizer(weight)
         out = self.conv(x, weight)
         if self.has_bias:
             out = self.bias_add(out, self.bias)

@@ -13,21 +13,20 @@
 # limitations under the License.
 # ============================================================================
 """SlbLayerPolicy."""
-
+import abc
 from typing import Optional
 from functools import partial
 from mindspore.nn import Cell
 from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
 from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
-from ..layer_policy import LayerPolicy
-from ..quantize_wrapper_cell import QuantizeWrapperCell
-from ..fake_quantizer import FakeQuantizer
+from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer, SlbActQuantizer
 from .slb_quant import Conv2dSlbQuant
 from .slb_quant_config import SlbQuantConfig
 
 
-class SlbLayerPolicy(LayerPolicy):
+class SlbLayerPolicy(LayerPolicy, abc.ABC):
     """
     Derived class of LayerPolicy. slb layer policy.
     Use slb perlayer fake quantizer as weight fake quantizer, linear perlayer fake quantizer as act fake quantizer.
@@ -95,11 +94,11 @@ class SlbLayerPolicy(LayerPolicy):
     def get_quant_config(self):
         return OpQuantConfig(self._weight_quantizer_partial, self._act_quantizer)
 
+    @abc.abstractmethod
     def wrap_cell(self, handler: Cell) -> Cell:
-        return QuantizeWrapperCell(handler, self)
+        raise NotImplementedError
 
 
 class ConvLayerPolicy(SlbLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
-        conv_quant = Conv2dSlbQuant.from_float(handler, self.get_quant_config(), self._config.weight_quant_dtype)
-        return QuantizeWrapperCell(conv_quant, self)
+        return Conv2dSlbQuant.from_float(handler, self.get_quant_config(), self._config.weight_quant_dtype)

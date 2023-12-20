@@ -15,18 +15,23 @@
 """Conv2dBnFoldQuantOneConv."""
 from __future__ import absolute_import
 
+import mindspore.context as context
+import mindspore.common.dtype as mstype
+from mindspore import Tensor
 from mindspore.ops import operations as P
+from mindspore.nn import Cell
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.dtype import QuantDtype
-import mindspore.context as context
-from mindspore.nn.cell import Cell
 from mindspore_gs.validator import Validator, twice
-from ...quantization.simulated_quantization.combined import Conv2dBn
-from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
+from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
+from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import quant_config_default, QuantConfig
+from mindspore_gs.quantization.quant_cell import QuantCell
+from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.quant_utils import fold_batchnorm
 
 
-class Conv2dBnFoldQuantOneConv(Cell):
+class Conv2dBnFoldQuantOneConv(QuantCell):
     r"""
     2D convolution which use the convolution layer statistics once to calculate Batch Normalization
     operation folded construct.
@@ -112,6 +117,8 @@ class Conv2dBnFoldQuantOneConv(Cell):
     """
 
     def __init__(self,
+                 handler: Cell,
+                 policy: LayerPolicy,
                  in_channels,
                  out_channels,
                  kernel_size,
@@ -133,7 +140,7 @@ class Conv2dBnFoldQuantOneConv(Cell):
                  quant_config=quant_config_default,
                  quant_dtype=QuantDtype.INT8):
         """Initialize Conv2dBnFoldQuant layer"""
-        super(Conv2dBnFoldQuantOneConv, self).__init__()
+        super(Conv2dBnFoldQuantOneConv, self).__init__(handler, policy)
         self.in_channels = Validator.check_positive_int(in_channels, "in_channels", self.cls_name)
         self.out_channels = Validator.check_positive_int(out_channels, "out_channels", self.cls_name)
         self.kernel_size = twice(kernel_size)
@@ -199,7 +206,7 @@ class Conv2dBnFoldQuantOneConv(Cell):
                                          requires_grad=False)
 
         # initialize fake ops
-        self.fake_quant_weight = quant_config.weight(channel_axis=channel_axis,
+        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis,
                                                      num_channels=out_channels)
         self.freeze_bn = False
         self.bn_train = P.BatchNorm(is_training=True, epsilon=self.eps,
@@ -215,12 +222,17 @@ class Conv2dBnFoldQuantOneConv(Cell):
         self.reshape = P.Reshape()
         _ = quant_dtype  # for fix pylint unused-argument
 
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
     @classmethod
-    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig):
+    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig, layer_policy: LayerPolicy):
         """
         A class method to create `Conv2dBnFoldQuantOneConv` from `Conv2dBn`
         """
-        conv_quant = cls(in_channels=convbn.conv.in_channels,
+        conv_quant = cls(handler=convbn,
+                         policy=layer_policy,
+                         in_channels=convbn.conv.in_channels,
                          out_channels=convbn.conv.out_channels,
                          kernel_size=convbn.conv.kernel_size,
                          stride=convbn.conv.stride,
@@ -253,7 +265,24 @@ class Conv2dBnFoldQuantOneConv(Cell):
                                           self.momentum)
         return s
 
-    def construct(self, x):
+    def convert(self):
+        if self.has_bias and self.bias:
+            raise ValueError("Only support conv2d with out bias.")
+        super(Conv2dBnFoldQuantOneConv, self).convert()
+        self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+        weight, bias = fold_batchnorm(self.weight.data.asnumpy(), self)
+        weight_tensor = Tensor(weight)
+        bias_tensor = Tensor(bias, mstype.float32)
+        self.weight = Parameter(weight_tensor, name=f"{self.weight.name}_bnfold")
+        if self.has_bias and self.bias:
+            bias_name = f"{self.bias.name}_bnfold"
+        else:
+            bias_name = f"{self.weight.name}_bias_bnfold"
+        self.bias = Parameter(bias_tensor, name=bias_name)
+        self.has_bias = True
+
+    # pylint: disable=arguments-differ
+    def core_construct(self, x):
         """construct."""
         running_std = P.Sqrt()(P.Add()(self.moving_variance, self.eps))
         scale_factor = self.gamma / running_std
@@ -263,7 +292,7 @@ class Conv2dBnFoldQuantOneConv(Cell):
             scale_factor = self.reshape(scale_factor, (-1, 1, 1, 1))
         weight = self.weight * scale_factor
         if self.fake:
-            weight = self.fake_quant_weight(weight)
+            weight = self._weight_quantizer(weight)
         conv = self.conv(x, weight)
 
         if self.freeze_bn:

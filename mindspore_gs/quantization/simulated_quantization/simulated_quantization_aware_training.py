@@ -20,7 +20,7 @@ from mindspore import log as logger
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.validator import Validator, Rel
-from ..quantization_aware_training import QuantizationAwareTraining
+from mindspore_gs.quantization.quantization_aware_training import QuantizationAwareTraining
 from .simulated_quantization_net_policy import SimulatedNetPolicy
 from .simulated_quantization_config import SimulatedQuantizationConfig
 from .simulated_quantization_convert import ConvertToQuantInferNetwork
@@ -132,7 +132,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
             (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter (name=_handler.bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=_handler.bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=_handler.bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=_handler.bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
             >
-          (Conv2dBnWithoutFoldQuant): QuantizeWrapperCell<
+          (Conv2dBnWithoutFoldQuant): QuantCell<
             handler: in_channels=1, out_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, input quantizer: bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900, output quantizer: bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900
             (_handler): Conv2dBnWithoutFoldQuant<
               in_channels=1, out_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
@@ -433,7 +433,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
            Conv2d + BatchNorm2d + ReLU, Conv2d + ReLU, Dense + BatchNorm2d + ReLU, Dense + BatchNorm2d, Dense + ReLU.
         2. Propagate LayerPolicies defined in NetPolicy through network.
         3. Reduce redundant fake quantizers which means two or more fake quantizers existing on one tensor.
-        4. Apply LayerPolicies to convert normal cell to `QuantizeWrapperCell`. We will insert real fake quantizer
+        4. Apply LayerPolicies to convert normal cell to `QuantCell`. We will insert real fake quantizer
            into network in this step.
 
         Args:

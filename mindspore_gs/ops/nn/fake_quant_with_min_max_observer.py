@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""FakeQuantWithMinMaxObserver."""
+"""
+FakeQuantWithMinMaxObserver. Deprecated and not used, please refer to FakeQuantizers in quantization algorithms.
+"""
+
 from __future__ import absolute_import
 
 from functools import partial
 from collections import namedtuple
 import numpy as np
 
+import mindspore.context as context
 from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
-import mindspore.context as context
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore_gs.validator import Validator

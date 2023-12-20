@@ -16,7 +16,7 @@
 
 from mindspore.nn.layer import Conv2d, Dense, BatchNorm2d, ReLU, ReLU6, Sigmoid, LeakyReLU, HSigmoid, HSwish
 from mindspore.rewrite import PatternEngine
-from ..net_policy import NetPolicy
+from mindspore_gs.quantization.net_policy import NetPolicy
 from .combined import Conv2dBn
 from .simulated_quantization_layer_policy import ConvLayerPolicy, DenseLayerPolicy, ConvBnLayerPolicy, ActLayerPolicy
 from .simulated_quantization_transforms import Conv2dBnFuse

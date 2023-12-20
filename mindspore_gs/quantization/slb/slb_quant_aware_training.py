@@ -23,7 +23,7 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 from mindspore_gs.validator import Validator, Rel
-from ..quantization_aware_training import QuantizationAwareTraining
+from mindspore_gs.quantization.quantization_aware_training import QuantizationAwareTraining
 from .slb_net_policy import SlbNetPolicy
 from .slb_quant_config import SlbQuantConfig
 from .slb_quant_convert import ConvertToQuantInferNetwork
@@ -151,7 +151,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9, gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.]), beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.])>
             >
           (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9, gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.]), beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.])>
-          (Conv2dSlbQuant): QuantizeWrapperCell<
+          (Conv2dSlbQuant): QuantCell<
             (_handler): Conv2dSlbQuant<
               in_channels=1, out_channels=6, kernel_size=(5, 5), weight_bit_num=1, stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
               (fake_quant_weight): SlbFakeQuantizerPerLayer<bit_num=1>
@@ -428,7 +428,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         1. Fuse certain cells in `network` using pattern engine which is defined by net policy.
         2. Propagate layer policies defined through cells.
         3. Reduce redundant fake quantizers when they are redundant.
-        4. Apply layer policies to convert normal cell to `QuantizeWrapperCell`.
+        4. Apply layer policies to convert normal cell to `QuantCell`.
 
         Args:
             network (Cell): Network to be quantized.

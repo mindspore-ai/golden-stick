@@ -26,7 +26,7 @@ from mindspore import Model
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
-from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/'))
 
@@ -73,11 +73,9 @@ def test_resnet(quant_bit, enable_bn_calibration, run_mode):
     new_network = qat.apply(network)
 
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dSlbQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
-    assert isinstance(conv_quant, QuantizeWrapperCell)
-    conv_handler = conv_quant._handler
-    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    conv_quant = cells.get("Conv2d", None)
+    assert isinstance(conv_quant, Conv2dSlbQuant)
+    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_quant.weight_quantizer()
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
     assert qat._config.enable_bn_calibration == enable_bn_calibration
     assert qat._config.epoch_size == 100
@@ -136,7 +134,11 @@ def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=con
     from models.resnet import resnet18
 
     # config
-    dataset_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
+    ds_path = os.getenv("DATASET_PATH", None)
+    if not ds_path:
+        dataset_path = os.path.join("/home/workspace/mindspore_dataset/cifar-10-batches-bin")
+    else:
+        dataset_path = os.path.join(f"{ds_path}/cifar/cifar-10-batches-bin")
     target = "GPU"
     class_num = 10
     epoch_size = 1

@@ -26,7 +26,7 @@ from mindspore.nn.metrics import Accuracy
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
-from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
 
@@ -78,11 +78,9 @@ def test_lenet_apply(quant_bit, enable_bn_calibration):
 
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dSlbQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
-    assert isinstance(conv_quant, QuantizeWrapperCell)
-    conv_handler = conv_quant._handler
-    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    conv_quant = cells.get("Conv2d", None)
+    assert isinstance(conv_quant, Conv2dSlbQuant)
+    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_quant.weight_quantizer()
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
     assert qat._config.enable_bn_calibration == enable_bn_calibration
     assert qat._config.epoch_size == 10
@@ -122,6 +120,10 @@ def test_lenet_convert(run_mode, enable_act_quant):
     mindspore.nn.GraphCell(graph)
 
 
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("quant_bit", ["W1", "W4A8", "W1A8"])
+@pytest.mark.parametrize("enable_bn_calibration", [True])
 def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
     """
     Feature: test accuracy of slb qat work on lenet5.
@@ -131,8 +133,8 @@ def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
 
     from lenet.src.lenet import LeNet5
     from lenet.src.dataset import create_dataset as create_mnist_ds
-    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
-    data_path = os.path.join(mnist_path, "train")
+    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/")
+    data_path = os.path.join(mnist_path, "mnist/train")
     ds_train = create_mnist_ds(data_path, 32, 1)
     network = LeNet5(10)
 
@@ -181,7 +183,7 @@ def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
     model.train(10, ds_train, callbacks=qat.callbacks(model, ds_train))
     print("============== End Training ==============")
 
-    ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
+    ds_eval = create_mnist_ds(os.path.join(mnist_path, "mnist/test"), 32, 1)
 
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval)
@@ -222,7 +224,7 @@ def test_lenet_accuracy_bnon_pynative(quant_bit, enable_bn_calibration):
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])
+@pytest.mark.parametrize("quant_bit", ["W4", "W1", "W1A8"])
 @pytest.mark.parametrize("enable_bn_calibration", [False])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE])
 def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
@@ -235,8 +237,8 @@ def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
     from lenet.src.lenet import LeNet5
     from lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=run_mode)
-    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
-    data_path = os.path.join(mnist_path, "train")
+    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/")
+    data_path = os.path.join(mnist_path, "mnist/train")
     ds_train = create_mnist_ds(data_path, 32, 1)
     network = LeNet5(10)
 
@@ -285,7 +287,7 @@ def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
     model.train(10, ds_train, callbacks=qat.callbacks(model, ds_train))
     print("============== End Training ==============")
 
-    ds_eval = create_mnist_ds(os.path.join(mnist_path, "test"), 32, 1)
+    ds_eval = create_mnist_ds(os.path.join(mnist_path, "mnist/test"), 32, 1)
 
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval)

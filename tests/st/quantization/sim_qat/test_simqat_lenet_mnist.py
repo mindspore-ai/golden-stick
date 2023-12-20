@@ -22,7 +22,7 @@ import mindspore
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
-from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant
 from tests.st import test_utils as utils
 
 cur_path = os.path.dirname(os.path.abspath(__file__))
@@ -47,30 +47,26 @@ def test_lenet_apply():
     qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQuant")
-    assert isinstance(conv_quant, QuantizeWrapperCell)
-    conv_handler = conv_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_handler.fake_quant_weight
+    conv_quant = cells.get("Conv2d", None)
+    assert isinstance(conv_quant, Conv2dQuant)
+    weight_fake_quant: SimulatedFakeQuantizerPerChannel = conv_quant.weight_quantizer()
     assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
+    assert weight_fake_quant.symmetric()
     assert weight_fake_quant._quant_delay == 900
-    act_fake_quant = conv_quant._output_quantizer
+    act_fake_quant = conv_quant.output_quantizer()
     assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
+    assert not act_fake_quant.symmetric()
     assert act_fake_quant._quant_delay == 900
 
-    assert cells.get("DenseQuant", None) is not None
-    dense_quant: QuantizeWrapperCell = cells.get("DenseQuant")
-    assert isinstance(dense_quant, QuantizeWrapperCell)
-    dense_handler = dense_quant._handler
-    weight_fake_quant: SimulatedFakeQuantizerPerChannel = dense_handler.fake_quant_weight
+    dense_quant = cells.get("Dense", None)
+    assert isinstance(dense_quant, DenseQuant)
+    weight_fake_quant: SimulatedFakeQuantizerPerChannel = dense_quant.weight_quantizer()
     assert isinstance(weight_fake_quant, SimulatedFakeQuantizerPerChannel)
-    assert weight_fake_quant._symmetric
+    assert weight_fake_quant.symmetric()
     assert weight_fake_quant._quant_delay == 900
-    act_fake_quant = dense_quant._output_quantizer
+    act_fake_quant = dense_quant.output_quantizer()
     assert isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
-    assert not act_fake_quant._symmetric
+    assert not act_fake_quant.symmetric()
     assert act_fake_quant._quant_delay == 900
 
 

@@ -16,17 +16,19 @@
 from __future__ import absolute_import
 
 from mindspore.ops import operations as P
+from mindspore.nn import Cell
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.dtype import QuantDtype
-from mindspore.nn.cell import Cell
 from mindspore.nn.layer.conv import Conv2d
 from mindspore_gs.validator import Validator, twice
-from ...quantization.simulated_quantization.combined import Conv2dBn
-from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
+from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
+from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import quant_config_default, QuantConfig
+from mindspore_gs.quantization.quant_cell import QuantCell
+from mindspore_gs.quantization.layer_policy import LayerPolicy
 
 
-class Conv2dQuant(Cell):
+class Conv2dQuant(QuantCell):
     r"""
     2D convolution with fake quantized operation layer.
 
@@ -88,6 +90,8 @@ class Conv2dQuant(Cell):
     """
 
     def __init__(self,
+                 handler: Cell,
+                 policy: LayerPolicy,
                  in_channels,
                  out_channels,
                  kernel_size,
@@ -102,7 +106,7 @@ class Conv2dQuant(Cell):
                  quant_config=quant_config_default,
                  quant_dtype=QuantDtype.INT8):
         """Initialize Conv2dQuant."""
-        super(Conv2dQuant, self).__init__()
+        super(Conv2dQuant, self).__init__(handler, policy)
         self.in_channels = Validator.check_positive_int(in_channels, "in_channels", self.cls_name)
         self.out_channels = Validator.check_positive_int(out_channels, "out_channels", self.cls_name)
         self.has_bias = has_bias
@@ -150,15 +154,24 @@ class Conv2dQuant(Cell):
                              dilation=self.dilation,
                              group=self.group)
         channel_axis = 0
-        self.fake_quant_weight = quant_config.weight(channel_axis=channel_axis,
+        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis,
                                                      num_channels=out_channels)
 
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
+    def convert(self):
+        super(Conv2dQuant, self).convert()
+        self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+
     @classmethod
-    def from_conv2d(cls, conv: Conv2d, quant_config: QuantConfig):
+    def from_conv2d(cls, conv: Conv2d, quant_config: QuantConfig, layer_policy: LayerPolicy):
         """
         A class method to create `Conv2dQuant` from `Conv2d`
         """
-        conv_quant = cls(in_channels=conv.in_channels,
+        conv_quant = cls(handler=conv,
+                         policy=layer_policy,
+                         in_channels=conv.in_channels,
                          out_channels=conv.out_channels,
                          kernel_size=conv.kernel_size,
                          stride=conv.stride,
@@ -176,11 +189,13 @@ class Conv2dQuant(Cell):
         return conv_quant
 
     @classmethod
-    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig):
+    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig, layer_policy: LayerPolicy):
         """
         A class method to create `Conv2dQuant` from `Conv2dBn`
         """
-        conv_quant = cls(in_channels=convbn.conv.in_channels,
+        conv_quant = cls(handler=convbn,
+                         policy=layer_policy,
+                         in_channels=convbn.conv.in_channels,
                          out_channels=convbn.conv.out_channels,
                          kernel_size=convbn.conv.kernel_size,
                          stride=convbn.conv.stride,
@@ -197,9 +212,10 @@ class Conv2dQuant(Cell):
             conv_quant.bias = convbn.conv.bias
         return conv_quant
 
-    def construct(self, x):
+    # pylint: disable=arguments-differ
+    def core_construct(self, x):
         """construct."""
-        weight = self.fake_quant_weight(self.weight)
+        weight = self._weight_quantizer(self.weight)
         out = self.conv(x, weight)
         if self.has_bias:
             return self.bias_add(out, self.bias)

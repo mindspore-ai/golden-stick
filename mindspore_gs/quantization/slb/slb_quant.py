@@ -15,6 +15,7 @@
 """SlbQuant."""
 
 from functools import partial
+import numpy as np
 import mindspore
 from mindspore import nn
 from mindspore.common.parameter import Parameter
@@ -23,9 +24,13 @@ from mindspore.nn.layer.conv import Conv2d
 from mindspore.common.initializer import initializer
 from mindspore.common import initializer as init
 from mindspore.common.dtype import QuantDtype
+from mindspore.common.tensor import Tensor
+from mindspore.common import dtype as mstype
 from mindspore_gs.validator import Validator, twice
 from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
 from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
+from mindspore_gs.quantization.quant_cell import QuantCell
+from mindspore_gs.quantization.layer_policy import LayerPolicy
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer
 
 
@@ -33,7 +38,7 @@ quant_config_slb_default = OpQuantConfig(weight=partial(SlbFakeQuantizerPerLayer
                                          activation=None)
 
 
-class Conv2dSlbQuant(nn.Cell):
+class Conv2dSlbQuant(QuantCell):
     r"""
     2D convolution with fake quantized operation layer.
 
@@ -96,6 +101,8 @@ class Conv2dSlbQuant(nn.Cell):
     """
 
     def __init__(self,
+                 handler: nn.Cell,
+                 policy: LayerPolicy,
                  in_channels,
                  out_channels,
                  kernel_size,
@@ -108,9 +115,9 @@ class Conv2dSlbQuant(nn.Cell):
                  weight_init='normal',
                  bias_init='zeros',
                  quant_config=quant_config_slb_default,
-                 quant_dtype=QuantDtype.INT1):
+                 weight_quant_dtype=QuantDtype.INT1):
         """Initialize Conv2dSlbQuant."""
-        super(Conv2dSlbQuant, self).__init__()
+        super(Conv2dSlbQuant, self).__init__(handler, policy)
         self.in_channels = Validator.check_positive_int(in_channels, "in_channels", self.cls_name)
         self.out_channels = Validator.check_positive_int(out_channels, "out_channels", self.cls_name)
         self.has_bias = has_bias
@@ -139,8 +146,8 @@ class Conv2dSlbQuant(nn.Cell):
                             f"but got {type(padding).__name__}!")
         self.group = Validator.check_positive_int(group, "group", self.cls_name)
 
-        self._num_bits = get_quant_dtype_num_bits(quant_dtype)
-        self._weight_num = 2**self._num_bits
+        self._weight_num_bits = get_quant_dtype_num_bits(weight_quant_dtype)
+        self._weight_num = 2**self._weight_num_bits
 
         weight_init = init.HeNormal(mode='fan_out', nonlinearity='relu')
         weight_shape = [out_channels, in_channels // group, *self.kernel_size, self._weight_num]
@@ -163,10 +170,11 @@ class Conv2dSlbQuant(nn.Cell):
                              dilation=self.dilation,
                              group=self.group)
 
-        self.fake_quant_weight = quant_config.weight()
+        self._weight_quantizer = quant_config.weight()
 
     @classmethod
-    def from_float(cls, conv: Conv2d, quant_config: OpQuantConfig, weight_quant_dtype: QuantDtype):
+    def from_float(cls, conv: Conv2d, quant_config: OpQuantConfig, weight_quant_dtype: QuantDtype,
+                   layer_policy: LayerPolicy = None):
         """
         A class method to create `Conv2dSlbQuant` from a `Conv2d`
 
@@ -188,6 +196,8 @@ class Conv2dSlbQuant(nn.Cell):
             >>> conv_quant = Conv2dSlbQuant.from_float(conv_op, quant_config, weight_quant_dtype)
         """
         conv_quant = cls(
+            conv,
+            layer_policy,
             conv.in_channels,
             conv.out_channels,
             kernel_size=conv.kernel_size,
@@ -200,11 +210,47 @@ class Conv2dSlbQuant(nn.Cell):
             bias_init=conv.bias_init,
             weight_init=conv.weight_init,
             quant_config=quant_config,
-            quant_dtype=weight_quant_dtype)
+            weight_quant_dtype=weight_quant_dtype)
         return conv_quant
 
-    def construct(self, x):
-        weight = self.fake_quant_weight(self.weight)
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
+    def __convert_weight5d_to_weight4d(self, conv2dquant_weights5d):
+        """Convert slb 5d weight to normal 4d weight"""
+        argmax = P.Argmax()
+        onehot = P.OneHot()
+        reduce_sum = P.ReduceSum()
+        true_tensor = Tensor(1, mstype.float32)
+        false_tensor = Tensor(0, mstype.float32)
+        num_bits = self._weight_num_bits
+
+        if num_bits == 1:
+            w_list = Parameter(Tensor([-1, 1], mstype.float32).view(1, 1, 1, 1, -1),
+                               name='w_list', requires_grad=False)
+        else:
+            w_list_init = np.linspace(-1, 1, 2**num_bits)
+            w_list = Parameter(Tensor(w_list_init, mstype.float32).view(1, 1, 1, 1, -1),
+                               name='w_list', requires_grad=False)
+
+        # Convert 5d weight to 4d weight
+        # Compute one-hot representation of matrix A's argmax
+        onehot_weights5d = onehot(argmax(conv2dquant_weights5d), conv2dquant_weights5d.shape[-1],
+                                  true_tensor, false_tensor)
+        # Compute continuous weights
+        weights_5d = onehot_weights5d * w_list
+        weights_4d = reduce_sum(weights_5d, -1)
+        return weights_4d
+
+    def convert(self):
+        super(Conv2dSlbQuant, self).convert()
+        self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+        weight_tensor = self.__convert_weight5d_to_weight4d(self.weight)
+        self.weight = Parameter(weight_tensor, name=f"{self.weight.name}_4d")
+
+    # pylint: disable=arguments-differ
+    def core_construct(self, x):
+        weight = self._weight_quantizer(self.weight)
         out = self.conv(x, weight)
         if self.has_bias:
             return self.bias_add(out, self.bias)
@@ -214,6 +260,6 @@ class Conv2dSlbQuant(nn.Cell):
         """Display instance object as string."""
         s = 'in_channels={}, out_channels={}, kernel_size={}, weight_bit_num={}, stride={}, ' \
             'pad_mode={}, padding={}, dilation={}, group={}, ' \
-            'has_bias={}'.format(self.in_channels, self.out_channels, self.kernel_size, self._num_bits, self.stride,
-                                 self.pad_mode, self.padding, self.dilation, self.group, self.has_bias)
+            'has_bias={}'.format(self.in_channels, self.out_channels, self.kernel_size, self._weight_num_bits,
+                                 self.stride, self.pad_mode, self.padding, self.dilation, self.group, self.has_bias)
         return s

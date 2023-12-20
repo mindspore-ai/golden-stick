@@ -18,12 +18,12 @@ from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
 from mindspore_gs.validator import Validator
-from ..simulated_quantization.simulated_quantization_aware_training import SimulatedQuantizationAwareTraining as SimQAT
+from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
+from mindspore_gs.quantization.quant_cell import QuantCell
 from .learned_step_size_quantization_net_policy import LearnedStepSizeQuantizationNetPolicy as LsqNetPolicy
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig as LsqConfig
 from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer as LsqFqPerLayer, \
     LearnedStepSizeFakeQuantizePerChannel as LsqFqPerChannel
-from ..quantize_wrapper_cell import QuantizeWrapperCell
 
 
 class LearnedStepSizeQuantizationAwareTraining(SimQAT):
@@ -133,7 +133,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
             (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
             (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.09999999999999998, gamma=Parameter (name=_handler.bn.gamma, shape=(6,), dtype=Float32, requires_grad=True), beta=Parameter (name=_handler.bn.beta, shape=(6,), dtype=Float32, requires_grad=True), moving_mean=Parameter (name=_handler.bn.moving_mean, shape=(6,), dtype=Float32, requires_grad=False), moving_variance=Parameter (name=_handler.bn.moving_variance, shape=(6,), dtype=Float32, requires_grad=False)>
             >
-          (Conv2dBnWithoutFoldQuant): QuantizeWrapperCell<
+          (Conv2dBnWithoutFoldQuant): QuantCell<
             handler: in_channels=1, out_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, input quantizer: bit_num=8, neg_trunc=False, symmetric=True, narrow_range=True, per_channel=False, quant_delay=0, output quantizer: bit_num=8, neg_trunc=False, symmetric=True, narrow_range=True, per_channel=False, quant_delay=0
             (_handler): Conv2dBnWithoutFoldQuant<
               in_channels=1, out_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
@@ -359,7 +359,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         1. Fuse certain cells in `network` using pattern engine which is defined by net policy.
         2. Propagate layer policies defined through cells.
         3. Reduce redundant fake quantizers when they are redundant.
-        4. Apply layer policies to convert normal cell to `QuantizeWrapperCell`.
+        4. Apply layer policies to convert normal cell to `QuantCell`.
 
         Args:
             network (Cell): Network to be quantized.
@@ -373,12 +373,12 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
 
     def _reset_weights_quantization_params(self, network: Cell):
         for _, cell in network.name_cells().items():
-            if isinstance(cell, QuantizeWrapperCell):
-                if isinstance(cell.get_handler(), (Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv,
-                                                   Conv2dBnWithoutFoldQuant, Conv2dBnFoldQuant)):
-                    weight_fq = cell.get_handler().fake_quant_weight
+            if isinstance(cell, QuantCell):
+                if isinstance(cell, (Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant,
+                                     Conv2dBnFoldQuant)):
+                    weight_fq = cell.weight_quantizer()
                     if isinstance(weight_fq, (LsqFqPerLayer, LsqFqPerChannel)):
-                        weight_fq.compute_quant_param(cell.get_handler().weight)
+                        weight_fq.compute_quant_param(cell.handler().weight)
 
     def _init_net_policy(self, config):
         return LsqNetPolicy(config)

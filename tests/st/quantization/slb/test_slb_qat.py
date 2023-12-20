@@ -24,7 +24,7 @@ from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.slb import SlbQuantAwareTraining as SlbQAT
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbActQuantizer
 from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
-from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
 
 
 class NetToQuant(nn.Cell):
@@ -78,11 +78,9 @@ def test_set_config(quant_bit, enable_bn_calibration):
     new_network = qat.apply(network)
     cells: OrderedDict = new_network.name_cells()
 
-    assert cells.get("Conv2dSlbQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
-    assert isinstance(conv_quant, QuantizeWrapperCell)
-    conv_handler = conv_quant._handler
-    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_handler.fake_quant_weight
+    conv_quant = cells.get("Conv2d", None)
+    assert isinstance(conv_quant, Conv2dSlbQuant)
+    weight_fake_quant: SlbFakeQuantizerPerLayer = conv_quant.weight_quantizer()
     assert isinstance(weight_fake_quant, SlbFakeQuantizerPerLayer)
     assert qat._config.enable_bn_calibration == enable_bn_calibration
     assert qat._config.epoch_size == 100
@@ -114,10 +112,9 @@ def test_convert(enable_act_quant):
     new_network = qat.convert(new_network)
 
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dSlbQuant", None) is not None
-    conv: QuantizeWrapperCell = cells.get("Conv2dSlbQuant")
-    assert isinstance(conv, QuantizeWrapperCell)
-    act_fake_quant = conv._output_quantizer
+    conv_quant = cells.get("Conv2d", None)
+    assert isinstance(conv_quant, Conv2dSlbQuant)
+    act_fake_quant = conv_quant.output_quantizer()
     assert not isinstance(act_fake_quant, SlbActQuantizer)
 
 

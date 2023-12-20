@@ -19,7 +19,7 @@ import numpy as np
 import mindspore
 from mindspore import Tensor, nn
 from mindspore_gs.ops.nn import ActQuant
-from .nn_utils import create_quant_config
+from .nn_utils import TestLayerPolicy
 
 
 @pytest.mark.level0
@@ -31,9 +31,10 @@ def test_act_quant():
     Description: Test nn ops ActQuant.
     Expectation: Success.
     """
-    qconfig = create_quant_config()
-    act_quant = ActQuant(nn.ReLU(), quant_config=qconfig)
+
+    policy = TestLayerPolicy(1)
+    act_quant = ActQuant(nn.ReLU(), policy)
     x = Tensor(np.array([[1, 2, -1], [-2, 0, -1]]), mindspore.float32)
-    expect_output = np.array([[0.9882355, 1.9764705, 0.], [0., 0., 0.]]).astype(np.float32)
+    expect_output = np.array([[1., 2., 0.], [0., 0., 0.]]).astype(np.float32)
     result = act_quant(x).asnumpy()
     assert np.allclose(expect_output, result, 0.001, 0.001)

@@ -19,7 +19,8 @@ import numpy as np
 import mindspore
 from mindspore import Tensor
 from mindspore_gs.ops.nn import Conv2dBnWithoutFoldQuant
-from .nn_utils import create_quant_config
+from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
+from .nn_utils import TestLayerPolicy
 
 
 @pytest.mark.level0
@@ -31,9 +32,11 @@ def test_conv2d_bn_without_fold_quant():
     Description: Test nn ops Conv2dBnWithoutFoldQuant.
     Expectation: Success.
     """
-    qconfig = create_quant_config()
-    conv2d_no_bnfold = Conv2dBnWithoutFoldQuant(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid",
-                                                weight_init='ones', quant_config=qconfig)
+    policy = TestLayerPolicy(1, True, False)
+    convbn: Conv2dBn = Conv2dBn(1, 1, kernel_size=(2, 2))
+    conv2d_no_bnfold = Conv2dBnWithoutFoldQuant(convbn, policy, 1, 1, kernel_size=(2, 2), stride=(1, 1),
+                                                pad_mode="valid", weight_init='ones',
+                                                quant_config=policy.get_quant_config())
     x = Tensor(np.array([[[[1, 0, 3], [1, 4, 7], [2, 5, 2]]]]), mindspore.float32)
     result = conv2d_no_bnfold(x).asnumpy()
     expect_output = np.array([[5.929658, 13.835868], [11.859316, 17.78116]]).astype(np.float32)
