@@ -14,7 +14,6 @@
 # ============================================================================
 """SlbQuant."""
 
-from functools import partial
 import numpy as np
 import mindspore
 from mindspore.common.parameter import Parameter
@@ -25,16 +24,9 @@ from mindspore.common import initializer as init
 from mindspore.common.dtype import QuantDtype
 from mindspore.common.tensor import Tensor
 from mindspore.common import dtype as mstype
-from mindspore_gs.quantization.simulated_quantization.quant_cells.fake_quant_with_min_max_observer import QuantConfig \
-    as OpQuantConfig
 from mindspore_gs.quantization.quant_utils import get_quant_dtype_num_bits
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
-from .slb_fake_quantizer import SlbFakeQuantizerPerLayer
-
-
-quant_config_slb_default = OpQuantConfig(weight=partial(SlbFakeQuantizerPerLayer, num_bits=1),
-                                         activation=None)
 
 
 class Conv2dSlbQuant(QuantCell):
@@ -88,10 +80,9 @@ class Conv2dSlbQuant(QuantCell):
     Examples:
         >>> import numpy as np
         >>> import mindspore
-        >>> from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant, quant_config_slb_default
+        >>> from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
         >>> from mindspore import Tensor
-        >>> conv2d_quant = Conv2dSlbQuant(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid",
-        ...                               weight_init='ones', quant_config=quant_config_slb_default)
+        >>> conv2d_quant = Conv2dSlbQuant(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid", weight_init='ones')
         >>> x = Tensor(np.array([[[[1, 0, 3], [1, 4, 7], [2, 5, 2]]]]), mindspore.float32)
         >>> result = conv2d_quant(x)
         >>> print(result)
@@ -99,8 +90,7 @@ class Conv2dSlbQuant(QuantCell):
            [-2.  4.]]]]
     """
 
-    def __init__(self, handler: Conv2d, policy: LayerPolicy, quant_config=quant_config_slb_default,
-                 weight_quant_dtype=QuantDtype.INT1):
+    def __init__(self, handler: Conv2d, policy: LayerPolicy, weight_quant_dtype=QuantDtype.INT1):
         """Initialize Conv2dSlbQuant."""
         super(Conv2dSlbQuant, self).__init__(handler, policy)
         self.in_channels = handler.in_channels
@@ -133,7 +123,7 @@ class Conv2dSlbQuant(QuantCell):
                              dilation=self.dilation,
                              group=self.group)
 
-        self._weight_quantizer = quant_config.weight()
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name)
 
     def weight_quantizer(self):
         return self._weight_quantizer

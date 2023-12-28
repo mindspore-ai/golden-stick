@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""TensorAddQuant."""
+"""MulQuant."""
 from __future__ import absolute_import
 
 from mindspore.ops import operations as P
@@ -21,11 +21,11 @@ from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 
 
-class TensorAddQuant(QuantCell):
+class MulQuant(QuantCell):
     r"""
-    Adds fake quantized operation after TensorAdd operation.
+    Adds fake quantized operation after `Mul` operation.
 
-    This part is a more detailed overview of TensorAdd operation. For more details about Quantization,
+    This part is a more detailed overview of `Mul` operation. For more details about Quantization,
     please refer to the implementation of class of `FakeQuantWithMinMaxObserver`,
     :class:`mindspore.nn.FakeQuantWithMinMaxObserver`.
 
@@ -37,8 +37,8 @@ class TensorAddQuant(QuantCell):
             Default: QuantConfig with both items set to default :class:`FakeQuantWithMinMaxObserver`.
 
     Inputs:
-        - **x1** (Tensor) - The first tensor of TensorAddQuant. The input dimension is preferably 2D or 4D.
-        - **x2** (Tensor) - The second tensor of TensorAddQuant. Has the same shape with `x1`.
+        - **x1** (Tensor) - The first tensor of MulQuant. The input dimension is preferably 2D or 4D.
+        - **x2** (Tensor) - The second tensor of MulQuant. Has the same shape with `x1`.
 
     Outputs:
         Tensor, with the same type and shape as the `x1`.
@@ -53,27 +53,25 @@ class TensorAddQuant(QuantCell):
     Examples:
         >>> import numpy as np
         >>> import mindspore
-        >>> from mindspore.compression import quant
         >>> from mindspore import Tensor, nn
-        >>> qconfig = quant.create_quant_config()
-        >>> add_quant = nn.TensorAddQuant(quant_config=qconfig)
+        >>> mul_quant = nn.MulQuant()
         >>> x1 = Tensor(np.array([[1, 2, 1], [-2, 0, -1]]), mindspore.float32)
-        >>> x2 = Tensor(np.ones((2, 3)), mindspore.float32)
-        >>> output = add_quant(x1, x2)
+        >>> x2 = Tensor(np.ones((2, 3)) * 2, mindspore.float32)
+        >>> output = mul_quant(x1, x2)
         >>> print(output)
-        [[ 1.9764705  3.011765   1.9764705]
-         [-0.9882355  0.9882355  0.       ]]
+        [[ 1.9764705  4.0000005  1.9764705]
+         [-4.         0.        -1.9764705]]
     """
-
-    def __init__(self, handler: Cell, policy: LayerPolicy):
-        """Initialize TensorAddQuant."""
-        super(TensorAddQuant, self).__init__(handler, policy)
-        self.add = P.Add()
 
     def weight_quantizer(self):
         return None
 
+    def __init__(self, handler: Cell, policy: LayerPolicy):
+        """Initialize MulQuant."""
+        super(MulQuant, self).__init__(handler, policy)
+        self.mul = P.Mul()
+
     # pylint: disable=arguments-differ
     def core_construct(self, x1, x2):
         """construct."""
-        return self.add(x1, x2)
+        return self.mul(x1, x2)

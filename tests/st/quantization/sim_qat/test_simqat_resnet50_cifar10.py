@@ -23,7 +23,7 @@ import mindspore
 from mindspore import context
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
-from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dBnFoldQuant, DenseQuant
+from mindspore_gs.quantization.ops.nn import Conv2dBnFoldQuant, DenseQuant
 from tests.st import test_utils as utils
 
 cur_path = os.path.dirname(os.path.abspath(__file__))

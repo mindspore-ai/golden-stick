@@ -19,7 +19,7 @@ import numpy as np
 import mindspore
 from mindspore import Tensor
 from mindspore.nn import Conv2d
-from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dQuant
+from mindspore_gs.quantization.ops.nn import Conv2dQuant
 from .nn_utils import TestLayerPolicy
 
 
@@ -34,7 +34,7 @@ def test_conv2d_quant():
     """
     policy = TestLayerPolicy(1, True, False)
     conv = Conv2d(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid", weight_init='ones')
-    conv2d_quant = Conv2dQuant(conv, policy, quant_config=policy.get_quantizer())
+    conv2d_quant = Conv2dQuant(conv, policy)
     x = Tensor(np.array([[[[1, 0, 3], [1, 4, 7], [2, 5, 2]]]]), mindspore.float32)
     result = conv2d_quant(x).asnumpy()
     expect_output = np.array([[5.9296875, 13.8359375], [11.859375, 17.78125]]).astype(np.float32)

@@ -20,7 +20,6 @@ from mindspore.common.dtype import QuantDtype
 from mindspore.nn.layer.basic import Dense
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
-from .fake_quant_with_min_max_observer import quant_config_default
 
 
 class DenseQuant(QuantCell):
@@ -70,10 +69,8 @@ class DenseQuant(QuantCell):
     Examples:
         >>> import numpy as np
         >>> import mindspore
-        >>> from mindspore.compression import quant
         >>> from mindspore import Tensor, nn
-        >>> qconfig = quant.create_quant_config()
-        >>> dense_quant = nn.DenseQuant(2, 1, weight_init='ones', quant_config=qconfig)
+        >>> dense_quant = nn.DenseQuant(2, 1, weight_init='ones')
         >>> x = Tensor(np.array([[1, 5], [3, 4]]), mindspore.float32)
         >>> result = dense_quant(x)
         >>> print(result)
@@ -81,8 +78,7 @@ class DenseQuant(QuantCell):
          [6.9176483]]
     """
 
-    def __init__(self, handler: Dense, policy: LayerPolicy, quant_config=quant_config_default,
-                 quant_dtype=QuantDtype.INT8):
+    def __init__(self, handler: Dense, policy: LayerPolicy, quant_dtype=QuantDtype.INT8):
         """Initialize DenseQuant."""
         super(DenseQuant, self).__init__(handler, policy)
         self.in_channels = handler.in_channels
@@ -98,7 +94,8 @@ class DenseQuant(QuantCell):
         self.activation_flag = self.activation is not None
 
         self.matmul = P.MatMul(transpose_b=True)
-        self._weight_quantizer = quant_config.weight(channel_axis=0, num_channels=self.out_channels)
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, **{"channel_axis": 0,
+                                                                                  "num_channels": self.out_channels})
 
     def weight_quantizer(self):
         return self._weight_quantizer

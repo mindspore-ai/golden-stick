@@ -24,7 +24,6 @@ from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 from mindspore_gs.quantization.quant_utils import without_fold_batchnorm
-from .fake_quant_with_min_max_observer import quant_config_default
 
 
 class Conv2dBnWithoutFoldQuant(QuantCell):
@@ -84,11 +83,9 @@ class Conv2dBnWithoutFoldQuant(QuantCell):
     Examples:
         >>> import numpy as np
         >>> import mindspore
-        >>> from mindspore.compression import quant
         >>> from mindspore import Tensor, nn
-        >>> qconfig = quant.create_quant_config()
         >>> conv2d_no_bnfold = nn.Conv2dBnWithoutFoldQuant(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid",
-        ...                                                weight_init='ones', quant_config=qconfig)
+        ...                                                weight_init='ones')
         >>> x = Tensor(np.array([[[[1, 0, 3], [1, 4, 7], [2, 5, 2]]]]), mindspore.float32)
         >>> result = conv2d_no_bnfold(x)
         >>> print(result)
@@ -96,7 +93,7 @@ class Conv2dBnWithoutFoldQuant(QuantCell):
            [11.859316  17.78116]]]]
     """
 
-    def __init__(self, handler: Conv2dBn, policy: LayerPolicy, quant_config=quant_config_default):
+    def __init__(self, handler: Conv2dBn, policy: LayerPolicy):
         """Initialize Conv2dBnWithoutFoldQuant."""
         if not handler.has_bn:
             raise ValueError(f"For '{self.cls_name}', input Conv2dBn should has batchnorm.")
@@ -124,7 +121,8 @@ class Conv2dBnWithoutFoldQuant(QuantCell):
                              group=self.group)
         self.weight = handler.weight
         channel_axis = 0
-        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis, num_channels=self.out_channels)
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, **{"channel_axis": channel_axis,
+                                                                                  "num_channels": self.out_channels})
         self.batchnorm = BatchNorm2d(self.out_channels, eps=handler.batchnorm.eps, momentum=handler.batchnorm.momentum)
 
     def weight_quantizer(self):

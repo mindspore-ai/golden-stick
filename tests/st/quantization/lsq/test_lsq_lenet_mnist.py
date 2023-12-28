@@ -22,7 +22,7 @@ from mindspore_gs.quantization.learned_step_size_quantization import LearnedStep
     LearnedQAT
 from mindspore_gs.quantization.learned_step_size_quantization.learned_step_size_quantization_layer_policy import \
     LearnedStepSizeFakeQuantizerPerLayer, LearnedStepSizeFakeQuantizePerChannel
-from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dQuant, DenseQuant
+from mindspore_gs.quantization.ops.nn import Conv2dQuant, DenseQuant
 
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))

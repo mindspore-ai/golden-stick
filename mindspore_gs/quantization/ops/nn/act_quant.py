@@ -48,10 +48,8 @@ class ActQuant(QuantCell):
     Examples:
         >>> import numpy as np
         >>> import mindspore
-        >>> from mindspore.compression import quant
         >>> from mindspore import Tensor
-        >>> qconfig = quant.create_quant_config()
-        >>> act_quant = nn.ActQuant(nn.ReLU(), quant_config=qconfig)
+        >>> act_quant = nn.ActQuant(nn.ReLU())
         >>> x = Tensor(np.array([[1, 2, -1], [-2, 0, -1]]), mindspore.float32)
         >>> result = act_quant(x)
         >>> print(result)

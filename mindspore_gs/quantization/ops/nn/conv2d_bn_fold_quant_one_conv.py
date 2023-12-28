@@ -26,7 +26,6 @@ from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 from mindspore_gs.quantization.quant_utils import fold_batchnorm
-from .fake_quant_with_min_max_observer import quant_config_default
 
 
 class Conv2dBnFoldQuantOneConv(QuantCell):
@@ -102,11 +101,9 @@ class Conv2dBnFoldQuantOneConv(QuantCell):
     Examples:
         >>> import numpy as np
         >>> import mindspore
-        >>> from mindspore.compression import quant
         >>> from mindspore import Tensor, nn
-        >>> qconfig = quant.create_quant_config()
         >>> conv2d_bnfold = nn.Conv2dBnFoldQuantOneConv(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid",
-        ...                                             weight_init="ones", quant_config=qconfig)
+        ...                                             weight_init="ones")
         >>> x = Tensor(np.array([[[[1, 0, 3], [1, 4, 7], [2, 5, 2]]]]), mindspore.float32)
         >>> result = conv2d_bnfold(x)
         >>> print(result)
@@ -114,8 +111,7 @@ class Conv2dBnFoldQuantOneConv(QuantCell):
            [11.859375 17.78125]]]]
     """
 
-    def __init__(self, handler: Conv2dBn, policy: LayerPolicy, fake=True, quant_config=quant_config_default,
-                 quant_dtype=QuantDtype.INT8):
+    def __init__(self, handler: Conv2dBn, policy: LayerPolicy, fake=True, quant_dtype=QuantDtype.INT8):
         """Initialize Conv2dBnFoldQuant layer"""
         if not handler.has_bn:
             raise ValueError(f"For '{self.cls_name}', input Conv2dBn should has batchnorm.")
@@ -132,7 +128,6 @@ class Conv2dBnFoldQuantOneConv(QuantCell):
         self.eps = handler.batchnorm.eps
         self.momentum = 1 - handler.batchnorm.momentum
         self.fake = Validator.check_bool(fake, "fake", self.cls_name)
-        self.quant_config = quant_config
         self.format = 'NCHW'
         self._target = context.get_context("device_target")
         self.is_graph_mode = context.get_context("mode") == context.GRAPH_MODE
@@ -163,7 +158,8 @@ class Conv2dBnFoldQuantOneConv(QuantCell):
         self.moving_variance = handler.batchnorm.moving_variance
 
         # initialize fake ops
-        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis, num_channels=self.out_channels)
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, **{"channel_axis": channel_axis,
+                                                                                  "num_channels": self.out_channels})
         self.freeze_bn = False
         self.bn_train = P.BatchNorm(is_training=True, epsilon=self.eps, momentum=self.momentum, data_format=self.format)
 
