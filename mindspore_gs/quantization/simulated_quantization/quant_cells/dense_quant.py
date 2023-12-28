@@ -15,19 +15,12 @@
 """DenseQuant."""
 from __future__ import absolute_import
 
-from mindspore.ops.primitive import Primitive
 from mindspore.ops import operations as P
-from mindspore.common.parameter import Parameter
-from mindspore.common.initializer import initializer
-from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
-from mindspore.nn.layer.activation import get_activation
 from mindspore.nn.layer.basic import Dense
-from mindspore.nn import Cell
-from mindspore_gs.validator import Validator
-from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import quant_config_default, QuantConfig
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
+from .fake_quant_with_min_max_observer import quant_config_default
 
 
 class DenseQuant(QuantCell):
@@ -88,78 +81,27 @@ class DenseQuant(QuantCell):
          [6.9176483]]
     """
 
-    def __init__(self,
-                 handler: Cell,
-                 policy: LayerPolicy,
-                 in_channels,
-                 out_channels,
-                 weight_init='normal',
-                 bias_init='zeros',
-                 has_bias=True,
-                 activation=None,
-                 quant_config=quant_config_default,
+    def __init__(self, handler: Dense, policy: LayerPolicy, quant_config=quant_config_default,
                  quant_dtype=QuantDtype.INT8):
         """Initialize DenseQuant."""
         super(DenseQuant, self).__init__(handler, policy)
-        self.in_channels = Validator.check_positive_int(in_channels, "in_channels", self.cls_name)
-        self.out_channels = Validator.check_positive_int(out_channels, "out_channels", self.cls_name)
-        self.has_bias = Validator.check_bool(has_bias, "has_bias", self.cls_name)
+        self.in_channels = handler.in_channels
+        self.out_channels = handler.out_channels
+        self.has_bias = handler.has_bias
         _ = quant_dtype  # for fix pylint unused-argument
 
-        if isinstance(weight_init, Tensor):
-            if weight_init.ndim != 2 or weight_init.shape[0] != out_channels or \
-                    weight_init.shape[1] != in_channels:
-                raise ValueError(f"For '{self.cls_name}', weight init shape error. The ndim of 'weight_init' should "
-                                 f"be equal to 2, and the first dim must be equal to 'out_channels', and the "
-                                 f"second dim must be equal to 'in_channels'. But got 'weight_init': {weight_init}, "
-                                 f"'out_channels': {out_channels}, 'in_channels': {in_channels}.")
-
-        self.weight = Parameter(initializer(
-            weight_init, [out_channels, in_channels]), name="weight")
-
+        self.weight = handler.weight
         if self.has_bias:
-            if isinstance(bias_init, Tensor):
-                if bias_init.ndim != 1 or bias_init.shape[0] != out_channels:
-                    raise ValueError(f"For '{self.cls_name}', bias init shape error. The ndim of 'bias_init' should "
-                                     f"be equal to 1, and the first dim must be equal to 'out_channels'. But got "
-                                     f"'bias_init': {bias_init}, 'out_channels': {out_channels}.")
-
-            self.bias = Parameter(initializer(
-                bias_init, [out_channels]), name="bias")
+            self.bias_add = P.BiasAdd()
+            self.bias = handler.bias
+        self.activation = handler.activation
+        self.activation_flag = self.activation is not None
 
         self.matmul = P.MatMul(transpose_b=True)
-        self.bias_add = P.BiasAdd()
-
-        self.activation = get_activation(activation) if isinstance(activation, str) else activation
-        if activation is not None and not isinstance(self.activation, (Cell, Primitive)):
-            raise TypeError(f"For '{self.cls_name}', the 'activation' must be str or Cell or Primitive, "
-                            f"but got {activation}.")
-
-        self.activation_flag = self.activation is not None
-        self._weight_quantizer = quant_config.weight(channel_axis=0,
-                                                     num_channels=out_channels)
+        self._weight_quantizer = quant_config.weight(channel_axis=0, num_channels=self.out_channels)
 
     def weight_quantizer(self):
         return self._weight_quantizer
-
-    @classmethod
-    def from_dense(cls, dense: Dense, quant_config: QuantConfig, layer_policy: LayerPolicy):
-        """
-        A class method to create `DenseQuant` from a `Dense`
-        """
-        dense_quant = cls(handler=dense,
-                          policy=layer_policy,
-                          in_channels=dense.in_channels,
-                          out_channels=dense.out_channels,
-                          weight_init=dense.weight,
-                          bias_init=dense.bias,
-                          has_bias=dense.has_bias,
-                          activation=dense.activation,
-                          quant_config=quant_config)
-        dense_quant.weight = dense.weight
-        if dense.has_bias:
-            dense_quant.bias = dense.bias
-        return dense_quant
 
     def convert(self):
         # Weight is transposed in old version

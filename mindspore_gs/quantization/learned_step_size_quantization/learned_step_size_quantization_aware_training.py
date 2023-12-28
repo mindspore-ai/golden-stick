@@ -15,8 +15,8 @@
 """lsq algorithm"""
 from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
-    Conv2dBnFoldQuant
+from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dQuant, DenseQuant, \
+    Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, Conv2dBnFoldQuant
 from mindspore_gs.validator import Validator
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.quant_cell import QuantCell

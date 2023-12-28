@@ -23,7 +23,7 @@ from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizati
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
 from mindspore_gs.quantization.simulated_quantization.simulated_quantization_config import SimulatedQuantizationConfig
-from mindspore_gs.ops.nn import Conv2dQuant
+from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dQuant
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position

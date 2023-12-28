@@ -89,6 +89,10 @@ class LayerPolicy(abc.ABC):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def get_config(self):
+        raise NotImplementedError
+
     def set_input_number(self, input_num: int):
         self._inputs_insert_fq.clear()
         self._input_num = input_num
