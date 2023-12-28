@@ -20,7 +20,7 @@ from mindspore import context, Tensor
 from mindspore.nn import Cell
 import mindspore.ops as ops
 from mindspore.ops.operations import _quant_ops as ms_Q
-import mindspore_gs.ops.operations as custom_Q
+import mindspore_gs.quantization.ops.operations as custom_Q
 
 
 class MinmaxUpdateLayerNet(Cell):

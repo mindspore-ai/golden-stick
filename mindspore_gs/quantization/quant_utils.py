@@ -15,36 +15,18 @@
 """Quantization utils."""
 
 import numpy as np
+from mindspore.common.dtype import QuantDtype
 
-from mindspore.ops.operations import _quant_ops as Q
-from mindspore.nn import Cell
-
-__all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max"]
+__all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max",
+           "get_quant_dtype_num_bits"]
 
 
-class LinearFakeQuantCell(Cell):
-    """
-    Fake quant layer with mindspore standard operator.
-    """
-
-    def __init__(self, quant_dtype, scale, zero_point, is_per_channel):
-        super(LinearFakeQuantCell, self).__init__()
-        self._quant_dtype = quant_dtype
-        self._scale = scale
-        self._zero_point = zero_point
-        self._is_per_channel = is_per_channel
-        self.fake_quant = Q.FakeQuantParam.linear_quant_param(quant_dtype=quant_dtype, scale=scale, zp=zero_point,
-                                                              is_per_channel=is_per_channel)
-
-    def extend_repr(self):
-        """Display instance object as string."""
-        s = 'quant_dtype={}, scale={}, zero_point={}, is_per_channel={}'.format(self._quant_dtype, self._scale,
-                                                                                self._zero_point, self._is_per_channel)
-        return s
-
-    def construct(self, x):
-        x = self.fake_quant(x)
-        return x
+def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
+    if 0 <= quant_dtype.value() <= 15:
+        return quant_dtype.value() + 1
+    if 100 <= quant_dtype.value() <= 115:
+        return quant_dtype.value() - 99
+    raise ValueError("Unsupported QuantDtype.")
 
 
 def cal_quantization_params(input_min,

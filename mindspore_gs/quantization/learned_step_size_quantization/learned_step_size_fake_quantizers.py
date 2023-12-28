@@ -23,9 +23,8 @@ from mindspore import QuantDtype
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
-from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
-from mindspore_gs.quantization.quant_utils import compute_kl_threshold
+from mindspore_gs.quantization.quant_utils import compute_kl_threshold, get_quant_dtype_num_bits
 
 
 def _calculate_quant_max(num_bits, neg_trunc=False):

@@ -13,19 +13,20 @@
 # limitations under the License.
 # ============================================================================
 """DefaultLayerPolicy."""
+
 import abc
 from typing import Optional
 from functools import partial
 
 from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
-from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
-    Conv2dBnFoldQuant, ActQuant
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from .simulated_fake_quantizers import SimulatedFakeQuantizerPerChannel, SimulatedFakeQuantizerPerLayer
 from .simulated_quantization_config import SimulatedQuantizationConfig
+from .quant_cells.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
+from .quant_cells import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
+    Conv2dBnFoldQuant, ActQuant
 
 
 class SimulatedLayerPolicy(LayerPolicy, abc.ABC):
@@ -40,7 +41,7 @@ class SimulatedLayerPolicy(LayerPolicy, abc.ABC):
     def __init__(self, weight_names: [], act_names: [],
                  config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()):
         super(SimulatedLayerPolicy, self).__init__()
-        self._config = config
+        self._config: SimulatedQuantizationConfig = config
         if config.weight_quant_dtype == QuantDtype.INT8:
             self._num_bits = 8
         else:
@@ -90,7 +91,7 @@ class SimulatedLayerPolicy(LayerPolicy, abc.ABC):
     def get_config(self) -> SimulatedQuantizationConfig:
         return self._config
 
-    def get_quant_config(self):
+    def get_quantizer(self):
         return OpQuantConfig(self._weight_quantizer_partial, self._output_quantizer)
 
     @abc.abstractmethod
@@ -104,7 +105,7 @@ class ConvLayerPolicy(SimulatedLayerPolicy):
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        return Conv2dQuant.from_conv2d(handler, self.get_quant_config(), self)
+        return Conv2dQuant(handler, self, self.get_quantizer())
 
 
 class DenseLayerPolicy(SimulatedLayerPolicy):
@@ -113,7 +114,7 @@ class DenseLayerPolicy(SimulatedLayerPolicy):
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        return DenseQuant.from_dense(handler, self.get_quant_config(), self)
+        return DenseQuant(handler, self, self.get_quantizer())
 
 
 class ConvBnLayerPolicy(SimulatedLayerPolicy):
@@ -125,14 +126,14 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
         if handler.has_bn:
             if self._config.bn_fold:
                 if self._config.one_conv_fold:
-                    conv_quant = Conv2dBnFoldQuantOneConv.from_convbn(handler, self.get_quant_config(), self)
+                    conv_quant = Conv2dBnFoldQuantOneConv(handler, self, quant_config=self.get_quantizer())
                 else:
-                    conv_quant = Conv2dBnFoldQuant.from_convbn(handler, self.get_quant_config(),
-                                                               {"freeze_bn": self._config.freeze_bn}, self)
+                    conv_quant = Conv2dBnFoldQuant(handler, self, quant_config=self.get_quantizer(),
+                                                   freeze_bn=self._config.freeze_bn)
             else:
-                conv_quant = Conv2dBnWithoutFoldQuant.from_convbn(handler, self.get_quant_config(), self)
+                conv_quant = Conv2dBnWithoutFoldQuant(handler, self, quant_config=self.get_quantizer())
         else:
-            conv_quant = Conv2dQuant.from_convbn(handler, self.get_quant_config(), self)
+            conv_quant = Conv2dQuant(handler, self, self.get_quantizer())
         return conv_quant
 
 

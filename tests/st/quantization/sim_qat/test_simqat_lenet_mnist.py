@@ -22,7 +22,7 @@ import mindspore
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.simulated_quantization.simulated_fake_quantizers import SimulatedFakeQuantizerPerLayer, \
     SimulatedFakeQuantizerPerChannel
-from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant
+from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dQuant, DenseQuant
 from tests.st import test_utils as utils
 
 cur_path = os.path.dirname(os.path.abspath(__file__))

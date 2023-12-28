@@ -13,12 +13,14 @@
 # limitations under the License.
 # ============================================================================
 """SlbLayerPolicy."""
+
 import abc
 from typing import Optional
 from functools import partial
 from mindspore.nn import Cell
-from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
-from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
+from mindspore_gs.quantization.simulated_quantization.quant_cells.fake_quant_with_min_max_observer import QuantConfig \
+    as OpQuantConfig
+from mindspore_gs.quantization.quant_utils import get_quant_dtype_num_bits
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer, SlbActQuantizer
@@ -59,6 +61,9 @@ class SlbLayerPolicy(LayerPolicy, abc.ABC):
         self._input_num = 0
         self._inputs_insert_fq = []
 
+    def get_config(self) -> SlbQuantConfig:
+        return self._config
+
     def get_weight_name_and_quantizers(self):
         return [(name, self._weight_quantizer_partial) for name in self._weight_names]
 
@@ -91,7 +96,7 @@ class SlbLayerPolicy(LayerPolicy, abc.ABC):
     def set_output_not_insert_fq(self, index: Optional[int] = None):
         self._output_quantizer = None
 
-    def get_quant_config(self):
+    def get_quantizer(self):
         return OpQuantConfig(self._weight_quantizer_partial, self._act_quantizer)
 
     @abc.abstractmethod
@@ -101,4 +106,4 @@ class SlbLayerPolicy(LayerPolicy, abc.ABC):
 
 class ConvLayerPolicy(SlbLayerPolicy):
     def wrap_cell(self, handler: Cell) -> Cell:
-        return Conv2dSlbQuant.from_float(handler, self.get_quant_config(), self._config.weight_quant_dtype)
+        return Conv2dSlbQuant(handler, self, self.get_quantizer(), self._config.weight_quant_dtype)

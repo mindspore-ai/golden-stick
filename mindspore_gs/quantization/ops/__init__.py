@@ -13,20 +13,5 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick operations.
+MindSpore golden stick quantization custom ops.
 """
-
-from .gs_custom import GSCustom, custom_op_attr_register
-from .fake_quant_perchannel import FakeQuantPerChannel
-from .fake_quant_perlayer import FakeQuantPerLayer
-from .min_max_update_perchannel import MinMaxUpdatePerChannel
-from .min_max_update_perlayer import MinMaxUpdatePerLayer
-
-__all__ = [
-    "MinMaxUpdatePerLayer",
-    "FakeQuantPerLayer",
-    "FakeQuantPerChannel",
-    "MinMaxUpdatePerChannel",
-    "GSCustom",
-    "custom_op_attr_register"
-]

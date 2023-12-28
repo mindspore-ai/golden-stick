@@ -15,18 +15,18 @@
 "golden-stick/mindspore_gs/quantization/simulated_quantization/simulated_quantization_aware_training.py"                 "line-too-long"
 
 # SimQAT OPS
-"golden-stick/mindspore_gs/ops/operations/fake_quant_perchannel.py"                             "unused-argument"
-"golden-stick/mindspore_gs/ops/operations/fake_quant_perlayer.py"                               "unused-argument"
-"golden-stick/mindspore_gs/ops/operations/min_max_update_perchannel.py"                         "unused-argument"
-"golden-stick/mindspore_gs/ops/operations/min_max_update_perlayer.py"                           "unused-argument"
-"golden-stick/mindspore_gs/ops/operations"                                                      "unused-argument"
-"golden-stick/mindspore_gs/ops/operations"                                                      "arguments-differ"
-"golden-stick/mindspore_gs/ops/operations"                                                      "super-init-not-called"
-"golden-stick/mindspore_gs/ops/operations/gs_custom.py"                                         "protected-access"
+"golden-stick/mindspore_gs/quantization/ops/operations/fake_quant_perchannel.py"               "unused-argument"
+"golden-stick/mindspore_gs/quantization/ops/operations/fake_quant_perlayer.py"                 "unused-argument"
+"golden-stick/mindspore_gs/quantization/ops/operations/min_max_update_perchannel.py"           "unused-argument"
+"golden-stick/mindspore_gs/quantization/ops/operations/min_max_update_perlayer.py"             "unused-argument"
+"golden-stick/mindspore_gs/quantization/ops/operations"                                        "unused-argument"
+"golden-stick/mindspore_gs/quantization/ops/operations"                                        "arguments-differ"
+"golden-stick/mindspore_gs/quantization/ops/operations"                                        "super-init-not-called"
+"golden-stick/mindspore_gs/ops/gs_custom.py"                                                   "protected-access"
 
 # SLB
-"golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                                                 "line-too-long"
-"golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                                                 "arguments-differ"
+"golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                       "line-too-long"
+"golden-stick/mindspore_gs/quantization/slb/slb_quant_aware_training.py"                       "arguments-differ"
 
 # LSQ
 "golden-stick/mindspore_gs/quantization/learned_step_size_quantization/learned_step_size_quantization_aware_training.py" "line-too-long"

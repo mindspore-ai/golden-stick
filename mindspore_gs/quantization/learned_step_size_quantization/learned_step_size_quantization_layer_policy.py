@@ -13,12 +13,13 @@
 # limitations under the License.
 # ============================================================================
 """learned step size quantization layer policy"""
+
 import abc
 from typing import Optional
 from functools import partial
 from mindspore.nn import Cell
-from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
-    Conv2dBnFoldQuant
+from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dQuant, DenseQuant, \
+    Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, Conv2dBnFoldQuant
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from mindspore_gs.quantization.simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
 from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer, \
@@ -34,6 +35,7 @@ class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy, abc.ABC):
     def __init__(self, weight_names: [], act_names: [],
                  config: LearnedStepSizeQuantizationConfig = LearnedStepSizeQuantizationConfig()):
         super(LearnedStepSizeQuantizationLayerPolicy, self).__init__(weight_names, act_names, config)
+        self._config: LearnedStepSizeQuantizationConfig = config
         if config.weight_per_channel:
             self._weight_quantizer_partial = partial(LearnedStepSizeFakeQuantizePerChannel,
                                                      quant_delay=config.weight_quant_delay,
@@ -61,6 +63,9 @@ class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy, abc.ABC):
             quant_delay=config.act_quant_delay, quant_dtype=config.act_quant_dtype, symmetric=config.act_symmetric,
             narrow_range=config.act_narrow_range)
 
+    def get_config(self) -> LearnedStepSizeQuantizationConfig:
+        return self._config
+
     @abc.abstractmethod
     def wrap_cell(self, handler: Cell) -> Cell:
         raise NotImplementedError
@@ -72,7 +77,7 @@ class LearnedStepSizeQuantizationConvLayerPolicy(LearnedStepSizeQuantizationLaye
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        return Conv2dQuant.from_conv2d(handler, self.get_quant_config(), self)
+        return Conv2dQuant(handler, self, quant_config=self.get_quantizer())
 
 
 class LearnedStepSizeQuantizationDenseLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
@@ -81,7 +86,7 @@ class LearnedStepSizeQuantizationDenseLayerPolicy(LearnedStepSizeQuantizationLay
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        return DenseQuant.from_dense(handler, self.get_quant_config(), self)
+        return DenseQuant(handler, self, quant_config=self.get_quantizer())
 
 
 class LearnedStepSizeQuantizationConvBnLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
@@ -93,12 +98,12 @@ class LearnedStepSizeQuantizationConvBnLayerPolicy(LearnedStepSizeQuantizationLa
         if handler.has_bn:
             if self._config.bn_fold:
                 if self._config.one_conv_fold:
-                    conv_quant = Conv2dBnFoldQuantOneConv.from_convbn(handler, self.get_quant_config(), self)
+                    conv_quant = Conv2dBnFoldQuantOneConv(handler, self, quant_config=self.get_quantizer())
                 else:
-                    conv_quant = Conv2dBnFoldQuant.from_convbn(handler, self.get_quant_config(),
-                                                               {"freeze_bn": self._config.freeze_bn}, self)
+                    conv_quant = Conv2dBnFoldQuant(handler, self, quant_config=self.get_quantizer(),
+                                                   freeze_bn=self._config.freeze_bn)
             else:
-                conv_quant = Conv2dBnWithoutFoldQuant.from_convbn(handler, self.get_quant_config(), self)
+                conv_quant = Conv2dBnWithoutFoldQuant(handler, self, quant_config=self.get_quantizer())
         else:
-            conv_quant = Conv2dQuant.from_convbn(handler, self.get_quant_config(), self)
+            conv_quant = Conv2dQuant(handler, self, quant_config=self.get_quantizer())
         return conv_quant

@@ -15,11 +15,14 @@
 """
 MindSpore golden stick simulated-quantization ops MinMaxUpdatePerLayer.
 """
+import os
+
 from mindspore.ops import DataType
+from mindspore import log as logger
 from mindspore.ops.functional import zeros_like
 from mindspore_gs.validator import Rel
 from mindspore_gs.validator import Validator as validator
-from mindspore_gs.ops.operations import GSCustom, custom_op_attr_register
+from mindspore_gs.ops import GSCustom, custom_op_attr_register
 
 
 class MinMaxUpdatePerLayer(GSCustom):
@@ -89,3 +92,20 @@ class MinMaxUpdatePerLayer(GSCustom):
         """set_op_dtype_format"""
         return [[DataType.F32_Default, DataType.F32_Default, DataType.F32_Default, DataType.F32_Default,
                  DataType.F32_Default]]
+
+    def _get_forward_func(self) -> str:
+        """
+        Automatically generate farward func according to class name.
+
+        Returns:
+            Farward func, a string represent '{dir_path}/{file_name}:{func_name}'.
+        """
+        dir_path = os.path.dirname(os.path.abspath(__file__))
+        func_path = os.path.join(dir_path, "../kernel/gpu/min_max_update_per_layer_impl.cu")
+        func_name = "Custom" + self._get_custom_op_name()
+        if not os.path.exists(func_path):
+            error_str = f"For {self._get_custom_op_name()}, cu file not exist, the path is {func_path}"
+            logger.error(error_str)
+            raise RuntimeError(error_str)
+        logger.info(f"Custom op {self._get_custom_op_name()} func: {func_path}:{func_name}")
+        return func_path + ":" + func_name

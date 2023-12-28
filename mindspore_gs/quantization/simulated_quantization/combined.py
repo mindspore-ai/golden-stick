@@ -14,13 +14,11 @@
 # ============================================================================
 """Combined layer."""
 
-from mindspore import nn
-from mindspore.nn.layer.normalization import BatchNorm2d
-from mindspore.nn.cell import Cell
+from mindspore.nn import Conv2d, BatchNorm2d
 from mindspore_gs.validator import Validator
 
 
-class Conv2dBn(Cell):
+class Conv2dBn(Conv2d):
     r"""
     A combination of convolution and Batchnorm layer.
 
@@ -97,25 +95,15 @@ class Conv2dBn(Cell):
                  momentum=0.997,
                  eps=1e-5):
         """Initialize Conv2dBn."""
-        super(Conv2dBn, self).__init__()
+        super(Conv2dBn, self).__init__(in_channels, out_channels, kernel_size, stride, pad_mode, padding, dilation,
+                                       group, has_bias, weight_init, bias_init)
 
-        self.conv = nn.Conv2d(in_channels,
-                              out_channels,
-                              kernel_size=kernel_size,
-                              stride=stride,
-                              pad_mode=pad_mode,
-                              padding=padding,
-                              dilation=dilation,
-                              group=group,
-                              has_bias=has_bias,
-                              weight_init=weight_init,
-                              bias_init=bias_init)
         self.has_bn = Validator.check_bool(has_bn, "has_bn", self.cls_name)
         if has_bn:
             self.batchnorm = BatchNorm2d(out_channels, eps, momentum)
 
     def construct(self, x):
-        x = self.conv(x)
+        x = super(Conv2dBn, self).construct(x)
         if self.has_bn:
             x = self.batchnorm(x)
         return x

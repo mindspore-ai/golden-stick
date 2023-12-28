@@ -19,7 +19,7 @@ import numpy as np
 import mindspore
 from mindspore import Tensor
 from mindspore.nn import Dense
-from mindspore_gs.ops.nn import DenseQuant
+from mindspore_gs.quantization.simulated_quantization.quant_cells import DenseQuant
 from .nn_utils import TestLayerPolicy
 
 
@@ -33,8 +33,8 @@ def test_dense_quant():
     Expectation: Success.
     """
     policy = TestLayerPolicy(1, True, False)
-    dense = Dense(2, 1)
-    dense_quant = DenseQuant(dense, policy, 2, 1, weight_init='ones', quant_config=policy.get_quant_config())
+    dense = Dense(2, 1, weight_init='ones')
+    dense_quant = DenseQuant(dense, policy, quant_config=policy.get_quantizer())
     x = Tensor(np.array([[1, 5], [3, 4]]), mindspore.float32)
     result = dense_quant(x).asnumpy()
     expect_output = np.array([[5.929413], [6.9176483]]).astype(np.float32)

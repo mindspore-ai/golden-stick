@@ -15,7 +15,7 @@
 """
 MindSpore golden stick base Custom op.
 """
-import os
+
 import functools
 import inspect
 import enum
@@ -250,18 +250,7 @@ class GSCustom(Custom):
         Returns:
             Farward func, a string represent '{dir_path}/{file_name}:{func_name}'.
         """
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        cu_file_name = GSCustom._get_lower_name(self._get_custom_op_name()) + "_impl.cu"
-        logger.info(f"Custom op {self._get_custom_op_name()} cu_file_name {cu_file_name}")
-        func_name = "Custom" + self._get_custom_op_name()
-        logger.info(f"Custom op {self._get_custom_op_name()} func_name {func_name}")
-        func_path = os.path.join(dir_path, "../kernel/gpu", cu_file_name)
-        logger.info(f"Custom op {self._get_custom_op_name()} func_path {func_path}")
-        if not os.path.exists(func_path):
-            error_str = f"For {self._get_custom_op_name()}, cu file not exist, the path is {func_path}"
-            logger.error(error_str)
-            raise RuntimeError(error_str)
-        return func_path + ":" + func_name
+        raise NotImplementedError
 
     @staticmethod
     def _get_lower_name(op_cls_name: str):
@@ -294,7 +283,7 @@ class GSCustom(Custom):
         if device_target not in device_target_list:
             error_str = f"MindSpore Golden Stick op not support in current device {device_target}."
             logger.error(error_str)
-            raise NotImplementedError(error_str)
+            raise ValueError(error_str)
 
     def _get_custom_op_name(self) -> str:
         """_get_custom_op_name"""

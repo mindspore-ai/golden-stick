@@ -22,15 +22,14 @@ from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
-from mindspore.nn import Cell
 from mindspore.ops.operations import _quant_ops as Q
-from mindspore_gs.validator import Validator, twice
+from mindspore_gs.validator import Validator
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
-from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import quant_config_default, QuantConfig
-from mindspore_gs.ops.nn.batchnorm_fold_cell import BatchNormFoldCell
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.quant_utils import fold_batchnorm
+from .fake_quant_with_min_max_observer import quant_config_default
+from .batchnorm_fold_cell import BatchNormFoldCell
 
 
 class Conv2dBnFoldQuant(QuantCell):
@@ -53,30 +52,6 @@ class Conv2dBnFoldQuant(QuantCell):
     is to count the mean `E[y]` and variance `Var[y]` of current batch output for quantization.
 
     Args:
-        in_channels (int): The number of input channel :math:`C_{in}`.
-        out_channels (int): The number of output channel :math:`C_{out}`.
-        kernel_size (Union[int, tuple[int]]): Specifies the height and width of the 2D convolution window.
-        stride (Union[int, tuple[int]]): Specifies stride for all spatial dimensions with the same value. Default: 1.
-        pad_mode (str): Specifies padding mode. The optional values are "same", "valid", "pad". Default: "same".
-        padding (Union[int, tuple[int]]): Implicit paddings on both sides of the `x`. Default: 0.
-        dilation (Union[int, tuple[int]]): Specifies the dilation rate to use for dilated convolution. Default: 1.
-        group (int): Splits filter into groups, `in_channels` and `out_channels` must be
-            divisible by the number of groups. Default: 1.
-        eps (float): Parameters for Batch Normalization. Default: 1e-5.
-        momentum (float): Parameters for Batch Normalization op. Default: 0.997.
-        has_bias (bool): Specifies whether the layer uses a bias vector. Default: False.
-        weight_init (Union[Tensor, str, Initializer, numbers.Number]): Initializer for the
-            convolution kernel. Default: 'normal'.
-        bias_init (Union[Tensor, str, Initializer, numbers.Number]): Initializer for the
-            bias vector. Default: 'zeros'.
-        beta_init (Union[Tensor, str, Initializer, numbers.Number]): Initializer for the
-            beta vector. Default: 'zeros'.
-        gamma_init (Union[Tensor, str, Initializer, numbers.Number]): Initializer for the
-            gamma vector. Default: 'ones'.
-        mean_init (Union[Tensor, str, Initializer, numbers.Number]): Initializer for the
-            mean vector. Default: 'zeros'.
-        var_init (Union[Tensor, str, Initializer, numbers.Number]): Initializer for the
-            variance vector. Default: 'ones'.
         fake (bool): Whether Conv2dBnFoldQuant Cell adds FakeQuantWithMinMaxObserver. Default: True.
         quant_config (QuantConfig): Configures the types of quant observer and quant settings of weight and
             activation. Note that, QuantConfig is a special namedtuple, which is designed for quantization
@@ -118,64 +93,24 @@ class Conv2dBnFoldQuant(QuantCell):
            [11.859375 17.78125]]]]
     """
 
-    def __init__(self,
-                 handler: Cell,
-                 policy: LayerPolicy,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 stride=1,
-                 pad_mode='same',
-                 padding=0,
-                 dilation=1,
-                 group=1,
-                 eps=1e-5,
-                 momentum=0.997,
-                 has_bias=False,
-                 weight_init='normal',
-                 bias_init='zeros',
-                 beta_init='zeros',
-                 gamma_init='ones',
-                 mean_init='zeros',
-                 var_init='ones',
-                 fake=True,
-                 quant_config=quant_config_default,
-                 quant_dtype=QuantDtype.INT8,
-                 freeze_bn=100000):
+    def __init__(self, handler: Conv2dBn, policy: LayerPolicy, fake=True, quant_config=quant_config_default,
+                 quant_dtype=QuantDtype.INT8, freeze_bn=100000):
         """Initialize Conv2dBnFoldQuant layer"""
         super(Conv2dBnFoldQuant, self).__init__(handler, policy)
+        if not handler.has_bn:
+            raise ValueError(f"For '{self.cls_name}', input Conv2dBn should has batchnorm.")
         if context.get_context('device_target') == "CPU":
             raise ValueError(f"For '{self.cls_name}', only the 'Ascend' and 'GPU' platforms"
                              f" are supported, but got {context.get_context('device_target')}.")
-        self.in_channels = Validator.check_positive_int(in_channels, "in_channels", self.cls_name)
-        self.out_channels = Validator.check_positive_int(out_channels, "out_channels", self.cls_name)
-        self.kernel_size = twice(kernel_size)
-        self.stride = twice(stride)
-        self.dilation = twice(dilation)
-        for kernel_size_elem in self.kernel_size:
-            Validator.check_positive_int(kernel_size_elem, 'kernel_size item', self.cls_name)
-        for stride_elem in self.stride:
-            Validator.check_positive_int(stride_elem, 'stride item', self.cls_name)
-        for dilation_elem in self.dilation:
-            Validator.check_positive_int(dilation_elem, 'dilation item', self.cls_name)
-        if pad_mode not in ('valid', 'same', 'pad'):
-            raise ValueError(f"For '{self.cls_name}', the 'pad_mode' must be one of values in "
-                             f"('valid', 'same', 'pad'), but got {pad_mode}.")
-        self.pad_mode = pad_mode
-        if isinstance(padding, int):
-            Validator.check_non_negative_int(padding, 'padding', self.cls_name)
-            self.padding = padding
-        elif isinstance(padding, tuple):
-            for pad in padding:
-                Validator.check_non_negative_int(pad, 'padding item', self.cls_name)
-            self.padding = padding
-        else:
-            raise TypeError(f"For '{self.cls_name}', the type of 'padding' must be int/tuple(int), "
-                            f"but got {type(padding).__name__}!")
-        self.group = Validator.check_positive_int(group, "group", self.cls_name)
-        self.eps = eps
-        self.momentum = momentum
-        self.has_bias = has_bias
+        self.in_channels = handler.in_channels
+        self.out_channels = handler.out_channels
+        self.kernel_size = handler.kernel_size
+        self.stride = handler.stride
+        self.dilation = handler.dilation
+        self.pad_mode = handler.pad_mode
+        self.padding = handler.padding
+        self.group = handler.group
+        self.has_bias = handler.has_bias
         self.freeze_bn = freeze_bn
         self.fake = Validator.check_bool(fake, "fake", self.cls_name)
         self.quant_config = quant_config
@@ -183,32 +118,30 @@ class Conv2dBnFoldQuant(QuantCell):
         self.is_gpu = context.get_context('device_target') == "GPU"
 
         # initialize convolution op and Parameter
-        self.conv = P.Conv2D(out_channel=out_channels,
+        self.conv = P.Conv2D(out_channel=self.out_channels,
                              kernel_size=self.kernel_size,
-                             pad_mode=pad_mode,
-                             pad=padding,
+                             pad_mode=self.pad_mode,
+                             pad=self.padding,
                              stride=self.stride,
                              dilation=self.dilation,
-                             group=group)
-        weight_shape = [out_channels, in_channels // group, *self.kernel_size]
+                             group=self.group)
         channel_axis = 0
-        self.weight = Parameter(initializer(weight_init, weight_shape), name='weight')
+        self.weight = handler.weight
         self.bias_add = P.BiasAdd()
-        self.bias = None
-        if Validator.check_bool(has_bias, "has_bias", self.cls_name):
-            self.bias = Parameter(initializer(bias_init, [out_channels]), name='bias')
+        if self.has_bias:
+            self.bias = handler.bias
 
         # initialize BatchNorm Parameter
-        self.gamma = Parameter(initializer(gamma_init, [out_channels]), name='gamma')
-        self.beta = Parameter(initializer(beta_init, [out_channels]), name='beta')
-        self.moving_mean = Parameter(initializer(mean_init, [out_channels]), name='moving_mean', requires_grad=False)
-        self.moving_variance = Parameter(initializer(var_init, [out_channels]), name='moving_variance',
-                                         requires_grad=False)
+        self.gamma = handler.batchnorm.gamma
+        self.beta = handler.batchnorm.beta
+        self.moving_mean = handler.batchnorm.moving_mean
+        self.moving_variance = handler.batchnorm.moving_variance
 
         # initialize fake ops
-        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis,
-                                                     num_channels=out_channels)
-        self.batchnorm_fold = BatchNormFoldCell(epsilon=eps, momentum=momentum, freeze_bn=freeze_bn)
+        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis, num_channels=self.out_channels)
+        self.eps = handler.batchnorm.eps
+        self.batchnorm_fold = BatchNormFoldCell(epsilon=self.eps, momentum=handler.batchnorm.momentum,
+                                                freeze_bn=freeze_bn)
         self.correct_mul = Q.CorrectionMul(channel_axis)
         if context.get_context('device_target') == "Ascend":
             self.batchnorm_fold2_train = Q.BatchNormFold2D(freeze_bn=freeze_bn)
@@ -223,45 +156,12 @@ class Conv2dBnFoldQuant(QuantCell):
     def weight_quantizer(self):
         return self._weight_quantizer
 
-    @classmethod
-    def from_convbn(cls, convbn: Conv2dBn, quant_config: QuantConfig, extra_args: dict, layer_policy: LayerPolicy):
-        """
-        A class method to create `Conv2dBnFoldQuant` from a `Conv2dBn`
-        """
-        conv_quant = cls(handler=convbn,
-                         policy=layer_policy,
-                         in_channels=convbn.conv.in_channels,
-                         out_channels=convbn.conv.out_channels,
-                         kernel_size=convbn.conv.kernel_size,
-                         stride=convbn.conv.stride,
-                         pad_mode=convbn.conv.pad_mode,
-                         padding=convbn.conv.padding,
-                         dilation=convbn.conv.dilation,
-                         group=convbn.conv.group,
-                         eps=convbn.batchnorm.eps,
-                         momentum=convbn.batchnorm.momentum,
-                         has_bias=convbn.conv.has_bias,
-                         bias_init=convbn.conv.bias_init,
-                         weight_init=convbn.conv.weight_init,
-                         quant_config=quant_config,
-                         fake=True,
-                         freeze_bn=extra_args["freeze_bn"])
-        conv_quant.gamma = convbn.batchnorm.gamma
-        conv_quant.beta = convbn.batchnorm.beta
-        conv_quant.moving_mean = convbn.batchnorm.moving_mean
-        conv_quant.moving_variance = convbn.batchnorm.moving_variance
-        conv_quant.weight = convbn.conv.weight
-        if convbn.conv.has_bias:
-            conv_quant.bias = convbn.conv.bias
-        return conv_quant
-
     def extend_repr(self):
         """Display instance object as string."""
         s = 'in_channels={}, out_channels={}, kernel_size={}, stride={}, ' \
-            'pad_mode={}, padding={}, dilation={}, group={}, ' \
-            'fake={}, freeze_bn={}, momentum={}'.format(self.in_channels, self.out_channels, self.kernel_size,
-                                                        self.stride, self.pad_mode, self.padding, self.dilation,
-                                                        self.group, self.fake, self.freeze_bn, self.momentum)
+            'pad_mode={}, padding={}, dilation={}, group={}, fake={}, freeze_bn={}'\
+            .format(self.in_channels, self.out_channels, self.kernel_size, self.stride, self.pad_mode, self.padding,
+                    self.dilation, self.group, self.fake, self.freeze_bn)
         return s
 
     def convert(self):
@@ -273,10 +173,7 @@ class Conv2dBnFoldQuant(QuantCell):
         weight_tensor = Tensor(weight)
         bias_tensor = Tensor(bias, mstype.float32)
         self.weight = Parameter(weight_tensor, name=f"{self.weight.name}_bnfold")
-        if self.has_bias and self.bias:
-            bias_name = f"{self.bias.name}_bnfold"
-        else:
-            bias_name = f"{self.weight.name}_bias_bnfold"
+        bias_name = f"{self.weight.name}_bias_bnfold"
         self.bias = Parameter(bias_tensor, name=bias_name)
         self.has_bias = True
 

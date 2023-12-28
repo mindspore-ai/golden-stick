@@ -17,7 +17,6 @@
 from functools import partial
 import numpy as np
 import mindspore
-from mindspore import nn
 from mindspore.common.parameter import Parameter
 from mindspore.ops import operations as P
 from mindspore.nn.layer.conv import Conv2d
@@ -26,9 +25,9 @@ from mindspore.common import initializer as init
 from mindspore.common.dtype import QuantDtype
 from mindspore.common.tensor import Tensor
 from mindspore.common import dtype as mstype
-from mindspore_gs.validator import Validator, twice
-from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig as OpQuantConfig
-from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
+from mindspore_gs.quantization.simulated_quantization.quant_cells.fake_quant_with_min_max_observer import QuantConfig \
+    as OpQuantConfig
+from mindspore_gs.quantization.quant_utils import get_quant_dtype_num_bits
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer
@@ -100,66 +99,30 @@ class Conv2dSlbQuant(QuantCell):
            [-2.  4.]]]]
     """
 
-    def __init__(self,
-                 handler: nn.Cell,
-                 policy: LayerPolicy,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 stride=1,
-                 pad_mode='same',
-                 padding=0,
-                 dilation=1,
-                 group=1,
-                 has_bias=False,
-                 weight_init='normal',
-                 bias_init='zeros',
-                 quant_config=quant_config_slb_default,
+    def __init__(self, handler: Conv2d, policy: LayerPolicy, quant_config=quant_config_slb_default,
                  weight_quant_dtype=QuantDtype.INT1):
         """Initialize Conv2dSlbQuant."""
         super(Conv2dSlbQuant, self).__init__(handler, policy)
-        self.in_channels = Validator.check_positive_int(in_channels, "in_channels", self.cls_name)
-        self.out_channels = Validator.check_positive_int(out_channels, "out_channels", self.cls_name)
-        self.has_bias = has_bias
-        self.kernel_size = twice(kernel_size)
-        self.stride = twice(stride)
-        self.dilation = twice(dilation)
-        for kernel_size_elem in self.kernel_size:
-            Validator.check_positive_int(kernel_size_elem, 'kernel_size item', self.cls_name)
-        for stride_elem in self.stride:
-            Validator.check_positive_int(stride_elem, 'stride item', self.cls_name)
-        for dilation_elem in self.dilation:
-            Validator.check_positive_int(dilation_elem, 'dilation item', self.cls_name)
-        if pad_mode not in ('valid', 'same', 'pad'):
-            raise ValueError(f"For '{self.cls_name}', the 'pad_mode' must be one of values "
-                             f"in ('valid', 'same', 'pad'), but got {pad_mode}.")
-        self.pad_mode = pad_mode
-        if isinstance(padding, int):
-            Validator.check_non_negative_int(padding, 'padding', self.cls_name)
-            self.padding = padding
-        elif isinstance(padding, tuple):
-            for pad in padding:
-                Validator.check_non_negative_int(pad, 'padding item', self.cls_name)
-            self.padding = padding
-        else:
-            raise TypeError(f"For '{self.cls_name}', the type of 'padding' must be int/tuple(int), "
-                            f"but got {type(padding).__name__}!")
-        self.group = Validator.check_positive_int(group, "group", self.cls_name)
-
-        self._weight_num_bits = get_quant_dtype_num_bits(weight_quant_dtype)
-        self._weight_num = 2**self._weight_num_bits
+        self.in_channels = handler.in_channels
+        self.out_channels = handler.out_channels
+        self.has_bias = handler.has_bias
+        self.kernel_size = handler.kernel_size
+        self.stride = handler.stride
+        self.dilation = handler.dilation
+        self.pad_mode = handler.pad_mode
+        self.padding = handler.padding
+        self.group = handler.group
 
         weight_init = init.HeNormal(mode='fan_out', nonlinearity='relu')
-        weight_shape = [out_channels, in_channels // group, *self.kernel_size, self._weight_num]
+        self._weight_num_bits = get_quant_dtype_num_bits(weight_quant_dtype)
+        self._weight_num = 2 ** self._weight_num_bits
+        weight_shape = [self.out_channels, self.in_channels // self.group, *self.kernel_size, self._weight_num]
         self.weight = Parameter(initializer(weight_init, weight_shape, mindspore.float32),
                                 name='weight', requires_grad=True)
 
-
-        self.bias_add = P.BiasAdd()
-        if Validator.check_bool(has_bias, "has_bias", self.cls_name):
-            self.bias = Parameter(initializer(bias_init, [out_channels]), name='bias')
-        else:
-            self.bias = None
+        if self.has_bias:
+            self.bias_add = P.BiasAdd()
+            self.bias = handler.bias
 
         self.conv = P.Conv2D(out_channel=self.out_channels,
                              kernel_size=self.kernel_size,
@@ -171,47 +134,6 @@ class Conv2dSlbQuant(QuantCell):
                              group=self.group)
 
         self._weight_quantizer = quant_config.weight()
-
-    @classmethod
-    def from_float(cls, conv: Conv2d, quant_config: OpQuantConfig, weight_quant_dtype: QuantDtype,
-                   layer_policy: LayerPolicy = None):
-        """
-        A class method to create `Conv2dSlbQuant` from a `Conv2d`
-
-        Examples:
-            >>> from functools import partial
-            >>> from mindspore import nn
-            >>> from mindspore.nn.layer.quant import QuantConfig as OpQuantConfig
-            >>> from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
-            >>> from mindspore_gs.quantization.slb.slb_fake_quantizer import SlbFakeQuantizerPerLayer
-            >>> from mindspore.common.dtype import QuantDtype
-            >>> ic = 10
-            >>> oc = 100
-            >>> kernel_size = 3
-            >>> conv_op = nn.Conv2d(ic, oc, kernel_size)
-            >>> # when apply QAT on `conv_op`, QAT need to create a quant conv2d whose weight is fake-quanted
-            >>> quant_config: OpQuantConfig = OpQuantConfig(weight=partial(SlbFakeQuantizerPerLayer, num_bits=1),
-            >>>                                             activation=None)
-            >>> weight_quant_dtype: QuantDtype = QuantDtype.INT1
-            >>> conv_quant = Conv2dSlbQuant.from_float(conv_op, quant_config, weight_quant_dtype)
-        """
-        conv_quant = cls(
-            conv,
-            layer_policy,
-            conv.in_channels,
-            conv.out_channels,
-            kernel_size=conv.kernel_size,
-            stride=conv.stride,
-            pad_mode=conv.pad_mode,
-            padding=conv.padding,
-            dilation=conv.dilation,
-            group=conv.group,
-            has_bias=conv.has_bias,
-            bias_init=conv.bias_init,
-            weight_init=conv.weight_init,
-            quant_config=quant_config,
-            weight_quant_dtype=weight_quant_dtype)
-        return conv_quant
 
     def weight_quantizer(self):
         return self._weight_quantizer

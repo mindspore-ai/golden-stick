@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Quantization utils."""
+"""
+MindSpore golden stick operations.
+"""
 
-from mindspore.common.dtype import QuantDtype
+from .fake_quant_perchannel import FakeQuantPerChannel
+from .fake_quant_perlayer import FakeQuantPerLayer
+from .min_max_update_perchannel import MinMaxUpdatePerChannel
+from .min_max_update_perlayer import MinMaxUpdatePerLayer
 
-
-def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
-    if 0 <= quant_dtype.value() <= 15:
-        return quant_dtype.value() + 1
-    if 100 <= quant_dtype.value() <= 115:
-        return quant_dtype.value() - 99
-    raise ValueError("Unsupported QuantDtype.")
+__all__ = [
+    "MinMaxUpdatePerLayer",
+    "FakeQuantPerLayer",
+    "FakeQuantPerChannel",
+    "MinMaxUpdatePerChannel",
+]
