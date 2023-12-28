@@ -20,9 +20,9 @@ from mindspore.nn import Cell
 from .net_policy import NetPolicy
 from .layer_policy import LayerPolicy, layer_policy_key
 from .transformer import Transformer
-from .quantize_wrapper_cell import QuantizeWrapperCell
 from ..comp_algo import CompAlgo
 from ..net_transform import NetTransformer
+from .quant_cell import QuantCell
 
 
 class QuantizationAwareTraining(CompAlgo):
@@ -122,8 +122,8 @@ class QuantizationAwareTraining(CompAlgo):
 
     @staticmethod
     def _replace_node(net_transformer: NetTransformer, target_node: Node, result_cell: Cell):
-        if isinstance(result_cell, QuantizeWrapperCell):
-            node_name = type(getattr(result_cell, '_handler')).__name__
+        if isinstance(result_cell, QuantCell):
+            node_name = type(result_cell.handler()).__name__
         else:
             node_name = target_node.get_name()
         node = NetTransformer.create_node(result_cell, target_node.get_targets(), target_node.get_args(),
@@ -143,9 +143,9 @@ class QuantizationAwareTraining(CompAlgo):
         for node in nodes:
             layer_policy = node.get_attribute(layer_policy_key)
             if isinstance(layer_policy, LayerPolicy):
-                wrapped_cell = layer_policy.wrap_cell(node.get_instance())
-                wrapped_cell.update_parameters_name(node.get_name() + '.')
-                QuantizationAwareTraining._replace_node(net_transformer, node, wrapped_cell)
+                quant_cell = layer_policy.wrap_cell(node.get_instance())
+                quant_cell.update_parameters_name(node.get_name() + '.')
+                QuantizationAwareTraining._replace_node(net_transformer, node, quant_cell)
 
     def apply(self, network: Cell) -> Cell:
         """
@@ -155,7 +155,7 @@ class QuantizationAwareTraining(CompAlgo):
         1. Fuse certain cells in `network` using pattern engine which is defined by net policy.
         2. Propagate layer policies defined through cells.
         3. Reduce redundant fake quantizers when they are redundant.
-        4. Apply layer policies to convert normal cell to `QuantizeWrapperCell`.
+        4. Apply layer policies to convert normal cell to `QuantCell`.
 
         Args:
             network (Cell): Network to be quantized.

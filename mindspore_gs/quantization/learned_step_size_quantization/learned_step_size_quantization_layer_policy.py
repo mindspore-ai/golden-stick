@@ -13,21 +13,20 @@
 # limitations under the License.
 # ============================================================================
 """learned step size quantization layer policy"""
-
+import abc
 from typing import Optional
 from functools import partial
 from mindspore.nn import Cell
 from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, Conv2dBnWithoutFoldQuant, \
     Conv2dBnFoldQuant
+from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
+from mindspore_gs.quantization.simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
 from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer, \
     LearnedStepSizeFakeQuantizePerChannel
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig
-from ..simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
-from ..fake_quantizer import FakeQuantizer
-from ..quantize_wrapper_cell import QuantizeWrapperCell
 
 
-class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy):
+class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy, abc.ABC):
     """
     Derived class of SimulatedLayerPolicy. LSQ layer policy.
     """
@@ -38,14 +37,14 @@ class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy):
         if config.weight_per_channel:
             self._weight_quantizer_partial = partial(LearnedStepSizeFakeQuantizePerChannel,
                                                      quant_delay=config.weight_quant_delay,
-                                                     num_bits=self._num_bits,
+                                                     quant_dtype=config.weight_quant_dtype,
                                                      neg_trunc=config.weight_neg_trunc,
                                                      symmetric=config.weight_symmetric,
                                                      narrow_range=config.weight_narrow_range)
         else:
             self._weight_quantizer_partial = partial(LearnedStepSizeFakeQuantizerPerLayer,
                                                      quant_delay=config.weight_quant_delay,
-                                                     num_bits=self._num_bits,
+                                                     quant_dtype=config.weight_quant_dtype,
                                                      neg_trunc=config.weight_neg_trunc,
                                                      symmetric=config.weight_symmetric,
                                                      narrow_range=config.weight_narrow_range)
@@ -53,14 +52,18 @@ class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy):
         if config.act_per_channel:
             raise NotImplementedError("act quant only support perlayer now!")
         self._act_quantizer: Optional[FakeQuantizer] = LearnedStepSizeFakeQuantizerPerLayer(
-            quant_delay=config.act_quant_delay, num_bits=self._num_bits, neg_trunc=config.act_neg_trunc,
+            quant_delay=config.act_quant_delay, quant_dtype=config.act_quant_dtype, neg_trunc=config.act_neg_trunc,
             symmetric=config.act_symmetric, narrow_range=config.act_narrow_range)
         self._input_quantizer: Optional[FakeQuantizer] = LearnedStepSizeFakeQuantizerPerLayer(
-            quant_delay=config.act_quant_delay, num_bits=self._num_bits, symmetric=config.act_symmetric,
+            quant_delay=config.act_quant_delay, quant_dtype=config.act_quant_dtype, symmetric=config.act_symmetric,
             narrow_range=config.act_narrow_range)
         self._output_quantizer: Optional[FakeQuantizer] = LearnedStepSizeFakeQuantizerPerLayer(
-            quant_delay=config.act_quant_delay, num_bits=self._num_bits, symmetric=config.act_symmetric,
+            quant_delay=config.act_quant_delay, quant_dtype=config.act_quant_dtype, symmetric=config.act_symmetric,
             narrow_range=config.act_narrow_range)
+
+    @abc.abstractmethod
+    def wrap_cell(self, handler: Cell) -> Cell:
+        raise NotImplementedError
 
 
 class LearnedStepSizeQuantizationConvLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
@@ -69,8 +72,7 @@ class LearnedStepSizeQuantizationConvLayerPolicy(LearnedStepSizeQuantizationLaye
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        conv_quant = Conv2dQuant.from_conv2d(handler, self.get_quant_config())
-        return QuantizeWrapperCell(conv_quant, self)
+        return Conv2dQuant.from_conv2d(handler, self.get_quant_config(), self)
 
 
 class LearnedStepSizeQuantizationDenseLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
@@ -79,8 +81,7 @@ class LearnedStepSizeQuantizationDenseLayerPolicy(LearnedStepSizeQuantizationLay
     """
 
     def wrap_cell(self, handler: Cell) -> Cell:
-        dense_quant = DenseQuant.from_dense(handler, self.get_quant_config())
-        return QuantizeWrapperCell(dense_quant, self)
+        return DenseQuant.from_dense(handler, self.get_quant_config(), self)
 
 
 class LearnedStepSizeQuantizationConvBnLayerPolicy(LearnedStepSizeQuantizationLayerPolicy):
@@ -92,12 +93,12 @@ class LearnedStepSizeQuantizationConvBnLayerPolicy(LearnedStepSizeQuantizationLa
         if handler.has_bn:
             if self._config.bn_fold:
                 if self._config.one_conv_fold:
-                    conv_quant = Conv2dBnFoldQuantOneConv.from_convbn(handler, self.get_quant_config())
+                    conv_quant = Conv2dBnFoldQuantOneConv.from_convbn(handler, self.get_quant_config(), self)
                 else:
                     conv_quant = Conv2dBnFoldQuant.from_convbn(handler, self.get_quant_config(),
-                                                               {"freeze_bn": self._config.freeze_bn})
+                                                               {"freeze_bn": self._config.freeze_bn}, self)
             else:
-                conv_quant = Conv2dBnWithoutFoldQuant.from_convbn(handler, self.get_quant_config())
+                conv_quant = Conv2dBnWithoutFoldQuant.from_convbn(handler, self.get_quant_config(), self)
         else:
-            conv_quant = Conv2dQuant.from_convbn(handler, self.get_quant_config())
-        return QuantizeWrapperCell(conv_quant, self)
+            conv_quant = Conv2dQuant.from_convbn(handler, self.get_quant_config(), self)
+        return conv_quant

@@ -22,7 +22,7 @@ from mindspore_gs.quantization.learned_step_size_quantization import LearnedStep
     LearnedQAT
 from mindspore_gs.quantization.learned_step_size_quantization.learned_step_size_quantization_layer_policy import \
     LearnedStepSizeFakeQuantizerPerLayer, LearnedStepSizeFakeQuantizePerChannel
-from mindspore_gs.quantization.quantize_wrapper_cell import QuantizeWrapperCell
+from mindspore_gs.ops.nn import Conv2dQuant, DenseQuant
 
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
@@ -44,28 +44,24 @@ def test_lenet_apply():
     lsq = LearnedQAT(config)
     new_network = lsq.apply(network)
     cells: OrderedDict = new_network.name_cells()
-    assert cells.get("Conv2dQuant", None) is not None
-    conv_quant: QuantizeWrapperCell = cells.get("Conv2dQuant")
-    assert isinstance(conv_quant, QuantizeWrapperCell)
-    conv_handler = conv_quant._handler
-    weight_fake_quant: LearnedStepSizeFakeQuantizePerChannel = conv_handler.fake_quant_weight
+    conv_quant = cells.get("Conv2d", None)
+    assert isinstance(conv_quant, Conv2dQuant)
+    weight_fake_quant: LearnedStepSizeFakeQuantizePerChannel = conv_quant.weight_quantizer()
     assert isinstance(weight_fake_quant, LearnedStepSizeFakeQuantizePerChannel)
-    assert weight_fake_quant._symmetric
+    assert weight_fake_quant.symmetric()
     assert weight_fake_quant._quant_delay == 0
-    act_fake_quant = conv_quant._output_quantizer
+    act_fake_quant = conv_quant.output_quantizer()
     assert isinstance(act_fake_quant, LearnedStepSizeFakeQuantizerPerLayer)
     assert act_fake_quant._symmetric
     assert act_fake_quant._quant_delay == 0
 
-    assert cells.get("DenseQuant", None) is not None
-    dense_quant: QuantizeWrapperCell = cells.get("DenseQuant")
-    assert isinstance(dense_quant, QuantizeWrapperCell)
-    dense_handler = dense_quant._handler
-    weight_fake_quant: LearnedStepSizeFakeQuantizePerChannel = dense_handler.fake_quant_weight
+    dense_quant = cells.get("Dense", None)
+    assert isinstance(dense_quant, DenseQuant)
+    weight_fake_quant: LearnedStepSizeFakeQuantizePerChannel = dense_quant.weight_quantizer()
     assert isinstance(weight_fake_quant, LearnedStepSizeFakeQuantizePerChannel)
-    assert weight_fake_quant._symmetric
+    assert weight_fake_quant.symmetric()
     assert weight_fake_quant._quant_delay == 0
-    act_fake_quant = dense_quant._output_quantizer
+    act_fake_quant = dense_quant.output_quantizer()
     assert isinstance(act_fake_quant, LearnedStepSizeFakeQuantizerPerLayer)
-    assert act_fake_quant._symmetric
+    assert act_fake_quant.symmetric()
     assert act_fake_quant._quant_delay == 0

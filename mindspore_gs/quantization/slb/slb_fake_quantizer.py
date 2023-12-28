@@ -24,10 +24,11 @@ from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
 from mindspore.ops import operations as P
+from mindspore.ops.operations._quant_ops import FakeQuantParam
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.validator import Validator
-from ..fake_quantizer import FakeQuantizer, LinearFakeQuantizer
-from ..quant_utils import get_quant_min_max, cal_quantization_params
+from mindspore_gs.quantization.fake_quantizer import FakeQuantizer, LinearFakeQuantizer
+from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params
 
 
 class SlbFakeQuantizerPerLayer(FakeQuantizer):
@@ -129,7 +130,11 @@ class SlbFakeQuantizerPerLayer(FakeQuantizer):
         return False
 
     def quant_params(self) -> dict:
-        return {"num_bits": self.num_bits}
+        scale_w = np.ones(1) * 2. ** (self.num_bits - 1)
+        zp_w = np.zeros(1)
+        return {FakeQuantParam.attr_key_linear_quant_scale: scale_w.tolist(),
+                FakeQuantParam.attr_key_linear_quant_zero_point: zp_w.tolist(),
+                "num_bits": self.num_bits}
 
 
 class SlbActQuantizer(LinearFakeQuantizer):

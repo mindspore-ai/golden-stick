@@ -15,13 +15,17 @@
 """learned step size fake quantizers."""
 
 from functools import partial
+from typing import Union
+
 import numpy as np
 import mindspore
+from mindspore import QuantDtype
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
-from ..fake_quantizer import FakeQuantizer
-from ..quant_utils import compute_kl_threshold
+from mindspore_gs.ops.common.quant_op_utils import get_quant_dtype_num_bits
+from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
+from mindspore_gs.quantization.quant_utils import compute_kl_threshold
 
 
 def _calculate_quant_max(num_bits, neg_trunc=False):
@@ -42,19 +46,20 @@ def _calculate_quant_max(num_bits, neg_trunc=False):
     return quant_max
 
 
-class LearnedStepSizeFakeQuantizerPerLayer(FakeQuantizer):
+class LearnedStepSizeFakeQuantizerPerLayer(LinearFakeQuantizer):
     """
     Derived class of FakeQuantizer. Use learning-rate from each epoch to compute scale and zero-point.
     """
 
-    def __init__(self, num_bits=8, quant_delay=0, min_init=-6, max_init=6, neg_trunc=False, symmetric=True,
-                 narrow_range=True):
+    def __init__(self, quant_delay=0, min_init=-6, max_init=6, neg_trunc=False, symmetric=True, narrow_range=True,
+                 quant_dtype=QuantDtype.INT8):
         super(LearnedStepSizeFakeQuantizerPerLayer, self).__init__()
-        self._num_bits = num_bits
         self._neg_trunc = neg_trunc
         self._symmetric = symmetric
         self._narrow_range = narrow_range
         self._quant_delay = quant_delay
+        self._quant_dtype = quant_dtype
+        self._num_bits = get_quant_dtype_num_bits(self._quant_dtype)
         self._quant_max = _calculate_quant_max(self._num_bits, self._neg_trunc)
         self.quant_max = Parameter(Tensor(np.array([self._quant_max]).astype(np.float32)))
         quant_func = partial(Q.FakeLearnedScaleQuantPerLayer, quant_delay=self._quant_delay, neg_trunc=self._neg_trunc)
@@ -62,6 +67,27 @@ class LearnedStepSizeFakeQuantizerPerLayer(FakeQuantizer):
         self.fake_quant_infer = quant_func(training=False)
         self._float_min = Parameter(Tensor([min_init], mindspore.float32), name="float_min")
         self._float_max = Parameter(Tensor([max_init], mindspore.float32), name="float_max")
+
+    def mins(self) -> Union[list, tuple]:
+        return self._float_min.data.asnumpy().tolist()
+
+    def maxs(self) -> Union[list, tuple]:
+        return self._float_max.data.asnumpy().tolist()
+
+    def num_bits(self) -> int:
+        return self._num_bits
+
+    def narrow_range(self) -> bool:
+        return self._narrow_range
+
+    def symmetric(self) -> bool:
+        return self._symmetric
+
+    def quant_dtype(self) -> QuantDtype:
+        return self._quant_dtype
+
+    def is_per_channel(self) -> bool:
+        return False
 
     def compute_quant_param(self, weight_param):
         max_init = [compute_kl_threshold(weight_param, self._num_bits)]
@@ -84,20 +110,21 @@ class LearnedStepSizeFakeQuantizerPerLayer(FakeQuantizer):
         return s
 
 
-class LearnedStepSizeFakeQuantizePerChannel(FakeQuantizer):
+class LearnedStepSizeFakeQuantizePerChannel(LinearFakeQuantizer):
     """
     Derived class of FakeQuantizer. perchannel version of LearnedFakeQuantizerPerLayer.
     """
 
-    def __init__(self, num_bits=8, num_channels=1, channel_axis=1, quant_delay=0,
-                 float_min=-6, float_max=6, neg_trunc=False, symmetric=True, narrow_range=True):
+    def __init__(self, num_channels=1, channel_axis=1, quant_delay=0, float_min=-6, float_max=6, neg_trunc=False,
+                 symmetric=True, narrow_range=True, quant_dtype=QuantDtype.INT8):
         super(LearnedStepSizeFakeQuantizePerChannel, self).__init__()
-        self._num_bits = num_bits
         self._symmetric = symmetric
         self._neg_trunc = neg_trunc
         self._narrow_range = narrow_range
         self._channel_axis = channel_axis
         self._quant_delay = quant_delay
+        self._quant_dtype = quant_dtype
+        self._num_bits = get_quant_dtype_num_bits(self._quant_dtype)
         self._quant_max = _calculate_quant_max(self._num_bits, self._neg_trunc)
         self.quant_max = Parameter(Tensor(np.array([self._quant_max]).astype(np.float32)))
         quant_func = partial(Q.FakeLearnedScaleQuantPerChannel, quant_delay=self._quant_delay,
@@ -136,6 +163,27 @@ class LearnedStepSizeFakeQuantizePerChannel(FakeQuantizer):
         else:
             out = self.fake_quant_infer(x, self._float_max, self.quant_max)
         return out
+
+    def mins(self) -> Union[list, tuple]:
+        return self._float_min.data.asnumpy().tolist()
+
+    def maxs(self) -> Union[list, tuple]:
+        return self._float_max.data.asnumpy().tolist()
+
+    def num_bits(self) -> int:
+        return self._num_bits
+
+    def narrow_range(self) -> bool:
+        return self._narrow_range
+
+    def symmetric(self) -> bool:
+        return self._symmetric
+
+    def quant_dtype(self) -> QuantDtype:
+        return self._quant_dtype
+
+    def is_per_channel(self) -> bool:
+        return False
 
     def extend_repr(self):
         """Display instance object as string."""

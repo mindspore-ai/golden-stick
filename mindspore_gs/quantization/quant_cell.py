@@ -12,48 +12,68 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""QuantizeWrapperCell."""
+"""
+QuantCell, wrap objected cell with fake-quantizer, LinearQuantCell for example..
+"""
+import abc
 
-from mindspore.nn import Cell
-from .layer_policy import LayerPolicy
+from mindspore.nn.cell import Cell
+from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 
 
-class QuantizeWrapperCell(Cell):
+class QuantCell(Cell):
     """
     Decorator of normal Cell class for decorate a cell to a quant-cell with fake-quant algorithm.
 
+    Also provide `convert` method to convert self into a standard quant cell of MindSpore.
+
     Args:
-        act (Cell): normal cell to be wrapped.
-        layer_policy (FakeQuantizer): Define how input data and output data to be fake-quant.
+        handler (Cell): normal cell to be wrapped.
+        policy (LayerPolicy): Define how fake-quant handler Cell.
     """
-
-    def __init__(self, handler: Cell, layer_policy: LayerPolicy):
+    def __init__(self, handler: Cell, policy: LayerPolicy):
         super().__init__()
-        self._handler: Cell = handler
-        self._policy = layer_policy
-        self._input_quantizer = self._policy.get_input_quantizer()
-        self._output_quantizer = self._policy.get_output_quantizer()
-        self._inputs_insert_fq = self._policy.get_input_need_insert_fq()
+        self._handler = handler
+        self._policy = policy
+        self._input_quantizer = None
+        self._output_quantizer = None
+        self._inputs_insert_fq = None
+        if self._policy:
+            self._input_quantizer: FakeQuantizer = self._policy.get_input_quantizer()
+            self._output_quantizer: FakeQuantizer = self._policy.get_output_quantizer()
+            self._inputs_insert_fq = self._policy.get_input_need_insert_fq()
 
-    def get_handler(self):
+    def handler(self):
         return self._handler
 
-    def get_input_quantizer(self):
+    def input_quantizer(self):
         return self._input_quantizer
 
-    def get_output_quantizer(self):
+    def output_quantizer(self):
         return self._output_quantizer
+
+    @abc.abstractmethod
+    def weight_quantizer(self):
+        raise NotImplementedError
+
+    def convert(self):
+        if self._input_quantizer:
+            self._input_quantizer = self._input_quantizer.convert_to_fakequantparam()
+        if self._output_quantizer:
+            self._output_quantizer = self._output_quantizer.convert_to_fakequantparam()
+
+    # pylint: disable=arguments-differ
+    @abc.abstractmethod
+    def core_construct(self, *args):
+        raise NotImplementedError
 
     def construct(self, *inputs):
         """
-        Defines the computation of QuantizeWrapperCell to be performed.
-
-        Returns:
-            Tensor, returns the computed result.
+        override construct of Cell.
         """
-        # fake-quant input, forward handler
         if self._input_quantizer is None:
-            outputs = self._handler(*inputs)
+            outputs = self.core_construct(*inputs)
         else:
             if len(self._inputs_insert_fq) > len(inputs):
                 raise ValueError("The num of cell inputs is incorrect.")
@@ -64,7 +84,7 @@ class QuantizeWrapperCell(Cell):
                     fq_inputs.append(self._input_quantizer(ori_input))
                 else:
                     fq_inputs.append(inputs[i])
-            outputs = self._handler(*fq_inputs)
+            outputs = self.core_construct(*fq_inputs)
 
         # fake-quant output
         if self._output_quantizer is None:

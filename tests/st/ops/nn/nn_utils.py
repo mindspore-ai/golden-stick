@@ -13,27 +13,27 @@
 # limitations under the License.
 # ============================================================================
 """utils for nn cell."""
-from mindspore_gs.ops.nn import FakeQuantWithMinMaxObserver
-from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import QuantConfig
-from mindspore.common.dtype import QuantDtype
+from mindspore.nn import Cell
+from mindspore_gs.quantization.simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
+from mindspore_gs.quantization.simulated_quantization.simulated_quantization_config import SimulatedQuantizationConfig
 
 
-def create_quant_config(quant_observer=(FakeQuantWithMinMaxObserver, FakeQuantWithMinMaxObserver),
-                        quant_delay=(0, 0),
-                        quant_dtype=(QuantDtype.INT8, QuantDtype.INT8),
-                        per_channel=(False, False),
-                        symmetric=(False, False),
-                        narrow_range=(False, False),
-                        mode="DEFAULT"):
+class TestLayerPolicy(SimulatedLayerPolicy):
     """
-    Config the observer type of weights and data flow with quant parameters.
+    Mock LayerPolicy for quant cell test.
     """
-    if per_channel[-1]:
-        raise ValueError("Arg 'per_channel' second element must be 'False'.")
-    weight_observer = quant_observer[0].partial_init(quant_delay=quant_delay[0], quant_dtype=quant_dtype[0],
-                                                     per_channel=per_channel[0], symmetric=symmetric[0],
-                                                     narrow_range=narrow_range[0], mode=mode)
-    act_observer = quant_observer[-1].partial_init(quant_delay=quant_delay[-1], quant_dtype=quant_dtype[-1],
-                                                   per_channel=per_channel[-1], symmetric=symmetric[-1],
-                                                   narrow_range=narrow_range[-1], mode=mode)
-    return QuantConfig(weight=weight_observer, activation=act_observer)
+    def __init__(self, input_number, weight_per_channel=False, act_per_channel=False):
+        config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()
+        config.weight_per_channel = weight_per_channel
+        config.act_per_channel = act_per_channel
+        super(TestLayerPolicy, self).__init__([], [], config)
+        self.set_input_number(input_number)
+
+    def get_input_quantizer(self):
+        return None
+
+    def get_output_quantizer(self):
+        return None
+
+    def wrap_cell(self, handler: Cell) -> Cell:
+        raise RuntimeError("Mock LayerPolicy, should not call wrap_cell method.")

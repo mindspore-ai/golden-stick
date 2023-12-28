@@ -15,7 +15,7 @@
 """Config for aware-training-quantization."""
 
 from mindspore.common.dtype import QuantDtype
-from ...comp_algo import CompAlgoConfig
+from mindspore_gs.comp_algo import CompAlgoConfig
 
 
 class SlbQuantConfig(CompAlgoConfig):

@@ -100,5 +100,5 @@ class LinearFakeQuantizer(FakeQuantizer):
     def quant_params(self) -> dict:
         scale, zp = self.get_scale_zp()
         return {"min": self.mins(), "max": self.maxs(), "num_bits": self.num_bits(),
-                "narrow_range": self.narrow_range(), "symmetric": self.symmetric(), "scale": scale,
-                "zero_point": zp}
+                "narrow_range": self.narrow_range(), "symmetric": self.symmetric(),
+                FakeQuantParam.attr_key_linear_quant_scale: scale, FakeQuantParam.attr_key_linear_quant_zero_point: zp}

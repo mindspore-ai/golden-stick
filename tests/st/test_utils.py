@@ -194,13 +194,6 @@ def train_network(ori_model_path, model_name, model_suffix, config_name, algo_rp
         A string represents real working model directory. Take LeNet as an example, it returns '$cur_path/lenet'.
     """
 
-    if ds_type == "mnist":
-        ds_sub_dir = "mnist/train"
-    elif ds_type == "cifar10":
-        ds_sub_dir = "cifar-10-batches-bin"
-    else:
-        raise NotImplementedError("ds_type not support {} now!".format(ds_type))
-
     cur_path_ = os.path.dirname(os.path.abspath(__file__))
     copy_file(os.path.join(ori_model_path, model_name), os.path.join(cur_path_, model_name + model_suffix))
     model_path = os.path.join(cur_path_, model_name + model_suffix)
@@ -212,9 +205,19 @@ def train_network(ori_model_path, model_name, model_suffix, config_name, algo_rp
     config.apply(config_file)
     ds_path = os.getenv("DATASET_PATH", None)
     if ds_path:
-        train_ds_path = os.path.join(ds_path, ds_sub_dir)
+        if ds_type == "mnist":
+            train_ds_path = os.path.join(ds_path, "mnist/train")
+        elif ds_type == "cifar10":
+            train_ds_path = os.path.join(ds_path, "cifar/cifar-10-batches-bin")
+        else:
+            raise NotImplementedError("ds_type not support {} now!".format(ds_type))
     else:
-        train_ds_path = os.path.join(data_root, ds_sub_dir)
+        if ds_type == "mnist":
+            train_ds_path = os.path.join(data_root, "mnist/train")
+        elif ds_type == "cifar10":
+            train_ds_path = os.path.join(data_root, "cifar-10-batches-bin")
+        else:
+            raise NotImplementedError("ds_type not support {} now!".format(ds_type))
     assert os.path.exists(exec_path)
     assert os.path.exists(algo_path)
     assert os.path.exists(train_ds_path)
@@ -273,13 +276,6 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
         A string represents real working model directory. Take LeNet as an example, it returns '$cur_path/lenet'.
     """
 
-    if ds_type == "mnist":
-        ds_sub_dir = "mnist/test"
-    elif ds_type == "cifar10":
-        ds_sub_dir = "cifar-10-verify-bin"
-    else:
-        raise NotImplementedError("ds_type not support {} now!".format(ds_type))
-
     assert os.path.exists(model_path)
     exec_path = os.path.join(model_path, "golden_stick", "scripts")
     algo_path = os.path.join(model_path, "golden_stick", algo_rpath)
@@ -290,9 +286,19 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
     config.apply(config_file)
     ds_path = os.getenv("DATASET_PATH", None)
     if ds_path:
-        eval_ds_path = os.path.join(ds_path, ds_sub_dir)
+        if ds_type == "mnist":
+            eval_ds_path = os.path.join(ds_path, "mnist/test")
+        elif ds_type == "cifar10":
+            eval_ds_path = os.path.join(ds_path, "cifar/cifar-10-verify-bin")
+        else:
+            raise NotImplementedError("ds_type not support {} now!".format(ds_type))
     else:
-        eval_ds_path = os.path.join(data_root, ds_sub_dir)
+        if ds_type == "mnist":
+            eval_ds_path = os.path.join(data_root, "mnist/test")
+        elif ds_type == "cifar10":
+            eval_ds_path = os.path.join(data_root, "cifar-10-verify-bin")
+        else:
+            raise NotImplementedError("ds_type not support {} now!".format(ds_type))
 
     ckpt_file = os.path.join(exec_path, ckpt_rpath)
     assert os.path.exists(os.path.join(exec_path, script_name))

@@ -17,9 +17,9 @@ import pytest
 import numpy as np
 
 import mindspore
-from mindspore import Tensor
+from mindspore import Tensor, ops
 from mindspore_gs.ops.nn import TensorAddQuant
-from .nn_utils import create_quant_config
+from .nn_utils import TestLayerPolicy
 
 
 @pytest.mark.level0
@@ -31,11 +31,10 @@ def test_tensor_add_quant():
     Description: Test nn ops TensorAddQuant.
     Expectation: Success.
     """
-    qconfig = create_quant_config()
-    add_quant = TensorAddQuant(quant_config=qconfig)
+    policy = TestLayerPolicy(1)
+    add_quant = TensorAddQuant(ops.Add(), policy)
     x1 = Tensor(np.array([[1, 2, 1], [-2, 0, -1]]), mindspore.float32)
     x2 = Tensor(np.ones((2, 3)), mindspore.float32)
     result = add_quant(x1, x2).asnumpy()
-    expect_output = np.array([[1.9764705, 3.011765, 1.9764705],
-                              [-0.9882355, 0.9882355, 0.]]).astype(np.float32)
+    expect_output = np.array([[2., 3., 2.], [-1., 1., 0.]]).astype(np.float32)
     assert np.allclose(expect_output, result, 0.001, 0.001)

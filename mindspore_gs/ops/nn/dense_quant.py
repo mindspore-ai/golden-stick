@@ -22,13 +22,15 @@ from mindspore.common.initializer import initializer
 from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
 from mindspore.nn.layer.activation import get_activation
-from mindspore.nn.cell import Cell
 from mindspore.nn.layer.basic import Dense
+from mindspore.nn import Cell
 from mindspore_gs.validator import Validator
-from .fake_quant_with_min_max_observer import quant_config_default, QuantConfig
+from mindspore_gs.ops.nn.fake_quant_with_min_max_observer import quant_config_default, QuantConfig
+from mindspore_gs.quantization.quant_cell import QuantCell
+from mindspore_gs.quantization.layer_policy import LayerPolicy
 
 
-class DenseQuant(Cell):
+class DenseQuant(QuantCell):
     r"""
     The fully connected layer with fake quantized operation.
 
@@ -87,6 +89,8 @@ class DenseQuant(Cell):
     """
 
     def __init__(self,
+                 handler: Cell,
+                 policy: LayerPolicy,
                  in_channels,
                  out_channels,
                  weight_init='normal',
@@ -96,7 +100,7 @@ class DenseQuant(Cell):
                  quant_config=quant_config_default,
                  quant_dtype=QuantDtype.INT8):
         """Initialize DenseQuant."""
-        super(DenseQuant, self).__init__()
+        super(DenseQuant, self).__init__(handler, policy)
         self.in_channels = Validator.check_positive_int(in_channels, "in_channels", self.cls_name)
         self.out_channels = Validator.check_positive_int(out_channels, "out_channels", self.cls_name)
         self.has_bias = Validator.check_bool(has_bias, "has_bias", self.cls_name)
@@ -132,15 +136,20 @@ class DenseQuant(Cell):
                             f"but got {activation}.")
 
         self.activation_flag = self.activation is not None
-        self.fake_quant_weight = quant_config.weight(channel_axis=0,
+        self._weight_quantizer = quant_config.weight(channel_axis=0,
                                                      num_channels=out_channels)
 
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
     @classmethod
-    def from_dense(cls, dense: Dense, quant_config: QuantConfig):
+    def from_dense(cls, dense: Dense, quant_config: QuantConfig, layer_policy: LayerPolicy):
         """
         A class method to create `DenseQuant` from a `Dense`
         """
-        dense_quant = cls(in_channels=dense.in_channels,
+        dense_quant = cls(handler=dense,
+                          policy=layer_policy,
+                          in_channels=dense.in_channels,
                           out_channels=dense.out_channels,
                           weight_init=dense.weight,
                           bias_init=dense.bias,
@@ -152,13 +161,19 @@ class DenseQuant(Cell):
             dense_quant.bias = dense.bias
         return dense_quant
 
-    def construct(self, x):
+    def convert(self):
+        # Weight is transposed in old version
+        super(DenseQuant, self).convert()
+        self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+
+    # pylint: disable=arguments-differ
+    def core_construct(self, x):
         """Use operators to construct the Dense layer.
 
         Args:
             x (Tensor): Input tensor.
         """
-        output = self.fake_quant_weight(self.weight)
+        output = self._weight_quantizer(self.weight)
         output = self.matmul(x, output)
         if self.has_bias:
             output = self.bias_add(output, self.bias)

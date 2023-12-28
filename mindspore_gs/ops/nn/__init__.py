@@ -27,7 +27,6 @@ from .fake_quant_with_min_max_observer import FakeQuantWithMinMaxObserver
 from .mul_quant import MulQuant
 from .tensor_add_quant import TensorAddQuant
 
-
 __all__ = [
     'FakeQuantWithMinMaxObserver',
     'Conv2dBnFoldQuantOneConv',

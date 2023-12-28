@@ -52,8 +52,8 @@ def test_lenet_export_mindir(run_mode):
     from lenet.src.lenet import LeNet5
     from lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=run_mode)
-    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/mnist")
-    data_path = os.path.join(mnist_path, "train")
+    mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/")
+    data_path = os.path.join(mnist_path, "mnist/train")
     ds_train = create_mnist_ds(data_path, 32, 1)
     if ds_train.get_dataset_size() == 0:
         raise ValueError("Please check dataset size > 0 and batch_size <= dataset size")

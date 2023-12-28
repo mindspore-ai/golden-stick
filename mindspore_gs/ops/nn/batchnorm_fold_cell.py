@@ -15,8 +15,8 @@
 """BatchNormFoldCell."""
 from __future__ import absolute_import
 
-from mindspore.ops import operations as P
 import mindspore.context as context
+from mindspore.ops import operations as P
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q
 
