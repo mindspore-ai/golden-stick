@@ -142,10 +142,9 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         self.float_max = Parameter(Tensor(np.array([-float("inf")] * output_channel), mstype.float32),
                                    name="float_max")
         self._in_strategy = strategy
-
+        per_channel_strategy = strategy[0][axis]
+        input_strategy = ((per_channel_strategy,),(per_channel_strategy,))
         if strategy:
-            per_channel_strategy = strategy[0][axis]
-            input_strategy = ((per_channel_strategy,), (per_channel_strategy,))
             self.min = P.ReduceMin().shard(strategy)
             self.max = P.ReduceMax().shard(strategy)
             self.transpose = P.Transpose().shard(strategy)
@@ -156,9 +155,6 @@ class MinMaxPerChannel(LinearFakeQuantizer):
             self.min = P.ReduceMin()
             self.max = P.ReduceMax()
             self.transpose = P.Transpose()
-            self.assign = P.Assign()
-            self.minimum = P.Minimum()
-            self.maximum = P.Maximum()
         if axis < 0:
             axis += data_rank
         self.axis = axis
