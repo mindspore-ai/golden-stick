@@ -75,8 +75,9 @@ class QuantCell(Cell):
         if self._input_quantizer is None:
             outputs = self.core_construct(*inputs)
         else:
-            if len(self._inputs_insert_fq) > len(inputs):
-                raise ValueError("The num of cell inputs is incorrect.")
+            if len(self._inputs_insert_fq) != len(inputs):
+                raise ValueError(f"The num of cell inputs is incorrect, set input number: "
+                                 f"{len(self._inputs_insert_fq)}, real input number: {len(inputs)}")
             fq_inputs = []
             for i in range(0, len(self._inputs_insert_fq)):
                 if self._inputs_insert_fq[i]:

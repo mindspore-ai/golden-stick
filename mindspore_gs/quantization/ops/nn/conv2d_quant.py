@@ -16,11 +16,9 @@
 from __future__ import absolute_import
 
 from mindspore.ops import operations as P
-from mindspore.common.dtype import QuantDtype
 from mindspore.nn.layer.conv import Conv2d
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
-from .fake_quant_with_min_max_observer import quant_config_default
 
 
 class Conv2dQuant(QuantCell):
@@ -59,11 +57,8 @@ class Conv2dQuant(QuantCell):
     Examples:
         >>> import numpy as np
         >>> import mindspore
-        >>> from mindspore.compression import quant
         >>> from mindspore import Tensor, nn
-        >>> qconfig = quant.create_quant_config()
-        >>> conv2d_quant = nn.Conv2dQuant(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid",
-        ...                               weight_init='ones', quant_config=qconfig)
+        >>> conv2d_quant = nn.Conv2dQuant(1, 1, kernel_size=(2, 2), stride=(1, 1), pad_mode="valid", weight_init='ones')
         >>> x = Tensor(np.array([[[[1, 0, 3], [1, 4, 7], [2, 5, 2]]]]), mindspore.float32)
         >>> result = conv2d_quant(x)
         >>> print(result)
@@ -71,8 +66,7 @@ class Conv2dQuant(QuantCell):
            [11.859375  17.78125]]]]
     """
 
-    def __init__(self, handler: Conv2d, policy: LayerPolicy, quant_config=quant_config_default,
-                 quant_dtype=QuantDtype.INT8):
+    def __init__(self, handler: Conv2d, policy: LayerPolicy):
         """Initialize Conv2dQuant."""
         super(Conv2dQuant, self).__init__(handler, policy)
         self.in_channels = handler.in_channels
@@ -85,7 +79,6 @@ class Conv2dQuant(QuantCell):
         self.padding = handler.padding
         self.group = handler.group
         self.has_bias = handler.has_bias
-        _ = quant_dtype  # for fix pylint unused-argument
 
         self.weight = handler.weight
         if self.has_bias:
@@ -103,7 +96,8 @@ class Conv2dQuant(QuantCell):
                              dilation=self.dilation,
                              group=self.group)
         channel_axis = 0
-        self._weight_quantizer = quant_config.weight(channel_axis=channel_axis, num_channels=handler.out_channels)
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, **{"channel_axis": channel_axis,
+                                                                                  "num_channels": self.out_channels})
 
     def weight_quantizer(self):
         return self._weight_quantizer

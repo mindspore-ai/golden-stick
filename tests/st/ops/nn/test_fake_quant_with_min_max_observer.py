@@ -18,7 +18,7 @@ import numpy as np
 
 import mindspore
 from mindspore import Tensor
-from mindspore_gs.quantization.simulated_quantization.quant_cells import FakeQuantWithMinMaxObserver
+from mindspore_gs.quantization.ops.nn import FakeQuantWithMinMaxObserver
 
 
 @pytest.mark.level0

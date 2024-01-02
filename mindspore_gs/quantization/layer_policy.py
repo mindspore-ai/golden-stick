@@ -41,8 +41,10 @@ class LayerPolicy(abc.ABC):
     def __init__(self):
         self._input_num = 0
         self._inputs_insert_fq = []
+        self._output_insert_fq: bool = True
 
-    def get_weight_name_and_quantizers(self) -> [(str, FakeQuantizer)]:
+    @abc.abstractmethod
+    def get_weight_quantizer(self, weight_name="", **kwargs) -> FakeQuantizer:
         """
         Define how to fake-quantize weight data. This method must be overridden by all subclasses.
 
@@ -50,30 +52,52 @@ class LayerPolicy(abc.ABC):
             Return a list of 2-tuple of weight_name and weight_quantizer.
             Return empty list if no need to fake-quant weight.
         """
+        raise NotImplementedError
 
-        return []
-
-    def get_act_name_and_quantizers(self) -> [(str, (Optional[FakeQuantizer], Optional[FakeQuantizer]))]:
-        return []
-
-    def get_input_quantizer(self) -> Optional[FakeQuantizer]:
+    @abc.abstractmethod
+    def _get_input_quantizer(self, input_index=-1, **kwargs) -> FakeQuantizer:
         """
         Define how to fake-quantize input data. This method must be overridden by all subclasses.
 
         Returns:
-            Return a instance of quantizer as quantizer for inputs.
+            Return an instance of quantizer as quantizer for inputs.
+        """
+        raise NotImplementedError
+
+    def get_input_quantizer(self, input_index=-1, **kwargs) -> Optional[FakeQuantizer]:
+        """
+        Define how to fake-quantize input data.
+
+        Returns:
+            Return an instance of quantizer as quantizer for inputs.
             Return None if all inputs don't need to fake-quant.
         """
-        return None
+        if input_index >= self._input_num:
+            return None
+        if not self._inputs_insert_fq[input_index]:
+            return None
+        return self._get_input_quantizer(input_index, **kwargs)
 
-    def get_output_quantizer(self) -> Optional[FakeQuantizer]:
+    @abc.abstractmethod
+    def _get_output_quantizer(self, **kwargs) -> FakeQuantizer:
         """
         Define how to fake-quantize output data. This method must be overridden by all subclasses.
 
         Returns:
-            Return a instance of quantizer as quantizer for outputs.
+            Return an instance of quantizer as quantizer for outputs.
+        """
+        raise NotImplementedError
+
+    def get_output_quantizer(self, **kwargs) -> Optional[FakeQuantizer]:
+        """
+        Define how to fake-quantize output data.
+
+        Returns:
+            Return an instance of quantizer as quantizer for outputs.
             Return None if all outputs don't need to fake-quant.
         """
+        if self._output_insert_fq:
+            return self._get_output_quantizer(**kwargs)
         return None
 
     @abc.abstractmethod
@@ -109,6 +133,5 @@ class LayerPolicy(abc.ABC):
     def get_input_need_insert_fq(self) -> list:
         return self._inputs_insert_fq
 
-    # only support one-output-quantizer pre layer because we can not get how many outputs a cell would has
-    def set_output_not_insert_fq(self, index: Optional[int] = None):
-        pass
+    def set_output_not_insert_fq(self):
+        self._output_insert_fq = False

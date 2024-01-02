@@ -21,7 +21,7 @@ from mindspore_gs.quantization.learned_step_size_quantization import LearnedStep
     LearnedQAT
 from mindspore_gs.quantization.learned_step_size_quantization.learned_step_size_quantization_layer_policy import \
     LearnedStepSizeFakeQuantizerPerLayer, LearnedStepSizeFakeQuantizePerChannel
-from mindspore_gs.quantization.simulated_quantization.quant_cells import Conv2dQuant
+from mindspore_gs.quantization.ops.nn import Conv2dQuant
 
 
 @pytest.mark.level0

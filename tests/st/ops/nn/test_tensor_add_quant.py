@@ -18,7 +18,7 @@ import numpy as np
 
 import mindspore
 from mindspore import Tensor, ops
-from mindspore_gs.quantization.simulated_quantization.quant_cells import TensorAddQuant
+from mindspore_gs.quantization.ops.nn import TensorAddQuant
 from .nn_utils import TestLayerPolicy
 
 
