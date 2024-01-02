@@ -26,6 +26,7 @@ from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantiz
 
 
 class FakeQuantParamCell(Cell):
+    """FakeQuantParamCell."""
     def __init__(self, op: FakeQuantParam):
         super().__init__()
         if not isinstance(op, FakeQuantParam):
@@ -34,6 +35,10 @@ class FakeQuantParamCell(Cell):
 
     def construct(self, x):
         return self._op(x)
+
+    # pylint: disable=W0613
+    def shard(self, in_strategy, out_strategy=None, parameter_plan=None, device="Ascend", level=0):
+        self._op = self._op.shard(in_strategy=in_strategy, out_strategy=out_strategy)
 
 
 class FakeQuantizer(Cell):
