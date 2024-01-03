@@ -128,14 +128,14 @@ def test_constructor_error():
         RTN(config)
 
 
-class NetToQuant(nn.Cell):
+class SimpleNet(nn.Cell):
     """
     Network with single linear to be quant
     """
 
     def __init__(self):
-        super(NetToQuant, self).__init__()
-        self.linear = Linear(5, 6)
+        super(SimpleNet, self).__init__()
+        self.linear = Linear(5, 6, weight_init="ones")
 
     def construct(self, x):
         return self.linear(x)
@@ -147,11 +147,11 @@ class NetToQuant(nn.Cell):
 def test_apply():
     """
     Feature: RoundToNearestPTQ algorithm set functions.
-    Description: Apply RoundToNearestPTQ on lenet.
+    Description: Apply RoundToNearestPTQ on SimpleNet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
 
-    network = NetToQuant()
+    network = SimpleNet()
     ptq = RTN()
     new_network = ptq.apply(network)
     cells: OrderedDict = new_network.name_cells()
@@ -186,7 +186,7 @@ def test_convert():
     Description: convert a compressed network to a standard network before exporting to MindIR.
     Expectation: convert success and structure of network as expect.
     """
-    network = NetToQuant()
+    network = SimpleNet()
     ptq = RTN()
     new_network = ptq.apply(network)
     new_network = ptq.convert(new_network)
@@ -216,7 +216,7 @@ def test_convert_error():
     Description: Feed invalid type of bn_fold to convert function.
     Expectation: Except TypeError.
     """
-    network = NetToQuant()
+    network = SimpleNet()
     ptq = RTN()
     new_network = ptq.apply(network)
     with pytest.raises(TypeError, match="The parameter `net_opt` must be isinstance of Cell"):
@@ -227,3 +227,43 @@ def test_convert_error():
 
     with pytest.raises(ValueError, match="The parameter `ckpt_path` can only be empty or a valid file"):
         ptq.convert(new_network, "file_path")
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_woq_apply():
+    """
+    Feature: RoundToNearestPTQ algorithm set functions.
+    Description: Apply RoundToNearestPTQ on SimpleNet.
+    Expectation: Apply success and coordinate attributes are same as config.
+    """
+
+    network = SimpleNet()
+    ptq = RTN()
+    ptq.set_weight_only_quant(True)
+    new_network = ptq.apply(network)
+    cells: OrderedDict = new_network.name_cells()
+
+    quant_cell = cells.get("linear", None)
+    assert isinstance(quant_cell, LinearQuant)
+    weight_fake_quant = quant_cell.weight_quantizer()
+    assert isinstance(weight_fake_quant, MinMaxPerChannel)
+    assert weight_fake_quant.symmetric()
+    assert weight_fake_quant.quant_dtype() == QuantDtype.INT8
+    assert weight_fake_quant.is_per_channel()
+    assert not weight_fake_quant.narrow_range()
+    assert weight_fake_quant.num_bits() == 8
+
+    assert quant_cell.input_quantizer() is None
+    assert quant_cell.output_quantizer() is None
+
+    quant_params = weight_fake_quant.quant_params()
+    min_data = quant_params.get("min")
+    max_data = quant_params.get("max")
+    assert len(min_data) == 6
+    assert len(max_data) == 6
+    for min_ in min_data:
+        assert min_ == 1.
+    for max_ in max_data:
+        assert max_ == 1.

@@ -34,3 +34,4 @@ class RTNConfig(CompAlgoConfig):
         self.weight_symmetric = True
         self.act_narrow_range = False
         self.weight_narrow_range = False
+        self.weight_only = False

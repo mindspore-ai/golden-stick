@@ -88,7 +88,9 @@ class LinearLayerPolicy(RTNLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
     """
+    def __init__(self, weight_names: [], act_names: [], config: RTNConfig = RTNConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Linear) -> Cell:
-        self.set_input_number(1)
         return LinearQuant(handler, self)

@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """ptq quant cells."""
+import abc
 
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
@@ -21,7 +22,13 @@ from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from .linear import Linear
 
 
-class LinearQuant(QuantCell):
+class PTQCell(QuantCell):
+    @abc.abstractmethod
+    def calibrate_weight(self):
+        raise NotImplementedError
+
+
+class LinearQuant(PTQCell):
     """Linear layer wrapper with min max"""
 
     def __init__(self, linear: Linear, policy: LayerPolicy):
@@ -43,8 +50,9 @@ class LinearQuant(QuantCell):
         prex = ""
         for _, param in linear.parameters_and_names():
             prex = param.name.rsplit(".", 1)[0]
-        self._input_quantizer.float_min.data.name = prex + "_input_float_min"
-        self._input_quantizer.float_max.data.name = prex + "_input_float_max"
+        if self._input_quantizer:
+            self._input_quantizer.float_min.data.name = prex + "_input_float_min"
+            self._input_quantizer.float_max.data.name = prex + "_input_float_max"
         self._weight_quantizer.float_min.data.name = prex + "_weight_float_min"
         self._weight_quantizer.float_max.data.name = prex + "_weight_float_max"
 
@@ -57,6 +65,13 @@ class LinearQuant(QuantCell):
     def convert(self):
         self._input_quantizer = self._input_quantizer.convert_to_ascend()
         self._weight_quantizer = self._weight_quantizer.convert_to_ascend()
+
+    def calibrate_weight(self):
+        if hasattr(self._linear, "dtype"):
+            weight = self._linear.cast(self._linear.weight, self._linear.dtype)
+        else:
+            weight = self._linear.weight
+        self._weight_quantizer(weight)
 
     # pylint: disable=W0221
     def construct(self, x):

@@ -81,5 +81,12 @@ class SlbLayerPolicy(LayerPolicy, abc.ABC):
 
 
 class ConvLayerPolicy(SlbLayerPolicy):
+    """
+    Derived class of SlbLayerPolicy. LayerPolicy used for nn.Conv2d.
+    """
+    def __init__(self, weight_names: [], act_names: [], config: SlbQuantConfig = SlbQuantConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
+
     def wrap_cell(self, handler: Cell) -> Cell:
         return Conv2dSlbQuant(handler, self, self._config.weight_quant_dtype)
