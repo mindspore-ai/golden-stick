@@ -17,7 +17,7 @@
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
 from mindspore_gs.quantization.quant_cell import QuantCell
-from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from .linear import Linear
 
 
@@ -30,13 +30,15 @@ class LinearQuant(QuantCell):
         rank = len(linear.weight.shape)
         self._weight_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
         input_fq_args = {}
-        weight_fq_args = {"channel_axis": self._weight_axis, "num_channels": self._linear.out_channels}
+        weight_perchannel_args = PerChannelArgs(self._linear.out_channels, self._weight_axis)
+        weight_fq_args = {}
         if "in_strategy" in self._linear.matmul.get_attr_dict():
             input_fq_args["strategy"] = (self._linear.matmul.in_strategy[0],)
             weight_fq_args["strategy"] = (self._linear.matmul.in_strategy[1],)
         self._input_quantizer = self._policy.get_input_quantizer(**input_fq_args)
         self._output_quantizer = None
-        self._weight_quantizer = self._policy.get_weight_quantizer(self._linear.weight.name, **weight_fq_args)
+        self._weight_quantizer = self._policy.get_weight_quantizer(self._linear.weight.name, weight_perchannel_args,
+                                                                   **weight_fq_args)
 
         prex = ""
         for _, param in linear.parameters_and_names():

@@ -21,6 +21,7 @@ from mindspore_gs.quantization.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFo
     Conv2dBnWithoutFoldQuant, Conv2dBnFoldQuant
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from mindspore_gs.quantization.simulated_quantization.simulated_quantization_layer_policy import SimulatedLayerPolicy
+from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from .learned_step_size_fake_quantizers import LearnedStepSizeFakeQuantizerPerLayer, \
     LearnedStepSizeFakeQuantizePerChannel
 from .learned_step_size_quantization_config import LearnedStepSizeQuantizationConfig
@@ -38,13 +39,14 @@ class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy, abc.ABC):
         if config.act_per_channel:
             raise ValueError("act quant only support perlayer now!")
 
-    def get_weight_quantizer(self, weight_name="", **kwargs) -> FakeQuantizer:
+    def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
         if self._config.weight_per_channel:
-            channel_axis = kwargs.get('channel_axis', None)
-            num_channels = kwargs.get('num_channels', None)
-            if channel_axis is None:
+            channel_axis = perchannel_args.channel_axis
+            num_channels = perchannel_args.num_channels
+            if channel_axis == -1:
                 raise RuntimeError("Please provide channel axis of weight for per-channel weight quantize.")
-            if num_channels is None:
+            if num_channels == -1:
                 raise RuntimeError("Please provide channel number of weight for per-channel weight quantize.")
             weight_quantizer = \
                 LearnedStepSizeFakeQuantizePerChannel(symmetric=self._config.weight_symmetric,
@@ -60,13 +62,14 @@ class LearnedStepSizeQuantizationLayerPolicy(SimulatedLayerPolicy, abc.ABC):
                                                                     narrow_range=self._config.weight_narrow_range)
         return weight_quantizer
 
-    def _get_input_quantizer(self, input_index=-1, **kwargs) -> FakeQuantizer:
+    def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
         return LearnedStepSizeFakeQuantizerPerLayer(
             quant_delay=self._config.act_quant_delay, quant_dtype=self._config.act_quant_dtype,
             symmetric=self._config.act_symmetric,
             narrow_range=self._config.act_narrow_range)
 
-    def _get_output_quantizer(self, **kwargs) -> FakeQuantizer:
+    def _get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
         return LearnedStepSizeFakeQuantizerPerLayer(
             quant_delay=self._config.act_quant_delay, quant_dtype=self._config.act_quant_dtype,
             symmetric=self._config.act_symmetric,

@@ -17,7 +17,14 @@ import abc
 from typing import Optional
 from mindspore.nn import Cell
 from .fake_quantizer import FakeQuantizer
+
 layer_policy_key = "layer_quant_policy"
+
+
+class PerChannelArgs:
+    def __init__(self, num_channels=-1, channel_axis=-1):
+        self.num_channels = num_channels
+        self.channel_axis = channel_axis
 
 
 class LayerPolicy(abc.ABC):
@@ -38,13 +45,15 @@ class LayerPolicy(abc.ABC):
         Derived class must override `get_weight_name_and_quantizers`, `get_act_name_and_quantizers`,
             `get_output_quantizers` and `wrapper_cell`.
     """
+
     def __init__(self):
         self._input_num = 0
         self._inputs_insert_fq = []
         self._output_insert_fq: bool = True
 
     @abc.abstractmethod
-    def get_weight_quantizer(self, weight_name="", **kwargs) -> FakeQuantizer:
+    def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
         """
         Define how to fake-quantize weight data. This method must be overridden by all subclasses.
 
@@ -55,7 +64,8 @@ class LayerPolicy(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _get_input_quantizer(self, input_index=-1, **kwargs) -> FakeQuantizer:
+    def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
         """
         Define how to fake-quantize input data. This method must be overridden by all subclasses.
 
@@ -64,7 +74,8 @@ class LayerPolicy(abc.ABC):
         """
         raise NotImplementedError
 
-    def get_input_quantizer(self, input_index=-1, **kwargs) -> Optional[FakeQuantizer]:
+    def get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> \
+    Optional[FakeQuantizer]:
         """
         Define how to fake-quantize input data.
 
@@ -76,10 +87,10 @@ class LayerPolicy(abc.ABC):
             return None
         if not self._inputs_insert_fq[input_index]:
             return None
-        return self._get_input_quantizer(input_index, **kwargs)
+        return self._get_input_quantizer(input_index, perchannel_args, **kwargs)
 
     @abc.abstractmethod
-    def _get_output_quantizer(self, **kwargs) -> FakeQuantizer:
+    def _get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
         """
         Define how to fake-quantize output data. This method must be overridden by all subclasses.
 
@@ -88,7 +99,8 @@ class LayerPolicy(abc.ABC):
         """
         raise NotImplementedError
 
-    def get_output_quantizer(self, **kwargs) -> Optional[FakeQuantizer]:
+    def get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> Optional[FakeQuantizer]:
         """
         Define how to fake-quantize output data.
 
@@ -97,7 +109,7 @@ class LayerPolicy(abc.ABC):
             Return None if all outputs don't need to fake-quant.
         """
         if self._output_insert_fq:
-            return self._get_output_quantizer(**kwargs)
+            return self._get_output_quantizer(perchannel_args, **kwargs)
         return None
 
     @abc.abstractmethod
