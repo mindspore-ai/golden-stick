@@ -42,7 +42,7 @@ class NetPolicy:
         return self._layer_policy_map
 
     def get_layer_policy(self, layer_type) -> Optional[LayerPolicy]:
-        return self._layer_policy_map.get(type(layer_type))
+        return self._layer_policy_map.get(layer_type)
 
     def get_net_layer_policy(self) -> Optional[LayerPolicy]:
         return self._net_layer_policy
