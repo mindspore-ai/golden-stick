@@ -24,7 +24,6 @@ from mindspore.ops import functional as F
 from mindspore.ops import operations as P
 from mindspore.parallel._utils import _get_parallel_mode, _is_sharding_propagation
 from mindspore.context import ParallelMode
-from mindformers.modules.activation import get_activation
 
 
 class Linear(Cell):
@@ -47,8 +46,8 @@ class Linear(Cell):
         super(Linear, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        if not (isinstance(activation, str) or activation is None or issubclass(activation, nn.Cell)):
-            raise TypeError(f"For Linear cell, the activation should str type or nn.Cell type, but got {activation}.")
+        if not (activation is None or issubclass(activation, nn.Cell)):
+            raise TypeError(f"For Linear cell, the activation should nn.Cell type, but got {activation}.")
         if isinstance(weight_init, Tensor) and (weight_init.ndim != 2 or weight_init.shape[0] != out_channels or
                                                 weight_init.shape[1] != in_channels):
             raise ValueError("The shape of parameter 'weight_init' is error, please check shape of 'weight_init'.")
@@ -83,10 +82,12 @@ class Linear(Cell):
             self.bias.parallel_optimizer = False
             self.bias_add = P.Add()
         self.act_name = activation
-        if callable(activation):
+        if activation and not callable(activation):
+            raise ValueError("Input activation should be callable.")
+        if activation:
             self.activation = activation()
         else:
-            self.activation = get_activation(activation) if isinstance(activation, str) else activation
+            self.activation = None
         self.activation_flag = self.activation is not None
         self.dtype = compute_dtype
         self.cast = P.Cast()

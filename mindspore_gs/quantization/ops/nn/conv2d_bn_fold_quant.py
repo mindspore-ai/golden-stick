@@ -24,7 +24,7 @@ from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore_gs.validator import Validator
-from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.quant_utils import fold_batchnorm
@@ -130,8 +130,8 @@ class Conv2dBnFoldQuant(QuantCell):
         self.moving_variance = handler.batchnorm.moving_variance
 
         # initialize fake ops
-        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, **{"channel_axis": channel_axis,
-                                                                                  "num_channels": self.out_channels})
+        weight_perchannel_args = PerChannelArgs(self.out_channels, channel_axis)
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, weight_perchannel_args)
         self.eps = handler.batchnorm.eps
         self.batchnorm_fold = BatchNormFoldCell(epsilon=self.eps, momentum=handler.batchnorm.momentum,
                                                 freeze_bn=freeze_bn)

@@ -18,7 +18,7 @@ import abc
 from typing import Optional
 from mindspore.nn import Cell
 from mindspore_gs.quantization.quant_utils import get_quant_dtype_num_bits
-from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from .slb_fake_quantizer import SlbFakeQuantizerPerLayer, SlbActQuantizer
 from .slb_quant import Conv2dSlbQuant
@@ -51,15 +51,17 @@ class SlbLayerPolicy(LayerPolicy, abc.ABC):
     def get_config(self) -> SlbQuantConfig:
         return self._config
 
-    def get_weight_quantizer(self, weight_name="", **kwargs) -> FakeQuantizer:
+    def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
         return SlbFakeQuantizerPerLayer(num_bits=self.weight_num_bits)
 
-    def _get_input_quantizer(self, input_index=-1, **kwargs) -> FakeQuantizer:
+    def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
         if self._config.enable_act_quant:
             return SlbActQuantizer(num_bits=self.act_num_bits)
         return None
 
-    def _get_output_quantizer(self, **kwargs) -> FakeQuantizer:
+    def _get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
         if self._config.enable_act_quant:
             return SlbActQuantizer(num_bits=self.act_num_bits)
         return None

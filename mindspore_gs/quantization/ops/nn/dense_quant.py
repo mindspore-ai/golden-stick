@@ -19,7 +19,7 @@ from mindspore.ops import operations as P
 from mindspore.common.dtype import QuantDtype
 from mindspore.nn.layer.basic import Dense
 from mindspore_gs.quantization.quant_cell import QuantCell
-from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 
 
 class DenseQuant(QuantCell):
@@ -94,8 +94,8 @@ class DenseQuant(QuantCell):
         self.activation_flag = self.activation is not None
 
         self.matmul = P.MatMul(transpose_b=True)
-        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, **{"channel_axis": 0,
-                                                                                  "num_channels": self.out_channels})
+        weight_perchannel_args = PerChannelArgs(self.out_channels, 0)
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, weight_perchannel_args)
 
     def weight_quantizer(self):
         return self._weight_quantizer

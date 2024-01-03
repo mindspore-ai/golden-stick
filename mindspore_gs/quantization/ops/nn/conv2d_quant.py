@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from mindspore.ops import operations as P
 from mindspore.nn.layer.conv import Conv2d
 from mindspore_gs.quantization.quant_cell import QuantCell
-from mindspore_gs.quantization.layer_policy import LayerPolicy
+from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 
 
 class Conv2dQuant(QuantCell):
@@ -96,8 +96,8 @@ class Conv2dQuant(QuantCell):
                              dilation=self.dilation,
                              group=self.group)
         channel_axis = 0
-        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, **{"channel_axis": channel_axis,
-                                                                                  "num_channels": self.out_channels})
+        weight_perchannel_args = PerChannelArgs(self.out_channels, channel_axis)
+        self._weight_quantizer = policy.get_weight_quantizer(self.weight.name, weight_perchannel_args)
 
     def weight_quantizer(self):
         return self._weight_quantizer
