@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """RoundToNearestPTQ."""
-
+import copy
 import os
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
@@ -182,6 +182,19 @@ class RoundToNearestPTQ(CompAlgo):
             raise ValueError("Only supported if `weight_narrow_range` is `False` yet.")
         self._config.weight_narrow_range = weight_narrow_range
 
+    def set_weight_only_quant(self, is_weight_only: bool):
+        """
+        Set value of weight_only of RoundToNearestPTQ `config`
+
+        Args:
+            is_weight_only (bool): Whether the algorithm only quant weight.
+
+        Raises:
+            TypeError: If `weight_only` is not bool.
+        """
+        Validator.check_bool(is_weight_only, "is_weight_only", self.__class__.__name__)
+        self._config.weight_only = is_weight_only
+
     @staticmethod
     def _convert2list(name, value):
         if not isinstance(value, list) and not isinstance(value, tuple):
@@ -220,12 +233,34 @@ class RoundToNearestPTQ(CompAlgo):
             for name, cell in root.name_cells().items():
                 layer_policy = self._qat_policy.get_layer_policy(type(cell))
                 if layer_policy:
-                    root.insert_child_to_cell(name, layer_policy.wrap_cell(cell))
+                    new_layer_policy = copy.deepcopy(layer_policy)
+                    if self._config.weight_only:
+                        new_layer_policy.set_input_not_insert_fq()
+                        new_layer_policy.set_output_not_insert_fq()
+                    root.insert_child_to_cell(name, new_layer_policy.wrap_cell(cell))
                 else:
                     _replace(cell)
 
         _replace(network)
+        if self._config.weight_only:
+            self._weight_only_quant(network)
         return network
+
+    @staticmethod
+    def _weight_only_quant(network):
+        """
+        If weight only quant, we don't need dataset, and don't need inference, so we need to statistic quant param.
+        """
+
+        def _process(root: Cell):
+            if root is None:
+                return
+            for _, cell in root.name_cells().items():
+                if not isinstance(cell, LinearQuant):
+                    _process(cell)
+                    continue
+                cell.calibrate_weight()
+        _process(network)
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """convert"""

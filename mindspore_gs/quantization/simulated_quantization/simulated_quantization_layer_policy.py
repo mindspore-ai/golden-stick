@@ -94,6 +94,10 @@ class ConvLayerPolicy(SimulatedLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
+    def __init__(self, weight_names: [], act_names: [],
+                 config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         return Conv2dQuant(handler, self)
@@ -103,6 +107,10 @@ class DenseLayerPolicy(SimulatedLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
     """
+    def __init__(self, weight_names: [], act_names: [],
+                 config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         return DenseQuant(handler, self)
@@ -112,6 +120,10 @@ class ConvBnLayerPolicy(SimulatedLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.ConvBn.
     """
+    def __init__(self, weight_names: [], act_names: [],
+                 config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         if handler.has_bn:
@@ -131,6 +143,10 @@ class ActLayerPolicy(SimulatedLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LayerPolicy used for activation layer.
     """
+    def __init__(self, weight_names: [], act_names: [],
+                 config: SimulatedQuantizationConfig = SimulatedQuantizationConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         return ActQuant(handler, self)

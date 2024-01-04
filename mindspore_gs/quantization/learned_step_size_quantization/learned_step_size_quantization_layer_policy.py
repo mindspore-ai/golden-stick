@@ -87,6 +87,10 @@ class LearnedStepSizeQuantizationConvLayerPolicy(LearnedStepSizeQuantizationLaye
     """
     Derived class of LearnedStepSizeQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
+    def __init__(self, weight_names: [], act_names: [],
+                 config: LearnedStepSizeQuantizationConfig = LearnedStepSizeQuantizationConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         return Conv2dQuant(handler, self)
@@ -96,6 +100,10 @@ class LearnedStepSizeQuantizationDenseLayerPolicy(LearnedStepSizeQuantizationLay
     """
     Derived class of LearnedStepSizeQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
+    def __init__(self, weight_names: [], act_names: [],
+                 config: LearnedStepSizeQuantizationConfig = LearnedStepSizeQuantizationConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         return DenseQuant(handler, self)
@@ -105,6 +113,10 @@ class LearnedStepSizeQuantizationConvBnLayerPolicy(LearnedStepSizeQuantizationLa
     """
     Derived class of LearnedStepSizeQuantizationLayerPolicy. LayerPolicy used for nn.Conv2d.
     """
+    def __init__(self, weight_names: [], act_names: [],
+                 config: LearnedStepSizeQuantizationConfig = LearnedStepSizeQuantizationConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
 
     def wrap_cell(self, handler: Cell) -> Cell:
         if handler.has_bn:

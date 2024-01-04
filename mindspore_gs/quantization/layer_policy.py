@@ -136,7 +136,10 @@ class LayerPolicy(abc.ABC):
             self._inputs_insert_fq.append(True)
 
     def set_input_not_insert_fq(self, index: Optional[int] = None):
-        if index is not None:
+        if index is None:
+            for i in range(0, self._input_num):
+                self._inputs_insert_fq[i] = False
+        else:
             if 0 <= index < self._input_num:
                 self._inputs_insert_fq[index] = False
             else:

@@ -62,7 +62,6 @@ class QuantizationAwareTraining(CompAlgo):
                 layer_policy = layer_policy_map.get(node.get_instance_type())
             if isinstance(layer_policy, LayerPolicy):
                 new_layer_policy = copy.deepcopy(layer_policy)
-                new_layer_policy.set_input_number(len(node.get_inputs()))
                 node.set_attribute(layer_policy_key, new_layer_policy)
 
     @staticmethod
