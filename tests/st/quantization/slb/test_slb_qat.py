@@ -91,7 +91,6 @@ def test_set_config(quant_bit, enable_bn_calibration):
     assert qat._config.t_factor == 1.2
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_act_quant", [True, False])
@@ -400,7 +399,6 @@ def test_set_t_factor_range():
         qat.set_t_factor(t_factor=-2.1)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_epoch_initial():
@@ -429,7 +427,6 @@ def test_callbacks_epoch_initial():
     qat.callbacks(model=model, dataset=ds_train)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_epoch_range_compare():
@@ -461,7 +458,6 @@ def test_callbacks_epoch_range_compare():
         qat.callbacks(model=model, dataset=ds_train)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_model_dataset_type():
@@ -493,7 +489,6 @@ def test_callbacks_model_dataset_type():
         qat.callbacks(model=model, dataset=5)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_convert_network_type():
