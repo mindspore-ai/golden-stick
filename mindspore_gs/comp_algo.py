@@ -15,6 +15,7 @@
 """GoldenStick."""
 
 import abc
+import enum
 import os.path
 
 from mindspore.nn.cell import Cell
@@ -22,6 +23,12 @@ from mindspore.train.callback import Callback
 from mindspore import export, context
 from mindspore import log as logger
 from mindspore_gs.validator import Validator
+
+
+class Backend(enum.Enum):
+    MS = 0
+    FAKE_QUANT = 1
+    GE_ASCEND = 2
 
 
 class CompAlgo(abc.ABC):
@@ -146,7 +153,7 @@ class CompAlgo(abc.ABC):
                              f" {save_mindir_path}.")
         self._config.save_mindir_path = os.path.realpath(save_mindir_path)
 
-    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
+    def convert(self, net_opt: Cell, ckpt_path="", backend: Backend = Backend.MS) -> Cell: # for coding, convert to FakeQuantParam and then convert to target backend.
         """
         Define how to convert a compressed network to a standard network before exporting to MindIR.
 
@@ -154,6 +161,9 @@ class CompAlgo(abc.ABC):
             net_opt (Cell): Network to be converted which is transformed by `CompAlgo.apply`.
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
                 checkpoint file to `net_opt`.
+            backend (Backend): target backend, default is `Backend.MS`, it means convert to standard MindSpore Quant
+                Network with mindspore.ops.operations.FakeQuantParam. `Backend.GE_ASCEND` means use to network with
+                quant/dequant layer from GE.
 
         Returns:
             An instance of Cell represents converted network.

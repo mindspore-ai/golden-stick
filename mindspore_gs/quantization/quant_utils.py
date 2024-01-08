@@ -84,6 +84,54 @@ def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
     return quant_min, quant_max
 
 
+def quant_data(data, scale, zero_point, quant_min, quant_max, data_axis=-1):
+    r"""
+    Calculate int8/uint8 weight from fp32. the formula is defined as:
+
+    .. math::
+        int8/uint8 = round(float/scale) + offset
+
+    Args:
+        data (numpy.ndarray): The dimension of channel or 1. Should be NCHW.
+        scale (numpy.ndarray): The dimension of channel or 1.
+        zero_point (numpy.ndarray): The dimension of channel or 1.
+        quant_min (int): The minimum quantization integer.
+        quant_max (int): The maximum quantization integer.
+        data_axis (int): Quantize axis.
+
+    Returns:
+        weight (numpy.ndarray): The dimension of channel or 1.
+    """
+    if scale.shape != zero_point.shape:
+        raise ValueError("`scale` and `zero_point` should have the same shape.")
+    if scale.shape[0] < 0:
+        raise ValueError("`scale` and `zero_point` shape should be greater than zero.")
+    if data.shape[data_axis] != scale.shape[0]:
+        raise ValueError("Dim of `data`'s `data_axis` should be equal to `scale`'s shape.")
+    if data_axis >= len(data.shape):
+        raise ValueError("`data_axis` out of range of `data`'s shape.")
+
+    if data_axis >= 0:
+        # for perchannel
+        if data_axis == 0:
+            # `Conv2d` or `Dense` op weight
+            shape_list = [-1] + [1] * len(data.shape[1:])
+            scale = scale.reshape(shape_list)
+            zero_point = zero_point.reshape(shape_list)
+        elif data_axis == 1:
+            # `DepthwiseConv2d` op weight
+            shape_list = [1, -1] + [1] * len(data.shape[2:])
+            scale = scale.reshape(shape_list)
+            zero_point = zero_point.reshape(shape_list)
+        else:
+            raise ValueError("Unsupported data_axis({})".format(data_axis))
+
+    quanted_data = np.round((data / scale) + zero_point)
+    quanted_data[quanted_data > quant_max] = quant_max
+    quanted_data[quanted_data < quant_min] = quant_min
+    return quanted_data
+
+
 def fold_batchnorm(weight, cell_quant):
     r"""
     Fold the batchnorm in `Conv2dBnFoldQuant` to weight.

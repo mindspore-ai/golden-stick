@@ -20,12 +20,32 @@ import subprocess
 import time
 import re
 from mindspore import log as logger
+from mindspore.nn import Cell
 
 # CI env
 data_root = "/home/workspace/mindspore_dataset/"
 ckpt_root = "/home/workspace/mindspore_ckpt/ckpt"
 cur_path = os.path.split(os.path.realpath(__file__))[0]
 model_zoo_path = os.path.join(cur_path, "../../../tests/models")
+
+
+def check_network_contain_layer(network: Cell, layer_type, end_points: tuple = tuple()):
+    """
+    check if network contains some kind of type.
+    """
+    if not isinstance(network, Cell):
+        return False
+    if not issubclass(layer_type, Cell):
+        return False
+    for name, cell in network.name_cells().items():
+        if isinstance(cell, layer_type):
+            logger.info(f"{layer_type} exist in network, layer name: {name}")
+            return True
+        if end_points and isinstance(cell, end_points):
+            continue
+        if check_network_contain_layer(cell, layer_type, end_points):
+            return True
+    return False
 
 
 def qat_config_compare(algo_cfg, target: dict):

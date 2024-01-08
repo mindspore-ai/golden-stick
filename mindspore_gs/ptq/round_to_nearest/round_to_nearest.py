@@ -15,13 +15,16 @@
 """RoundToNearestPTQ."""
 import copy
 import os
+from typing import Tuple
+
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs import CompAlgo
+from mindspore_gs import CompAlgo, Backend
 from mindspore_gs.validator import Validator
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cells import LinearQuant
+from mindspore_gs.ptq.processor import Processor
 from .rtn_net_policy import RTNNetPolicy
 from .rtn_config import RTNConfig
 
@@ -227,21 +230,25 @@ class RoundToNearestPTQ(CompAlgo):
             raise RuntimeError("Derived class should provide net policy")
         self._qat_policy.build()
 
-        def _replace(root: Cell):
-            if root is None:
-                return
-            for name, cell in root.name_cells().items():
-                layer_policy = self._qat_policy.get_layer_policy(type(cell))
+        class ApplyProcessor(Processor):
+            """A network iterator for applying algorithm on network."""
+            def __init__(self, ptq_policy, weight_only):
+                self._ptq_policy = ptq_policy
+                self._weight_only = weight_only
+
+            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, Cell):
+                    return cell, True
+                layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
-                    if self._config.weight_only:
+                    if self._weight_only:
                         new_layer_policy.set_input_not_insert_fq()
                         new_layer_policy.set_output_not_insert_fq()
-                    root.insert_child_to_cell(name, new_layer_policy.wrap_cell(cell))
-                else:
-                    _replace(cell)
+                    return new_layer_policy.wrap_cell(cell), True
+                return cell, False
 
-        _replace(network)
+        ApplyProcessor(self._qat_policy, self._config.weight_only).process(network)
         if self._config.weight_only:
             self._weight_only_quant(network)
         return network
@@ -259,12 +266,11 @@ class RoundToNearestPTQ(CompAlgo):
                 if not isinstance(cell, LinearQuant):
                     _process(cell)
                     continue
-                cell.calibrate_weight()
+                cell.calibrate()
         _process(network)
 
-    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
-        """convert"""
-
+    def convert(self, net_opt: Cell, ckpt_path="", backend: Backend = Backend.MS) -> Cell:
+        """Implement method convert of super class."""
         if not isinstance(net_opt, Cell):
             raise TypeError(
                 f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
@@ -280,14 +286,19 @@ class RoundToNearestPTQ(CompAlgo):
                 raise ValueError(
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
 
-        def _convert(root: Cell):
-            if root is None:
-                return
-            for _, cell in root.name_cells().items():
-                if isinstance(cell, LinearQuant):
-                    cell.convert()
-                else:
-                    _convert(cell)
+        class ConvertProcessor(Processor):
+            """A network iterator for converting network to deploy network."""
+            def __init__(self, ptq_policy, weight_only):
+                self._ptq_policy = ptq_policy
+                self._weight_only = weight_only
 
-        _convert(net_opt)
+            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, Cell):
+                    return cell, True
+                if isinstance(cell, LinearQuant):
+                    cell.convert(backend)
+                    return cell, True
+                return cell, False
+
+        ConvertProcessor(self._qat_policy, self._config.weight_only).process(net_opt)
         return net_opt

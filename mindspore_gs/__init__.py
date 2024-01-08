@@ -19,7 +19,7 @@ MindSpore golden stick module.
 from .version import __version__, mindspore_version_check
 mindspore_version_check()
 
-from .comp_algo import CompAlgo
+from .comp_algo import CompAlgo, Backend
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 from .ghost import GhostAlgo
