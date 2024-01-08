@@ -33,7 +33,6 @@ ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train_parallel", "log")
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
@@ -79,7 +78,6 @@ def test_resnet_apply(run_mode):
     assert act_fake_quant._quant_delay == 900
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_fusion", [True, False])
@@ -111,7 +109,6 @@ def test_resnet_convert(enable_fusion, bn_fold, one_conv_fold):
     mindspore.nn.GraphCell(graph)
 
 
-@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_single
 def test_gpu_accuracy_graph():
@@ -140,7 +137,6 @@ def test_gpu_accuracy_graph():
     assert acc > acc_thres
 
 
-@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_single
 def test_gpu_accuracy_pynative():
@@ -170,7 +166,6 @@ def test_gpu_accuracy_pynative():
     assert acc > acc_thres
 
 
-@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_single
 def test_gpu_continue_train():

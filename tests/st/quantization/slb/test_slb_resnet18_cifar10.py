@@ -31,7 +31,6 @@ from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/official/cv/'))
 
 
-@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
@@ -88,7 +87,6 @@ def test_resnet(quant_bit, enable_bn_calibration, run_mode):
 
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_act_quant", [True, False])
@@ -259,7 +257,6 @@ def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=con
     return model, lr, dataset, qat
 
 
-@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])
@@ -297,7 +294,6 @@ def test_resnet_accuracy_graph_bnon(quant_bit, enable_bn_calibration):
 
 
 
-@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W1", "W4A8", "W1A8"])

@@ -141,7 +141,6 @@ def test_unipruningmaskedconv2d_set_out_mask():
     assert (mask_conv2d.out_mask.value().asnumpy() == np.array([1, 0, 1, 0, 1], np.int8)).all()
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_unipruningmaskedconv2d_zeroing():
@@ -306,7 +305,6 @@ def test_unipruningmaskeddense_set_out_mask():
     assert (mask_dense.out_mask.value().asnumpy() == np.array([1, 0, 1, 0, 1], np.int8)).all()
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_unipruningmaskeddense_zeroing():

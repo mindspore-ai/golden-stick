@@ -101,7 +101,6 @@ class ResNetSimple(nn.Cell):
         return nn.SequentialCell(layers)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_unfold_nodes():

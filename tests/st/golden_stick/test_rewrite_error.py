@@ -41,7 +41,6 @@ class SampleNet(nn.Cell):
         return conv0
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_rewrite_log():

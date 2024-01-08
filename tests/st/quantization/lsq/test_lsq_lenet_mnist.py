@@ -28,7 +28,6 @@ from mindspore_gs.quantization.ops.nn import Conv2dQuant, DenseQuant
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_lenet_apply():

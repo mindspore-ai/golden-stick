@@ -31,7 +31,6 @@ from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
@@ -91,7 +90,6 @@ def test_lenet_apply(quant_bit, enable_bn_calibration):
     assert qat._config.t_factor == 3.2
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_act_quant", [True, False])
@@ -191,7 +189,6 @@ def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
     assert acc['Accuracy'] > 0.95
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W1", "W4A8", "W1A8"])
@@ -206,7 +203,6 @@ def test_lenet_accuracy_bnon_graph(quant_bit, enable_bn_calibration):
     lenet_accuracy_bnon(quant_bit, enable_bn_calibration)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4"])
@@ -221,7 +217,6 @@ def test_lenet_accuracy_bnon_pynative(quant_bit, enable_bn_calibration):
     lenet_accuracy_bnon(quant_bit, enable_bn_calibration)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W1", "W1A8"])

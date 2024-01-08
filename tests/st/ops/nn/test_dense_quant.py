@@ -33,9 +33,9 @@ def test_dense_quant():
     Expectation: Success.
     """
     policy = TestLayerPolicy(1, True, False)
-    dense = Dense(2, 1, weight_init='ones')
+    dense = Dense(2, 1, weight_init='ones', bias_init='ones')
     dense_quant = DenseQuant(dense, policy)
     x = Tensor(np.array([[1, 5], [3, 4]]), mindspore.float32)
     result = dense_quant(x).asnumpy()
-    expect_output = np.array([[5.929413], [6.9176483]]).astype(np.float32)
+    expect_output = np.array([[6.929412], [7.9176474]]).astype(np.float32)
     assert np.allclose(expect_output, result, 0.001, 0.001)
