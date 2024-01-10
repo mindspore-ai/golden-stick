@@ -19,12 +19,12 @@ from collections import OrderedDict
 import pytest
 from mindspore import nn
 from mindspore.common.dtype import QuantDtype
-from mindspore.ops.operations import _quant_ops as Q
+from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
 from mindspore_gs.ptq import RoundToNearestPTQ as RTN
 from mindspore_gs.ptq import RTNConfig
-from mindspore_gs.ptq.linear import Linear
 from mindspore_gs.ptq.quant_cells import LinearQuant
-from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel, MinMaxHolder
+from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel
+from mindformers.modules import Linear
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
@@ -144,7 +144,7 @@ class SimpleNet(nn.Cell):
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-def test_apply():
+def test_apply_convert():
     """
     Feature: RoundToNearestPTQ algorithm set functions.
     Description: Apply RoundToNearestPTQ on SimpleNet.
@@ -153,12 +153,12 @@ def test_apply():
 
     network = SimpleNet()
     ptq = RTN()
+    # apply
     new_network = ptq.apply(network)
     cells: OrderedDict = new_network.name_cells()
-
     quant_cell = cells.get("linear", None)
     assert isinstance(quant_cell, LinearQuant)
-    weight_fake_quant = quant_cell.weight_quantizer()
+    weight_fake_quant: MinMaxPerChannel = quant_cell.weight_quantizer()
     assert isinstance(weight_fake_quant, MinMaxPerChannel)
     assert weight_fake_quant.symmetric()
     assert weight_fake_quant.quant_dtype() == QuantDtype.INT8
@@ -166,7 +166,7 @@ def test_apply():
     assert not weight_fake_quant.narrow_range()
     assert weight_fake_quant.num_bits() == 8
 
-    act_fake_quant = quant_cell.input_quantizer()
+    act_fake_quant: MinMaxPerLayer = quant_cell.input_quantizer()
     assert isinstance(act_fake_quant, MinMaxPerLayer)
     assert act_fake_quant.symmetric()
     assert act_fake_quant.quant_dtype() == QuantDtype.INT8
@@ -176,33 +176,24 @@ def test_apply():
 
     assert quant_cell.output_quantizer() is None
 
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_convert():
-    """
-    Feature: simulated quantization convert function.
-    Description: convert a compressed network to a standard network before exporting to MindIR.
-    Expectation: convert success and structure of network as expect.
-    """
-    network = SimpleNet()
-    ptq = RTN()
-    new_network = ptq.apply(network)
+    # calibrate
+    weight_fake_quant.float_min = weight_fake_quant.float_min * -1
+    weight_fake_quant.float_max = weight_fake_quant.float_max * -1
+    act_fake_quant.float_min = act_fake_quant.float_min * -1
+    act_fake_quant.float_max = act_fake_quant.float_max * -1
+    # convert
     new_network = ptq.convert(new_network)
     cells: OrderedDict = new_network.name_cells()
 
     quant_cell = cells.get("linear", None)
     assert isinstance(quant_cell, LinearQuant)
     weight_fake_quant = quant_cell.weight_quantizer()
-    assert isinstance(weight_fake_quant, MinMaxHolder)
-    # pylint: disable=W0212
-    assert isinstance(weight_fake_quant._fq, Q.FakeQuantPerChannel)
+    assert isinstance(weight_fake_quant, FakeQuantParamCell)
+    assert isinstance(weight_fake_quant.fq, FakeQuantParam)
 
     act_fake_quant = quant_cell.input_quantizer()
-    assert isinstance(act_fake_quant, MinMaxHolder)
-    # pylint: disable=W0212
-    assert isinstance(act_fake_quant._fq, Q.FakeQuantPerLayer)
+    assert isinstance(act_fake_quant, FakeQuantParamCell)
+    assert isinstance(act_fake_quant.fq, FakeQuantParam)
 
     assert quant_cell.output_quantizer() is None
 

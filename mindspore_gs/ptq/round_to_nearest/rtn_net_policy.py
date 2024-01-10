@@ -16,9 +16,9 @@
 
 from mindspore.rewrite import PatternEngine
 from mindspore_gs.quantization.net_policy import NetPolicy
+from mindformers import Linear
 from .rtn_layer_policy import LinearLayerPolicy
 from .rtn_config import RTNConfig
-from ..linear import Linear
 
 
 class RTNNetPolicy(NetPolicy):

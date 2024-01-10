@@ -20,10 +20,10 @@ from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
+from mindformers import Linear
 from .rtn_config import RTNConfig
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
 from ..quant_cells import LinearQuant
-from ..linear import Linear
 
 
 class RTNLayerPolicy(LayerPolicy, abc.ABC):
@@ -65,16 +65,23 @@ class RTNLayerPolicy(LayerPolicy, abc.ABC):
             weight_quantizer = MinMaxPerLayer(symmetric=self._config.weight_symmetric,
                                               quant_dtype=self._config.weight_quant_dtype,
                                               narrow_range=self._config.weight_narrow_range, strategy=strategy)
+        weight_quantizer.set_attr("position", "weight")
+        weight_quantizer.set_attr("weight_only_quant", self._config.weight_only)
         return weight_quantizer
 
     def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
                              **kwargs) -> FakeQuantizer:
-        return MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_quant_dtype,
-                              narrow_range=self._config.act_narrow_range, strategy=kwargs.get('strategy', None))
+        quantizer = MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_quant_dtype,
+                                   narrow_range=self._config.act_narrow_range, strategy=kwargs.get('strategy', None))
+        quantizer.set_attr("position", "input")
+        return quantizer
 
     def _get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
-        return MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_quant_dtype,
-                              narrow_range=self._config.act_narrow_range, strategy=kwargs.get('strategy', None))
+        quantizer = MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_quant_dtype,
+                                   narrow_range=self._config.act_narrow_range, strategy=kwargs.get('strategy', None))
+
+        quantizer.set_attr("position", "output")
+        return quantizer
 
     def get_config(self) -> RTNConfig:
         return self._config
