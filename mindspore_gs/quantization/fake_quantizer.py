@@ -86,6 +86,7 @@ class LinearFakeQuantizer(FakeQuantizer):
     attr_key_num_bits = "num_bits"
     attr_key_narrow_range = "narrow_range"
     attr_key_symmetric = "symmetric"
+    attr_key_channel_axis = "channel_axis"
 
     def name(self) -> str:
         return FakeQuantParam.attr_value_linear_quant_algo_name
@@ -110,6 +111,9 @@ class LinearFakeQuantizer(FakeQuantizer):
     def symmetric(self) -> bool:
         raise NotImplementedError
 
+    def channel_axis(self) -> int:
+        return -1
+
     def get_scale_zp(self):
         quant_min, quant_max = get_quant_min_max(self.num_bits(), self.symmetric(), self.narrow_range())
         input_mins = np.array(self.mins(), dtype=np.float32)
@@ -121,8 +125,12 @@ class LinearFakeQuantizer(FakeQuantizer):
 
     def quant_params(self) -> dict:
         scale, zp = self.get_scale_zp()
-        return {LinearFakeQuantizer.attr_key_min: self.mins(), LinearFakeQuantizer.attr_key_max: self.maxs(),
-                LinearFakeQuantizer.attr_key_num_bits: self.num_bits(),
-                LinearFakeQuantizer.attr_key_narrow_range: self.narrow_range(),
-                LinearFakeQuantizer.attr_key_symmetric: self.symmetric(),
-                FakeQuantParam.attr_key_linear_quant_scale: scale, FakeQuantParam.attr_key_linear_quant_zero_point: zp}
+        params = {LinearFakeQuantizer.attr_key_min: self.mins(), LinearFakeQuantizer.attr_key_max: self.maxs(),
+                  LinearFakeQuantizer.attr_key_num_bits: self.num_bits(),
+                  LinearFakeQuantizer.attr_key_narrow_range: self.narrow_range(),
+                  LinearFakeQuantizer.attr_key_symmetric: self.symmetric(),
+                  FakeQuantParam.attr_key_linear_quant_scale: scale,
+                  FakeQuantParam.attr_key_linear_quant_zero_point: zp}
+        if self.is_per_channel():
+            params[LinearFakeQuantizer.attr_key_channel_axis] = self.channel_axis()
+        return params

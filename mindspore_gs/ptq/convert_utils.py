@@ -15,7 +15,7 @@
 """Convert network to target backend quant network from mindposre quant network."""
 
 import numpy as np
-from mindspore import Parameter, Tensor, dtype
+from mindspore import Parameter, Tensor, dtype, context
 from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
@@ -27,7 +27,11 @@ class AntiQuantCell(Cell):
     """AntiQuantCell, warp AntiQuant to support per-channel AntiQuant."""
     def __init__(self, scale: list, zp: list):
         super().__init__()
-        self.scale = Parameter(Tensor(scale, dtype=dtype.float32))
+        if context.get_context("device_target") == "Ascend":
+            outdtype = dtype.float16
+        else:
+            outdtype = dtype.float32
+        self.scale = Parameter(Tensor(scale, dtype=outdtype))
         self.zp_neg = Parameter(Tensor(np.array(zp) * -1, dtype=dtype.int32))
         self.anti_quant = AntiQuant(1., 0.)
         self.mul = msops.Mul()
@@ -49,7 +53,7 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell) -> AntiQuantCell:
     zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
     if scale is None:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
-    if scale is None:
+    if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
     return AntiQuantCell(scale, zp)
 
