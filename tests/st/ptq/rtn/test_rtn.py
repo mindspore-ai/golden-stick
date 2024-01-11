@@ -1,4 +1,4 @@
-# Copyright 2022 Huawei Technologies Co., Ltd
+# Copyright 2023 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,12 +17,15 @@ import os
 import sys
 from collections import OrderedDict
 import pytest
-from mindspore import nn
+import numpy as np
+from mindspore import nn, context, GRAPH_MODE, Parameter, dtype, Tensor
 from mindspore.common.dtype import QuantDtype
+from mindspore_gs import Backend
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
 from mindspore_gs.ptq import RoundToNearestPTQ as RTN
 from mindspore_gs.ptq import RTNConfig
 from mindspore_gs.ptq.quant_cells import LinearQuant
+from mindspore_gs.ptq.convert_utils import AntiQuantCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel
 from mindformers.modules import Linear
 
@@ -250,11 +253,47 @@ def test_woq_apply():
     assert quant_cell.output_quantizer() is None
 
     quant_params = weight_fake_quant.quant_params()
-    min_data = quant_params.get("min")
-    max_data = quant_params.get("max")
-    assert len(min_data) == 6
-    assert len(max_data) == 6
+    min_data = np.array(quant_params.get("min"))
+    max_data = np.array(quant_params.get("max"))
+    assert min_data.shape == (6, 1)
+    assert max_data.shape == (6, 1)
     for min_ in min_data:
-        assert min_ == 1.
+        assert min_[0] == 1.
     for max_ in max_data:
-        assert max_ == 1.
+        assert max_[0] == 1.
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_woq_predict(device, mode):
+    """
+    Feature: RoundToNearestPTQ algorithm set functions.
+    Description: Apply, Convert and Predict RoundToNearestPTQ on SimpleNet.
+    Expectation: Execute success.
+    """
+
+    context.set_context(device_target=device, mode=mode)
+    network = SimpleNet()
+    ptq = RTN()
+    ptq.set_weight_only_quant(True)
+    quant_network = ptq.apply(network)
+    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    for _, cell in ascend_network.name_cells().items():
+        if not isinstance(cell, LinearQuant):
+            continue
+        linear: LinearQuant = cell
+        assert not linear.input_quantizer()
+        assert not linear.output_quantizer()
+        assert isinstance(linear.weight_quantizer(), AntiQuantCell)
+        weight: Parameter = linear.handler().weight
+        assert isinstance(weight, Parameter)
+        assert weight.dtype == dtype.int8
+        assert weight.value().dtype == dtype.int8
+    inputx = Tensor(np.ones((5, 5), dtype=np.float32), dtype=dtype.float32)
+    output: np.ndarray = ascend_network(inputx).asnumpy()
+    assert output.shape == (5, 6)
+    for ele in output.flatten():
+        assert ele == 5.

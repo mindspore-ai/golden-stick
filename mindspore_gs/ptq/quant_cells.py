@@ -44,7 +44,7 @@ class LinearQuant(PTQCell):
         rank = len(linear.weight.shape)
         self._weight_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
         input_fq_args = {}
-        weight_perchannel_args = PerChannelArgs(self._linear.out_channels, self._weight_axis)
+        weight_perchannel_args = PerChannelArgs(self._linear.out_channels, self._weight_axis, rank)
         weight_fq_args = {}
         if "in_strategy" in self._linear.matmul.get_attr_dict():
             input_fq_args["strategy"] = (self._linear.matmul.in_strategy[0],)

@@ -53,11 +53,14 @@ class RTNLayerPolicy(LayerPolicy, abc.ABC):
         if self._config.weight_per_channel:
             channel_axis = perchannel_args.channel_axis
             num_channels = perchannel_args.num_channels
+            rank = perchannel_args.rank
             if channel_axis == -1:
                 raise RuntimeError("Please provide channel axis of weight for per-channel weight quantize.")
             if num_channels == -1:
                 raise RuntimeError("Please provide channel number of weight for per-channel weight quantize.")
-            weight_quantizer = MinMaxPerChannel(symmetric=self._config.weight_symmetric,
+            if rank == -1:
+                raise RuntimeError("Please provide rank of weight for per-channel weight quantize.")
+            weight_quantizer = MinMaxPerChannel(symmetric=self._config.weight_symmetric, data_rank=rank,
                                                 quant_dtype=self._config.weight_quant_dtype,
                                                 narrow_range=self._config.weight_narrow_range,
                                                 axis=channel_axis, output_channel=num_channels, strategy=strategy)

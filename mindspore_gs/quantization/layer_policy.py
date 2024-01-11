@@ -22,9 +22,10 @@ layer_policy_key = "layer_quant_policy"
 
 
 class PerChannelArgs:
-    def __init__(self, num_channels=-1, channel_axis=-1):
+    def __init__(self, num_channels=-1, channel_axis=-1, rank=-1):
         self.num_channels = num_channels
         self.channel_axis = channel_axis
+        self.rank = rank
 
 
 class LayerPolicy(abc.ABC):

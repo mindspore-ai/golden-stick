@@ -51,8 +51,6 @@ def cal_quantization_params(input_min,
 
     if input_min.shape != input_max.shape:
         raise ValueError("input min shape should be equal to input max.")
-    if len(input_min.shape) > 1:
-        raise ValueError("input min and max shape should be one dim.")
     if (input_min > input_max).all():
         raise ValueError("input_min min should be less than input max.")
     if (input_max == input_min).all():

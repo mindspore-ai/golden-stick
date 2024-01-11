@@ -117,12 +117,13 @@ class MinMaxPerLayer(LinearFakeQuantizer):
 class MinMaxPerChannel(LinearFakeQuantizer):
     """Static minmax by channel"""
 
-    def __init__(self, axis, output_channel, symmetric=True, narrow_range=False, quant_dtype=QuantDtype.INT8,
+    def __init__(self, axis, output_channel, data_rank, symmetric=True, narrow_range=False, quant_dtype=QuantDtype.INT8,
                  strategy=None):
         super(MinMaxPerChannel, self).__init__()
         self._symmetric = symmetric
         self._narrow_range = narrow_range
         self._quant_dtype = quant_dtype
+        self._data_rank = data_rank
         if not self.symmetric:
             raise ValueError("Not support un-symmetric now.")
         if self._narrow_range:
@@ -140,7 +141,18 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         else:
             self.min = P.ReduceMin()
             self.max = P.ReduceMax()
+        if axis < 0:
+            axis += data_rank
         self.axis = axis
+        perm_shape = [axis]
+        for i in range(data_rank):
+            if i != axis:
+                perm_shape.append(i)
+        self._perm_shape = tuple(perm_shape)
+
+        pre_dims = axis
+        post_dims = data_rank - axis - 1
+        self._param_shape = [1] * pre_dims + [-1] + [1] * post_dims
 
     def construct(self, x):
         """
@@ -149,15 +161,7 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         Returns:
             Tensor, returns the computed result.
         """
-        rank_x = len(x.shape)
-        axis = self.axis
-        if axis < 0:
-            axis += rank_x
-        perm_shape = [axis]
-        for i in range(rank_x):
-            if i != axis:
-                perm_shape.append(i)
-        tmp = ops.Transpose()(x, tuple(perm_shape))
+        tmp = ops.Transpose()(x, self._perm_shape)
         tmp = tmp.reshape((-1, tmp.shape[-1]))
         self.float_min = ops.minimum(self.min(tmp, 1), self.float_min)
         self.float_max = ops.maximum(self.max(tmp, 1), self.float_max)
@@ -165,10 +169,10 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         return x
 
     def mins(self) -> Union[list, tuple]:
-        return self.float_min.data.asnumpy().tolist()
+        return self.float_min.data.asnumpy().reshape(self._param_shape).tolist()
 
     def maxs(self) -> Union[list, tuple]:
-        return self.float_max.data.asnumpy().tolist()
+        return self.float_max.data.asnumpy().reshape(self._param_shape).tolist()
 
     def num_bits(self) -> int:
         return 8
@@ -184,6 +188,9 @@ class MinMaxPerChannel(LinearFakeQuantizer):
 
     def is_per_channel(self) -> bool:
         return True
+
+    def channel_axis(self) -> int:
+        return self.axis
 
     def convert_to_ascend(self):
         fake_quant = Q.FakeQuantPerChannel(num_bits=self.num_bits(), symmetric=self.symmetric(), channel_axis=self.axis)
