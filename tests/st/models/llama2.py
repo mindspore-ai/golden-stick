@@ -16,6 +16,8 @@
 Create llama2 from mindformers.
 """
 
+import numpy as np
+from mindspore import Tensor, dtype
 from mindformers.modules.transformer.transformer import default_transformer_config, TransformerOpParallelConfig
 from mindformers import LlamaForCausalLM, LlamaConfig
 
@@ -48,3 +50,19 @@ def llama2(batch_size: int = 32,
     llama2_config.use_kvcache_mgr = True
     llama2_config.checkpoint_name_or_path = checkpoint_name_or_path
     return LlamaForCausalLM(llama2_config)
+
+
+def _dummy_tensor(shape, dt):
+    """create dummy tensor"""
+    if None in shape:
+        return Tensor(shape=shape, dtype=dt)
+    return Tensor(np.ones(shape=tuple(shape)), dtype=dt)
+
+
+def create_dummy_inputs(bs=None, seqlen=None, activate_len_shape=None):
+    input_ids = _dummy_tensor(shape=[bs, seqlen], dt=dtype.int32)
+    input_position = _dummy_tensor(shape=[bs], dt=dtype.int32)
+    batch_valid_length = _dummy_tensor(shape=[bs], dt=dtype.int64)
+    batch_index = _dummy_tensor(shape=[bs], dt=dtype.int64)
+    activate_len = _dummy_tensor(shape=[activate_len_shape], dt=dtype.int64)
+    return [input_ids, None, input_position, None, None, None, None, batch_valid_length, batch_index, activate_len]

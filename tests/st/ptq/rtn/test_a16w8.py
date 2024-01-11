@@ -26,7 +26,7 @@ from mindformers.modules import Linear
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
-from tests.st.models.llama2 import llama2
+from tests.st.models.llama2 import llama2, create_dummy_inputs
 from tests.st.test_utils import check_network_contain_layer
 
 
@@ -77,8 +77,17 @@ def test_llama2_woq_predict(device, mode):
     """
 
     context.set_context(device_target=device, mode=mode)
-    network = llama2(8, 512, 1024, 2)
+    network = llama2(8, 512, 2048, 2)
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     quant_network = ptq.apply(network)
-    ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    inputs = create_dummy_inputs(8, 512, 512)
+    outputs = ascend_network(*inputs)
+    assert len(outputs) == 3
+    assert outputs[0].shape == (8, 32000)
+    assert outputs[0].dtype == dtype.float32
+    assert outputs[1].shape == (8, 512)
+    assert outputs[1].dtype == dtype.int32
+    assert outputs[2].shape == (8, 512)
+    assert outputs[2].dtype == dtype.float32
