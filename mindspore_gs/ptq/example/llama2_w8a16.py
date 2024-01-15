@@ -16,13 +16,12 @@
 import argparse
 
 import mindspore as ms
-from mindspore import dataset
-import mindspore.dataset.transforms as C
-from mindspore import context, dtype
-from mindspore.communication.management import init, get_rank, get_group_size
+from mindspore import context
 from mindspore_gs import Backend
 from mindspore_gs.ptq import RoundToNearestPTQ as RTN
-from mindformers import MindFormerConfig, LlamaConfig, LlamaForCausalLM, init_context, TransformerOpParallelConfig
+from mindspore_gs.datasets import create_wikitext_dataset
+from mindformers import MindFormerConfig, LlamaConfig, LlamaForCausalLM, init_context, TransformerOpParallelConfig, \
+    LlamaTokenizer
 from mindformers.core.metric import PerplexityMetric
 
 
@@ -42,46 +41,9 @@ def _set_config(config_path, device_id):
     return mfconfig
 
 
-def _get_rank_info(distribute):
-    """
-    get rank size and rank id
-    """
-    if distribute:
-        init()
-        rank_id = get_rank()
-        device_num = get_group_size()
-    else:
-        rank_id = 0
-        device_num = 1
-    return device_num, rank_id
-
-
-def create_dataset(bs, repeat_count=1, distribute=False, do_shuffle=True, dataset_path=""):
-    """create dataset like language model task"""
-    device_num, rank_id = _get_rank_info(distribute)
-    type_cast_op = C.TypeCast(dtype.int32)
-    ds = dataset.MindDataset(dataset_path,
-                             columns_list=["input_ids"],
-                             shuffle=do_shuffle,
-                             num_shards=device_num,
-                             shard_id=rank_id)
-    print("batch_size: {}".format(bs))
-
-    ds = ds.map(operations=type_cast_op, input_columns="input_ids")
-    ds = ds.batch(bs, drop_remainder=True)
-    ds = ds.repeat(repeat_count)
-
-    print("dataset size: {}".format(ds.get_dataset_size()))
-    print("repeat count: {}".format(ds.get_repeat_count()))
-    print("output shape: {}".format(ds.output_shapes()))
-    print("output type: {}".format(ds.output_types()))
-    print("============== create dataset successful ===============")
-
-    return ds
-
-
-def evaluate(net, dataset_path):
-    ds = create_dataset(bs=batch_size, dataset_path=dataset_path)
+def evaluate(net, dataset_path, bs, seq_len, vocab_file):
+    tokenizer = LlamaTokenizer(vocab_file=vocab_file)
+    ds = create_wikitext_dataset(dataset_path, bs, seq_len, tokenizer)
     metrics = {"PerplexityMetric": PerplexityMetric()}
     model = ms.Model(net, metrics=metrics, eval_network=net)
     output = model.eval(ds, dataset_sink_mode=config.runner_config.sink_mode)
@@ -108,14 +70,15 @@ if __name__ == "__main__":
     config.processor.tokenizer.vocab_file = uargs.tokenizer_path
     network = LlamaForCausalLM(config.model.model_config)
     batch_size = config.model.model_config.batch_size
+    seq_length = config.model.model_config.seq_length
     network.set_train(False)
     network.phase = 'predict'
     print('------------ eval llama2 ------------', flush=True)
-    evaluate(network, uargs.dataset_path)
+    evaluate(network, uargs.dataset_path, batch_size, seq_length, uargs.tokenizer_path)
 
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     quant_network = ptq.apply(network)
     ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
     print('------------ eval W8A16 quant llama2 ------------', flush=True)
-    evaluate(ascend_network, uargs.dataset_path)
+    evaluate(ascend_network, uargs.dataset_path, batch_size, seq_length, uargs.tokenizer_path)
