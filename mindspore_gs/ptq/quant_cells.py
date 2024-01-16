@@ -91,11 +91,7 @@ class LinearQuant(PTQCell):
                 super(LinearQuant, self).convert(backend)
                 self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
                 weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
-                if hasattr(self._linear, "dtype"):
-                    weight = self._linear.cast(self._linear.weight, self._linear.dtype)
-                else:
-                    weight = self._linear.weight
-                weight = weight.asnumpy()
+                weight = self._linear.weight.asnumpy()
                 quant_min, quant_max = get_quant_min_max(weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
                                                          weight_quantizer.attrs[
                                                              LinearFakeQuantizer.attr_key_narrow_range])
@@ -117,12 +113,8 @@ class LinearQuant(PTQCell):
                 return
 
     def calibrate(self):
-        logger.info(f"calibrating weight of Linear Cell: {self._linear.weight.name}")
-        if hasattr(self._linear, "dtype"):
-            weight = self._linear.cast(self._linear.weight, self._linear.dtype)
-        else:
-            weight = self._linear.weight
-        self._weight_quantizer(weight)
+        logger.info(f"Calibrating weight of Linear Cell: {self._linear.weight.name}")
+        self._weight_quantizer(self._linear.weight)
 
     # pylint: disable=W0221
     def construct(self, x):
@@ -153,7 +145,7 @@ class LinearQuant(PTQCell):
                 x = self._linear.cast(x, self._linear.weight.dtype)
         if self._weight_quantizer:
             weight = self._weight_quantizer(weight)
-        elif linear_dtype:
+        if linear_dtype:
             weight = self._linear.cast(self._linear.weight, linear_dtype)
 
         x = self._linear.matmul(x, weight)

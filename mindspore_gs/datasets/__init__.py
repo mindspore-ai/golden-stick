@@ -17,3 +17,4 @@ MindSpore golden stick datasets.
 """
 
 from .wikitext2 import create_wikitext_dataset
+from .squad import create_squad_dataset
