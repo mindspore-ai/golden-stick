@@ -58,7 +58,25 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell) -> AntiQuantCell:
     return AntiQuantCell(scale, zp)
 
 
-def convert_to_quant(fqcell: FakeQuantParamCell) -> Quant:
+class QuantCell(Cell):
+    """QuantCell, warp Quant to support serialize and deserialize."""
+    def __init__(self, scale: float, zp: float):
+        super().__init__()
+        self.scale = Parameter(Tensor([scale], dtype=dtype.float32))
+        self.zp = Parameter(Tensor([zp], dtype=dtype.float32))
+        self.quant = None
+        self.update_ascend_quant()
+
+    def update_ascend_quant(self):
+        scale = self.scale.asnumpy().tolist()[0]
+        zp = self.zp.asnumpy().tolist()[0]
+        self.quant = Quant(scale, zp)
+
+    def construct(self, x):
+        return self.quant(x)
+
+
+def convert_to_quant(fqcell: FakeQuantParamCell) -> QuantCell:
     """Convert FakeQuantParamCell to Quant."""
     fq: FakeQuantParam = fqcell.fq
     if not isinstance(fq, FakeQuantParam):
@@ -69,15 +87,24 @@ def convert_to_quant(fqcell: FakeQuantParamCell) -> Quant:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if scale is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    return Quant(scale, zp)
+    return QuantCell(scale[0], zp[0])
 
 
 class DequantCell(Cell):
     """DequantCell, warp Dequant to support zero-point."""
     def __init__(self, scale: list):
         super().__init__()
-        self.scale = Parameter(Tensor(scale, dtype=dtype.float32))
+        scale_ui64 = DequantCell._trans_fp32_to_u64(scale)
+        self.scale = Parameter(Tensor(scale_ui64, dtype=dtype.uint64))
         self.dequant = Dequant()
+
+    @staticmethod
+    def _trans_fp32_to_u64(scale_fp32: list):
+        fp32_scale_deq = np.array(scale_fp32, dtype=np.float32)
+        ui32_scale_deq = np.frombuffer(fp32_scale_deq, np.uint32)
+        ui64_scale_deq = np.zeros(fp32_scale_deq.shape, np.uint64)
+        ui64_scale_deq |= np.uint64(ui32_scale_deq)
+        return ui64_scale_deq.tolist()
 
     def construct(self, x):
         return self.dequant(x, self.scale)
