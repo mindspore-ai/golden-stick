@@ -249,6 +249,10 @@ class RoundToNearestPTQ(CompAlgo):
                 return cell, False
 
         ApplyProcessor(self._qat_policy, self._config.weight_only).process(network)
+        network.update_parameters_name()
+        return network
+
+    def calibrate(self, network):
         if self._config.weight_only:
             self._weight_only_quant(network)
         return network
@@ -301,4 +305,5 @@ class RoundToNearestPTQ(CompAlgo):
                 return cell, False
 
         ConvertProcessor(self._qat_policy, self._config.weight_only).process(net_opt)
+        net_opt.update_parameters_name()
         return net_opt

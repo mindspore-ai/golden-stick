@@ -237,6 +237,7 @@ def test_woq_apply():
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     new_network = ptq.apply(network)
+    new_network = ptq.calibrate(new_network)
     cells: OrderedDict = new_network.name_cells()
 
     quant_cell = cells.get("linear", None)
@@ -280,6 +281,7 @@ def test_woq_predict(device, mode):
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     quant_network = ptq.apply(network)
+    quant_network = ptq.calibrate(quant_network)
     ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, LinearQuant):
