@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import time
 import re
+import numpy as np
 from mindspore import log as logger
 from mindspore.nn import Cell
 
@@ -357,3 +358,17 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
     assert len(results) == 1
     print("=" * 10, "LeNet {} mode accuracy: {}".format(config.get_run_mode(), results[0]), "=" * 10, flush=True)
     return results[0]
+
+
+def relative_tolerance(data: np.ndarray, ground: np.ndarray):
+    """Calculate relative tolerance."""
+    diff = np.abs(data - ground)
+    return diff / np.abs(ground + 1e-5)
+
+
+def relative_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, tolerance: float):
+    """Calculate relative tolerance and check."""
+    diff = relative_tolerance(data, ground)
+    max_diff = np.max(diff)
+    print(f"------- relative_tolerance: \r\n{diff}, \r\nmax: {max_diff}", flush=True)
+    return max_diff < tolerance

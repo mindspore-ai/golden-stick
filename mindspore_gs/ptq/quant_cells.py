@@ -63,6 +63,12 @@ class LinearQuant(PTQCell):
         self._weight_quantizer.float_min.data.name = prex + "_weight_float_min"
         self._weight_quantizer.float_max.data.name = prex + "_weight_float_max"
 
+        has_dtype = hasattr(self._linear, "dtype")
+        self._cast_dtype = self._linear.dtype if has_dtype else self._linear.weight.dtype
+        if self._cast_dtype == dtype.bfloat16:
+            self._cast_dtype = dtype.float16
+        self._quant_deployed = False
+
     def weight_quantizer(self):
         return self._weight_quantizer
 
@@ -91,8 +97,10 @@ class LinearQuant(PTQCell):
                 super(LinearQuant, self).convert(backend)
                 self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
                 weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
-                weight = self._linear.weight.asnumpy()
+                weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+                weight = weight.asnumpy()
                 quant_min, quant_max = get_quant_min_max(weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
+                                                         weight_quantizer.attrs[LinearFakeQuantizer.attr_key_symmetric],
                                                          weight_quantizer.attrs[
                                                              LinearFakeQuantizer.attr_key_narrow_range])
                 scale = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale]
@@ -104,10 +112,12 @@ class LinearQuant(PTQCell):
             if all_quant:
                 self._output_quantizer = convert_to_dequant(self._input_quantizer, self._weight_quantizer)
                 self._input_quantizer = convert_to_quant(self._input_quantizer)
+                self._quant_deployed = True
             elif weight_only:
                 self._input_quantizer = None
                 self._output_quantizer = None
                 self._weight_quantizer = convert_to_antiquant(self._weight_quantizer)
+                self._quant_deployed = True
             else:
                 logger.info(f"LinearQuant {self} is not quanted.")
                 return
@@ -133,20 +143,12 @@ class LinearQuant(PTQCell):
             else:
                 x = P.Reshape()(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
         ori_dtype = F.dtype(x)
-        linear_dtype = self._linear.dtype if hasattr(self._linear, "dtype") else None
 
-        weight = self._linear.weight
-        if self._input_quantizer:
-            x = self._input_quantizer(x)
+        x = self._linear.cast(x, self._cast_dtype)
+        if self._quant_deployed:
+            weight = self._weight_quantizer(self._linear.weight)
         else:
-            if linear_dtype:
-                x = self._linear.cast(x, linear_dtype)
-            else:
-                x = self._linear.cast(x, self._linear.weight.dtype)
-        if self._weight_quantizer:
-            weight = self._weight_quantizer(weight)
-        if linear_dtype:
-            weight = self._linear.cast(self._linear.weight, linear_dtype)
+            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
 
         x = self._linear.matmul(x, weight)
         if self._linear.has_bias:
