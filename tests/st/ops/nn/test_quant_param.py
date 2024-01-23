@@ -13,15 +13,21 @@
 # limitations under the License.
 # ============================================================================
 """test quant param cells can serialize and deserialize successfully."""
+import os
+import sys
 
 import pytest
 import numpy as np
 
 import mindspore
-from mindspore import QuantDtype, Tensor, dtype, context, GRAPH_MODE
-from mindspore.ops.operations import FakeQuantParam
+from mindspore import QuantDtype, Tensor, dtype, context, GRAPH_MODE, nn, Parameter
+from mindspore.ops.operations import FakeQuantParam, BatchMatMul, MatMul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell
+
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
+# pylint: disable=wrong-import-position
+from tests.st.test_utils import relative_tolerance_acceptable
 
 
 def test_fake_quant_cell():
@@ -95,13 +101,122 @@ def test_antiquant_cell(mode):
     origin = np.ones((4, 2), dtype=np.int8)
     expect = origin.astype(np.float32)
     expect = (expect - zp) * scale
-    x = Tensor(origin, dtype=dtype.int8)
-    aqcell = AntiQuantCell(scale, zp)
-    output = aqcell(x)
-    assert (output.asnumpy() == expect).all()
-    mindspore.save_checkpoint(aqcell, "ascend-antiquant-cell.ckpt")
 
-    aqcell2 = AntiQuantCell([1.0, 1.0], [0.0, 0.0])
-    mindspore.load_checkpoint("ascend-antiquant-cell.ckpt", aqcell2)
-    output2 = aqcell2(x)
-    assert (output2.asnumpy() == expect).all()
+    def check_1stage():
+        x = Tensor(origin, dtype=dtype.int8)
+        aqcell = AntiQuantCell(scale, zp)
+        output = aqcell(x)
+        assert (output.asnumpy() == expect).all()
+        mindspore.save_checkpoint(aqcell, "ascend-antiquant-cell.ckpt")
+
+    def check_2stage():
+        x = Tensor(origin, dtype=dtype.int8)
+        aqcell2 = AntiQuantCell([1.0, 1.0], [0.0, 0.0])
+        mindspore.load_checkpoint("ascend-antiquant-cell.ckpt", aqcell2)
+        output2 = aqcell2(x)
+        assert (output2.asnumpy() == expect).all()
+
+    check_1stage()
+    check_2stage()
+
+
+class AntiQuantBMMNet(nn.Cell):
+    """BatchMatMul network with AntiQuantCell."""
+    def __init__(self, scale, zp, ic=5, oc=6):
+        super().__init__()
+        self.antiquant = AntiQuantCell(scale, zp)
+        self.matmul = BatchMatMul(transpose_a=False, transpose_b=False)
+        self.weight = Parameter(Tensor(np.ones((ic, oc), np.int8), dtype.int8))
+
+    def construct(self, x):
+        weight = self.antiquant(self.weight)
+        y = self.matmul(x, weight)
+        return y
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_antiquantbmm_cell(mode):
+    """
+    Feature: AntiQuantCell + BatchMatmul.
+    Description: test AntiQuantCell + BatchMatmul can serialize, deserialize and predict successfully.
+    Expectation: Success.
+    """
+
+    context.set_context(device_target="Ascend", mode=mode)
+    bs = 2
+    ic = 5
+    oc = 2
+    scale = [2.0, 3.0]
+    zp = [-1.0, 1.0]
+    expect = np.array([[[20., 0.], [20., 0.], [20., 0.], [20., 0.], [20., 0.]],
+                       [[20., 0.], [20., 0.], [20., 0.], [20., 0.], [20., 0.]]])
+
+    def check_1stage():
+        net = AntiQuantBMMNet(scale, zp, ic, oc)
+        x = Tensor(np.ones((bs, ic, ic)), dtype=dtype.float16)
+        output = net(x)
+        assert relative_tolerance_acceptable(output.asnumpy(), expect, 1e-5)
+        mindspore.save_checkpoint(net, "test_antiquantbmm_cell.ckpt")
+
+    def check_2stage():
+        net = AntiQuantBMMNet([1.0, 1.0], [0.0, 0.0], ic, oc)
+        mindspore.load_checkpoint("test_antiquantbmm_cell.ckpt", net)
+        x = Tensor(np.ones((bs, ic, ic)), dtype=dtype.float16)
+        output2 = net(x)
+        assert relative_tolerance_acceptable(output2.asnumpy(), expect, 1e-5)
+
+    check_1stage()
+    check_2stage()
+
+
+class AntiQuantMMNet(nn.Cell):
+    """MatMul network with AntiQuantCell."""
+    def __init__(self, scale, zp, ic=5, oc=6):
+        super().__init__()
+        self.antiquant = AntiQuantCell(scale, zp)
+        self.matmul = MatMul(transpose_a=False, transpose_b=False)
+        self.weight = Parameter(Tensor(np.ones((ic, oc), np.int8), dtype.int8))
+
+    def construct(self, x):
+        weight = self.antiquant(self.weight)
+        y = self.matmul(x, weight)
+        return y
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_antiquantmm_cell(mode):
+    """
+    Feature: AntiQuantCell + Matmul.
+    Description: test AntiQuantCell + Matmul can serialize, deserialize and predict successfully.
+    Expectation: Success.
+    """
+
+    context.set_context(device_target="Ascend", mode=mode)
+    ic = 5
+    oc = 2
+    scale = [2.0, 3.0]
+    zp = [-1.0, 1.0]
+    expect = np.array([[[20., 0.], [20., 0.], [20., 0.], [20., 0.], [20., 0.]]])
+
+    def check_1stage():
+        net = AntiQuantMMNet(scale, zp, ic, oc)
+        x = Tensor(np.ones((ic, ic)), dtype=dtype.float16)
+        output = net(x)
+        assert relative_tolerance_acceptable(output.asnumpy(), expect, 1e-5)
+        mindspore.save_checkpoint(net, "test_antiquantmm_cell.ckpt")
+
+    def check_2stage():
+        net = AntiQuantMMNet([1.0, 1.0], [0.0, 0.0], ic, oc)
+        mindspore.load_checkpoint("test_antiquantmm_cell.ckpt", net)
+        x = Tensor(np.ones((ic, ic)), dtype=dtype.float16)
+        output2 = net(x)
+        assert relative_tolerance_acceptable(output2.asnumpy(), expect, 1e-5)
+
+    check_1stage()
+    check_2stage()

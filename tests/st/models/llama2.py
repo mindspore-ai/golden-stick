@@ -18,7 +18,6 @@ Create llama2 from mindformers.
 
 import numpy as np
 from mindspore import Tensor, dtype
-from mindformers.modules.transformer.transformer import default_transformer_config, TransformerOpParallelConfig
 from mindformers import LlamaForCausalLM, LlamaConfig
 
 
@@ -27,28 +26,37 @@ def llama2(batch_size: int = 32,
            hidden_size: int = 8192,
            num_layers: int = 80,
            num_heads: int = 64,
-           vocab_size: int = 32000,
-           n_kv_heads: int = 8,
-           bos_token_id: int = 1,
-           eos_token_id: int = 2,
-           pad_token_id: int = 0,
-           ignore_token_id: int = -100,
-           parallel_config: TransformerOpParallelConfig = default_transformer_config,
            checkpoint_name_or_path=""):
     """Create a Llama2 network for test from mindformers."""
-    llama2_config = LlamaConfig(batch_size, seq_length, hidden_size, num_layers, num_heads, n_kv_heads,
-                                vocab_size=vocab_size, multiple_of=256, ffn_dim_multiplier=1.3, rms_norm_eps=1.0e-5,
-                                bos_token_id=bos_token_id, eos_token_id=eos_token_id, pad_token_id=pad_token_id,
-                                ignore_token_id=ignore_token_id, compute_dtype="float16",
-                                layernorm_compute_type="float32", softmax_compute_type="float16",
-                                rotary_dtype="float16", param_init_type="float16", parallel_config=parallel_config)
-    llama2_config.use_past = True
-    llama2_config.use_flash_attention = False
-    llama2_config.is_dynamic = True
-    llama2_config.use_past_shard = True
-    llama2_config.use_rope_slice = True
-    llama2_config.use_kvcache_mgr = True
+    llama2_config = LlamaConfig()
+    llama2_config.batch_size = batch_size
+    llama2_config.seq_length = seq_length
+    llama2_config.hidden_size = hidden_size
+    llama2_config.num_layers = num_layers
+    llama2_config.num_heads = num_heads
+    llama2_config.vocab_size = 32000
+    llama2_config.multiple_of = 256
+    llama2_config.rms_norm_eps = 1.0e-5
+    llama2_config.bos_token_id = 1
+    llama2_config.eos_token_id = 2
+    llama2_config.pad_token_id = 0
+    llama2_config.ignore_token_id = -100
+    llama2_config.compute_dtype = dtype.float16
+    llama2_config.layernorm_compute_type = dtype.float32
+    llama2_config.softmax_compute_type = dtype.float16
+    llama2_config.rotary_dtype = dtype.float32
+    llama2_config.param_init_type = dtype.float32
+    llama2_config.use_past = False
+    llama2_config.pretrain_seqlen = 4096
+    llama2_config.compute_in_2d = True
+    llama2_config.use_flash_attention = True
+    llama2_config.offset = 0
+    llama2_config.use_past_shard = False
     llama2_config.checkpoint_name_or_path = checkpoint_name_or_path
+    llama2_config.repetition_penalty = 1
+    llama2_config.max_decode_length = 512
+    llama2_config.top_k = 3
+    llama2_config.top_p = 1
     return LlamaForCausalLM(llama2_config)
 
 

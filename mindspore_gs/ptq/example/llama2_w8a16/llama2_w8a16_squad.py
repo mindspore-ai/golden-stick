@@ -1,4 +1,4 @@
-# Copyright 2023 Huawei Technologies Co., Ltd
+# Copyright 2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,28 +18,11 @@ import argparse
 import mindspore as ms
 from mindspore import context
 from mindspore_gs import Backend
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
 from mindspore_gs.datasets import create_squad_dataset
 from mindspore_gs.ptq.evaluate import LLMGenerateNetwork
-from mindformers import MindFormerConfig, LlamaConfig, LlamaForCausalLM, init_context, TransformerOpParallelConfig, \
-    LlamaTokenizer
+from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import EmF1Metric
-
-
-def _set_config(config_path, device_id):
-    """setup MindFormerConfig"""
-    mfconfig = MindFormerConfig(config_path)
-    if device_id != -1:
-        mfconfig.context.device_id = device_id
-    mfconfig.model.model_config = LlamaConfig(**mfconfig.model.model_config)
-
-    init_context(use_parallel=mfconfig.use_parallel, context_config=mfconfig.context, parallel_config=mfconfig.parallel)
-
-    parallel_config = TransformerOpParallelConfig(**mfconfig.parallel_config)
-    mfconfig.model.model_config.parallel_config = parallel_config
-    mfconfig.model.model_config.checkpoint_name_or_path = mfconfig.load_checkpoint
-    print(mfconfig)
-    return mfconfig
+from common import create_mfconfig, quant_llama2
 
 
 def evaluate(net, dataset_path, vocab_file, cfg):
@@ -79,13 +62,7 @@ def get_args():
 if __name__ == "__main__":
     uargs = get_args()
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = _set_config(uargs.config_path, uargs.device_id)
-    config.processor.tokenizer.vocab_file = uargs.tokenizer_path
-    config.model.model_config.compute_dtype = ms.bfloat16
-    config.model.model_config.layernorm_compute_type = ms.float32
-    config.model.model_config.softmax_compute_type = ms.float16
-    config.model.model_config.rotary_dtype = ms.float32
-    config.model.model_config.param_init_type = ms.float32
+    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 512, uargs.tokenizer_path)
     if not uargs.quant:
         config.load_checkpoint = uargs.ckpt_path
         config.model.model_config.checkpoint_name_or_path = uargs.ckpt_path
@@ -94,13 +71,12 @@ if __name__ == "__main__":
     network.set_train(False)
     network.phase = 'predict'
 
-    print('------------ eval llama2 ------------', flush=True)
+    if uargs.quant:
+        network = quant_llama2(network, Backend.GE_ASCEND)
+        if not uargs.ckpt_path:
+            uargs.ckpt_path = "llama2-w8a16.ckpt"
+        print('------------ eval W8A16 quant llama2 ------------', flush=True)
+    else:
+        print('------------ eval llama2 ------------', flush=True)
+    ms.load_checkpoint(uargs.ckpt_path, network)
     evaluate(network, uargs.dataset_path, uargs.tokenizer_path, config)
-
-    ptq = RTN()
-    ptq.set_weight_only_quant(True)
-    quant_network = ptq.apply(network)
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
-    ms.load_checkpoint("llama2-w8a16.ckpt", ascend_network)
-    print('------------ eval W8A16 quant llama2 ------------', flush=True)
-    evaluate(ascend_network, uargs.dataset_path, uargs.tokenizer_path, config)

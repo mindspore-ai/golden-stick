@@ -28,10 +28,10 @@ class AntiQuantCell(Cell):
     def __init__(self, scale: list, zp: list):
         super().__init__()
         if context.get_context("device_target") == "Ascend":
-            outdtype = dtype.float16
+            self.outdtype = dtype.float16
         else:
-            outdtype = dtype.float32
-        self.scale = Parameter(Tensor(scale, dtype=outdtype))
+            self.outdtype = dtype.float32
+        self.scale = Parameter(Tensor(scale, dtype=self.outdtype))
         self.zp_neg = Parameter(Tensor(np.array(zp) * -1, dtype=dtype.int32))
         self.anti_quant = AntiQuant(1., 0.)
         self.mul = msops.Mul()

@@ -16,6 +16,7 @@
 
 import numpy as np
 from mindspore.common.dtype import QuantDtype
+from mindspore import log as logger
 
 __all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max",
            "get_quant_dtype_num_bits"]
@@ -51,10 +52,10 @@ def cal_quantization_params(input_min,
 
     if input_min.shape != input_max.shape:
         raise ValueError("input min shape should be equal to input max.")
-    if (input_min > input_max).all():
-        raise ValueError("input_min min should be less than input max.")
     if (input_max == input_min).all():
         return np.ones(input_min.shape), np.zeros(input_min.shape)
+    if (input_min > input_max).all():
+        logger.warning("input_min min should be less than input max, may lead to bad accuracy.")
 
     # calculate scale
     if symmetric:
@@ -64,7 +65,7 @@ def cal_quantization_params(input_min,
 
     # calculate zero point
     zp_double = quant_min - input_min / scale
-    zp = (np.floor(zp_double + 0.5)).astype(np.int)
+    zp = np.round(zp_double).astype(np.int)
 
     return scale, zp
 

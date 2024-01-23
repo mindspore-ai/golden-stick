@@ -1,4 +1,4 @@
-# Copyright 2023 Huawei Technologies Co., Ltd
+# Copyright 2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,24 +18,8 @@ import argparse
 import mindspore as ms
 from mindspore import context
 from mindspore_gs import Backend
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
-from mindformers import MindFormerConfig, LlamaConfig, LlamaForCausalLM, init_context, TransformerOpParallelConfig
-
-
-def _set_config(config_path, device_id):
-    """setup MindFormerConfig"""
-    mfconfig = MindFormerConfig(config_path)
-    if device_id != -1:
-        mfconfig.context.device_id = device_id
-    mfconfig.model.model_config = LlamaConfig(**mfconfig.model.model_config)
-
-    init_context(use_parallel=mfconfig.use_parallel, context_config=mfconfig.context, parallel_config=mfconfig.parallel)
-
-    parallel_config = TransformerOpParallelConfig(**mfconfig.parallel_config)
-    mfconfig.model.model_config.parallel_config = parallel_config
-    mfconfig.model.model_config.checkpoint_name_or_path = mfconfig.load_checkpoint
-    print(mfconfig)
-    return mfconfig
+from mindformers import LlamaForCausalLM
+from common import quant_llama2, create_mfconfig
 
 
 def get_args():
@@ -52,23 +36,11 @@ def get_args():
 if __name__ == "__main__":
     uargs = get_args()
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = _set_config(uargs.config_path, uargs.device_id)
-    config.model.model_config.seq_length = 512
-    config.model.model_config.compute_dtype = ms.bfloat16
-    config.model.model_config.layernorm_compute_type = ms.float32
-    config.model.model_config.softmax_compute_type = ms.float16
-    config.model.model_config.rotary_dtype = ms.float32
-    config.model.model_config.param_init_type = ms.float32
-    config.load_checkpoint = uargs.fp_ckpt_path
-    config.model.model_config.checkpoint_name_or_path = uargs.fp_ckpt_path
+    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 512, ckpt_path=uargs.fp_ckpt_path)
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
     network.phase = 'predict'
 
-    ptq = RTN()
-    ptq.set_weight_only_quant(True)
     print('------------ quant llama2 to W8A16 ------------', flush=True)
-    fq_network = ptq.apply(network)
-    quant_network = ptq.calibrate(fq_network)
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
-    ms.save_checkpoint(ascend_network, "llama2-w8a16.ckpt")
+    network = quant_llama2(network, Backend.GE_ASCEND, True)
+    ms.save_checkpoint(network, "llama2-w8a16.ckpt")
