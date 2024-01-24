@@ -133,7 +133,7 @@ model:
   model_config:
     type: LlamaConfig
     batch_size: 1 # add for increase predict
-    seq_length: 512
+    seq_length: 2048
     hidden_size: 4096
     num_layers: 32
     num_heads: 32
@@ -158,10 +158,11 @@ model:
     use_past_shard: False
     checkpoint_name_or_path: ""
     repetition_penalty: 1
-    max_decode_length: 512
+    max_decode_length: 700
     top_k: 3
     top_p: 1
     do_sample: False
+    max_new_tokens: 20
   arch:
     type: LlamaForCausalLM
 

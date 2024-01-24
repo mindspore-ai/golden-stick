@@ -15,33 +15,55 @@
 """Quant llama2 to w8a16."""
 import argparse
 
+import numpy as np
 import mindspore as ms
 from mindspore import context
 from mindspore_gs import Backend
 from mindspore_gs.datasets import create_squad_dataset
-from mindspore_gs.ptq.evaluate import LLMGenerateNetwork
 from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import EmF1Metric
 from common import create_mfconfig, quant_llama2
 
 
-def evaluate(net, dataset_path, vocab_file, cfg):
+def evaluate(net: LlamaForCausalLM, dataset_path, vocab_file, cfg):
     """evaluate `net` with dataset from `dataset_path`."""
     top_k = cfg.model.model_config.top_k
     top_p = cfg.model.model_config.top_p
     do_sample = cfg.model.model_config.do_sample
     batch_size = cfg.model.model_config.batch_size
     seq_length = cfg.model.model_config.seq_length
-    pad_token_id = cfg.model.model_config.pad_token_id
     ignore_token_id = cfg.model.model_config.ignore_token_id
 
     tokenizer = LlamaTokenizer(vocab_file=vocab_file)
-    eval_net = LLMGenerateNetwork(net, do_sample, seq_length, top_p, top_k, pad_token_id, tokenizer)
     ds = create_squad_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id)
-    metrics = {"EmF1Metric": EmF1Metric()}
-    model = ms.Model(eval_net, metrics=metrics, eval_network=eval_net)
-    output = model.eval(ds, dataset_sink_mode=cfg.runner_config.sink_mode)
-    print(f"EMF1: {output}")
+    metric = EmF1Metric()
+    metric.clear()
+
+    pad_token_id = tokenizer.pad_token_id
+    data_count = 0
+    total_count = ds.get_dataset_size()
+    for _, inputs in enumerate(ds.create_dict_iterator()):
+        data_count += 1
+        print(f"Dataset count: {data_count}/{total_count}", flush=True)
+        input_ids = inputs['input_ids'].asnumpy()
+        labels = inputs['labels'].asnumpy()
+
+        valid_length_each_example = []
+        for j in range(input_ids.shape[0]):
+            # As the nonzero returns the index and we need length
+            valid_length_each_example.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
+        valid_length_each_example = np.array(valid_length_each_example)
+
+        outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length, top_p=top_p, top_k=top_k)
+        output_ids = []
+        for j in range(input_ids.shape[0]):
+            output_ids.append(outputs[j][int(valid_length_each_example[j]):])
+
+        pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
+        labels_str = tokenizer.decode(labels, skip_special_tokens=True)
+        metric.update(pres_str, labels_str)
+    metric.eval()
+    print('...........Evaluate Over!...............', flush=True)
 
 
 def get_args():
@@ -63,9 +85,6 @@ if __name__ == "__main__":
     uargs = get_args()
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 512, uargs.tokenizer_path)
-    if not uargs.quant:
-        config.load_checkpoint = uargs.ckpt_path
-        config.model.model_config.checkpoint_name_or_path = uargs.ckpt_path
 
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
