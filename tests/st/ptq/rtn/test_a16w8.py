@@ -50,7 +50,6 @@ def test_llama2_woq_apply_convert(device, mode):
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     quant_network = ptq.apply(network.model)
-    quant_network = ptq.calibrate(quant_network)
     assert not check_network_contain_layer(quant_network, Linear, (LinearQuant,))
     assert check_network_contain_layer(quant_network, LinearQuant)
     ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
@@ -88,7 +87,6 @@ def test_llama2_woq_predict_1stage(device, mode):
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     quant_network = ptq.apply(network.model)
-    quant_network = ptq.calibrate(quant_network)
     ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
     network.model = ascend_network
     quant_outputs = network(*inputs)
@@ -137,7 +135,6 @@ def test_llama2_woq_predict_2stage(device, mode):
         ptq = RTN()
         ptq.set_weight_only_quant(True)
         quant_network = ptq.apply(network.model)
-        quant_network = ptq.calibrate(quant_network)
         ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
         network.model = ascend_network
         mindspore.save_checkpoint(network, "test_llama2_woq_predict_2stage.ckpt")
@@ -147,6 +144,7 @@ def test_llama2_woq_predict_2stage(device, mode):
         network = llama2(8, 512, 2048, 2)
         ptq = RTN()
         ptq.set_weight_only_quant(True)
+        ptq.set_deploy(True)
         quant_network = ptq.apply(network.model)
         ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
         network.model = ascend_network

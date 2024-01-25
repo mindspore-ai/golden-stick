@@ -91,6 +91,9 @@ class LinearFakeQuantizer(FakeQuantizer):
     def name(self) -> str:
         return FakeQuantParam.attr_value_linear_quant_algo_name
 
+    def foo_init(self):
+        raise NotImplementedError
+
     @abc.abstractmethod
     def mins(self) -> Union[list, tuple]:
         raise NotImplementedError

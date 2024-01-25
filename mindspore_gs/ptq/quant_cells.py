@@ -20,10 +20,11 @@ from mindspore.ops import functional as F
 from mindspore.ops import operations as P
 from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
+from mindspore.common.initializer import initializer
 from mindspore_gs import Backend
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_cell import QuantCell
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_data
+from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.ptq.convert_utils import convert_to_antiquant, convert_to_quant, convert_to_dequant
 from mindformers.modules import Linear
@@ -65,8 +66,8 @@ class LinearQuant(PTQCell):
 
         has_dtype = hasattr(self._linear, "dtype")
         self._cast_dtype = self._linear.dtype if has_dtype else self._linear.weight.dtype
-        if self._cast_dtype == dtype.bfloat16:
-            self._cast_dtype = dtype.float16
+        # if self._cast_dtype == dtype.bfloat16:
+        #     self._cast_dtype = dtype.float16
         self._quant_deployed = False
 
     def weight_quantizer(self):
@@ -75,7 +76,7 @@ class LinearQuant(PTQCell):
     def core_construct(self, *args):
         pass
 
-    def convert(self, backend: Backend = Backend.MS):
+    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
         if backend == Backend.MS:
             super(LinearQuant, self).convert(backend)
             if self._weight_quantizer:
@@ -92,35 +93,44 @@ class LinearQuant(PTQCell):
                           self._weight_quantizer.get_attr("weight_only_quant", False)
             all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
                         isinstance(self._input_quantizer, LinearFakeQuantizer)
+            if not all_quant and not weight_only:
+                logger.info(f"LinearQuant {self} is not quanted.")
+                return
+            if is_deploy:
+                if isinstance(self._input_quantizer, LinearFakeQuantizer):
+                    self._input_quantizer.foo_init()
+                if isinstance(self._weight_quantizer, LinearFakeQuantizer):
+                    self._weight_quantizer.foo_init()
+            super(LinearQuant, self).convert(backend)
+            self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
             # quant weight to int8
-            if all_quant or weight_only:
-                super(LinearQuant, self).convert(backend)
-                self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+            if not is_deploy:
                 weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
                 weight = self._linear.cast(self._linear.weight, self._cast_dtype)
-                weight = weight.asnumpy()
-                quant_min, quant_max = get_quant_min_max(weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
-                                                         weight_quantizer.attrs[LinearFakeQuantizer.attr_key_symmetric],
-                                                         weight_quantizer.attrs[
-                                                             LinearFakeQuantizer.attr_key_narrow_range])
+                # weight = weight.asnumpy()
+                quant_min, quant_max = get_quant_min_max(
+                    weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
+                    weight_quantizer.attrs[LinearFakeQuantizer.attr_key_symmetric],
+                    weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
                 scale = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale]
                 zp = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point]
-                weight_quant = quant_data(weight, np.array(scale), np.array(zp), quant_min, quant_max,
-                                          self._weight_axis)
-                self._linear.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8), name=self._linear.weight.name)
+                weight_quant = quant_tensor_data(weight, np.array(scale), np.array(zp), quant_min, quant_max,
+                                                 self._weight_axis, dtype.int8)
+                self._linear.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8),
+                                                name=self._linear.weight.name)
+            else:
+                self._linear.weight = Parameter(initializer('ones', self._linear.weight.shape, dtype.int8),
+                                                name=self._linear.weight.name)
             # convert to ascend quant layer
             if all_quant:
                 self._output_quantizer = convert_to_dequant(self._input_quantizer, self._weight_quantizer)
                 self._input_quantizer = convert_to_quant(self._input_quantizer)
                 self._quant_deployed = True
-            elif weight_only:
+            else:
                 self._input_quantizer = None
                 self._output_quantizer = None
-                self._weight_quantizer = convert_to_antiquant(self._weight_quantizer)
+                self._weight_quantizer = convert_to_antiquant(self._weight_quantizer, self._cast_dtype)
                 self._quant_deployed = True
-            else:
-                logger.info(f"LinearQuant {self} is not quanted.")
-                return
 
     def calibrate(self):
         logger.info(f"Calibrating weight of Linear Cell: {self._linear.weight.name}")
