@@ -84,12 +84,10 @@ class SQuADDataset(GeneratorDataset):
                     input_ids = np.pad(input_ids, (0, self.seq_len - len(input_ids)), 'constant',
                                        constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
 
-                # input_ids = np.array(input_ids).reshape(1, -1)
-
                 label_id = self.tokenizer.encode(answer, add_special_tokens=False)
                 label_id = np.pad(label_id, (0, self.seq_len - len(label_id)), 'constant',
                                   constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
-                # label_id = np.array(label_id).reshape(1, -1)
+
                 self.input_ids.append(Tensor(input_ids, dtype=dtype.int32))
                 self.labels.append(Tensor(label_id, dtype=dtype.int32))
         # for train/finetune
