@@ -104,14 +104,14 @@ def test_antiquant_cell(mode):
 
     def check_1stage():
         x = Tensor(origin, dtype=dtype.int8)
-        aqcell = AntiQuantCell(scale, zp)
+        aqcell = AntiQuantCell(scale, zp, dtype.float16)
         output = aqcell(x)
         assert (output.asnumpy() == expect).all()
         mindspore.save_checkpoint(aqcell, "ascend-antiquant-cell.ckpt")
 
     def check_2stage():
         x = Tensor(origin, dtype=dtype.int8)
-        aqcell2 = AntiQuantCell([1.0, 1.0], [0.0, 0.0])
+        aqcell2 = AntiQuantCell([1.0, 1.0], [0.0, 0.0], dtype.float16)
         mindspore.load_checkpoint("ascend-antiquant-cell.ckpt", aqcell2)
         output2 = aqcell2(x)
         assert (output2.asnumpy() == expect).all()
@@ -124,7 +124,7 @@ class AntiQuantBMMNet(nn.Cell):
     """BatchMatMul network with AntiQuantCell."""
     def __init__(self, scale, zp, ic=5, oc=6):
         super().__init__()
-        self.antiquant = AntiQuantCell(scale, zp)
+        self.antiquant = AntiQuantCell(scale, zp, dtype.float16)
         self.matmul = BatchMatMul(transpose_a=False, transpose_b=False)
         self.weight = Parameter(Tensor(np.ones((ic, oc), np.int8), dtype.int8))
 
@@ -176,7 +176,7 @@ class AntiQuantMMNet(nn.Cell):
     """MatMul network with AntiQuantCell."""
     def __init__(self, scale, zp, ic=5, oc=6):
         super().__init__()
-        self.antiquant = AntiQuantCell(scale, zp)
+        self.antiquant = AntiQuantCell(scale, zp, dtype.float16)
         self.matmul = MatMul(transpose_a=False, transpose_b=False)
         self.weight = Parameter(Tensor(np.ones((ic, oc), np.int8), dtype.int8))
 

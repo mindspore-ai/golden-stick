@@ -17,6 +17,7 @@ from typing import Union
 
 import numpy as np
 from mindspore import Parameter, Tensor, QuantDtype, nn
+from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore import ops
@@ -74,6 +75,12 @@ class MinMaxPerLayer(LinearFakeQuantizer):
         self.float_min = ops.minimum(self.min(x), self.float_min)
         self.float_max = ops.maximum(self.max(x), self.float_max)
         return x
+
+    def foo_init(self):
+        self.float_min = Parameter(initializer('ones', self.float_min.shape, self.float_min.dtype),
+                                   name=self.float_min.name)
+        self.float_max = Parameter(initializer('ones', self.float_max.shape, self.float_max.dtype),
+                                   name=self.float_max.name)
 
     def mins(self) -> Union[list, tuple]:
         return self.float_min.data.asnumpy().tolist()
@@ -153,6 +160,12 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         pre_dims = axis
         post_dims = data_rank - axis - 1
         self._param_shape = [1] * pre_dims + [-1] + [1] * post_dims
+
+    def foo_init(self):
+        self.float_min = Parameter(initializer('ones', self.float_min.shape, self.float_min.dtype),
+                                   name=self.float_min.name)
+        self.float_max = Parameter(initializer('ones', self.float_max.shape, self.float_max.dtype),
+                                   name=self.float_max.name)
 
     def construct(self, x):
         """

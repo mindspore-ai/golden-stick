@@ -48,14 +48,14 @@ def chat(net: BaseModel, tokenizer_: LlamaTokenizer, max_length):
 
 if __name__ == "__main__":
     uargs = get_args()
-    seq_length = 512
+    seq_length = 2048
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     config = create_mfconfig(uargs.config_path, uargs.device_id, 1, seq_length, uargs.tokenizer_path)
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
     network.phase = 'predict'
     if uargs.quant:
-        network = quant_llama2(network, Backend.GE_ASCEND)
+        network = quant_llama2(network, Backend.GE_ASCEND, True)
     ms.load_checkpoint(uargs.ckpt_path, network)
     tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
     chat(network, tokenizer, seq_length)

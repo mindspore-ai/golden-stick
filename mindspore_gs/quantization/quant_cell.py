@@ -59,7 +59,7 @@ class QuantCell(Cell):
         raise NotImplementedError
 
     # pylint: disable=W0613
-    def convert(self, backend: Backend = Backend.MS):
+    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
         if self._input_quantizer:
             self._input_quantizer: FakeQuantParamCell = self._input_quantizer.convert_to_fakequantparam()
         if self._output_quantizer:

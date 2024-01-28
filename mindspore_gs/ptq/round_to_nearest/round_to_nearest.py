@@ -39,6 +39,7 @@ class RoundToNearestPTQ(CompAlgo):
         self._qat_policy = RoundToNearestPTQ._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
+        self._is_deploy: bool = False
         if "custom_transforms" in config.keys():
             self._custom_transforms = config["custom_transforms"]
         if "custom_policies" in config.keys():
@@ -249,13 +250,18 @@ class RoundToNearestPTQ(CompAlgo):
                 return cell, False
 
         ApplyProcessor(self._qat_policy, self._config.weight_only).process(network)
+        if not self._is_deploy:
+            network = self._calibrate(network)
         network.update_parameters_name()
         return network
 
-    def calibrate(self, network):
+    def _calibrate(self, network):
         if self._config.weight_only:
             self._weight_only_quant(network)
         return network
+
+    def set_deploy(self, is_deploy: bool = True):
+        self._is_deploy = is_deploy
 
     @staticmethod
     def _weight_only_quant(network):
@@ -292,18 +298,19 @@ class RoundToNearestPTQ(CompAlgo):
 
         class ConvertProcessor(Processor):
             """A network iterator for converting network to deploy network."""
-            def __init__(self, ptq_policy, weight_only):
+            def __init__(self, ptq_policy, weight_only, is_deploy):
                 self._ptq_policy = ptq_policy
                 self._weight_only = weight_only
+                self._is_deploy = is_deploy
 
             def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
                     return cell, True
                 if isinstance(cell, LinearQuant):
-                    cell.convert(backend)
+                    cell.convert(backend, self._is_deploy)
                     return cell, True
                 return cell, False
 
-        ConvertProcessor(self._qat_policy, self._config.weight_only).process(net_opt)
+        ConvertProcessor(self._qat_policy, self._config.weight_only, self._is_deploy).process(net_opt)
         net_opt.update_parameters_name()
         return net_opt

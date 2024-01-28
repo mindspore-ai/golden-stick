@@ -239,7 +239,6 @@ def test_woq_apply():
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     new_network = ptq.apply(network)
-    new_network = ptq.calibrate(new_network)
     cells: OrderedDict = new_network.name_cells()
 
     quant_cell = cells.get("linear", None)
@@ -283,7 +282,6 @@ def test_woq_predict_1stage(device, mode):
     ptq = RTN()
     ptq.set_weight_only_quant(True)
     quant_network = ptq.apply(network)
-    quant_network = ptq.calibrate(quant_network)
     ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, LinearQuant):
@@ -322,7 +320,6 @@ def test_woq_predict_2stage(device, mode):
         ptq = RTN()
         ptq.set_weight_only_quant(True)
         quant_network = ptq.apply(network)
-        quant_network = ptq.calibrate(quant_network)
         ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
         for _, cell in ascend_network.name_cells().items():
             if not isinstance(cell, LinearQuant):
@@ -342,6 +339,7 @@ def test_woq_predict_2stage(device, mode):
         network = SimpleNet()
         ptq = RTN()
         ptq.set_weight_only_quant(True)
+        ptq.set_deploy(True)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
         mindspore.load_checkpoint("test_woq_predict_2stage.ckpt", ascend_network)
@@ -393,7 +391,6 @@ def test_linears_woq_predict_2stage(device, mode):
         ptq = RTN()
         ptq.set_weight_only_quant(True)
         quant_network = ptq.apply(network)
-        quant_network = ptq.calibrate(quant_network)
         ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
         mindspore.save_checkpoint(ascend_network, "test_linears_woq_predict_2stage.ckpt")
         return fp_outputs
@@ -402,6 +399,7 @@ def test_linears_woq_predict_2stage(device, mode):
         network = LinearsNet()
         ptq = RTN()
         ptq.set_weight_only_quant(True)
+        ptq.set_deploy(True)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
         mindspore.load_checkpoint("test_linears_woq_predict_2stage.ckpt", ascend_network)

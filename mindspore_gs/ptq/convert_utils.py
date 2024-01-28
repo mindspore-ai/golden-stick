@@ -25,26 +25,25 @@ from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 
 class AntiQuantCell(Cell):
     """AntiQuantCell, warp AntiQuant to support per-channel AntiQuant."""
-    def __init__(self, scale: list, zp: list):
+    def __init__(self, scale: list, zp: list, dst_dtype):
         super().__init__()
-        if context.get_context("device_target") == "Ascend":
-            self.outdtype = dtype.float16
-        else:
-            self.outdtype = dtype.float32
+        self.outdtype = dst_dtype
         self.scale = Parameter(Tensor(scale, dtype=self.outdtype))
         self.zp_neg = Parameter(Tensor(np.array(zp) * -1, dtype=dtype.int32))
         self.anti_quant = AntiQuant(1., 0.)
         self.mul = msops.Mul()
         self.add = msops.Add()
+        self.cast = msops.Cast()
 
     def construct(self, x):
         x = self.anti_quant(x)
         x = self.add(x, self.zp_neg)
         x = self.mul(x, self.scale)
+        x = self.cast(x, self.outdtype)
         return x
 
 
-def convert_to_antiquant(fqcell: FakeQuantParamCell) -> AntiQuantCell:
+def convert_to_antiquant(fqcell: FakeQuantParamCell, dst_dtype=None) -> AntiQuantCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
     fq: FakeQuantParam = fqcell.fq
     if not isinstance(fq, FakeQuantParam):
@@ -55,7 +54,12 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell) -> AntiQuantCell:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    return AntiQuantCell(scale, zp)
+    if not dst_dtype:
+        if context.get_context("device_target") == "Ascend":
+            dst_dtype = dtype.float16
+        else:
+            dst_dtype = dtype.float32
+    return AntiQuantCell(scale, zp, dst_dtype)
 
 
 class QuantCell(Cell):

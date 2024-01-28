@@ -15,8 +15,9 @@
 """Quantization utils."""
 
 import numpy as np
+import mindspore as ms
 from mindspore.common.dtype import QuantDtype
-from mindspore import log as logger
+from mindspore import Tensor
 
 __all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max",
            "get_quant_dtype_num_bits"]
@@ -52,14 +53,14 @@ def cal_quantization_params(input_min,
 
     if input_min.shape != input_max.shape:
         raise ValueError("input min shape should be equal to input max.")
+    if (input_min > input_max).any():
+        raise ValueError("input_min should be smaller than input_max.")
     if (input_max == input_min).all():
         return np.ones(input_min.shape), np.zeros(input_min.shape)
-    if (input_min > input_max).all():
-        logger.warning("input_min min should be less than input max, may lead to bad accuracy.")
 
     # calculate scale
     if symmetric:
-        input_max = np.maximum(-input_min, input_max)
+        input_max = np.maximum(np.abs(input_min), np.abs(input_max))
         input_min = -input_max
     scale = (input_max - input_min) / (quant_max - quant_min)
 
@@ -81,6 +82,56 @@ def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
     if narrow_range:
         quant_min = quant_min + 1
     return quant_min, quant_max
+
+
+def quant_tensor_data(tensor: Tensor, scale, zero_point, quant_min, quant_max, data_axis=-1, dtype=ms.dtype.int8):
+    r"""
+    Calculate int8/uint8 weight from fp32. the formula is defined as:
+
+    .. math::
+        int8/uint8 = round(float/scale) + offset
+
+    Args:
+        tensor (Tensor): The dimension of channel or 1. Should be NCHW.
+        scale (numpy.ndarray): The dimension of channel or 1.
+        zero_point (numpy.ndarray): The dimension of channel or 1.
+        quant_min (int): The minimum quantization integer.
+        quant_max (int): The maximum quantization integer.
+        data_axis (int): Quantize axis.
+
+    Returns:
+        weight (numpy.ndarray): The dimension of channel or 1.
+    """
+    if scale.shape != zero_point.shape:
+        raise ValueError("`scale` and `zero_point` should have the same shape.")
+    if scale.shape[0] < 0:
+        raise ValueError("`scale` and `zero_point` shape should be greater than zero.")
+    if tensor.shape[data_axis] != scale.shape[0]:
+        raise ValueError("Dim of `data`'s `data_axis` should be equal to `scale`'s shape.")
+    if data_axis >= len(tensor.shape):
+        raise ValueError("`data_axis` out of range of `data`'s shape.")
+
+    if data_axis >= 0:
+        # for perchannel
+        if data_axis == 0:
+            # `Conv2d` or `Dense` op weight
+            shape_list = [-1] + [1] * len(tensor.shape[1:])
+            scale = scale.reshape(shape_list)
+            zero_point = zero_point.reshape(shape_list)
+        elif data_axis == 1:
+            # `DepthwiseConv2d` op weight
+            shape_list = [1, -1] + [1] * len(tensor.shape[2:])
+            scale = scale.reshape(shape_list)
+            zero_point = zero_point.reshape(shape_list)
+        else:
+            raise ValueError("Unsupported data_axis({})".format(data_axis))
+
+    t_scale = Tensor(scale)
+    t_zp = Tensor(zero_point)
+    quanted_data = ms.ops.round((tensor / t_scale) + t_zp)
+    quanted_data = ms.ops.clamp(quanted_data, quant_min, quant_max)
+    quanted_data = ms.ops.cast(quanted_data, dtype)
+    return quanted_data
 
 
 def quant_data(data, scale, zero_point, quant_min, quant_max, data_axis=-1):

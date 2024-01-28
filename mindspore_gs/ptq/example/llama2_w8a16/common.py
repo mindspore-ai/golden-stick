@@ -53,17 +53,16 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     return config
 
 
-def quant_llama2(network: LlamaForCausalLM, backend: Backend = Backend.GE_ASCEND, calibrate_woq: bool = False):
+def quant_llama2(network: LlamaForCausalLM, backend: Backend = Backend.GE_ASCEND, is_deploy: bool = False):
     """Quant llama2 model to w8a16 with RTN algorithm."""
-    if calibrate_woq:
+    if not is_deploy:
         print("Use RTN algo to quant network and weight.", flush=True)
     else:
         print("Use RTN algo to quant network.", flush=True)
     ptq = RTN()
     ptq.set_weight_only_quant(True)
+    ptq.set_deploy(is_deploy)
     qnet = ptq.apply(network.model)
-    if calibrate_woq:
-        qnet = ptq.calibrate(qnet)
     qnet = ptq.convert(qnet, backend=backend)
     network.model = qnet
     return network

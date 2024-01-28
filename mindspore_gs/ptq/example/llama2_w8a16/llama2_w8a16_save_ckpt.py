@@ -36,11 +36,11 @@ def get_args():
 if __name__ == "__main__":
     uargs = get_args()
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 512, ckpt_path=uargs.fp_ckpt_path)
+    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 2048, ckpt_path=uargs.fp_ckpt_path)
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
     network.phase = 'predict'
 
     print('------------ quant llama2 to W8A16 ------------', flush=True)
-    network = quant_llama2(network, Backend.GE_ASCEND, True)
+    network = quant_llama2(network, Backend.GE_ASCEND, False)
     ms.save_checkpoint(network, "llama2-w8a16.ckpt")
