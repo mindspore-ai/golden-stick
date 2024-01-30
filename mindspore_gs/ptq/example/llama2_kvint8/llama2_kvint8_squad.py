@@ -73,7 +73,8 @@ def get_args():
     parser.add_argument('--device_id', '-d', type=int, required=True)
     parser.add_argument('--ckpt_path', '-k', type=str, required=True)
     parser.add_argument('--quant', '-q', type=int, required=True)
-    parser.add_argument('--dataset_path', '-s', type=str, required=True)
+    parser.add_argument('--dataset_path', '-s', type=str, required=True, help="Preprocessed dataset, "
+                                                                              "must be in mindrecord format.")
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     args = parser.parse_args()
     print(f"-------------------------------------------------evaluate args: {args}", flush=True)
@@ -83,7 +84,7 @@ def get_args():
 if __name__ == "__main__":
     uargs = get_args()
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 2048, uargs.tokenizer_path)
+    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 1024, uargs.tokenizer_path)
 
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
@@ -92,8 +93,8 @@ if __name__ == "__main__":
     if uargs.quant:
         network = quant_llama2(network, Backend.GE_ASCEND, True)
         if not uargs.ckpt_path:
-            uargs.ckpt_path = "llama2-w8a16.ckpt"
-        print('------------ eval W8A16 quant llama2 ------------', flush=True)
+            uargs.ckpt_path = "llama2-kvint8.ckpt"
+        print('------------ eval KVCache int8 quant llama2 ------------', flush=True)
     else:
         print('------------ eval llama2 ------------', flush=True)
     ms.load_checkpoint(uargs.ckpt_path, network)

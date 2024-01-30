@@ -64,19 +64,33 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell, dst_dtype=None) -> AntiQuan
 
 class QuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
-    def __init__(self, scale: float, zp: float):
+    def __init__(self, t_scale: Tensor, t_zp: Tensor):
         super().__init__()
-        self.scale = Parameter(Tensor([scale], dtype=dtype.float32))
-        self.zp = Parameter(Tensor([zp], dtype=dtype.float32))
+        if t_scale.shape != t_zp.shape:
+            raise ValueError(f"Size of scale({t_scale.shape}) should be equal to size of zp({t_zp.shape}).")
+        t_scale = 1 / t_scale
+        self._is_perchannel: bool = t_scale.shape != (1,)
         self.quant = None
-        self.update_ascend_quant()
+        if self._is_perchannel:
+            self.t_scale = Parameter(Tensor([1.0], dtype=dtype.float32))
+            self.t_zp = Parameter(Tensor([0.0], dtype=dtype.float32))
+            self.update_ascend_quant()
+            self.mul = msops.Mul()
+            self.add = msops.Add()
+            self.mul_param = Parameter(t_scale)
+            self.add_param = Parameter(t_zp)
+        else:
+            self.t_scale = Parameter(t_scale)
+            self.t_zp = Parameter(t_zp)
+            self.update_ascend_quant()
 
     def update_ascend_quant(self):
-        scale = self.scale.asnumpy().tolist()[0]
-        zp = self.zp.asnumpy().tolist()[0]
-        self.quant = Quant(scale, zp)
+        self.quant = Quant(self.t_scale.asnumpy().tolist()[0], self.t_zp.asnumpy().tolist()[0])
 
     def construct(self, x):
+        if self._is_perchannel:
+            x = self.mul(x, self.mul_param)
+            x = self.add(x, self.add_param)
         return self.quant(x)
 
 
@@ -91,7 +105,7 @@ def convert_to_quant(fqcell: FakeQuantParamCell) -> QuantCell:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if scale is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    return QuantCell(scale[0], zp[0])
+    return QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32))
 
 
 class DequantCell(Cell):

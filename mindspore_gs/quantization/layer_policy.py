@@ -86,7 +86,7 @@ class LayerPolicy(abc.ABC):
         """
         if input_index >= self._input_num:
             return None
-        if not self._inputs_insert_fq[input_index]:
+        if input_index >= 0 and not self._inputs_insert_fq[input_index]:
             return None
         return self._get_input_quantizer(input_index, perchannel_args, **kwargs)
 
