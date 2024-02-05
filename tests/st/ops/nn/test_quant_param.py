@@ -58,7 +58,7 @@ def test_fake_quant_cell():
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_quant_cell(mode):
+def test_quant_cell_pertensor(mode):
     """
     Feature: QuantCell.
     Description: test QuantCell can serialize and deserialize successfully.
@@ -69,16 +69,50 @@ def test_quant_cell(mode):
     scale = 2.0
     zp = 1.0
     origin = np.ones((3, 4), dtype=np.float32)
-    expect = origin * scale + zp
+    expect = np.round(origin / scale + zp)
     expect = expect.astype(np.int8)
     x = Tensor(origin, dtype=dtype.float32)
-    qcell = QuantCell(scale, zp)
+    t_scale = Tensor([scale], dtype=dtype.float32)
+    t_zp = Tensor([zp], dtype=dtype.float32)
+    qcell = QuantCell(t_scale, t_zp)
     output = qcell(x)
     assert (expect == output.asnumpy()).all()
-    mindspore.save_checkpoint(qcell, "ascend-quant-cell.ckpt")
+    mindspore.save_checkpoint(qcell, "test_quant_cell_pertensor.ckpt")
 
-    qcell2 = QuantCell(1.0, 0.0)
-    mindspore.load_checkpoint("ascend-quant-cell.ckpt", qcell2)
+    qcell2 = QuantCell(Tensor([1.0], dtype=dtype.float32), Tensor([0.0], dtype=dtype.float32))
+    mindspore.load_checkpoint("test_quant_cell_pertensor.ckpt", qcell2)
+    qcell2.update_ascend_quant()
+    output2 = qcell2(x)
+    assert (expect == output2.asnumpy()).all()
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_quant_cell_perchannel(mode):
+    """
+    Feature: QuantCell.
+    Description: test QuantCell can serialize and deserialize successfully.
+    Expectation: Success.
+    """
+
+    context.set_context(device_target="Ascend", mode=mode)
+    scale = [2.0, 3.0]
+    zp = [1.0, 2.0]
+    origin = np.ones((3, 2), dtype=np.float32)
+    expect = np.round(origin / scale + zp)
+    expect = expect.astype(np.int8)
+    x = Tensor(origin, dtype=dtype.float32)
+    t_scale = Tensor(scale, dtype=dtype.float32)
+    t_zp = Tensor(zp, dtype=dtype.float32)
+    qcell = QuantCell(t_scale, t_zp)
+    output = qcell(x)
+    assert (expect == output.asnumpy()).all()
+    mindspore.save_checkpoint(qcell, "test_quant_cell_perchannel.ckpt")
+
+    qcell2 = QuantCell(Tensor([1.0, 1.0], dtype=dtype.float32), Tensor([0.0, 0.0], dtype=dtype.float32))
+    mindspore.load_checkpoint("test_quant_cell_perchannel.ckpt", qcell2)
     qcell2.update_ascend_quant()
     output2 = qcell2(x)
     assert (expect == output2.asnumpy()).all()

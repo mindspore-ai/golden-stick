@@ -34,4 +34,5 @@ class RTNConfig(CompAlgoConfig):
         self.weight_symmetric = True
         self.act_narrow_range = False
         self.weight_narrow_range = False
-        self.weight_only = False
+        self.enable_kvcache_int8 = False
+        self.enable_linear_w8a16 = True

@@ -49,6 +49,7 @@
 "golden-stick/tests/st/quantization/slb/test_slb_qat.py"                                                 "protected-access"
 "golden-stick/tests/st/quantization/slb/test_slb_lenet_mnist.py"                                         "protected-access"
 "golden-stick/tests/st/quantization/slb/test_slb_resnet18_cifar10.py"                                    "protected-access"
+"golden-stick/tests/st/ptq/rtn/test_kvcache_int8.py"                                                     "protected-access"
 "golden-stick/tests/st/quantization/slb/test_slb_qat.py"                                                 "unused-variable"
 "golden-stick/tests/st/quantization/lsq/test_lsq_lenet_mnist.py"                                         "protected-access"
 "golden-stick/tests/st/quantization/lsq/test_lsq.py"                                                     "protected-access"

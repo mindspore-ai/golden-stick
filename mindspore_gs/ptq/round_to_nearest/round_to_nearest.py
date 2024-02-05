@@ -23,8 +23,9 @@ from mindspore.common.dtype import QuantDtype
 from mindspore_gs import CompAlgo, Backend
 from mindspore_gs.validator import Validator
 from mindspore_gs.quantization.net_policy import NetPolicy
-from mindspore_gs.ptq.quant_cells import LinearQuant
+from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq.convert_utils import QuantCell
 from .rtn_net_policy import RTNNetPolicy
 from .rtn_config import RTNConfig
 
@@ -186,18 +187,31 @@ class RoundToNearestPTQ(CompAlgo):
             raise ValueError("Only supported if `weight_narrow_range` is `False` yet.")
         self._config.weight_narrow_range = weight_narrow_range
 
-    def set_weight_only_quant(self, is_weight_only: bool):
+    def set_linear_w8a16(self, is_enable: bool):
         """
         Set value of weight_only of RoundToNearestPTQ `config`
 
         Args:
-            is_weight_only (bool): Whether the algorithm only quant weight.
+            is_enable (bool): Whether enable Linear W8A16 quant algorithm.
 
         Raises:
-            TypeError: If `weight_only` is not bool.
+            TypeError: If `is_enable` is not bool.
         """
-        Validator.check_bool(is_weight_only, "is_weight_only", self.__class__.__name__)
-        self._config.weight_only = is_weight_only
+        Validator.check_bool(is_enable, "is_enable_linear_w8a16", self.__class__.__name__)
+        self._config.enable_linear_w8a16 = is_enable
+
+    def set_kv_int8_quant(self, is_enable: bool):
+        """
+        Set value of weight_only of RoundToNearestPTQ `config`
+
+        Args:
+            is_enable (bool): Whether enable KVCache Int8 quant algorithm.
+
+        Raises:
+            TypeError: If `is_enable` is not bool.
+        """
+        Validator.check_bool(is_enable, "is_enable_kvcache_int8", self.__class__.__name__)
+        self._config.enable_kvcache_int8 = is_enable
 
     @staticmethod
     def _convert2list(name, value):
@@ -223,6 +237,10 @@ class RoundToNearestPTQ(CompAlgo):
         self.set_weight_symmetric(symmetric_list[-1])
         self.set_act_narrow_range(narrow_range_list[0])
         self.set_weight_narrow_range(narrow_range_list[-1])
+        if config.get("enable_kvcache_int8") is not None:
+            self.set_kv_int8_quant(config["enable_kvcache_int8"])
+        if config.get("enable_linear_w8a16") is not None:
+            self.set_linear_w8a16(config["enable_linear_w8a16"])
 
     def apply(self, network: Cell) -> Cell:
         """Apply"""
@@ -233,9 +251,8 @@ class RoundToNearestPTQ(CompAlgo):
 
         class ApplyProcessor(Processor):
             """A network iterator for applying algorithm on network."""
-            def __init__(self, ptq_policy, weight_only):
+            def __init__(self, ptq_policy):
                 self._ptq_policy = ptq_policy
-                self._weight_only = weight_only
 
             def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
@@ -243,41 +260,54 @@ class RoundToNearestPTQ(CompAlgo):
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
-                    if self._weight_only:
-                        new_layer_policy.set_input_not_insert_fq()
-                        new_layer_policy.set_output_not_insert_fq()
                     return new_layer_policy.wrap_cell(cell), True
                 return cell, False
 
-        ApplyProcessor(self._qat_policy, self._config.weight_only).process(network)
-        if not self._is_deploy:
-            network = self._calibrate(network)
+        ApplyProcessor(self._qat_policy).process(network)
+        if not self._is_deploy and self._config.enable_linear_w8a16:
+            network = self.calibrate(network)
         network.update_parameters_name()
         return network
 
-    def _calibrate(self, network):
-        if self._config.weight_only:
-            self._weight_only_quant(network)
-        return network
-
-    def set_deploy(self, is_deploy: bool = True):
-        self._is_deploy = is_deploy
-
-    @staticmethod
-    def _weight_only_quant(network):
+    def calibrate(self, network):
         """
-        If weight only quant, we don't need dataset, and don't need inference, so we need to statistic quant param.
+        Start calibrating network and statistic quant parameters.
         """
-
         def _process(root: Cell):
             if root is None:
                 return
             for _, cell in root.name_cells().items():
-                if not isinstance(cell, LinearQuant):
+                if not isinstance(cell, PTQCell):
                     _process(cell)
                     continue
                 cell.calibrate()
+
         _process(network)
+        return network
+
+    def set_deploy(self, is_deploy: bool = True):
+        """
+        Set algorithm exchange to deploy mode. In deploy mode, algorithm will not statistic quant parameter and not
+        quant weight anymore, only load quant parameter and quanted weight from checkpoint instead.
+        """
+        self._is_deploy = is_deploy
+
+    @staticmethod
+    def fix_param_after_load_ckpt(network):
+        """
+        Fix quant param after loaded checkpoint for some quant parameter is store in attribute of primitive. QuantCell
+        is an example who's quant parameter is an attribute.
+        """
+        class FixProcessor(Processor):
+            """A network iterator for fix parameter after load ckpt."""
+            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, QuantCell):
+                    return cell, True
+                cell.update_ascend_quant()
+                return cell, False
+
+        FixProcessor().process(network)
+        network.update_parameters_name()
 
     def convert(self, net_opt: Cell, ckpt_path="", backend: Backend = Backend.MS) -> Cell:
         """Implement method convert of super class."""
@@ -298,19 +328,18 @@ class RoundToNearestPTQ(CompAlgo):
 
         class ConvertProcessor(Processor):
             """A network iterator for converting network to deploy network."""
-            def __init__(self, ptq_policy, weight_only, is_deploy):
+            def __init__(self, ptq_policy, is_deploy):
                 self._ptq_policy = ptq_policy
-                self._weight_only = weight_only
                 self._is_deploy = is_deploy
 
             def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
                     return cell, True
-                if isinstance(cell, LinearQuant):
+                if isinstance(cell, PTQCell):
                     cell.convert(backend, self._is_deploy)
                     return cell, True
                 return cell, False
 
-        ConvertProcessor(self._qat_policy, self._config.weight_only, self._is_deploy).process(net_opt)
+        ConvertProcessor(self._qat_policy, self._is_deploy).process(net_opt)
         net_opt.update_parameters_name()
         return net_opt

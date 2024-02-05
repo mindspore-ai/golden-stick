@@ -175,7 +175,7 @@ class MinMaxPerChannel(LinearFakeQuantizer):
             Tensor, returns the computed result.
         """
         tmp = ops.Transpose()(x, self._perm_shape)
-        tmp = tmp.reshape((-1, tmp.shape[-1]))
+        tmp = tmp.reshape((tmp.shape[0], -1))
         self.float_min = ops.minimum(self.min(tmp, 1), self.float_min)
         self.float_max = ops.maximum(self.max(tmp, 1), self.float_max)
 

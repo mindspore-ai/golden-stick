@@ -46,7 +46,7 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     config.model.model_config.layernorm_compute_type = ms.float32
     config.model.model_config.softmax_compute_type = ms.float16
     config.model.model_config.rotary_dtype = ms.float32
-    config.model.model_config.param_init_type = ms.float32
+    config.model.model_config.param_init_type = ms.float16
     config.processor.tokenizer.vocab_file = tokenizer_path
     config.load_checkpoint = ckpt_path
     config.model.model_config.checkpoint_name_or_path = ckpt_path
@@ -60,9 +60,10 @@ def quant_llama2(network: LlamaForCausalLM, backend: Backend = Backend.GE_ASCEND
     else:
         print("Use RTN algo to quant network.", flush=True)
     ptq = RTN()
-    ptq.set_linear_w8a16(True)
+    ptq.set_linear_w8a16(False)
+    ptq.set_kv_int8_quant(True)
     ptq.set_deploy(is_deploy)
-    qnet = ptq.apply(network.model)
-    qnet = ptq.convert(qnet, backend=backend)
-    network.model = qnet
+    network.model = ptq.apply(network.model)
+    if is_deploy:
+        network.model = ptq.convert(network.model, backend=backend)
     return network

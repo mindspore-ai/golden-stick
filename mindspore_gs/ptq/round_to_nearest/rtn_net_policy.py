@@ -16,8 +16,8 @@
 
 from mindspore.rewrite import PatternEngine
 from mindspore_gs.quantization.net_policy import NetPolicy
-from mindformers import Linear
-from .rtn_layer_policy import LinearLayerPolicy
+from mindformers.modules import Linear, KVCacheMgr
+from .rtn_layer_policy import LinearLayerPolicy, KVCacheMgrPolicy
 from .rtn_config import RTNConfig
 
 
@@ -41,5 +41,8 @@ class RTNNetPolicy(NetPolicy):
         """Initialize `RTNNetPolicy`. A `RTNNetPolicy` can only be built once."""
         if self._build:
             return
-        self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
+        if self._config.enable_linear_w8a16:
+            self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
+        if self._config.enable_kvcache_int8:
+            self._layer_policy_map[KVCacheMgr] = KVCacheMgrPolicy([], [], self._config)
         self._build = True
