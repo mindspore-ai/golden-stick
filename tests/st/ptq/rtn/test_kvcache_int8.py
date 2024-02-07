@@ -65,6 +65,7 @@ def test_apply_convert():
     Expectation: Apply success and coordinate attributes are same as config.
     """
 
+    mindspore.set_context(device_target="CPU", mode=mindspore.GRAPH_MODE)
     network = SimpleNet()
     kv_shape = network.kvcache.key_past.shape
     kv_dtype = network.kvcache.key_past.dtype
