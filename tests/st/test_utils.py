@@ -372,3 +372,16 @@ def relative_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, toleranc
     max_diff = np.max(diff)
     print(f"------- relative_tolerance: \r\n{diff}, \r\nmax: {max_diff}", flush=True)
     return max_diff < tolerance
+
+
+def absolute_tolerance(data: np.ndarray, ground: np.ndarray):
+    """Calculate relative tolerance."""
+    return np.abs(data - ground)
+
+
+def absolute_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, tolerance: float):
+    """Calculate relative tolerance and check."""
+    diff = absolute_tolerance(data, ground)
+    max_diff = np.max(diff)
+    print(f"------- absolute_tolerance: \r\n{diff}, \r\nmax: {max_diff}", flush=True)
+    return max_diff < tolerance

@@ -128,6 +128,8 @@ def quant_tensor_data(tensor: Tensor, scale, zero_point, quant_min, quant_max, d
 
     t_scale = Tensor(scale)
     t_zp = Tensor(zero_point)
+    t_scale = ms.ops.cast(t_scale, tensor.dtype)
+    t_zp = ms.ops.cast(t_zp, tensor.dtype)
     quanted_data = ms.ops.round((tensor / t_scale) + t_zp)
     quanted_data = ms.ops.clamp(quanted_data, quant_min, quant_max)
     quanted_data = ms.ops.cast(quanted_data, dtype)
