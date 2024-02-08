@@ -154,7 +154,7 @@ def _create_resnet_accuracy_model(run_mode=context.GRAPH_MODE):
     return model, lr, dataset
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_resnet_accuracy_pynative():
