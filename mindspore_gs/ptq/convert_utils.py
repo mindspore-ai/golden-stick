@@ -25,12 +25,12 @@ from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 
 class AntiQuantCell(Cell):
     """AntiQuantCell, warp AntiQuant to support per-channel AntiQuant."""
-    def __init__(self, scale: list, zp: list, dst_dtype):
+    def __init__(self, scale: list, zp: list, dst_dtype=dtype.float16, sqrt_mode=False):
         super().__init__()
         self.outdtype = dst_dtype
         self.scale = Parameter(Tensor(scale, dtype=self.outdtype))
-        self.zp_neg = Parameter(Tensor(np.array(zp) * -1, dtype=dtype.int32))
-        self.anti_quant = AntiQuant()
+        self.zp_neg = Parameter(Tensor(np.array(zp) * -1, dtype=self.outdtype))
+        self.anti_quant = AntiQuant(sqrt_mode, dst_dtype)
         self.mul = msops.Mul()
         self.add = msops.Add()
         self.cast = msops.Cast()
@@ -42,8 +42,11 @@ class AntiQuantCell(Cell):
         x = self.cast(x, self.outdtype)
         return x
 
+    def shard(self, strategy):
+        self.anti_quant.shard(strategy)
 
-def convert_to_antiquant(fqcell: FakeQuantParamCell, dst_dtype=None) -> AntiQuantCell:
+
+def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=None) -> AntiQuantCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
     fq: FakeQuantParam = fqcell.fq
     if not isinstance(fq, FakeQuantParam):
@@ -59,7 +62,10 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell, dst_dtype=None) -> AntiQuan
             dst_dtype = dtype.float16
         else:
             dst_dtype = dtype.float32
-    return AntiQuantCell(scale, zp, dst_dtype)
+    anti_quant = AntiQuantCell(scale, zp, dst_dtype=dst_dtype)
+    if strategy is not None:
+        anti_quant.shard(strategy)
+    return anti_quant
 
 
 class QuantCell(Cell):
@@ -70,11 +76,9 @@ class QuantCell(Cell):
             raise ValueError(f"Size of scale({t_scale.shape}) should be equal to size of zp({t_zp.shape}).")
         t_scale = 1 / t_scale
         self._is_perchannel: bool = t_scale.shape != (1,)
-        self.quant = None
         if self._is_perchannel:
             self.t_scale = Parameter(Tensor([1.0], dtype=dtype.float32))
             self.t_zp = Parameter(Tensor([0.0], dtype=dtype.float32))
-            self.update_ascend_quant()
             self.mul = msops.Mul()
             self.add = msops.Add()
             self.mul_param = Parameter(t_scale)
@@ -82,10 +86,11 @@ class QuantCell(Cell):
         else:
             self.t_scale = Parameter(t_scale)
             self.t_zp = Parameter(t_zp)
-            self.update_ascend_quant()
+        self.quant = Quant(self.t_scale.asnumpy().tolist()[0], self.t_zp.asnumpy().tolist()[0])
 
     def update_ascend_quant(self):
-        self.quant = Quant(self.t_scale.asnumpy().tolist()[0], self.t_zp.asnumpy().tolist()[0])
+        self.quant.add_prim_attr('scale', self.t_scale.asnumpy().tolist()[0])
+        self.quant.add_prim_attr('offset', self.t_zp.asnumpy().tolist()[0])
 
     def construct(self, x):
         if self._is_perchannel:
@@ -93,8 +98,11 @@ class QuantCell(Cell):
             x = self.add(x, self.add_param)
         return self.quant(x)
 
+    def shard(self, strategy):
+        self.quant.shard(strategy)
 
-def convert_to_quant(fqcell: FakeQuantParamCell) -> QuantCell:
+
+def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
     """Convert FakeQuantParamCell to Quant."""
     fq: FakeQuantParam = fqcell.fq
     if not isinstance(fq, FakeQuantParam):
@@ -103,9 +111,12 @@ def convert_to_quant(fqcell: FakeQuantParamCell) -> QuantCell:
     zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
     if scale is None:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
-    if scale is None:
+    if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    return QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32))
+    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32))
+    if strategy is not None:
+        quant_cell.shard(strategy)
+    return quant_cell
 
 
 class DequantCell(Cell):

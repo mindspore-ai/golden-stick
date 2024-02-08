@@ -33,9 +33,23 @@ from mindformers.modules.kvcache_mgr import KVCacheMgr
 
 
 class PTQCell(QuantCell):
+    """Wrapper Cell to PTQCell with FakeQuantizer"""
     @abc.abstractmethod
     def calibrate(self):
         raise NotImplementedError
+
+    @staticmethod
+    def antiquant_strategy(weight_strategy=None):
+        """antiquant strategy for w8a16"""
+        if weight_strategy is None:
+            return None
+        strategy_len = len(weight_strategy)
+        if strategy_len != 2:
+            raise RuntimeError(f'strategy length shall be 2, but got {strategy_len}')
+        x_strategy = weight_strategy
+
+        anti_strategy = (x_strategy, (), ())
+        return anti_strategy
 
 
 class LinearQuant(PTQCell):
@@ -49,9 +63,11 @@ class LinearQuant(PTQCell):
         input_fq_args = {}
         weight_perchannel_args = PerChannelArgs(self._linear.out_channels, self._weight_axis, rank)
         weight_fq_args = {}
+        self._weight_strategy = None
         if "in_strategy" in self._linear.matmul.get_attr_dict():
+            self._weight_strategy = self._linear.matmul.in_strategy[1]
             input_fq_args["strategy"] = (self._linear.matmul.in_strategy[0],)
-            weight_fq_args["strategy"] = (self._linear.matmul.in_strategy[1],)
+            weight_fq_args["strategy"] = (self._weight_strategy,)
         self._input_quantizer = self._policy.get_input_quantizer(input_index=0, **input_fq_args)
         self._output_quantizer = None
         self._weight_quantizer = self._policy.get_weight_quantizer(self._linear.weight.name, weight_perchannel_args,
@@ -129,7 +145,9 @@ class LinearQuant(PTQCell):
             else:
                 self._input_quantizer = None
                 self._output_quantizer = None
-                self._weight_quantizer = convert_to_antiquant(self._weight_quantizer, self._cast_dtype)
+                self._weight_quantizer = convert_to_antiquant(
+                    self._weight_quantizer, dst_dtype=self._cast_dtype,
+                    strategy=self.antiquant_strategy(self._weight_strategy))
                 self._quant_deployed = True
 
     def calibrate(self):
