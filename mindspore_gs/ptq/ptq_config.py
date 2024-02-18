@@ -17,10 +17,12 @@
 from dataclasses import dataclass, field, is_dataclass, asdict
 from typing import List
 
+from mindspore import QuantDtype
+
 from mindspore_gs.common.config import GSBaseConfig
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.register import RegisterMachine
-from mindspore_gs.common.gs_enum import GSPTQApproach, GSQuantCellType, GSQuantDtype
+from mindspore_gs.common.gs_enum import GSPTQApproach, GSQuantCellType
 
 algo_cfg_register = RegisterMachine()
 
@@ -72,14 +74,8 @@ class PTQConfig(QuantizerConfig):
                               item.value for item in GSPTQApproach.__members__.values()
                           ]})
     calibration_sampling_size: int = 0
-    act_quant_dtype: str = field(default=GSQuantDtype.int8.value,
-                                 metadata={'valid_values': [
-                                     item.value for item in GSQuantDtype.__members__.values()
-                                 ]})
-    weight_quant_dtype: str = field(default=GSQuantDtype.int8.value,
-                                    metadata={'valid_values': [
-                                        item.value for item in GSQuantDtype.__members__.values()
-                                    ]})
+    act_quant_dtype: QuantDtype = QuantDtype.INT8
+    weight_quant_dtype: QuantDtype = QuantDtype.INT8
     weight_only: bool = False
     act_per_channel: bool = False
     weight_per_channel: bool = True
@@ -94,8 +90,8 @@ class PTQConfig(QuantizerConfig):
 
     def __post_init__(self):
         value_check('calibration_sampling_size', self.calibration_sampling_size, int)
-        value_check('act_quant_dtype', self.act_quant_dtype, str)
-        value_check('weight_quant_dtype', self.weight_quant_dtype, str)
+        value_check('act_quant_dtype', self.act_quant_dtype, QuantDtype)
+        value_check('weight_quant_dtype', self.weight_quant_dtype, QuantDtype)
         value_check('weight_only', self.weight_only, bool)
         value_check('act_per_channel', self.act_per_channel, bool)
         value_check('weight_per_channel', self.weight_per_channel, bool)
@@ -117,3 +113,22 @@ class PTQConfig(QuantizerConfig):
 
     def value_check(self):
         self.__post_init__()
+
+    def _parse_dict(self):
+        """ parse data class to readable dicts"""
+        parsed_dict = self.__dict__
+        parsed_dict['act_quant_dtype'] = self.act_quant_dtype.name
+        parsed_dict['weight_quant_dtype'] = self.weight_quant_dtype.name
+        return parsed_dict
+
+    def _unparse_dict(self, data_dict):
+        """ convert readable dicts to data config"""
+        if 'act_quant_dtype' not in data_dict:
+            raise ValueError('act_quant_dtype shall in ptq config, but not found')
+        value = data_dict['act_quant_dtype']
+        data_dict['act_quant_dtype'] = QuantDtype[value]
+        if 'weight_quant_dtype' not in data_dict:
+            raise ValueError('act_quant_dtype shall in ptq config, but not found')
+        value = data_dict['weight_quant_dtype']
+        data_dict['weight_quant_dtype'] = QuantDtype[value]
+        self.__dict__.update(data_dict)

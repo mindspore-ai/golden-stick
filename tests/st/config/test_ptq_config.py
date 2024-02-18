@@ -17,6 +17,7 @@ import os
 import sys
 
 import pytest
+from mindspore import QuantDtype
 
 from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig
 
@@ -94,3 +95,22 @@ def test_ptq_yaml_dump_and_load():
     new_cfg = PTQConfig(approach='smooth_quant')
     new_cfg.load('my_cfg.yaml')
     assert new_cfg.weight_symmetric is False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_ptq_yaml_parse_unparse():
+    """
+    Feature: test load and dump api for ptq config
+    Description: dump config to yaml and then load it with yaml
+    Expectation: dump and load file success
+    """
+    cfg = PTQConfig(approach='smooth_quant')
+    cfg.dump('my_cfg.yaml')
+    new_cfg = PTQConfig(approach='smooth_quant')
+    new_cfg.act_quant_dtype = QuantDtype.UINT8
+    new_cfg.weight_quant_dtype = QuantDtype.UINT8
+    new_cfg.load('my_cfg.yaml')
+    assert new_cfg.act_quant_dtype == QuantDtype.INT8
+    assert new_cfg.weight_quant_dtype == QuantDtype.INT8
