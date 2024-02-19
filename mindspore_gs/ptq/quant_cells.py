@@ -123,7 +123,6 @@ class LinearQuant(PTQCell):
             if not is_deploy:
                 weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
                 weight = self._linear.cast(self._linear.weight, self._cast_dtype)
-                # weight = weight.asnumpy()
                 quant_min, quant_max = get_quant_min_max(
                     weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
                     weight_quantizer.attrs[LinearFakeQuantizer.attr_key_symmetric],
@@ -286,8 +285,9 @@ class KVCacheMgrQuant(PTQCell):
             value_compute_type = self._kvcache.value_past.dtype
             self._key_input_quantizer = convert_to_quant(self._key_input_quantizer)
             self._value_input_quantizer = convert_to_quant(self._value_input_quantizer)
-            self._key_output_quantizer = convert_to_antiquant(self._key_output_quantizer, key_compute_type)
-            self._value_output_quantizer = convert_to_antiquant(self._value_output_quantizer, value_compute_type)
+            self._key_output_quantizer = convert_to_antiquant(self._key_output_quantizer, dst_dtype=key_compute_type)
+            self._value_output_quantizer = convert_to_antiquant(self._value_output_quantizer,
+                                                                dst_dtype=value_compute_type)
 
             self._kvcache.key_past = Parameter(Tensor(np.zeros(self._kvcache.key_past.shape), dtype=dtype.int8),
                                                name=self._kvcache.key_past.name, requires_grad=False)

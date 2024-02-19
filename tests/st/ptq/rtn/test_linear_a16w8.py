@@ -32,7 +32,8 @@ from mindformers.modules import Linear
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
 from tests.st.models.llama2 import llama2, create_dummy_inputs
-from tests.st.test_utils import check_network_contain_layer, relative_tolerance_acceptable
+from tests.st.test_utils import check_network_contain_layer, relative_tolerance_acceptable, \
+    absolute_tolerance_acceptable
 
 
 class SimpleNet(nn.Cell):
@@ -257,6 +258,7 @@ def test_linears_woq_predict_2stage(device, mode):
     assert relative_tolerance_acceptable(quant_output.asnumpy(), fp_output.asnumpy(), 0.1587)
 
 
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])
@@ -375,7 +377,7 @@ def test_llama2_woq_predict_2stage(device, mode):
         ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
         network.model = ascend_network
         mindspore.load_checkpoint("test_llama2_woq_predict_2stage.ckpt", network)
-        return ascend_network(*inputs)
+        return network(*inputs)
 
     inputs = create_dummy_inputs(8, 512, 512)
     fp_outputs = quant(inputs)
@@ -397,6 +399,6 @@ def test_llama2_woq_predict_2stage(device, mode):
     assert quant_outputs[2].dtype == dtype.float32
 
     context.set_context(device_target="CPU", mode=mode)
-    assert relative_tolerance_acceptable(quant_outputs[0].asnumpy(), fp_outputs[0].asnumpy(), 9e-2)
+    assert absolute_tolerance_acceptable(quant_outputs[0].asnumpy(), fp_outputs[0].asnumpy(), 4e-2)
     assert relative_tolerance_acceptable(quant_outputs[1].asnumpy(), fp_outputs[1].asnumpy(), 5e-2)
     assert relative_tolerance_acceptable(quant_outputs[2].asnumpy(), fp_outputs[2].asnumpy(), 5e-2)
