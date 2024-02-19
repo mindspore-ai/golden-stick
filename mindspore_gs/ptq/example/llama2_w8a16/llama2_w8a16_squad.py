@@ -75,6 +75,7 @@ def get_args():
     parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
+    parser.add_argument('--parallel', '-p', type=int, default=1)
     args = parser.parse_args()
     print(f"-------------------------------------------------evaluate args: {args}", flush=True)
     return args
@@ -83,7 +84,8 @@ def get_args():
 if __name__ == "__main__":
     uargs = get_args()
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 2048, uargs.tokenizer_path)
+    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 2048, uargs.tokenizer_path,
+                             model_parallel=uargs.parallel)
 
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)

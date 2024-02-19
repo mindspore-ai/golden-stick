@@ -30,13 +30,16 @@ class AntiQuantCell(Cell):
         self.outdtype = dst_dtype
         self.scale = Parameter(Tensor(scale, dtype=self.outdtype))
         self.zp_neg = Parameter(Tensor(np.array(zp) * -1, dtype=self.outdtype))
-        self.anti_quant = AntiQuant(sqrt_mode, dst_dtype)
+        self.anti_quant = AntiQuant(sqrt_mode)
         self.mul = msops.Mul()
         self.add = msops.Add()
         self.cast = msops.Cast()
+        self.scale1 = Parameter(Tensor(1., dtype=self.outdtype), requires_grad=False)
+        self.zp0 = Parameter(Tensor(0., dtype=self.outdtype), requires_grad=False)
 
     def construct(self, x):
-        x = self.anti_quant(x, 1., 0.)
+        x = self.anti_quant(x, self.scale1, self.zp0)
+        x = self.cast(x, self.outdtype)
         x = self.add(x, self.zp_neg)
         x = self.mul(x, self.scale)
         x = self.cast(x, self.outdtype)

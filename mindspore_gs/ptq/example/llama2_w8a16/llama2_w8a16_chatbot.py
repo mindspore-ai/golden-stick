@@ -30,27 +30,36 @@ def get_args():
     parser.add_argument('--ckpt_path', '-k', type=str, required=True)
     parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
+    parser.add_argument('--parallel', '-p', type=int, default=1)
     args = parser.parse_args()
     print(f"-------------------------------------------------evaluate args: {args}", flush=True)
     return args
 
 
-def chat(net: BaseModel, tokenizer_: LlamaTokenizer, max_length):
-    while True:
-        question = input("Please input question:")
-        if question == "exit":
-            break
-        input_ids = tokenizer_(question)['input_ids']
+def chat(net: BaseModel, tokenizer_: LlamaTokenizer, max_length, use_parallel: bool):
+    """chat."""
+    if use_parallel:
+        input_ids = tokenizer_("Hello.")['input_ids']
         outputs = net.generate(input_ids, do_sample=False, max_length=max_length, top_p=1, top_k=3)
         answer = tokenizer_.decode(outputs, skip_special_tokens=True)
         print(f"Answer: {answer}\r\n", flush=True)
+    else:
+        while True:
+            question = input("Please input question:")
+            if question == "exit":
+                break
+            input_ids = tokenizer_(question)['input_ids']
+            outputs = net.generate(input_ids, do_sample=False, max_length=max_length, top_p=1, top_k=3)
+            answer = tokenizer_.decode(outputs, skip_special_tokens=True)
+            print(f"Answer: {answer}\r\n", flush=True)
 
 
 if __name__ == "__main__":
     uargs = get_args()
     seq_length = 2048
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, seq_length, uargs.tokenizer_path)
+    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, seq_length, uargs.tokenizer_path,
+                             model_parallel=uargs.parallel)
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
     network.phase = 'predict'
@@ -58,4 +67,4 @@ if __name__ == "__main__":
         network = quant_llama2(network, Backend.GE_ASCEND, True)
     ms.load_checkpoint(uargs.ckpt_path, network)
     tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
-    chat(network, tokenizer, seq_length)
+    chat(network, tokenizer, seq_length, uargs.parallel > 1)
