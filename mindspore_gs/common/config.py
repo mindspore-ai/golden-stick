@@ -37,13 +37,22 @@ class GSBaseConfig:
     def __post_init__(self):
         value_check('dev_id', self.dev_id, int)
 
-    def dump(self, file_path):
+    def dump(self, file_path: str):
         """dump config to yaml file"""
+        parsed_dict = self._parse_dict()
         with open(file_path, 'w') as fi:
-            yaml.safe_dump(self.__dict__, fi, allow_unicode=True)
+            yaml.safe_dump(parsed_dict, fi, allow_unicode=True)
 
     def load(self, yaml_file):
         """init config from yaml_file"""
         with open(yaml_file, 'r', encoding='utf8') as fi:
             load_data = yaml.safe_load(fi)
-            self.__dict__.update(load_data)
+            self._unparse_dict(load_data)
+
+    def _parse_dict(self):
+        """ parse data class to readable dicts"""
+        return self.__dict__
+
+    def _unparse_dict(self, data_dict):
+        """ convert readable dicts to data config"""
+        self.__dict__.update(data_dict)

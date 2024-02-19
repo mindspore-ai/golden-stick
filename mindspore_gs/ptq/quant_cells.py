@@ -29,7 +29,7 @@ from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tenso
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.ptq.convert_utils import convert_to_antiquant, convert_to_quant, convert_to_dequant
 from mindformers.modules import Linear
-from mindformers.modules.kvcache_mgr import KVCacheMgr
+from mindformers.modules import KVCacheMgr
 
 
 class PTQCell(QuantCell):
