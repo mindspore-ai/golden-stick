@@ -37,12 +37,21 @@ def _set_config(config_path, device_id):
     return mfconfig
 
 
-def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt_path=""):
+def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt_path="", model_parallel=1):
     """Create mindformers config for llama2 network for example."""
+    if model_parallel > 1:
+        # MS parallel not support bfloat16 now.
+        compute_dtype = ms.float16
+        use_parallel = True
+        model_parallel = model_parallel
+    else:
+        compute_dtype = ms.bfloat16
+        use_parallel = False
+        model_parallel = 1
     config = _set_config(config_path, device_id)
     config.model.model_config.batch_size = bs
     config.model.model_config.seq_length = seq_len
-    config.model.model_config.compute_dtype = ms.bfloat16
+    config.model.model_config.compute_dtype = compute_dtype
     config.model.model_config.layernorm_compute_type = ms.float32
     config.model.model_config.softmax_compute_type = ms.float16
     config.model.model_config.rotary_dtype = ms.float32
@@ -50,6 +59,8 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     config.processor.tokenizer.vocab_file = tokenizer_path
     config.load_checkpoint = ckpt_path
     config.model.model_config.checkpoint_name_or_path = ckpt_path
+    config.use_parallel = use_parallel
+    config.parallel_config.model_parallel = model_parallel
     return config
 
 
