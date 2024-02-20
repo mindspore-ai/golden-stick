@@ -53,21 +53,8 @@ class ConvertToQuantInferNetwork:
             subcell = cells[name]
             if subcell == network:
                 continue
-# <<<<<<< HEAD
             if isinstance(subcell, QuantCell):
                 subcell.convert()
-# =======
-#             if isinstance(subcell, QuantizeWrapperCell):
-#                 quant_cell = subcell.get_handler()
-#                 new_subcell = self._convert_core_quant_subcell(quant_cell)
-#                 subcell.insert_child_to_cell("_handler", new_subcell)
-#                 if isinstance(subcell.get_input_quantizer(), SlbActQuantizer):
-#                     fake_quant_input = subcell.get_input_quantizer().convert_to_fakequantparam()
-#                     subcell.insert_child_to_cell("_input_quantizer", fake_quant_input)
-#                 if isinstance(subcell.get_output_quantizer(), SlbActQuantizer):
-#                     fake_quant_output = subcell.get_output_quantizer().convert_to_fakequantparam()
-#                     subcell.insert_child_to_cell("_output_quantizer", fake_quant_output)
-# >>>>>>> 5d6244d... adapt to the lastest rewrite
             else:
                 self._convert_quant2deploy(subcell)
         return network

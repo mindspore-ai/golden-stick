@@ -20,6 +20,7 @@ from mindspore import Tensor
 from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.nn.layer.normalization import BatchNorm2d
+from mindspore_gs import Backend
 from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
@@ -128,10 +129,14 @@ class Conv2dBnWithoutFoldQuant(QuantCell):
     def weight_quantizer(self):
         return self._weight_quantizer
 
-    def convert(self):
+    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
+        if self._converted:
+            return
+        if backend is not Backend.MS:
+            raise ValueError("Only support convert to MS Backend now, got: ", backend)
         if self.has_bias and self.bias:
             raise ValueError("Only support conv2d with out bias.")
-        super(Conv2dBnWithoutFoldQuant, self).convert()
+        super(Conv2dBnWithoutFoldQuant, self).convert(backend, is_deploy)
         self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
         weight, bias = without_fold_batchnorm(self.weight.data.asnumpy(), self)
         weight_tensor = Tensor(weight)

@@ -210,6 +210,7 @@ class NetToQuant(nn.Cell):
         return x
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_apply():
@@ -244,6 +245,7 @@ def test_apply():
     assert act_fake_quant._quant_delay == 900
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_convert():
@@ -264,6 +266,7 @@ def test_convert():
     assert not isinstance(act_fake_quant, SimulatedFakeQuantizerPerLayer)
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_convert_error():

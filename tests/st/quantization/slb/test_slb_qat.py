@@ -14,8 +14,6 @@
 # ============================================================================
 """test slb qat."""
 
-import os
-import sys
 from collections import OrderedDict
 import pytest
 from mindspore import nn, context
@@ -91,6 +89,7 @@ def test_set_config(quant_bit, enable_bn_calibration):
     assert qat._config.t_factor == 1.2
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_act_quant", [True, False])
@@ -399,6 +398,7 @@ def test_set_t_factor_range():
         qat.set_t_factor(t_factor=-2.1)
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_epoch_initial():
@@ -408,8 +408,7 @@ def test_callbacks_epoch_initial():
     Expectation: Except RuntimeError.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
-    from lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=context.GRAPH_MODE)
     data_path = "/home/workspace/mindspore_dataset/mnist/train"
     ds_train = create_mnist_ds(data_path, 32, 1)
@@ -427,6 +426,7 @@ def test_callbacks_epoch_initial():
     qat.callbacks(model=model, dataset=ds_train)
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_epoch_range_compare():
@@ -436,8 +436,7 @@ def test_callbacks_epoch_range_compare():
     Expectation: Except ValueError.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
-    from lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=context.GRAPH_MODE)
     data_path = "/home/workspace/mindspore_dataset/mnist/train"
     ds_train = create_mnist_ds(data_path, 32, 1)
@@ -458,6 +457,7 @@ def test_callbacks_epoch_range_compare():
         qat.callbacks(model=model, dataset=ds_train)
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_callbacks_model_dataset_type():
@@ -467,8 +467,7 @@ def test_callbacks_model_dataset_type():
     Expectation: Except TypeError.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
-    from lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=context.GRAPH_MODE)
     data_path = "/home/workspace/mindspore_dataset/mnist/train"
     ds_train = create_mnist_ds(data_path, 32, 1)
@@ -489,6 +488,7 @@ def test_callbacks_model_dataset_type():
         qat.callbacks(model=model, dataset=5)
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_convert_network_type():

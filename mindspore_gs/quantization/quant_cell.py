@@ -44,6 +44,7 @@ class QuantCell(Cell):
             self._input_quantizer: FakeQuantizer = self._policy.get_input_quantizer()
             self._output_quantizer: FakeQuantizer = self._policy.get_output_quantizer()
             self._inputs_insert_fq = self._policy.get_input_need_insert_fq()
+        self._converted = False
 
     def handler(self):
         return self._handler
@@ -60,6 +61,9 @@ class QuantCell(Cell):
 
     # pylint: disable=W0613
     def convert(self, backend: Backend = Backend.MS, is_deploy=False):
+        if self._converted:
+            return
+        self._converted = True
         if self._input_quantizer:
             self._input_quantizer: FakeQuantParamCell = self._input_quantizer.convert_to_fakequantparam()
         if self._output_quantizer:

@@ -386,6 +386,7 @@ class NetToQuant(nn.Cell):
         return x
 
 
+@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_apply():

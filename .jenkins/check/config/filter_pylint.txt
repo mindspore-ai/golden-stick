@@ -1,5 +1,6 @@
 # mindspore_gs
 "golden-stick/mindspore_gs/comp_algo.py"                                                                                 "unused-argument"
+"golden-stick/mindspore_gs/net_transform.py"                                                                             "protected-access"
 
 # Quantization
 "golden-stick/mindspore_gs/quantization/net_policy.py"                                                                   "unused-argument"

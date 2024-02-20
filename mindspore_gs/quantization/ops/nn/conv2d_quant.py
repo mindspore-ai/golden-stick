@@ -17,6 +17,7 @@ from __future__ import absolute_import
 
 from mindspore.ops import operations as P
 from mindspore.nn.layer.conv import Conv2d
+from mindspore_gs import Backend
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 
@@ -102,8 +103,12 @@ class Conv2dQuant(QuantCell):
     def weight_quantizer(self):
         return self._weight_quantizer
 
-    def convert(self):
-        super(Conv2dQuant, self).convert()
+    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
+        if self._converted:
+            return
+        if backend is not Backend.MS:
+            raise ValueError("Only support convert to MS Backend now, got: ", backend)
+        super(Conv2dQuant, self).convert(backend, is_deploy)
         self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
 
     # pylint: disable=arguments-differ
