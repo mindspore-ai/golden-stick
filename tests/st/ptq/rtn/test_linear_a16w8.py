@@ -25,7 +25,7 @@ from mindspore_gs import Backend
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
 from mindspore_gs.ptq import RoundToNearestPTQ as RTN
 from mindspore_gs.ptq.quant_cells import LinearQuant
-from mindspore_gs.ptq.convert_utils import AntiQuantCell
+from mindspore_gs.ptq.convert_utils import FusionAntiquantCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 from mindformers.modules import Linear
 
@@ -126,7 +126,7 @@ def test_woq_predict_1stage(device, mode):
         linear: LinearQuant = cell
         assert not linear.input_quantizer()
         assert not linear.output_quantizer()
-        assert isinstance(linear.weight_quantizer(), AntiQuantCell)
+        assert isinstance(linear.weight_quantizer(), FusionAntiquantCell)
         weight: Parameter = linear.handler().weight
         assert isinstance(weight, Parameter)
         assert weight.dtype == dtype.int8
@@ -164,7 +164,7 @@ def test_woq_predict_2stage(device, mode):
             linear: LinearQuant = cell
             assert not linear.input_quantizer()
             assert not linear.output_quantizer()
-            assert isinstance(linear.weight_quantizer(), AntiQuantCell)
+            assert isinstance(linear.weight_quantizer(), FusionAntiquantCell)
             weight: Parameter = linear.handler().weight
             assert isinstance(weight, Parameter)
             assert weight.dtype == dtype.int8
@@ -287,7 +287,7 @@ def test_llama2_woq_apply_convert(device, mode):
         linear: LinearQuant = cell
         assert not linear.input_quantizer()
         assert not linear.output_quantizer()
-        assert isinstance(linear.weight_quantizer(), AntiQuantCell)
+        assert isinstance(linear.weight_quantizer(), FusionAntiquantCell)
         weight: Parameter = linear.handler().weight
         assert isinstance(weight, Parameter)
         assert weight.dtype == dtype.int8

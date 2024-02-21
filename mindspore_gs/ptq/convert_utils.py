@@ -20,6 +20,8 @@ from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
 from mindspore.ops.operations._inner_ops import AntiQuant, Quant, Dequant
+from mindspore.ops.auto_generate.gen_inner_ops_def import WeightQuantBatchMatmul
+
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 
 
@@ -159,3 +161,59 @@ def convert_to_dequant(input_fqcell: FakeQuantParamCell, weight_fqcell: FakeQuan
     if len(input_scale) != 1:
         raise ValueError("Input only support perlayer quant.")
     return DequantCell(input_scale[0] * weight_scale)
+
+
+class FusionAntiquantCell(Cell):
+    """fused anti quant cell."""
+    def __init__(self,
+                 scale,
+                 offset,
+                 out_dtype=dtype.float16,
+                 transpose_x: bool = False,
+                 transpose_weight: bool = False):
+        super().__init__()
+        self.out_dtype = out_dtype
+        self.scale = Parameter(Tensor(scale, dtype=self.out_dtype))
+        self.zp_neg = Parameter(Tensor(np.array(offset) * -1, dtype=self.out_dtype))
+        self.weight_qbmm = WeightQuantBatchMatmul(transpose_x, transpose_weight)
+        self.cast = msops.Cast()
+
+    def construct(self,
+                  x,
+                  weight,
+                  bias=None):
+        out = self.weight_qbmm(x, weight, self.scale, self.zp_neg, None, None, bias)
+        return self.cast(out, self.out_dtype)
+
+    def shard(self, strategy):
+        self.weight_qbmm.shard(strategy)
+
+
+def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell,
+                                transpose_weight=False,
+                                transpose_x=False,
+                                strategy=None,
+                                dst_dtype=None) -> FusionAntiquantCell:
+    """Convert FakeQuantParamCell to AntiQuantCell."""
+    fq: FakeQuantParam = fqcell.fq
+    if not isinstance(fq, FakeQuantParam):
+        raise ValueError("Only support convert FakeQuantParam to AntiQuant.")
+    scale = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
+    zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
+    if scale is None:
+        raise ValueError("Can not find scale in FakeQuantParamCell.")
+    if zp is None:
+        raise ValueError("Can not find zp in FakeQuantParamCell.")
+    if not dst_dtype:
+        if context.get_context("device_target") == "Ascend":
+            dst_dtype = dtype.float16
+        else:
+            dst_dtype = dtype.float32
+    anti_quant = FusionAntiquantCell(scale,
+                                     zp,
+                                     out_dtype=dst_dtype,
+                                     transpose_x=transpose_x,
+                                     transpose_weight=transpose_weight)
+    if strategy is not None:
+        anti_quant.shard(strategy)
+    return anti_quant

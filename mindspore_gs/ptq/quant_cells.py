@@ -27,7 +27,9 @@ from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
-from mindspore_gs.ptq.convert_utils import convert_to_antiquant, convert_to_quant, convert_to_dequant
+from mindspore_gs.ptq.convert_utils import (
+    convert_to_antiquant, convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant
+)
 from mindformers.modules import Linear
 from mindformers.modules import KVCacheMgr
 
@@ -144,9 +146,10 @@ class LinearQuant(PTQCell):
             else:
                 self._input_quantizer = None
                 self._output_quantizer = None
-                self._weight_quantizer = convert_to_antiquant(
-                    self._weight_quantizer, dst_dtype=self._cast_dtype,
-                    strategy=self.antiquant_strategy(self._weight_strategy))
+                self._weight_quantizer = convert_to_fusion_antiquant(
+                    self._weight_quantizer, transpose_weight=self._linear.transpose_b,
+                    dst_dtype=self._cast_dtype, strategy=self.antiquant_strategy(self._weight_strategy)
+                )
                 self._quant_deployed = True
 
     def calibrate(self):
@@ -171,18 +174,19 @@ class LinearQuant(PTQCell):
                 x = P.Reshape()(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
         ori_dtype = F.dtype(x)
 
-        x = self._linear.cast(x, self._cast_dtype)
-        if self._quant_deployed:
-            weight = self._weight_quantizer(self._linear.weight)
-        else:
-            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
-
-        x = self._linear.matmul(x, weight)
+        bias = None
         if self._linear.has_bias:
             if hasattr(self._linear, "dtype"):
                 bias = self._linear.cast(self._linear.bias, self._linear.dtype)
             else:
                 bias = self._linear.cast(self._linear.bias, x.dtype)
+        x = self._linear.cast(x, self._cast_dtype)
+        if self._quant_deployed:
+            x = self._weight_quantizer(x, self._linear.weight, bias)
+        else:
+            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+
+            x = self._linear.matmul(x, weight)
             x = self._linear.bias_add(x, bias)
         if self._linear.activation_flag:
             x = self._linear.activation(x)
