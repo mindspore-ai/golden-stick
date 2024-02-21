@@ -14,8 +14,6 @@
 # ============================================================================
 """test slb qat."""
 
-import os
-import sys
 from collections import OrderedDict
 import pytest
 from mindspore import nn, context
@@ -410,8 +408,7 @@ def test_callbacks_epoch_initial():
     Expectation: Except RuntimeError.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
-    from lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=context.GRAPH_MODE)
     data_path = "/home/workspace/mindspore_dataset/mnist/train"
     ds_train = create_mnist_ds(data_path, 32, 1)
@@ -439,8 +436,7 @@ def test_callbacks_epoch_range_compare():
     Expectation: Except ValueError.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
-    from lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=context.GRAPH_MODE)
     data_path = "/home/workspace/mindspore_dataset/mnist/train"
     ds_train = create_mnist_ds(data_path, 32, 1)
@@ -471,8 +467,7 @@ def test_callbacks_model_dataset_type():
     Expectation: Except TypeError.
     """
 
-    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
-    from lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=context.GRAPH_MODE)
     data_path = "/home/workspace/mindspore_dataset/mnist/train"
     ds_train = create_mnist_ds(data_path, 32, 1)

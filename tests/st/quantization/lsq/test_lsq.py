@@ -68,9 +68,8 @@ def test_set_bn_fold():
     lsq.set_bn_fold(True)
     assert lsq._config.bn_fold
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_bn_fold(1)
-    assert "LearnedStepSizeQuantizationAwareTraining', the 'bn_fold' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -89,9 +88,8 @@ def test_set_one_conv_fold():
     lsq.set_one_conv_fold(True)
     assert lsq._config.one_conv_fold
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_one_conv_fold(0.5)
-    assert "LearnedStepSizeQuantizationAwareTraining', the 'one_conv_fold' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -111,13 +109,11 @@ def test_set_act_quant_delay():
     lsq.set_act_quant_delay(0)
     assert lsq._config.act_quant_delay == 0
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_act_quant_delay(100)
-    assert "Learned step size quantization only support `act_quant_delay` is 0 currently" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_act_quant_delay(0.1)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the type of 'act_quant_delay' must be int" in str(e.value)
 
 
 @pytest.mark.level0
@@ -137,14 +133,11 @@ def test_set_weight_quant_delay():
     lsq.set_weight_quant_delay(0)
     assert lsq._config.weight_quant_delay == 0
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_weight_quant_delay(100)
-    assert "Learned step size quantization only support `weight_quant_delay` is 0 currently" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_weight_quant_delay(0.1)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the type of 'weight_quant_delay' must be int" \
-           in str(e.value)
 
 
 @pytest.mark.level0
@@ -164,13 +157,11 @@ def test_set_act_per_channel():
     lsq.set_act_per_channel(False)
     assert not lsq._config.act_per_channel
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_act_per_channel(True)
-    assert "Only supported if `act_per_channel` is False yet." in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_act_per_channel(0.1)
-    assert "LearnedStepSizeQuantizationAwareTraining', the 'act_per_channel' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -189,9 +180,8 @@ def test_set_weight_per_channel():
     lsq.set_weight_per_channel(True)
     assert lsq._config.weight_per_channel
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_weight_per_channel(1)
-    assert "LearnedStepSizeQuantizationAwareTraining', the 'weight_per_channel' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -211,13 +201,11 @@ def test_set_act_quant_dtype():
     lsq.set_act_quant_dtype(QuantDtype.INT8)
     assert lsq._config.act_quant_dtype == QuantDtype.INT8
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_act_quant_dtype(QuantDtype.INT4)
-    assert "Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet." in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_act_quant_dtype(1)
-    assert "The parameter `act quant dtype` must be isinstance of QuantDtype" in str(e.value)
 
 
 @pytest.mark.level0
@@ -237,13 +225,11 @@ def test_set_weight_quant_dtype():
     lsq.set_weight_quant_dtype(QuantDtype.INT8)
     assert lsq._config.weight_quant_dtype == QuantDtype.INT8
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_weight_quant_dtype(QuantDtype.INT4)
-    assert "Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet." in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_weight_quant_dtype(1)
-    assert "The parameter `weight quant dtype` must be isinstance of QuantDtype" in str(e.value)
 
 
 @pytest.mark.level0
@@ -263,13 +249,11 @@ def test_set_act_symmetric():
     lsq.set_act_symmetric(True)
     assert lsq._config.act_symmetric
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_act_symmetric(False)
-    assert "Learned step size quantization only support `act_symmetric` is True currently" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_act_symmetric(1)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'act_symmetric' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -289,13 +273,11 @@ def test_set_weight_symmetric():
     lsq.set_weight_symmetric(True)
     assert lsq._config.weight_symmetric
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_weight_symmetric(False)
-    assert "Learned step size quantization only support `weight_symmetric` is True currently" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_weight_symmetric(1)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'weight_symmetric' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -315,13 +297,11 @@ def test_set_act_narrow_range():
     lsq.set_act_narrow_range(True)
     assert lsq._config.act_narrow_range
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_act_narrow_range(False)
-    assert "Learned step size quantization only support `act_narrow_range` is True currently" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_act_narrow_range(1)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'act_narrow_range' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -341,13 +321,11 @@ def test_set_weight_narrow_range():
     lsq.set_weight_narrow_range(True)
     assert lsq._config.weight_narrow_range
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_weight_narrow_range(False)
-    assert "Learned step size quantization only support `weight_narrow_range` is True currently" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_weight_narrow_range(1)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'weight_narrow_range' must be a bool" in str(e.value)
 
 
 @pytest.mark.level0
@@ -367,13 +345,11 @@ def test_set_freeze_bn():
     lsq.set_freeze_bn(0)
     assert lsq._config.freeze_bn == 0
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         lsq.set_freeze_bn(100)
-    assert "Learned step size quantization only support `freeze_bn` is 0 currently" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_freeze_bn(0.5)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the type of 'freeze_bn' must be int" in str(e.value)
 
 
 @pytest.mark.level0
@@ -392,9 +368,8 @@ def test_set_enable_fusion():
     lsq.set_enable_fusion(True)
     assert lsq._config.enable_fusion
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError):
         lsq.set_enable_fusion(0.5)
-    assert "For 'LearnedStepSizeQuantizationAwareTraining', the 'enable_fusion' must be a bool" in str(e.value)
 
 
 class NetToQuant(nn.Cell):

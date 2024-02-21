@@ -19,6 +19,7 @@ from mindspore.nn import Cell
 from mindspore import log as logger
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.common.dtype import QuantDtype
+from mindspore_gs import Backend
 from mindspore_gs.validator import Validator, Rel
 from mindspore_gs.quantization.quantization_aware_training import QuantizationAwareTraining
 from .simulated_quantization_net_policy import SimulatedNetPolicy
@@ -445,7 +446,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         self._qat_policy.build()
         return super(SimulatedQuantizationAwareTraining, self).apply(network)
 
-    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
+    def convert(self, net_opt: Cell, ckpt_path="", backend: Backend = Backend.MS) -> Cell:
         """
         Define how to convert a compressed network to a standard network before exporting to MindIR.
 
@@ -453,6 +454,9 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             net_opt (Cell): Network to be converted which is transformed by `SimulatedQuantizationAwareTraining.apply`.
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
                 checkpoint file to `net_opt`.
+            backend (Backend): target backend, default is `Backend.MS`, it means convert to standard MindSpore Quant
+                Network with mindspore.ops.operations.FakeQuantParam. `Backend.GE_ASCEND` means use to network with
+                quant/dequant layer from GE.
 
         Returns:
             An instance of Cell represents converted network.
@@ -461,7 +465,10 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.
             ValueError: If `ckpt_path` is not empty and invalid.
+            ValueError: If `backend` is not `Backend.MS`.
         """
+        if backend != Backend.MS:
+            raise ValueError("SimulatedQuantizationAwareTraining only support convert to `Backend.MS` network now.")
         if not isinstance(net_opt, Cell):
             raise TypeError(
                 f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')

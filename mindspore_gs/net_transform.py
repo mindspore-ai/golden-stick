@@ -15,8 +15,13 @@
 """NetTransform."""
 from typing import Union, Optional
 
+import mindspore
 from mindspore.nn.cell import Cell
-from mindspore.rewrite import PatternEngine, SymbolTree, Node, ScopedValue, TreeNodeHelper, NodeType
+from mindspore.rewrite import PatternEngine, SymbolTree, Node, ScopedValue, NodeType
+from mindspore_gs.quantization.quant_cell import QuantCell
+
+
+mindspore.rewrite.common.namespace._subtree_black_list.append(QuantCell)
 
 
 class NetTransformer:
@@ -32,6 +37,7 @@ class NetTransformer:
             self._net = net
             try:
                 self._symbol_tree = SymbolTree.create(net)
+                self._symbol_tree.flatten_static_if_control_flow()
             except (RuntimeError, ValueError, TypeError, NotImplementedError):
                 raise RuntimeError(f"For MindSpore Golden Stick, input network type '{type(net).__name__}' "
                                    f"is not supported right now.")
@@ -42,7 +48,7 @@ class NetTransformer:
 
     @staticmethod
     def create_from_tree_node(node):
-        modify_tree = TreeNodeHelper.get_sub_tree(node)
+        modify_tree = node.get_sub_tree()
         return NetTransformer(None, modify_tree)
 
     @staticmethod
@@ -136,7 +142,7 @@ class NodeUnfolder:
         cell_container = node.get_handler()
         for i, sub_node in enumerate(cell_container.nodes()):
             if i == 0 and not sub_node.get_inputs():
-                sub_node.set_inputs(cell_container.get_inputs())
+                sub_node.set_arg_providers(0, (cell_container.get_inputs()[0], 0))
             for single_node in NodeUnfolder.unfold_nodes(Node(sub_node)):
                 yield single_node
 

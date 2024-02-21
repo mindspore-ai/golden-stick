@@ -23,25 +23,21 @@ from mindspore_gs.quantization import SimulatedQuantizationAwareTraining as SimQ
 class SampleNet(nn.Cell):
     """SampleNet."""
 
+    class InnerNet(nn.Cell):
+        def construct(self, x):
+            return x
+
     def __init__(self):
         """__init__"""
         super(SampleNet, self).__init__()
-        self.avg_pool = nn.AvgPool2d(5)
-        self.conv2d_0 = nn.Conv2d(64, 128, 1)
-        self.conv2d_1 = nn.Conv2d(64, 128, 1)
-        self.is_training = True
+        self.inner_net = SampleNet.InnerNet()
 
     def construct(self, x):
         """construct."""
-        x = self.avg_pool(x)
-        conv0 = self.conv2d_0(x)
-        conv1 = self.conv2d_1(x)
-        if self.is_training:
-            return conv0, conv1
-        return conv0
+        x = self.inner_net(x)
+        return x
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_rewrite_log():

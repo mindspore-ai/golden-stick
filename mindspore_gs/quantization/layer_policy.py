@@ -22,9 +22,10 @@ layer_policy_key = "layer_quant_policy"
 
 
 class PerChannelArgs:
-    def __init__(self, num_channels=-1, channel_axis=-1):
+    def __init__(self, num_channels=-1, channel_axis=-1, rank=-1):
         self.num_channels = num_channels
         self.channel_axis = channel_axis
+        self.rank = rank
 
 
 class LayerPolicy(abc.ABC):
@@ -85,7 +86,7 @@ class LayerPolicy(abc.ABC):
         """
         if input_index >= self._input_num:
             return None
-        if not self._inputs_insert_fq[input_index]:
+        if input_index >= 0 and not self._inputs_insert_fq[input_index]:
             return None
         return self._get_input_quantizer(input_index, perchannel_args, **kwargs)
 

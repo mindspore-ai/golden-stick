@@ -18,15 +18,16 @@
 CURRPATH=$(cd "$(dirname $0)" || exit; pwd)
 
 backend=${1-'cpu'}
+sub_dir=${2-'st'}
 
 cd ${CURRPATH} || exit 1
 if [[ ${backend} == 'cpu' ]]; then
   # shellcheck disable=SC2038
-  find "st" -name 'test_*.py' -type f|xargs -r grep -A 6 'pytest.mark.level0'|grep 'pytest.mark.platform_x86_cpu'|awk -F'-' '{print $1}'|uniq|xargs python -m pytest -vrt -q -m 'level0 and platform_x86_cpu'
+  find ${sub_dir} -name 'test_*.py' -type f|xargs -r grep -A 6 'pytest.mark.level0'|grep 'pytest.mark.platform_x86_cpu'|awk -F'-' '{print $1}'|uniq|xargs python -m pytest -vrt -q -m 'level0 and platform_x86_cpu'
 elif [[ ${backend} == 'gpu' ]]; then
   echo "Please ensure dataset path is exported to env. for example, cifar10 is installed in: /path/to/ds/cifar/cifar-10-batches-bin/xxx.bin, and mnist is installed in: /path/to/ds/mnist/train/xxx-ubyte, you should export DATASET_PATH=/path/to/ds."
   # shellcheck disable=SC2038
-  find "st" -name 'test_*.py' -type f|xargs -r grep -A 6 'pytest.mark.level0'|grep 'pytest.mark.platform_x86_gpu_training'|awk -F'-' '{print $1}'|uniq|xargs python -m pytest -vrt -q -m 'level0 and platform_x86_gpu_training'
+  find ${sub_dir} -name 'test_*.py' -type f|xargs -r grep -A 6 'pytest.mark.level0'|grep 'pytest.mark.platform_x86_gpu_training'|awk -F'-' '{print $1}'|uniq|xargs python -m pytest -vrt -q -m 'level0 and platform_x86_gpu_training'
 else
   echo "There is no ${backend} backend testcases, available: cpu, gpu."
 fi

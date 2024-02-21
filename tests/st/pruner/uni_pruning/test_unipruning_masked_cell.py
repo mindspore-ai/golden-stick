@@ -150,7 +150,7 @@ def test_unipruningmaskedconv2d_zeroing():
     Description: invoke zeroing check result.
     Expectation: Except success.
     """
-    cell = nn.Conv2d(3, 2, (2, 2), has_bias=True)
+    cell = nn.Conv2d(3, 2, (2, 2), has_bias=True, weight_init="ones", bias_init="zeros")
     mask_conv2d = UniPruningMaskedConv2d(cell)
     mask_conv2d.set_in_mask(np.array([1, 0, 1], np.int8))
     mask_conv2d.set_out_mask(np.array([1, 0], np.int8))
@@ -315,7 +315,7 @@ def test_unipruningmaskeddense_zeroing():
     Description: invoke zeroing check result.
     Expectation: Except success.
     """
-    cell = nn.Dense(3, 2)
+    cell = nn.Dense(3, 2, weight_init="ones", bias_init="zeros")
     mask_dense = UniPruningMaskedDense(cell)
     mask_dense.set_in_mask(np.array([1, 0, 1], np.int8))
     mask_dense.set_out_mask(np.array([1, 0], np.int8))

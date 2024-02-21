@@ -25,7 +25,7 @@ from mindspore.nn import Cell, Conv2d, Dense
 from mindspore.train.callback import Callback
 
 from mindspore_gs.validator import Validator
-from ...comp_algo import CompAlgo
+from ...comp_algo import CompAlgo, Backend
 from .graph_analyzer import GraphAnalyzer
 from .utils import do_mask, get_channel_importances, get_mask, prune_net, save_model_and_mask
 from .unipruning_masked_layer import UniPruningMaskedConv2d, UniPruningMaskedDense
@@ -288,8 +288,10 @@ class UniPruner(CompAlgo):
                             args.epoch_size, self._callback.input_size, args.device_target,
                             export_air=True)
 
-    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
+    def convert(self, net_opt: Cell, ckpt_path="", backend: Backend = Backend.MS) -> Cell:
         """prune network using checkpoint with zeroed weights and pruning mask saved"""
+        if backend != Backend.MS:
+            raise ValueError("UniPruner only support convert to `Backend.MS` network now.")
         if not isinstance(net_opt, Cell):
             raise TypeError(
                 f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
