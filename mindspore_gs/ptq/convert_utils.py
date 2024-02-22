@@ -163,7 +163,7 @@ def convert_to_dequant(input_fqcell: FakeQuantParamCell, weight_fqcell: FakeQuan
     return DequantCell(input_scale[0] * weight_scale)
 
 
-class FusionAntiquantCell(Cell):
+class AntiquantBMMCell(Cell):
     """fused anti quant cell."""
     def __init__(self,
                  scale,
@@ -173,8 +173,8 @@ class FusionAntiquantCell(Cell):
                  transpose_weight: bool = False):
         super().__init__()
         self.out_dtype = out_dtype
-        self.scale = Parameter(Tensor(scale, dtype=self.out_dtype))
-        self.zp_neg = Parameter(Tensor(np.array(offset) * -1, dtype=self.out_dtype))
+        self.scale = Parameter(Tensor(np.squeeze(scale), dtype=self.out_dtype))
+        self.zp_neg = Parameter(Tensor(np.squeeze(np.array(offset)) * -1, dtype=self.out_dtype))
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_x, transpose_weight)
         self.cast = msops.Cast()
 
@@ -193,7 +193,7 @@ def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell,
                                 transpose_weight=False,
                                 transpose_x=False,
                                 strategy=None,
-                                dst_dtype=None) -> FusionAntiquantCell:
+                                dst_dtype=None) -> AntiquantBMMCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
     fq: FakeQuantParam = fqcell.fq
     if not isinstance(fq, FakeQuantParam):
@@ -209,11 +209,11 @@ def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell,
             dst_dtype = dtype.float16
         else:
             dst_dtype = dtype.float32
-    anti_quant = FusionAntiquantCell(scale,
-                                     zp,
-                                     out_dtype=dst_dtype,
-                                     transpose_x=transpose_x,
-                                     transpose_weight=transpose_weight)
+    anti_quant = AntiquantBMMCell(scale,
+                                  zp,
+                                  out_dtype=dst_dtype,
+                                  transpose_x=transpose_x,
+                                  transpose_weight=transpose_weight)
     if strategy is not None:
         anti_quant.shard(strategy)
     return anti_quant
