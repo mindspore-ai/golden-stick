@@ -21,6 +21,7 @@ from mindspore import Tensor
 from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.dtype import QuantDtype
+from mindspore_gs import Backend
 from mindspore_gs.validator import Validator
 from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
 from mindspore_gs.quantization.quant_cell import QuantCell
@@ -185,10 +186,14 @@ class Conv2dBnFoldQuantOneConv(QuantCell):
                                           self.momentum)
         return s
 
-    def convert(self):
+    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
+        if self._converted:
+            return
+        if backend is not Backend.MS:
+            raise ValueError("Only support convert to MS Backend now, got: ", backend)
         if self.has_bias and self.bias:
             raise ValueError("Only support conv2d with out bias.")
-        super(Conv2dBnFoldQuantOneConv, self).convert()
+        super(Conv2dBnFoldQuantOneConv, self).convert(backend, is_deploy)
         self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
         weight, bias = fold_batchnorm(self.weight.data.asnumpy(), self)
         weight_tensor = Tensor(weight)

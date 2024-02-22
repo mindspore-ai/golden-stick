@@ -14,8 +14,6 @@
 # ============================================================================
 """test lsq applied on lenet netwok and mnist dataset."""
 
-import os
-import sys
 from collections import OrderedDict
 import pytest
 from mindspore_gs.quantization.learned_step_size_quantization import LearnedStepSizeQuantizationAwareTraining as \
@@ -23,9 +21,6 @@ from mindspore_gs.quantization.learned_step_size_quantization import LearnedStep
 from mindspore_gs.quantization.learned_step_size_quantization.learned_step_size_quantization_layer_policy import \
     LearnedStepSizeFakeQuantizerPerLayer, LearnedStepSizeFakeQuantizePerChannel
 from mindspore_gs.quantization.ops.nn import Conv2dQuant, DenseQuant
-
-
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../models/research/cv/'))
 
 
 @pytest.mark.level0
@@ -38,7 +33,7 @@ def test_lenet_apply():
     Expectation: Apply success.
     """
 
-    from lenet.src.lenet import LeNet5
+    from ....models.research.cv.lenet.src.lenet import LeNet5
     network = LeNet5(10)
     config = {"per_channel": [False, True], "symmetric": [True, True], "quant_delay": [0, 0]}
     lsq = LearnedQAT(config)

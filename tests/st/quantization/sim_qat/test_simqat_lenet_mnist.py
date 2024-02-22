@@ -28,7 +28,7 @@ from tests.st import test_utils as utils
 cur_path = os.path.dirname(os.path.abspath(__file__))
 model_name = "lenet"
 config_name = "lenet_mnist_config.yaml"
-ori_model_path = os.path.join(cur_path, "../../../../tests/models/research/cv")
+ori_model_path = os.path.join(cur_path, "../../../../tests/models/research/cv/")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train", "log")
 
 

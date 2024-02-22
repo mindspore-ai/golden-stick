@@ -18,8 +18,9 @@ QuantCell, wrap objected cell with fake-quantizer, LinearQuantCell for example..
 import abc
 
 from mindspore.nn.cell import Cell
+from mindspore_gs import Backend
 from mindspore_gs.quantization.layer_policy import LayerPolicy
-from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
+from mindspore_gs.quantization.fake_quantizer import FakeQuantizer, FakeQuantParamCell
 
 
 class QuantCell(Cell):
@@ -43,6 +44,7 @@ class QuantCell(Cell):
             self._input_quantizer: FakeQuantizer = self._policy.get_input_quantizer()
             self._output_quantizer: FakeQuantizer = self._policy.get_output_quantizer()
             self._inputs_insert_fq = self._policy.get_input_need_insert_fq()
+        self._converted = False
 
     def handler(self):
         return self._handler
@@ -57,11 +59,15 @@ class QuantCell(Cell):
     def weight_quantizer(self):
         raise NotImplementedError
 
-    def convert(self):
+    # pylint: disable=W0613
+    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
+        if self._converted:
+            return
+        self._converted = True
         if self._input_quantizer:
-            self._input_quantizer = self._input_quantizer.convert_to_fakequantparam()
+            self._input_quantizer: FakeQuantParamCell = self._input_quantizer.convert_to_fakequantparam()
         if self._output_quantizer:
-            self._output_quantizer = self._output_quantizer.convert_to_fakequantparam()
+            self._output_quantizer: FakeQuantParamCell = self._output_quantizer.convert_to_fakequantparam()
 
     # pylint: disable=arguments-differ
     @abc.abstractmethod

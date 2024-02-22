@@ -82,10 +82,9 @@ def test_resnet_apply(run_mode):
 @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("enable_fusion", [True, False])
 @pytest.mark.parametrize("bn_fold", [True, False])
 @pytest.mark.parametrize("one_conv_fold", [True, False])
-def test_resnet_convert(enable_fusion, bn_fold, one_conv_fold):
+def test_resnet_convert_fusion(bn_fold, one_conv_fold):
     """
     Feature: simulated quantization convert function.
     Description: convert a compressed network to a standard network, export to MindIR.
@@ -99,13 +98,44 @@ def test_resnet_convert(enable_fusion, bn_fold, one_conv_fold):
     mindspore.context.set_context(device_target="GPU")
     network = resnet50(10)
     qat = create_simqat()
-    qat.set_enable_fusion(enable_fusion=enable_fusion)
+    qat.set_enable_fusion(enable_fusion=True)
     qat.set_bn_fold(bn_fold=bn_fold)
     qat.set_one_conv_fold(one_conv_fold=one_conv_fold)
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(numpy.ones([1, 3, 224, 224]), mindspore.float32)
     file_name = "./resnet50.mindir"
+    mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    graph = mindspore.load(file_name)
+    mindspore.nn.GraphCell(graph)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_gpu_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("bn_fold", [True, False])
+@pytest.mark.parametrize("one_conv_fold", [True, False])
+def test_resnet_convert_no_fusion(bn_fold, one_conv_fold):
+    """
+    Feature: simulated quantization convert function.
+    Description: convert a compressed network to a standard network, export to MindIR.
+    Expectation: convert success and export MindIR to specified path.
+    """
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/ResNet/'))
+    sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
+    from tests.models.official.cv.ResNet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.st.models.resnet import resnet50
+
+    mindspore.context.set_context(device_target="GPU")
+    network = resnet50(10)
+    qat = create_simqat()
+    qat.set_one_conv_fold(one_conv_fold=one_conv_fold)
+    qat.set_enable_fusion(enable_fusion=False)
+    qat.set_bn_fold(bn_fold=bn_fold)
+    new_network = qat.apply(network)
+    new_network = qat.convert(new_network)
+    file_name = "./resnet50.mindir"
+    data_in = mindspore.Tensor(numpy.ones([1, 3, 224, 224]), mindspore.float32)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)

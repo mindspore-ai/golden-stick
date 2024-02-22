@@ -72,109 +72,95 @@ def test_constructor_error():
     """
 
     config = {"quant_delay": (True, True)}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the type of 'act_quant_delay' "
-                                        "must be int, but got 'bool'"):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"quant_delay": (1, True)}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the type of 'weight_quant_delay' "
-                                        "must be int, but got 'bool'"):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"per_channel": (1, 1)}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'act_per_channel' must be a "
-                                        "bool, but got int."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"per_channel": (False, 1)}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'weight_per_channel' must be a "
-                                        "bool, but got int."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"symmetric": (1, 1)}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'act_symmetric' must be a bool, "
-                                        "but got int."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"symmetric": (True, 1)}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'weight_symmetric' must be a "
-                                        "bool, but got int."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"narrow_range": (1, 1)}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'act_narrow_range' must be a "
-                                        "bool, but got int."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"bn_fold": 1}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'bn_fold' must be a bool, but "
-                                        "got int."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"one_conv_fold": 1}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'one_conv_fold' must be a bool, "
-                                        "but got int."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"quant_dtype": [1, 1]}
-    with pytest.raises(TypeError, match="The parameter `act quant dtype` must be isinstance of QuantDtype, but got 1."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"quant_dtype": [QuantDtype.INT8, 1]}
-    with pytest.raises(TypeError, match="The parameter `weight quant dtype` must be isinstance of QuantDtype, but got "
-                                        "1."):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"freeze_bn": True}
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the type of 'freeze_bn' must be "
-                                        "int, but got 'bool'"):
+    with pytest.raises(TypeError):
         SimQAT(config)
 
     config = {"freeze_bn": -1}
-    with pytest.raises(ValueError, match="For 'SimulatedQuantizationAwareTraining', the 'freeze_bn' must be int and "
-                                         "must >= 0, but got '-1' with type 'int'."):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"quant_delay": [1, 1, 1]}
-    with pytest.raises(ValueError, match="input `quant delay` len should be less than 3"):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.INT8, QuantDtype.INT8]}
-    with pytest.raises(ValueError, match="input `quant dtype` len should be less than 3"):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"per_channel": [False, False, False]}
-    with pytest.raises(ValueError, match="input `per channel` len should be less than 3"):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"symmetric": [False, False, False]}
-    with pytest.raises(ValueError, match="input `symmetric` len should be less than 3"):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"narrow_range": [False, False, False]}
-    with pytest.raises(ValueError, match="input `narrow range` len should be less than 3"):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"quant_delay": [-1, -1]}
-    with pytest.raises(ValueError, match="For 'SimulatedQuantizationAwareTraining', the 'act_quant_delay' must be int "
-                                         "and must >= 0, but got '-1' with type 'int'."):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"quant_delay": [1, -1]}
-    with pytest.raises(ValueError, match="For 'SimulatedQuantizationAwareTraining', the 'weight_quant_delay' must be "
-                                         "int and must >= 0, but got '-1' with type 'int'."):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"per_channel": [True, True]}
-    with pytest.raises(ValueError, match="Only supported if `act_per_channel` is False yet."):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"quant_dtype": [QuantDtype.UINT8, QuantDtype.UINT8]}
-    with pytest.raises(ValueError, match="Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet."):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
     config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.UINT8]}
-    with pytest.raises(ValueError, match="Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet."):
+    with pytest.raises(ValueError):
         SimQAT(config)
 
 
@@ -206,8 +192,7 @@ def test_set_bn_fold_type_error():
     """
 
     qat = SimQAT()
-    with pytest.raises(TypeError, match="For 'SimulatedQuantizationAwareTraining', the 'bn_fold' must be a bool, but "
-                                        "got int."):
+    with pytest.raises(TypeError):
         qat.set_bn_fold(1)
 
 

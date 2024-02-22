@@ -19,13 +19,34 @@ import shutil
 import subprocess
 import time
 import re
+import numpy as np
 from mindspore import log as logger
+from mindspore.nn import Cell
 
 # CI env
 data_root = "/home/workspace/mindspore_dataset/"
 ckpt_root = "/home/workspace/mindspore_ckpt/ckpt"
 cur_path = os.path.split(os.path.realpath(__file__))[0]
 model_zoo_path = os.path.join(cur_path, "../../../tests/models")
+
+
+def check_network_contain_layer(network: Cell, layer_type, end_points: tuple = tuple()):
+    """
+    check if network contains some kind of type.
+    """
+    if not isinstance(network, Cell):
+        return False
+    if not issubclass(layer_type, Cell):
+        return False
+    for name, cell in network.name_cells().items():
+        if isinstance(cell, layer_type):
+            logger.info(f"{layer_type} exist in network, layer name: {name}")
+            return True
+        if end_points and isinstance(cell, end_points):
+            continue
+        if check_network_contain_layer(cell, layer_type, end_points):
+            return True
+    return False
 
 
 def qat_config_compare(algo_cfg, target: dict):
@@ -337,3 +358,30 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
     assert len(results) == 1
     print("=" * 10, "LeNet {} mode accuracy: {}".format(config.get_run_mode(), results[0]), "=" * 10, flush=True)
     return results[0]
+
+
+def relative_tolerance(data: np.ndarray, ground: np.ndarray):
+    """Calculate relative tolerance."""
+    diff = np.abs(data - ground)
+    return diff / np.abs(ground + 1e-5)
+
+
+def relative_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, tolerance: float):
+    """Calculate relative tolerance and check."""
+    diff = relative_tolerance(data, ground)
+    max_diff = np.max(diff)
+    print(f"------- relative_tolerance: \r\n{diff}, \r\nmax: {max_diff}", flush=True)
+    return max_diff < tolerance
+
+
+def absolute_tolerance(data: np.ndarray, ground: np.ndarray):
+    """Calculate relative tolerance."""
+    return np.abs(data - ground)
+
+
+def absolute_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, tolerance: float):
+    """Calculate relative tolerance and check."""
+    diff = absolute_tolerance(data, ground)
+    max_diff = np.max(diff)
+    print(f"------- absolute_tolerance: \r\n{diff}, \r\nmax: {max_diff}", flush=True)
+    return max_diff < tolerance
