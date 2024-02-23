@@ -159,6 +159,8 @@ def test_resnet_accuracy_pynative():
     Feature: Simulated quantization algorithm.
     Description: Apply simulated_quantization on resnet and test accuracy
     Expectation: Loss of first epoch is smaller than 4.52.
+
+    r2.3 pynative need more memory leads to OOM.
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     from loss_monitor import LossMonitor
