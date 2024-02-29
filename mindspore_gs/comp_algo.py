@@ -18,11 +18,16 @@ import abc
 import enum
 import os.path
 
+from dataclasses import dataclass
+
+import yaml
+
 from mindspore.nn.cell import Cell
 from mindspore.train.callback import Callback
 from mindspore import export, context
 from mindspore import log as logger
 from mindspore_gs.validator import Validator
+from mindspore_gs.common.config import GSBaseConfig
 
 
 class Backend(enum.Enum):
@@ -46,14 +51,24 @@ class CompAlgo(abc.ABC):
     """
 
     def __init__(self, config=None):
-        if config is None:
-            config = {}
-        Validator.check_value_type("config", config, [dict], self.__class__.__name__)
-        self._is_cpu = context.get_context('device_target') == "CPU"
         self._config = None
-        self._create_config()
-        self._update_common_config(config)
-        self._update_config_from_dict(config)
+        self._dict = {}
+        if config is None:
+            self._dict = {}
+        elif isinstance(config, dict):
+            self._dict = config
+        elif isinstance(config, str) and os.path.isfile(config) and config.endswith('yaml'):
+            with open(config, 'r') as f:
+                self._dict = yaml.safe_load(f)
+        elif isinstance(config, GSBaseConfig):
+            self._config = config
+        else:
+            raise ValueError(f'config type is not supported: {type(config)}')
+
+    def _init_config_with_dict(self):
+        if self._config is None:
+            raise RuntimeError('Shall init config first, bug got None')
+        self._config.__dict__.update(self._dict)
 
     def _create_config(self):
         """Create base config. If derived class has extra attributes, Should be over-writed."""
@@ -201,6 +216,7 @@ class CompAlgo(abc.ABC):
         return loss_fn
 
 
+@dataclass
 class CompAlgoConfig:
     """
     Config for CompAlgo.
