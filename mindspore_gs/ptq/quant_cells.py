@@ -53,6 +53,24 @@ class PTQCell(QuantCell):
         anti_strategy = (x_strategy, (), ())
         return anti_strategy
 
+    @staticmethod
+    def antiquant_bmm_strategy(act_strategy,
+                               weight_strategy,
+                               has_bias=False,
+                               is_transpose=False):
+        """parallel strategy for antiquant bmm"""
+        if act_strategy is None or weight_strategy is None:
+            return None
+        if is_transpose:
+            scale_strategy = (weight_strategy[0],)
+        else:
+            scale_strategy = (weight_strategy[1],)
+        offset_strategy = scale_strategy
+        if not has_bias:
+            return act_strategy, weight_strategy, scale_strategy, offset_strategy
+        bias_strategy = scale_strategy
+        return act_strategy, weight_strategy, scale_strategy, offset_strategy, bias_strategy
+
 
 class LinearQuant(PTQCell):
     """Linear layer wrapper with min max"""
@@ -65,8 +83,10 @@ class LinearQuant(PTQCell):
         input_fq_args = {}
         weight_perchannel_args = PerChannelArgs(self._linear.out_channels, self._weight_axis, rank)
         weight_fq_args = {}
+        self._act_strategy = None
         self._weight_strategy = None
         if "in_strategy" in self._linear.matmul.get_attr_dict():
+            self._act_strategy = self._linear.matmul.in_strategy[0]
             self._weight_strategy = self._linear.matmul.in_strategy[1]
             input_fq_args["strategy"] = (self._linear.matmul.in_strategy[0],)
             weight_fq_args["strategy"] = (self._weight_strategy,)
@@ -131,8 +151,8 @@ class LinearQuant(PTQCell):
                     weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
                 scale = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale]
                 zp = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point]
-                weight_quant = quant_tensor_data(weight, np.array(scale), np.array(zp), quant_min, quant_max,
-                                                 self._weight_axis, dtype.int8)
+                weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
+                                                 quant_min, quant_max, self._weight_axis, dtype.int8)
                 self._linear.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8),
                                                 name=self._linear.weight.name)
             else:
@@ -148,7 +168,10 @@ class LinearQuant(PTQCell):
                 self._output_quantizer = None
                 self._weight_quantizer = convert_to_fusion_antiquant(
                     self._weight_quantizer, transpose_weight=self._linear.transpose_b,
-                    dst_dtype=self._cast_dtype, strategy=self.antiquant_strategy(self._weight_strategy)
+                    dst_dtype=self._cast_dtype, strategy=self.antiquant_bmm_strategy(self._act_strategy,
+                                                                                     self._weight_strategy,
+                                                                                     False,
+                                                                                     self._linear.transpose_b)
                 )
                 self._quant_deployed = True
 
@@ -182,11 +205,11 @@ class LinearQuant(PTQCell):
                 bias = self._linear.cast(self._linear.bias, x.dtype)
         x = self._linear.cast(x, self._cast_dtype)
         if self._quant_deployed:
-            x = self._weight_quantizer(x, self._linear.weight, bias)
+            x = self._weight_quantizer(x, self._linear.weight)
         else:
             weight = self._linear.cast(self._linear.weight, self._cast_dtype)
-
             x = self._linear.matmul(x, weight)
+        if self._linear.has_bias:
             x = self._linear.bias_add(x, bias)
         if self._linear.activation_flag:
             x = self._linear.activation(x)

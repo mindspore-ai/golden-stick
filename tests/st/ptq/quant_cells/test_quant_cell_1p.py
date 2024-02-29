@@ -20,7 +20,7 @@ import numpy as np
 from mindspore import Parameter, context, GRAPH_MODE, Tensor
 from mindspore import dtype as mstype
 
-from mindspore_gs.ptq.convert_utils import FusionAntiquantCell
+from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
 from tests.st.test_utils import relative_tolerance_acceptable
 from .quant_common import NumpyQuantOps
 
@@ -41,7 +41,7 @@ def test_weight_quant_bmm_cell_as_antiquant_1p():
     scale = np.array([0.5, 0.27]).astype(np.float16)
     offset = np.array([-127, -10]).astype(np.float16)
     expect = np.matmul(activation, NumpyQuantOps.anti_quant(weight, scale, offset))
-    wqmm_cell = FusionAntiquantCell(scale, offset)
+    wqmm_cell = AntiquantBMMCell(scale, offset)
     t_activation = Tensor(activation, dtype=mstype.float16)
     p_weight = Parameter(Tensor(weight, dtype=mstype.int8), 'weight')
     fact = wqmm_cell(t_activation, p_weight).asnumpy()
