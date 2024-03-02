@@ -18,7 +18,6 @@ import argparse
 import numpy as np
 import mindspore as ms
 from mindspore import context
-from mindspore_gs import Backend
 from mindspore_gs.datasets import create_squad_dataset
 from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import EmF1Metric
@@ -92,7 +91,7 @@ if __name__ == "__main__":
     network.phase = 'predict'
 
     if uargs.quant:
-        network = quant_llama2(network, Backend.GE_ASCEND, True)
+        network = quant_llama2(network, mode='quantize', backend='ascend')
         if not uargs.ckpt_path:
             uargs.ckpt_path = "llama2-w8a16.ckpt"
         print('------------ eval W8A16 quant llama2 ------------', flush=True)

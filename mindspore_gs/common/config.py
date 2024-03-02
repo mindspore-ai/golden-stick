@@ -28,11 +28,9 @@ class GSBaseConfig:
     """ base config for golden-stick """
     save_model_type: str = field(default='ckpt',
                                  metadata={'choices': ['ckpt', 'mindir']})
-    dev_type: str = field(default='ascend',
-                          metadata={'choices': ['cpu', 'ascend', 'gpu']})
+    device_target: str = field(default='ascend',
+                               metadata={'choices': ['cpu', 'ascend', 'gpu']})
     dev_id: List[int] = field(default_factory=lambda: [0])
-    backend: str = field(default='ge',
-                         metadata={'choices': ['ge', 'aclnn']})
 
     def __post_init__(self):
         value_check('dev_id', self.dev_id, int)

@@ -41,7 +41,7 @@ class RTNNetPolicy(NetPolicy):
         """Initialize `RTNNetPolicy`. A `RTNNetPolicy` can only be built once."""
         if self._build:
             return
-        if self._config.enable_linear_w8a16:
+        if self._config.weight_only:
             self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
         if self._config.enable_kvcache_int8:
             self._layer_policy_map[KVCacheMgr] = KVCacheMgrPolicy([], [], self._config)

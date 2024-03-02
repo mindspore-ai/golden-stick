@@ -20,6 +20,7 @@ import pytest
 from mindspore import QuantDtype
 
 from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig
+from mindspore_gs.common.gs_enum import PTQMode, BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 
@@ -71,8 +72,10 @@ def test_ptq_algo_config():
     assert cfg.algo_args.get('is_deploy') is False
 
     cfg = PTQConfig(approach='rtn')
+    assert cfg.mode == PTQMode.QUANTIZE.value
+    assert cfg.backend == BackendTarget.NONE.value
     assert cfg.calibration_sampling_size == 0
-    assert cfg.weight_only is False
+    assert cfg.weight_only is True
     assert cfg.act_per_channel is False
     assert cfg.act_symmetric is False
     assert cfg.weight_symmetric is True

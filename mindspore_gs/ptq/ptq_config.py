@@ -22,7 +22,7 @@ from mindspore import QuantDtype
 from mindspore_gs.common.config import GSBaseConfig
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.register import RegisterMachine
-from mindspore_gs.common.gs_enum import GSPTQApproach, GSQuantCellType
+from mindspore_gs.common.gs_enum import GSPTQApproach, GSQuantCellType, PTQMode, BackendTarget
 
 algo_cfg_register = RegisterMachine()
 
@@ -73,10 +73,20 @@ class PTQConfig(QuantizerConfig):
                           metadata={'valid_values': [
                               item.value for item in GSPTQApproach.__members__.values()
                           ]})
+    mode: str = field(default=PTQMode.QUANTIZE.value,
+                      metadata={'valid_values': [
+                          item.value for item in PTQMode.__members__.values()
+                      ]})
+    backend: str = field(default=BackendTarget.NONE.value,
+                         metadata={'valid_values': [
+                             item.value for item in BackendTarget.__members__.values()
+                         ]})
+
     calibration_sampling_size: int = 0
     act_quant_dtype: QuantDtype = QuantDtype.INT8
     weight_quant_dtype: QuantDtype = QuantDtype.INT8
-    weight_only: bool = False
+    weight_only: bool = True
+    enable_kvcache_int8: bool = False
     act_per_channel: bool = False
     weight_per_channel: bool = True
     act_symmetric: bool = False
@@ -93,6 +103,7 @@ class PTQConfig(QuantizerConfig):
         value_check('act_quant_dtype', self.act_quant_dtype, QuantDtype)
         value_check('weight_quant_dtype', self.weight_quant_dtype, QuantDtype)
         value_check('weight_only', self.weight_only, bool)
+        value_check('enable_kvcache_int8', self.enable_kvcache_int8, bool)
         value_check('act_per_channel', self.act_per_channel, bool)
         value_check('weight_per_channel', self.weight_per_channel, bool)
         value_check('act_symmetric', self.weight_symmetric, bool)
