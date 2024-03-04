@@ -20,7 +20,7 @@ from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
 from mindspore.ops.operations._inner_ops import AntiQuant, Quant, Dequant
-from mindspore.ops.auto_generate.gen_inner_ops_def import WeightQuantBatchMatmul
+from mindspore.ops.auto_generate import WeightQuantBatchMatmul
 
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 
