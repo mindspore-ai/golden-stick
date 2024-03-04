@@ -15,9 +15,11 @@
 """Quant llama2."""
 
 
+import time
 import mindspore as ms
 from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig
-from mindspore_gs import Backend
+from mindspore_gs.common.gs_enum import BackendTarget, PTQMode
+from mindspore_gs.ptq.ptq_config import PTQConfig
 from mindspore_gs.ptq import RoundToNearestPTQ as RTN
 
 
@@ -45,7 +47,7 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
         use_parallel = True
         model_parallel = model_parallel
     else:
-        compute_dtype = ms.bfloat16
+        compute_dtype = ms.float16
         use_parallel = False
         model_parallel = 1
     config = _set_config(config_path, device_id)
@@ -64,16 +66,24 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     return config
 
 
-def quant_llama2(network: LlamaForCausalLM, backend: Backend = Backend.GE_ASCEND, is_deploy: bool = False):
+def quant_llama2(network: LlamaForCausalLM,
+                 mode: str = PTQMode.QUANTIZE.value,
+                 backend: str = BackendTarget.ASCEND.value):
     """Quant llama2 model to w8a16 with RTN algorithm."""
-    if not is_deploy:
+    if mode == PTQMode.QUANTIZE.value:
         print("Use RTN algo to quant network and weight.", flush=True)
     else:
         print("Use RTN algo to quant network.", flush=True)
-    ptq = RTN()
-    ptq.set_linear_w8a16(True)
-    ptq.set_deploy(is_deploy)
+    cfg = PTQConfig(mode=mode, backend=backend)
+    ptq = RTN(config=cfg)
+    start = time.time()
     qnet = ptq.apply(network.model)
-    qnet = ptq.convert(qnet, backend=backend)
+    end = time.time()
+    print(f'fake quantize cost time is {end - start}')
+
+    start = time.time()
+    qnet = ptq.convert(qnet)
+    end = time.time()
+    print(f'convert to real quantize cost time is {end - start}')
     network.model = qnet
     return network

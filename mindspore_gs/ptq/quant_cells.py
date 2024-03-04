@@ -22,7 +22,7 @@ from mindspore.ops.operations import FakeQuantParam
 from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
-from mindspore_gs import Backend
+from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
@@ -114,19 +114,13 @@ class LinearQuant(PTQCell):
     def core_construct(self, *args):
         pass
 
-    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
-        if backend == Backend.MS:
+    def convert(self, backend: str = BackendTarget.NONE.value, is_deploy=False):
+        if backend == BackendTarget.NONE.value:
             super(LinearQuant, self).convert(backend)
             if self._weight_quantizer:
                 self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
             return
-        if backend == Backend.FAKE_QUANT:
-            if self._input_quantizer:
-                self._input_quantizer = self._input_quantizer.convert_to_ascend()
-            if self._weight_quantizer:
-                self._weight_quantizer = self._weight_quantizer.convert_to_ascend()
-            return
-        if backend == Backend.GE_ASCEND:
+        if backend == BackendTarget.ASCEND.value:
             weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
                           self._weight_quantizer.get_attr("weight_only_quant", False)
             all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
@@ -286,8 +280,8 @@ class KVCacheMgrQuant(PTQCell):
             zp = t_zp.asnumpy().tolist()
             fq.attrs[FakeQuantParam.attr_key_linear_quant_zero_point] = zp
 
-    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
-        if backend in (Backend.MS, Backend.GE_ASCEND):
+    def convert(self, backend: BackendTarget = BackendTarget.NONE.value, is_deploy=False):
+        if backend in (BackendTarget.NONE.value, BackendTarget.ASCEND.value):
             if is_deploy:
                 if isinstance(self._key_input_quantizer, LinearFakeQuantizer):
                     self._key_input_quantizer.foo_init()
@@ -307,7 +301,7 @@ class KVCacheMgrQuant(PTQCell):
             self._reshape_quant_param(self._value_output_quantizer.fq)
         else:
             raise ValueError("Only support convert KVCacheMgrQuant to GE_ASCEND or MS backend.")
-        if backend == Backend.GE_ASCEND:
+        if backend == BackendTarget.ASCEND.value:
             key_compute_type = self._kvcache.key_past.dtype
             value_compute_type = self._kvcache.value_past.dtype
             self._key_input_quantizer = convert_to_quant(self._key_input_quantizer)

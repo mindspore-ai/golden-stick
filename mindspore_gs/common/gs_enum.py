@@ -55,3 +55,19 @@ class GSQuantDtype(Enum):
     uint8 = 'UINT8'
     int16 = 'INT16'
     UINT16 = 'UINT16'
+
+
+class PTQMode(Enum):
+    """
+    mode for ptq quantizer
+    """
+    QUANTIZE = 'quantize'
+    DEPLOY = 'deploy'
+
+
+class BackendTarget(Enum):
+    """
+    mindspore backend target for cell convert
+    """
+    NONE = 'none'
+    ASCEND = 'ascend'

@@ -21,12 +21,12 @@ import pytest
 import numpy as np
 import mindspore
 from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype
-from mindspore_gs import Backend
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
 from mindspore_gs.ptq import RoundToNearestPTQ as RTN
 from mindspore_gs.ptq.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
+from mindspore_gs.ptq.ptq_config import PTQConfig
 from mindformers.modules import Linear
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
@@ -61,7 +61,6 @@ def test_apply_convert():
 
     network = SimpleNet()
     ptq = RTN()
-    ptq.set_linear_w8a16(True)
     # apply & calibrate
     new_network = ptq.apply(network)
     cells: OrderedDict = new_network.name_cells()
@@ -116,10 +115,10 @@ def test_woq_predict_1stage(device, mode):
 
     context.set_context(device_target=device, mode=mode)
     network = SimpleNet()
-    ptq = RTN()
-    ptq.set_linear_w8a16(True)
+    cfg = PTQConfig(mode='quantize', backend='ascend')
+    ptq = RTN(config=cfg)
     quant_network = ptq.apply(network)
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    ascend_network = ptq.convert(quant_network)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, LinearQuant):
             continue
@@ -154,10 +153,10 @@ def test_woq_predict_2stage(device, mode):
 
     def quant():
         network = SimpleNet()
-        ptq = RTN()
-        ptq.set_linear_w8a16(True)
+        cfg = PTQConfig(mode='quantize', backend='ascend')
+        ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         for _, cell in ascend_network.name_cells().items():
             if not isinstance(cell, LinearQuant):
                 continue
@@ -174,11 +173,10 @@ def test_woq_predict_2stage(device, mode):
     def infer():
         inputx = Tensor(np.ones((5, 5), dtype=np.float32), dtype=dtype.float32)
         network = SimpleNet()
-        ptq = RTN()
-        ptq.set_linear_w8a16(True)
-        ptq.set_deploy(True)
+        cfg = PTQConfig(mode='deploy', backend='ascend')
+        ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         mindspore.load_checkpoint("test_woq_predict_2stage.ckpt", ascend_network)
         output: np.ndarray = ascend_network(inputx).asnumpy()
         assert output.shape == (5, 6)
@@ -225,20 +223,19 @@ def test_linears_woq_predict_2stage(device, mode):
         mindspore.load_checkpoint(ckpt_path, network)
         fp_outputs = network(*inputs)
 
-        ptq = RTN()
-        ptq.set_linear_w8a16(True)
+        cfg = PTQConfig(mode='quantize', backend='ascend')
+        ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         mindspore.save_checkpoint(ascend_network, "test_linears_woq_predict_2stage.ckpt")
         return fp_outputs
 
     def infer(inputs):
         network = LinearsNet()
-        ptq = RTN()
-        ptq.set_linear_w8a16(True)
-        ptq.set_deploy(True)
+        cfg = PTQConfig(mode='deploy', backend='ascend')
+        ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         mindspore.load_checkpoint("test_linears_woq_predict_2stage.ckpt", ascend_network)
         return ascend_network(*inputs)
 
@@ -275,12 +272,13 @@ def test_llama2_woq_apply_convert(device, mode):
     context.set_context(device_target=device, mode=mode)
     network = llama2(8, 512, 1024, 2)
     assert check_network_contain_layer(network, Linear)
-    ptq = RTN()
+    cfg = PTQConfig(mode='quantize', backend='ascend')
+    ptq = RTN(config=cfg)
     ptq.set_linear_w8a16(True)
     quant_network = ptq.apply(network.model)
     assert not check_network_contain_layer(quant_network, Linear, (LinearQuant,))
     assert check_network_contain_layer(quant_network, LinearQuant)
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    ascend_network = ptq.convert(quant_network)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, LinearQuant):
             continue
@@ -312,10 +310,10 @@ def test_llama2_woq_predict_1stage(device, mode):
     network = llama2(8, 512, 2048, 2)
     fp_outputs = network(*inputs)
 
-    ptq = RTN()
-    ptq.set_linear_w8a16(True)
+    cfg = PTQConfig(mode='quantize', backend='ascend')
+    ptq = RTN(config=cfg)
     quant_network = ptq.apply(network.model)
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    ascend_network = ptq.convert(quant_network)
     network.model = ascend_network
     quant_outputs = network(*inputs)
 
@@ -360,21 +358,20 @@ def test_llama2_woq_predict_2stage(device, mode):
         network = llama2(8, 512, 2048, 2)
         fp_outputs = network(*inputs)
 
-        ptq = RTN()
-        ptq.set_linear_w8a16(True)
+        cfg = PTQConfig(mode='quantize', backend='ascend')
+        ptq = RTN(config=cfg)
         quant_network = ptq.apply(network.model)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         network.model = ascend_network
         mindspore.save_checkpoint(network, "test_llama2_woq_predict_2stage.ckpt")
         return fp_outputs
 
     def infer(inputs):
         network = llama2(8, 512, 2048, 2)
-        ptq = RTN()
-        ptq.set_linear_w8a16(True)
-        ptq.set_deploy(True)
+        cfg = PTQConfig(mode='deploy', backend='ascend')
+        ptq = RTN(config=cfg)
         quant_network = ptq.apply(network.model)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         network.model = ascend_network
         mindspore.load_checkpoint("test_llama2_woq_predict_2stage.ckpt", network)
         return network(*inputs)
