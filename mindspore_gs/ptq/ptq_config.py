@@ -61,7 +61,34 @@ class QuantizerConfig(GSBaseConfig):
 
 
 @dataclass
-class PTQConfig(QuantizerConfig):
+class PTQConfig:
+    """
+    config for post trainning quantization.
+    Args:
+        mode(PTQMode): flag for ptq mode, QUANTIZATION for quantization mode, DEPLOY for deploy mode
+        backend(BackendTarget): flag for backend target, NONE for no specific backend, ASCEND for ascend backend
+    Example:
+        >>> from mindspore_gs import PTQConfig, PTQMode, BackendTarget
+        >>> ascend_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        >>> print(ascend_config)
+        >>> PTQConfig(mode=<PTQMode.DEPLOY: 'deploy'>, backend=<BackendTarget.ASCEND: 'ascend'>)
+    """
+    mode: PTQMode = field(default=PTQMode.QUANTIZE,
+                          metadata={'valid_values': PTQMode.__members__.values()}
+                          )
+    backend: BackendTarget = field(default=BackendTarget.NONE,
+                                   metadata={'valid_values': BackendTarget.__members__.values()}
+                                   )
+
+    def __post_init__(self):
+        if self.mode not in PTQMode.__members__.values():
+            raise ValueError(f'mode shall be in {PTQMode.__members__.values()}')
+        if self.backend not in {item for item in BackendTarget.__members__.values()}:
+            raise ValueError(f'backend shall be in '
+                             f'{BackendTarget.__members__.values()}')
+
+@dataclass
+class InnerPTQConfig(QuantizerConfig, PTQConfig):
     """
     config for post-trainning-quantizer
     Example:
@@ -73,14 +100,6 @@ class PTQConfig(QuantizerConfig):
                           metadata={'valid_values': [
                               item.value for item in GSPTQApproach.__members__.values()
                           ]})
-    mode: str = field(default=PTQMode.QUANTIZE.value,
-                      metadata={'valid_values': [
-                          item.value for item in PTQMode.__members__.values()
-                      ]})
-    backend: str = field(default=BackendTarget.NONE.value,
-                         metadata={'valid_values': [
-                             item.value for item in BackendTarget.__members__.values()
-                         ]})
 
     calibration_sampling_size: int = 0
     act_quant_dtype: QuantDtype = QuantDtype.INT8
@@ -130,16 +149,33 @@ class PTQConfig(QuantizerConfig):
         parsed_dict = self.__dict__
         parsed_dict['act_quant_dtype'] = self.act_quant_dtype.name
         parsed_dict['weight_quant_dtype'] = self.weight_quant_dtype.name
+        parsed_dict['backend'] = self.backend.name
+        parsed_dict['mode'] = self.mode.name
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
         """ convert readable dicts to data config"""
-        if 'act_quant_dtype' not in data_dict:
-            raise ValueError('act_quant_dtype shall in ptq config, but not found')
-        value = data_dict['act_quant_dtype']
-        data_dict['act_quant_dtype'] = QuantDtype[value]
-        if 'weight_quant_dtype' not in data_dict:
-            raise ValueError('act_quant_dtype shall in ptq config, but not found')
-        value = data_dict['weight_quant_dtype']
-        data_dict['weight_quant_dtype'] = QuantDtype[value]
+        def update_dict(key, enum_name):
+            nonlocal data_dict
+            if key not in data_dict:
+                raise ValueError(f'{key} shall in yaml, but not found')
+            data_dict[key] = enum_name[data_dict[key]]
+        unparse_list = [
+            ('act_quant_dtype', QuantDtype),
+            ('weight_quant_dtype', QuantDtype),
+            ('mode', PTQMode),
+            ('backend', BackendTarget)
+        ]
+        for item in unparse_list:
+            update_dict(*item)
         self.__dict__.update(data_dict)
+
+    @staticmethod
+    def inner_config(cfg: PTQConfig):
+        """convert PTQConfig to InnerConfig"""
+        if not isinstance(cfg, PTQConfig):
+            raise TypeError(f'input config shall be PTQConfig, but got {type(cfg)}')
+        inner_cfg = InnerPTQConfig()
+        for key, val in asdict(cfg).items():
+            setattr(inner_cfg, key, val)
+        return inner_cfg

@@ -14,11 +14,12 @@
 # ============================================================================
 """RTNNetPolicy."""
 
-from mindspore.rewrite import PatternEngine
-from mindspore_gs.quantization.net_policy import NetPolicy
 from mindformers.modules import Linear, KVCacheMgr
+from mindspore.rewrite import PatternEngine
+
+from mindspore_gs.quantization.net_policy import NetPolicy
+from mindspore_gs.ptq.ptq_config import PTQConfig
 from .rtn_layer_policy import LinearLayerPolicy, KVCacheMgrPolicy
-from .rtn_config import RTNConfig
 
 
 class RTNNetPolicy(NetPolicy):
@@ -29,9 +30,9 @@ class RTNNetPolicy(NetPolicy):
         ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` .
     """
 
-    def __init__(self, config=RTNConfig()):
+    def __init__(self, config=PTQConfig()):
         super().__init__(config)
-        self._config: RTNConfig = config
+        self._config: PTQConfig = config
         self._build = False
         self._net_layer_policy = None
         self._pattern_engines: [PatternEngine] = []

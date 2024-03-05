@@ -17,9 +17,10 @@ import argparse
 
 import mindspore as ms
 from mindspore import context
-from mindspore_gs.datasets import create_wikitext_dataset
 from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import PerplexityMetric
+from mindspore_gs.datasets import create_wikitext_dataset
+from mindspore_gs import PTQMode, BackendTarget
 from common import create_mfconfig, quant_llama2
 
 
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     network.set_train(False)
     network.phase = 'predict'
     if uargs.quant:
-        network = quant_llama2(network, mode='quantize', backend='ascend')
+        network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         if not uargs.ckpt_path:
             uargs.ckpt_path = "llama2-w8a16.ckpt"
         print('------------ eval W8A16 quant llama2 ------------', flush=True)

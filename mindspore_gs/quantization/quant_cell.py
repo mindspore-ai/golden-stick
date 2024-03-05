@@ -60,7 +60,7 @@ class QuantCell(Cell):
         raise NotImplementedError
 
     # pylint: disable=W0613
-    def convert(self, backend: str = BackendTarget.NONE.value, is_deploy=False):
+    def convert(self, backend: str = BackendTarget.NONE, is_deploy=False):
         if self._converted:
             return
         self._converted = True

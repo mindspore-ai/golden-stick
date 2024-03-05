@@ -19,6 +19,7 @@ import mindspore as ms
 from mindspore import context
 from mindformers import LlamaForCausalLM
 from common import quant_llama2, create_mfconfig
+from mindspore_gs import PTQMode, BackendTarget
 
 
 def get_args():
@@ -41,5 +42,5 @@ if __name__ == "__main__":
     network.phase = 'predict'
 
     print('------------ quant llama2 to W8A16 ------------', flush=True)
-    network = quant_llama2(network, mode='quantize', backend='ascend')
+    network = quant_llama2(network, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ms.save_checkpoint(network, "llama2-w8a16.ckpt")

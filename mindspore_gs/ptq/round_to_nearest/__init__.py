@@ -16,5 +16,4 @@
 MindSpore golden stick MinMaxPTQ Algorithm.
 """
 
-from .rtn_config import RTNConfig
-from .round_to_nearest import RoundToNearestPTQ
+from .round_to_nearest import RoundToNearest

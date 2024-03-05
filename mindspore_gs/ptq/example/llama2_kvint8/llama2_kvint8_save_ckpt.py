@@ -17,8 +17,7 @@ import argparse
 
 import mindspore as ms
 from mindspore import context
-from mindspore_gs import Backend
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
+from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.datasets import create_wikitext_dataset
 from mindformers import LlamaForCausalLM, LlamaTokenizer
 from common import create_mfconfig
@@ -66,5 +65,5 @@ if __name__ == "__main__":
         network.generate(input_ids, do_sample=False, max_length=seq_length, top_p=1, top_k=3)
         ptq.calibrate(network)
 
-    network.model = ptq.convert(network.model, backend=Backend.GE_ASCEND)
+    network.model = ptq.convert(network.model)
     ms.save_checkpoint(network, "llama2-kvint8.ckpt")
