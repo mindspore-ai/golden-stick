@@ -22,12 +22,12 @@ from mindspore import QuantDtype
 from mindspore_gs.common.config import GSBaseConfig
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.register import RegisterMachine
-from mindspore_gs.common.gs_enum import GSPTQApproach, GSQuantCellType, PTQMode, BackendTarget
+from mindspore_gs.common.gs_enum import PTQApproach, QuantCellType, PTQMode, BackendTarget
 
 algo_cfg_register = RegisterMachine()
 
 
-@algo_cfg_register.register(GSPTQApproach.SMOOTH_QUANT.value)
+@algo_cfg_register.register(PTQApproach.SMOOTH_QUANT)
 @dataclass
 class SmoothQuantConfig:
     """config for smooth quant algorithm"""
@@ -39,7 +39,7 @@ class SmoothQuantConfig:
         value_check('is_deploy', self.is_deploy, bool)
 
 
-@algo_cfg_register.register(GSPTQApproach.RTN.value)
+@algo_cfg_register.register(PTQApproach.RTN)
 @dataclass
 class RTNConfig:
     """
@@ -63,10 +63,10 @@ class QuantizerConfig(GSBaseConfig):
 @dataclass
 class PTQConfig:
     """
-    config for post trainning quantization.
+    Config for post trainning quantization.
     Args:
-        mode(PTQMode): flag for ptq mode, QUANTIZATION for quantization mode, DEPLOY for deploy mode
-        backend(BackendTarget): flag for backend target, NONE for no specific backend, ASCEND for ascend backend
+        mode(PTQMode): flag for ptq mode, QUANTIZATION for quantization mode, DEPLOY for deploy mode.
+        backend(BackendTarget): flag for backend target, NONE for no specific backend, ASCEND for ascend backend.
     Example:
         >>> from mindspore_gs import PTQConfig, PTQMode, BackendTarget
         >>> ascend_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
@@ -91,16 +91,10 @@ class PTQConfig:
 class InnerPTQConfig(QuantizerConfig, PTQConfig):
     """
     config for post-trainning-quantizer
-    Example:
-        >>> from mindspore_gs import PTQConfig
-        >>> smooth_quant_config = PTQConfig(approach='smooth_quant',
-        >>>                                 algo_args={'alpha': 0.5, 'is_deploy': True})
     """
-    approach: str = field(default=GSPTQApproach.RTN.value,
-                          metadata={'valid_values': [
-                              item.value for item in GSPTQApproach.__members__.values()
-                          ]})
-
+    approach: PTQApproach = field(default=PTQApproach.RTN,
+                                  metadata={'valid_values': PTQApproach.__members__.values()}
+                                  )
     calibration_sampling_size: int = 0
     act_quant_dtype: QuantDtype = QuantDtype.INT8
     weight_quant_dtype: QuantDtype = QuantDtype.INT8
@@ -112,9 +106,9 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
     weight_symmetric: bool = True
     act_narrow_range: bool = False
     weight_narrow_range: bool = False
-    op_types: List[str] = field(default_factory=lambda: [GSQuantCellType.MF_LINEAR.value],
+    op_types: List[str] = field(default_factory=lambda: [QuantCellType.MF_LINEAR.value],
                                 metadata={'choices': [
-                                    item.value for item in GSQuantCellType.__members__.values()
+                                    item.value for item in QuantCellType.__members__.values()
                                 ]})
 
     def __post_init__(self):
@@ -128,10 +122,10 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
         value_check('act_symmetric', self.weight_symmetric, bool)
         value_check('act_narrow_range', self.act_narrow_range, bool)
         value_check('weight_narrow_range', self.weight_narrow_range, bool)
-        if self.approach not in {item.value for item in GSPTQApproach.__members__.values()}:
+        if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
         support_op_types = {
-            item.value for item in GSQuantCellType.__members__.values()
+            item.value for item in QuantCellType.__members__.values()
         }
         for op_type in self.op_types:
             if op_type not in support_op_types:
@@ -151,6 +145,7 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
         parsed_dict['weight_quant_dtype'] = self.weight_quant_dtype.name
         parsed_dict['backend'] = self.backend.name
         parsed_dict['mode'] = self.mode.name
+        parsed_dict['approach'] = self.approach.name
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
@@ -164,7 +159,8 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
             ('act_quant_dtype', QuantDtype),
             ('weight_quant_dtype', QuantDtype),
             ('mode', PTQMode),
-            ('backend', BackendTarget)
+            ('backend', BackendTarget),
+            ('approach', PTQApproach)
         ]
         for item in unparse_list:
             update_dict(*item)

@@ -20,7 +20,7 @@ import pytest
 from mindspore import QuantDtype
 
 from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig
-from mindspore_gs.common.gs_enum import PTQMode, BackendTarget
+from mindspore_gs.common.gs_enum import PTQMode, BackendTarget, PTQApproach
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 
@@ -70,7 +70,7 @@ def test_inner_ptq_config():
     with pytest.raises(ValueError):
         _ = InnerPTQConfig(approach='no_such_approach')
 
-    cfg = InnerPTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     with pytest.raises(ValueError):
         cfg.weight_only = 1
         cfg.value_check()
@@ -85,11 +85,11 @@ def test_ptq_algo_config():
     Description: Feed invalid param to ptq_config to raise value error.
     Expectation: all value is consistent with default
     """
-    cfg = InnerPTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     assert cfg.algo_args.get('alpha') == 0.5
     assert cfg.algo_args.get('is_deploy') is False
 
-    cfg = InnerPTQConfig(approach='rtn')
+    cfg = InnerPTQConfig(approach=PTQApproach.RTN)
     assert cfg.mode == PTQMode.QUANTIZE
     assert cfg.backend == BackendTarget.NONE
     assert cfg.calibration_sampling_size == 0
@@ -132,10 +132,10 @@ def test_ptq_yaml_dump_and_load():
     Description: dump config to yaml and then load it with yaml
     Expectation: dump and load file success
     """
-    cfg = InnerPTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.weight_symmetric = False
     cfg.dump('my_cfg.yaml')
-    new_cfg = InnerPTQConfig(approach='smooth_quant')
+    new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
     assert new_cfg.weight_symmetric is False
 
@@ -149,9 +149,9 @@ def test_ptq_yaml_parse_unparse():
     Description: dump config to yaml and then load it with yaml
     Expectation: dump and load file success
     """
-    cfg = InnerPTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.dump('my_cfg.yaml')
-    new_cfg = InnerPTQConfig(approach='smooth_quant')
+    new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.act_quant_dtype = QuantDtype.UINT8
     new_cfg.weight_quant_dtype = QuantDtype.UINT8
     new_cfg.load('my_cfg.yaml')

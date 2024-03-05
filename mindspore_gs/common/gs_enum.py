@@ -19,7 +19,7 @@ enum classes in golden-stick
 from enum import Enum
 
 
-class GSPTQApproach(Enum):
+class PTQApproach(Enum):
     """
     PTQ approach enums
     """
@@ -28,7 +28,7 @@ class GSPTQApproach(Enum):
     GPTQ = 'gptq'
 
 
-class GSQATApproach(Enum):
+class QATApproach(Enum):
     """
     QAT approach enums
     """
@@ -36,7 +36,7 @@ class GSQATApproach(Enum):
     SLB = 'slb'
 
 
-class GSQuantCellType(Enum):
+class QuantCellType(Enum):
     """
     supported quant cell type enums
     """
@@ -59,7 +59,9 @@ class GSQuantDtype(Enum):
 
 class PTQMode(Enum):
     """
-    mode for ptq quantizer
+    Mode for ptq quantizer.
+    QUANTIZE: indicate ptq quantizer in quantize mode.
+    DEPLOY: indicate ptq quantizer in deploy mode.
     """
     QUANTIZE = 'quantize'
     DEPLOY = 'deploy'
@@ -67,7 +69,9 @@ class PTQMode(Enum):
 
 class BackendTarget(Enum):
     """
-    mindspore backend target for cell convert
+    Mindspore backend target for cell convert.
+    NONE: indicate target cell is not for specific backend.
+    ASCEND: indicate target cell is for ascend backend.
     """
     NONE = 'none'
     ASCEND = 'ascend'
