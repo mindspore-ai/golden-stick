@@ -22,11 +22,12 @@ import numpy as np
 import mindspore
 from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
+from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 from mindspore_gs.ptq.ptq_config import PTQConfig
+from mindspore_gs.common.gs_enum import PTQMode, BackendTarget
 from mindformers.modules import Linear
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
@@ -115,7 +116,7 @@ def test_woq_predict_1stage(device, mode):
 
     context.set_context(device_target=device, mode=mode)
     network = SimpleNet()
-    cfg = PTQConfig(mode='quantize', backend='ascend')
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = RTN(config=cfg)
     quant_network = ptq.apply(network)
     ascend_network = ptq.convert(quant_network)
@@ -153,7 +154,7 @@ def test_woq_predict_2stage(device, mode):
 
     def quant():
         network = SimpleNet()
-        cfg = PTQConfig(mode='quantize', backend='ascend')
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network)
@@ -173,7 +174,7 @@ def test_woq_predict_2stage(device, mode):
     def infer():
         inputx = Tensor(np.ones((5, 5), dtype=np.float32), dtype=dtype.float32)
         network = SimpleNet()
-        cfg = PTQConfig(mode='deploy', backend='ascend')
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network)
@@ -223,7 +224,7 @@ def test_linears_woq_predict_2stage(device, mode):
         mindspore.load_checkpoint(ckpt_path, network)
         fp_outputs = network(*inputs)
 
-        cfg = PTQConfig(mode='quantize', backend='ascend')
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network)
@@ -232,7 +233,7 @@ def test_linears_woq_predict_2stage(device, mode):
 
     def infer(inputs):
         network = LinearsNet()
-        cfg = PTQConfig(mode='deploy', backend='ascend')
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network)
@@ -272,7 +273,7 @@ def test_llama2_woq_apply_convert(device, mode):
     context.set_context(device_target=device, mode=mode)
     network = llama2(8, 512, 1024, 2)
     assert check_network_contain_layer(network, Linear)
-    cfg = PTQConfig(mode='quantize', backend='ascend')
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = RTN(config=cfg)
     ptq.set_linear_w8a16(True)
     quant_network = ptq.apply(network.model)
@@ -310,7 +311,7 @@ def test_llama2_woq_predict_1stage(device, mode):
     network = llama2(8, 512, 2048, 2)
     fp_outputs = network(*inputs)
 
-    cfg = PTQConfig(mode='quantize', backend='ascend')
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = RTN(config=cfg)
     quant_network = ptq.apply(network.model)
     ascend_network = ptq.convert(quant_network)
@@ -358,7 +359,7 @@ def test_llama2_woq_predict_2stage(device, mode):
         network = llama2(8, 512, 2048, 2)
         fp_outputs = network(*inputs)
 
-        cfg = PTQConfig(mode='quantize', backend='ascend')
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network.model)
         ascend_network = ptq.convert(quant_network)
@@ -368,7 +369,7 @@ def test_llama2_woq_predict_2stage(device, mode):
 
     def infer(inputs):
         network = llama2(8, 512, 2048, 2)
-        cfg = PTQConfig(mode='deploy', backend='ascend')
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network.model)
         ascend_network = ptq.convert(quant_network)

@@ -28,35 +28,32 @@ from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.convert_utils import QuantCell
-from mindspore_gs.ptq.ptq_config import PTQConfig
+from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig
 from mindspore_gs.common.gs_enum import PTQMode
 from .rtn_net_policy import RTNNetPolicy
-from .rtn_config import RTNConfig
 
 
-class RoundToNearestPTQ(CompAlgo):
+class RoundToNearest(CompAlgo):
     """MinMaxPTQ"""
 
     def __init__(self, config=None):
-        super(RoundToNearestPTQ, self).__init__()
+        super(RoundToNearest, self).__init__()
         if config is not None:
             if not isinstance(config, PTQConfig):
                 raise TypeError(f'Shall init RTN with PTQConfig, bug got {type(config)}')
             self._config = config
         else:
             self._config = PTQConfig()
-        self._qat_policy = RoundToNearestPTQ._init_net_policy(self._config)
+        # convert PTQConfig to InnerConfig to add inner parameters
+        self._config = InnerPTQConfig.inner_config(self._config)
+        self._qat_policy = RoundToNearest._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
-        self._is_deploy: bool = self._config.mode == PTQMode.DEPLOY.value
+        self._is_deploy: bool = self._config.mode == PTQMode.DEPLOY
         if hasattr(config, 'custom_transforms'):
             self._custom_transforms = config.custom_transforms
         if hasattr(config, 'custom_policies'):
             self._custom_layer_policy_map = config.custom_policies
-        #if "custom_transforms" in config.keys():
-        #    self._custom_transforms = config["custom_transforms"]
-        #if "custom_policies" in config.keys():
-        #    self._custom_layer_policy_map = config["custom_policies"]
 
     @staticmethod
     def _init_net_policy(config):
@@ -64,7 +61,7 @@ class RoundToNearestPTQ(CompAlgo):
 
     def _create_config(self):
         """Create SimulatedQuantizationConfig."""
-        self._config = RTNConfig()
+        self._config = PTQConfig()
 
     def set_act_per_channel(self, act_per_channel):
         """
@@ -235,11 +232,11 @@ class RoundToNearestPTQ(CompAlgo):
 
     def _update_config_from_dict(self, config: dict):
         """Create RoundToNearestPTQ `config` from a dict"""
-        quant_dtype_list = RoundToNearestPTQ. \
+        quant_dtype_list = RoundToNearest. \
             _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
-        per_channel_list = RoundToNearestPTQ._convert2list("per channel", config.get("per_channel", [False, True]))
-        symmetric_list = RoundToNearestPTQ._convert2list("symmetric", config.get("symmetric", [True, True]))
-        narrow_range_list = RoundToNearestPTQ._convert2list("narrow range", config.get("narrow_range", [False, False]))
+        per_channel_list = RoundToNearest._convert2list("per channel", config.get("per_channel", [False, True]))
+        symmetric_list = RoundToNearest._convert2list("symmetric", config.get("symmetric", [True, True]))
+        narrow_range_list = RoundToNearest._convert2list("narrow range", config.get("narrow_range", [False, False]))
 
         self.set_act_quant_dtype(quant_dtype_list[0])
         self.set_weight_quant_dtype(quant_dtype_list[-1])

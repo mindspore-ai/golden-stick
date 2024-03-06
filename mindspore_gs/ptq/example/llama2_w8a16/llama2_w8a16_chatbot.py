@@ -19,6 +19,7 @@ import mindspore as ms
 from mindspore import context
 from mindformers import LlamaForCausalLM, LlamaTokenizer, BaseModel
 from common import create_mfconfig, quant_llama2
+from mindspore_gs import PTQMode, BackendTarget
 
 
 def get_args():
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     network.set_train(False)
     network.phase = 'predict'
     if uargs.quant:
-        network = quant_llama2(network, backend='ascend', mode='deploy')
+        network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
     ms.load_checkpoint(uargs.ckpt_path, network)
     tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
     chat(network, tokenizer, seq_length, uargs.parallel > 1)

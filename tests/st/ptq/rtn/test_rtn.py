@@ -18,8 +18,7 @@ import sys
 
 import pytest
 from mindspore import nn
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
-from mindspore_gs.ptq import RTNConfig
+from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.ptq_config import PTQConfig
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
 
@@ -31,19 +30,20 @@ def test_constructor():
     """
     Feature: RoundToNearestPTQ algorithm.
     Description: Call constructor of RoundToNearestPTQ and check config.
-    Expectation: RTNConfig is updated according to argument `config` of constructor.
+    Expectation: Config is updated according to argument `config` of constructor.
     """
 
     config = PTQConfig()
     ptq = RTN(config)
     # pylint: disable=W0212
-    quant_config: RTNConfig = ptq._config
-    assert config == quant_config
+    quant_config = ptq._config
+    assert config != quant_config
 
     ptq_default = RTN()
     # pylint: disable=W0212
     quant_defalut_config = ptq_default._config
-    assert quant_defalut_config == config
+    assert quant_defalut_config.mode == config.mode
+    assert quant_defalut_config.backend == config.backend
 
 
 @pytest.mark.level0

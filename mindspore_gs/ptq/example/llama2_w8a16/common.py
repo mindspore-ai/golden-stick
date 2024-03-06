@@ -18,9 +18,8 @@
 import time
 import mindspore as ms
 from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig
-from mindspore_gs.common.gs_enum import BackendTarget, PTQMode
-from mindspore_gs.ptq.ptq_config import PTQConfig
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
+from mindspore_gs import PTQConfig, BackendTarget, PTQMode
+from mindspore_gs.ptq import RoundToNearest as RTN
 
 
 def _set_config(config_path, device_id):
@@ -67,8 +66,8 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
 
 
 def quant_llama2(network: LlamaForCausalLM,
-                 mode: str = PTQMode.QUANTIZE.value,
-                 backend: str = BackendTarget.ASCEND.value):
+                 mode: str = PTQMode.QUANTIZE,
+                 backend: str = BackendTarget.ASCEND):
     """Quant llama2 model to w8a16 with RTN algorithm."""
     if mode == PTQMode.QUANTIZE.value:
         print("Use RTN algo to quant network and weight.", flush=True)
