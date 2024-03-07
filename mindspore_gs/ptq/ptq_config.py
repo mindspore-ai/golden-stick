@@ -15,6 +15,7 @@
 """algorithm related configs"""
 
 from dataclasses import dataclass, field, is_dataclass, asdict
+from enum import Enum
 from typing import List
 
 from mindspore import QuantDtype
@@ -22,9 +23,28 @@ from mindspore import QuantDtype
 from mindspore_gs.common.config import GSBaseConfig
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.register import RegisterMachine
-from mindspore_gs.common.gs_enum import PTQApproach, QuantCellType, PTQMode, BackendTarget
+from mindspore_gs.common.gs_enum import QuantCellType, BackendTarget
 
 algo_cfg_register = RegisterMachine()
+
+
+class PTQApproach(Enum):
+    """
+    PTQ approach enums
+    """
+    SMOOTH_QUANT = 'smooth_quant'
+    RTN = 'rtn'
+    GPTQ = 'gptq'
+
+
+class PTQMode(Enum):
+    """
+    Mode for ptq quantizer.
+    QUANTIZE: indicate ptq quantizer in quantize mode.
+    DEPLOY: indicate ptq quantizer in deploy mode.
+    """
+    QUANTIZE = 'quantize'
+    DEPLOY = 'deploy'
 
 
 @algo_cfg_register.register(PTQApproach.SMOOTH_QUANT)

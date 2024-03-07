@@ -20,7 +20,8 @@ from mindspore import context
 from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import PerplexityMetric
 from mindspore_gs.datasets import create_wikitext_dataset
-from mindspore_gs import PTQMode, BackendTarget
+from mindspore_gs.ptq import PTQMode
+from mindspore_gs.common import BackendTarget
 from common import create_mfconfig, quant_llama2
 
 

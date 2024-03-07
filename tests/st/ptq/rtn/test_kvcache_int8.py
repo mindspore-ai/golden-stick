@@ -28,8 +28,8 @@ from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.quant_cells import KVCacheMgrQuant
 from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
-from mindspore_gs.ptq.ptq_config import PTQConfig
-from mindspore_gs.common.gs_enum import BackendTarget, PTQMode
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
+from mindspore_gs.common.gs_enum import BackendTarget
 from mindformers.modules import KVCacheMgr
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))

@@ -28,8 +28,7 @@ from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.convert_utils import QuantCell
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig
-from mindspore_gs.common.gs_enum import PTQMode
+from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode
 from .rtn_net_policy import RTNNetPolicy
 
 

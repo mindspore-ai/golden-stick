@@ -24,9 +24,7 @@ from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTrain
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 from .ghost import GhostAlgo
 from .ptq.ptq_config import PTQConfig
-from .common.gs_enum import PTQMode, BackendTarget
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
-           "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo", 'PTQConfig', 'PTQMode',
-           'BackendTarget']
+           "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo", 'PTQConfig']
 __all__.extend(__version__)
