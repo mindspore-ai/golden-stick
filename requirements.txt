@@ -1,7 +1,5 @@
 numpy >= 1.17.0
 scipy >= 1.5.2
-# for ci
-mindformers >=1.0.0
 
 # for ut/st
 pytest >= 1.6.0
