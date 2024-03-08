@@ -19,8 +19,8 @@ import sys
 import pytest
 from mindspore import QuantDtype
 
-from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig
-from mindspore_gs.common.gs_enum import PTQMode, BackendTarget, PTQApproach
+from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig, PTQApproach, PTQMode
+from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 

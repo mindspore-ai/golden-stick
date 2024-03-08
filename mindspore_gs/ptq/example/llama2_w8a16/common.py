@@ -18,7 +18,8 @@
 import time
 import mindspore as ms
 from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig
-from mindspore_gs import PTQConfig, BackendTarget, PTQMode
+from mindspore_gs.ptq import PTQConfig, PTQMode
+from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import RoundToNearest as RTN
 
 
@@ -55,8 +56,8 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     config.model.model_config.compute_dtype = compute_dtype
     config.model.model_config.layernorm_compute_type = ms.float32
     config.model.model_config.softmax_compute_type = ms.float16
-    config.model.model_config.rotary_dtype = ms.float32
-    config.model.model_config.param_init_type = ms.float32
+    config.model.model_config.rotary_dtype = ms.float16
+    config.model.model_config.param_init_type = ms.float16
     config.processor.tokenizer.vocab_file = tokenizer_path
     config.load_checkpoint = ckpt_path
     config.model.model_config.checkpoint_name_or_path = ckpt_path

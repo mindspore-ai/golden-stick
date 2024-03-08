@@ -26,8 +26,8 @@ from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
-from mindspore_gs.ptq.ptq_config import PTQConfig
-from mindspore_gs.common.gs_enum import PTQMode, BackendTarget
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
+from mindspore_gs.common.gs_enum import BackendTarget
 from mindformers.modules import Linear
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))

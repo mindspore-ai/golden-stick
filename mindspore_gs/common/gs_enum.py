@@ -19,15 +19,6 @@ enum classes in golden-stick
 from enum import Enum
 
 
-class PTQApproach(Enum):
-    """
-    PTQ approach enums
-    """
-    SMOOTH_QUANT = 'smooth_quant'
-    RTN = 'rtn'
-    GPTQ = 'gptq'
-
-
 class QATApproach(Enum):
     """
     QAT approach enums
@@ -55,16 +46,6 @@ class GSQuantDtype(Enum):
     uint8 = 'UINT8'
     int16 = 'INT16'
     UINT16 = 'UINT16'
-
-
-class PTQMode(Enum):
-    """
-    Mode for ptq quantizer.
-    QUANTIZE: indicate ptq quantizer in quantize mode.
-    DEPLOY: indicate ptq quantizer in deploy mode.
-    """
-    QUANTIZE = 'quantize'
-    DEPLOY = 'deploy'
 
 
 class BackendTarget(Enum):

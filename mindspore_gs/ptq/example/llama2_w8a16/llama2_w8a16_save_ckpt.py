@@ -16,10 +16,10 @@
 import argparse
 
 import mindspore as ms
-from mindspore import context
 from mindformers import LlamaForCausalLM
 from common import quant_llama2, create_mfconfig
-from mindspore_gs import PTQMode, BackendTarget
+from mindspore_gs.ptq import PTQMode
+from mindspore_gs.common import BackendTarget
 
 
 def get_args():
@@ -35,7 +35,6 @@ def get_args():
 
 if __name__ == "__main__":
     uargs = get_args()
-    context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 2048, ckpt_path=uargs.fp_ckpt_path)
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
