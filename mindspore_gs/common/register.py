@@ -21,13 +21,13 @@ import mindspore.log as logger
 import mindspore.nn as nn
 from mindformers.modules import Linear
 
-from mindspore_gs.common.gs_enum import GSQuantCellType
+from mindspore_gs.common.gs_enum import QuantCellType
 
 
 cell_type_dicts = {
-    GSQuantCellType.LINEAR.value: nn.Dense,
-    GSQuantCellType.CONV2D.value: nn.Conv2d,
-    GSQuantCellType.MF_LINEAR.value: Linear
+    QuantCellType.LINEAR.value: nn.Dense,
+    QuantCellType.CONV2D.value: nn.Conv2d,
+    QuantCellType.MF_LINEAR.value: Linear
 }
 
 

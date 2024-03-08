@@ -22,12 +22,14 @@ from mindspore.ops.operations import FakeQuantParam
 from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
-from mindspore_gs import Backend
+from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
-from mindspore_gs.ptq.convert_utils import convert_to_antiquant, convert_to_quant, convert_to_dequant
+from mindspore_gs.ptq.convert_utils import (
+    convert_to_antiquant, convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant
+)
 from mindformers.modules import Linear
 from mindformers.modules import KVCacheMgr
 
@@ -51,6 +53,24 @@ class PTQCell(QuantCell):
         anti_strategy = (x_strategy, (), ())
         return anti_strategy
 
+    @staticmethod
+    def antiquant_bmm_strategy(act_strategy,
+                               weight_strategy,
+                               has_bias=False,
+                               is_transpose=False):
+        """parallel strategy for antiquant bmm"""
+        if act_strategy is None or weight_strategy is None:
+            return None
+        if is_transpose:
+            scale_strategy = (weight_strategy[0],)
+        else:
+            scale_strategy = (weight_strategy[1],)
+        offset_strategy = scale_strategy
+        if not has_bias:
+            return act_strategy, weight_strategy, scale_strategy, offset_strategy
+        bias_strategy = scale_strategy
+        return act_strategy, weight_strategy, scale_strategy, offset_strategy, bias_strategy
+
 
 class LinearQuant(PTQCell):
     """Linear layer wrapper with min max"""
@@ -63,8 +83,10 @@ class LinearQuant(PTQCell):
         input_fq_args = {}
         weight_perchannel_args = PerChannelArgs(self._linear.out_channels, self._weight_axis, rank)
         weight_fq_args = {}
+        self._act_strategy = None
         self._weight_strategy = None
         if "in_strategy" in self._linear.matmul.get_attr_dict():
+            self._act_strategy = self._linear.matmul.in_strategy[0]
             self._weight_strategy = self._linear.matmul.in_strategy[1]
             input_fq_args["strategy"] = (self._linear.matmul.in_strategy[0],)
             weight_fq_args["strategy"] = (self._weight_strategy,)
@@ -92,19 +114,13 @@ class LinearQuant(PTQCell):
     def core_construct(self, *args):
         pass
 
-    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
-        if backend == Backend.MS:
+    def convert(self, backend: str = BackendTarget.NONE, is_deploy=False):
+        if backend == BackendTarget.NONE:
             super(LinearQuant, self).convert(backend)
             if self._weight_quantizer:
                 self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
             return
-        if backend == Backend.FAKE_QUANT:
-            if self._input_quantizer:
-                self._input_quantizer = self._input_quantizer.convert_to_ascend()
-            if self._weight_quantizer:
-                self._weight_quantizer = self._weight_quantizer.convert_to_ascend()
-            return
-        if backend == Backend.GE_ASCEND:
+        if backend == BackendTarget.ASCEND:
             weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
                           self._weight_quantizer.get_attr("weight_only_quant", False)
             all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
@@ -129,8 +145,8 @@ class LinearQuant(PTQCell):
                     weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
                 scale = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale]
                 zp = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point]
-                weight_quant = quant_tensor_data(weight, np.array(scale), np.array(zp), quant_min, quant_max,
-                                                 self._weight_axis, dtype.int8)
+                weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
+                                                 quant_min, quant_max, self._weight_axis, dtype.int8)
                 self._linear.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8),
                                                 name=self._linear.weight.name)
             else:
@@ -144,9 +160,13 @@ class LinearQuant(PTQCell):
             else:
                 self._input_quantizer = None
                 self._output_quantizer = None
-                self._weight_quantizer = convert_to_antiquant(
-                    self._weight_quantizer, dst_dtype=self._cast_dtype,
-                    strategy=self.antiquant_strategy(self._weight_strategy))
+                self._weight_quantizer = convert_to_fusion_antiquant(
+                    self._weight_quantizer, transpose_weight=self._linear.transpose_b,
+                    dst_dtype=self._cast_dtype, strategy=self.antiquant_bmm_strategy(self._act_strategy,
+                                                                                     self._weight_strategy,
+                                                                                     False,
+                                                                                     self._linear.transpose_b)
+                )
                 self._quant_deployed = True
 
     def calibrate(self):
@@ -171,18 +191,19 @@ class LinearQuant(PTQCell):
                 x = P.Reshape()(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
         ori_dtype = F.dtype(x)
 
-        x = self._linear.cast(x, self._cast_dtype)
-        if self._quant_deployed:
-            weight = self._weight_quantizer(self._linear.weight)
-        else:
-            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
-
-        x = self._linear.matmul(x, weight)
+        bias = None
         if self._linear.has_bias:
             if hasattr(self._linear, "dtype"):
                 bias = self._linear.cast(self._linear.bias, self._linear.dtype)
             else:
                 bias = self._linear.cast(self._linear.bias, x.dtype)
+        x = self._linear.cast(x, self._cast_dtype)
+        if self._quant_deployed:
+            x = self._weight_quantizer(x, self._linear.weight)
+        else:
+            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+            x = self._linear.matmul(x, weight)
+        if self._linear.has_bias:
             x = self._linear.bias_add(x, bias)
         if self._linear.activation_flag:
             x = self._linear.activation(x)
@@ -259,8 +280,8 @@ class KVCacheMgrQuant(PTQCell):
             zp = t_zp.asnumpy().tolist()
             fq.attrs[FakeQuantParam.attr_key_linear_quant_zero_point] = zp
 
-    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
-        if backend in (Backend.MS, Backend.GE_ASCEND):
+    def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
+        if backend in (BackendTarget.NONE, BackendTarget.ASCEND):
             if is_deploy:
                 if isinstance(self._key_input_quantizer, LinearFakeQuantizer):
                     self._key_input_quantizer.foo_init()
@@ -280,7 +301,7 @@ class KVCacheMgrQuant(PTQCell):
             self._reshape_quant_param(self._value_output_quantizer.fq)
         else:
             raise ValueError("Only support convert KVCacheMgrQuant to GE_ASCEND or MS backend.")
-        if backend == Backend.GE_ASCEND:
+        if backend == BackendTarget.ASCEND:
             key_compute_type = self._kvcache.key_past.dtype
             value_compute_type = self._kvcache.value_past.dtype
             self._key_input_quantizer = convert_to_quant(self._key_input_quantizer)

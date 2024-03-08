@@ -18,7 +18,7 @@ QuantCell, wrap objected cell with fake-quantizer, LinearQuantCell for example..
 import abc
 
 from mindspore.nn.cell import Cell
-from mindspore_gs import Backend
+from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer, FakeQuantParamCell
 
@@ -60,7 +60,7 @@ class QuantCell(Cell):
         raise NotImplementedError
 
     # pylint: disable=W0613
-    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
+    def convert(self, backend: str = BackendTarget.NONE, is_deploy=False):
         if self._converted:
             return
         self._converted = True

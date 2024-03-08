@@ -19,7 +19,8 @@ import sys
 import pytest
 from mindspore import QuantDtype
 
-from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig
+from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig, PTQApproach, PTQMode
+from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 
@@ -38,20 +39,38 @@ def test_sq_config():
     with pytest.raises(ValueError):
         _ = SmoothQuantConfig(alpha=0.5, is_deploy=1)
 
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_ptq_config_construct():
+    """
+    Feature: config for customer for post training quant
+    Description: Feed valid and invalid param to ptq_config to test constructor
+    Expectation: as expectation
+    """
+    cfg = PTQConfig()
+    assert cfg.mode == PTQMode.QUANTIZE
+    assert cfg.backend == BackendTarget.NONE
+
+    with pytest.raises(ValueError):
+        _ = PTQConfig(mode='none')
+
+    with pytest.raises(ValueError):
+        _ = PTQConfig(backend=PTQMode.QUANTIZE)
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
-def test_ptq_config():
+def test_inner_ptq_config():
     """
     Feature: config for post training quant
     Description: Feed invalid param to ptq_config to raise value error.
     Expectation: Except error.
     """
     with pytest.raises(ValueError):
-        _ = PTQConfig(approach='no_such_approach')
+        _ = InnerPTQConfig(approach='no_such_approach')
 
-    cfg = PTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     with pytest.raises(ValueError):
         cfg.weight_only = 1
         cfg.value_check()
@@ -66,18 +85,42 @@ def test_ptq_algo_config():
     Description: Feed invalid param to ptq_config to raise value error.
     Expectation: all value is consistent with default
     """
-    cfg = PTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     assert cfg.algo_args.get('alpha') == 0.5
     assert cfg.algo_args.get('is_deploy') is False
 
-    cfg = PTQConfig(approach='rtn')
+    cfg = InnerPTQConfig(approach=PTQApproach.RTN)
+    assert cfg.mode == PTQMode.QUANTIZE
+    assert cfg.backend == BackendTarget.NONE
     assert cfg.calibration_sampling_size == 0
-    assert cfg.weight_only is False
+    assert cfg.weight_only is True
     assert cfg.act_per_channel is False
     assert cfg.act_symmetric is False
     assert cfg.weight_symmetric is True
     assert cfg.act_narrow_range is False
     assert cfg.weight_narrow_range is False
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_inner_ptq_func():
+    """
+    Feature: test convert PTQConfig to InnerPTQConfig
+    Description: convert PTQConfig to InnerPTQConfig
+    Expectation: as expect
+    """
+    inner_cfg = InnerPTQConfig()
+    inner_cfg.mode = PTQMode.DEPLOY
+    inner_cfg.backend = BackendTarget.ASCEND
+
+    ptq_cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND)
+    convert_inner_cfg = inner_cfg.inner_config(ptq_cfg)
+    assert convert_inner_cfg == inner_cfg
+
+    with pytest.raises(TypeError):
+        inner_cfg.inner_config('none')
 
 
 @pytest.mark.level0
@@ -89,10 +132,10 @@ def test_ptq_yaml_dump_and_load():
     Description: dump config to yaml and then load it with yaml
     Expectation: dump and load file success
     """
-    cfg = PTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.weight_symmetric = False
     cfg.dump('my_cfg.yaml')
-    new_cfg = PTQConfig(approach='smooth_quant')
+    new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
     assert new_cfg.weight_symmetric is False
 
@@ -106,9 +149,9 @@ def test_ptq_yaml_parse_unparse():
     Description: dump config to yaml and then load it with yaml
     Expectation: dump and load file success
     """
-    cfg = PTQConfig(approach='smooth_quant')
+    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.dump('my_cfg.yaml')
-    new_cfg = PTQConfig(approach='smooth_quant')
+    new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.act_quant_dtype = QuantDtype.UINT8
     new_cfg.weight_quant_dtype = QuantDtype.UINT8
     new_cfg.load('my_cfg.yaml')

@@ -20,31 +20,39 @@ from typing import Tuple
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs import CompAlgo, Backend
+import mindspore.log as logger
+
+from mindspore_gs import CompAlgo
 from mindspore_gs.validator import Validator
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.convert_utils import QuantCell
+from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode
 from .rtn_net_policy import RTNNetPolicy
-from .rtn_config import RTNConfig
 
 
-class RoundToNearestPTQ(CompAlgo):
+class RoundToNearest(CompAlgo):
     """MinMaxPTQ"""
 
     def __init__(self, config=None):
-        super(RoundToNearestPTQ, self).__init__(config)
-        if config is None:
-            config = {}
-        self._qat_policy = RoundToNearestPTQ._init_net_policy(self._config)
+        super(RoundToNearest, self).__init__()
+        if config is not None:
+            if not isinstance(config, PTQConfig):
+                raise TypeError(f'Shall init RTN with PTQConfig, bug got {type(config)}')
+            self._config = config
+        else:
+            self._config = PTQConfig()
+        # convert PTQConfig to InnerConfig to add inner parameters
+        self._config = InnerPTQConfig.inner_config(self._config)
+        self._qat_policy = RoundToNearest._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
-        self._is_deploy: bool = False
-        if "custom_transforms" in config.keys():
-            self._custom_transforms = config["custom_transforms"]
-        if "custom_policies" in config.keys():
-            self._custom_layer_policy_map = config["custom_policies"]
+        self._is_deploy: bool = self._config.mode == PTQMode.DEPLOY
+        if hasattr(config, 'custom_transforms'):
+            self._custom_transforms = config.custom_transforms
+        if hasattr(config, 'custom_policies'):
+            self._custom_layer_policy_map = config.custom_policies
 
     @staticmethod
     def _init_net_policy(config):
@@ -52,7 +60,7 @@ class RoundToNearestPTQ(CompAlgo):
 
     def _create_config(self):
         """Create SimulatedQuantizationConfig."""
-        self._config = RTNConfig()
+        self._config = PTQConfig()
 
     def set_act_per_channel(self, act_per_channel):
         """
@@ -223,11 +231,11 @@ class RoundToNearestPTQ(CompAlgo):
 
     def _update_config_from_dict(self, config: dict):
         """Create RoundToNearestPTQ `config` from a dict"""
-        quant_dtype_list = RoundToNearestPTQ. \
+        quant_dtype_list = RoundToNearest. \
             _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
-        per_channel_list = RoundToNearestPTQ._convert2list("per channel", config.get("per_channel", [False, True]))
-        symmetric_list = RoundToNearestPTQ._convert2list("symmetric", config.get("symmetric", [True, True]))
-        narrow_range_list = RoundToNearestPTQ._convert2list("narrow range", config.get("narrow_range", [False, False]))
+        per_channel_list = RoundToNearest._convert2list("per channel", config.get("per_channel", [False, True]))
+        symmetric_list = RoundToNearest._convert2list("symmetric", config.get("symmetric", [True, True]))
+        narrow_range_list = RoundToNearest._convert2list("narrow range", config.get("narrow_range", [False, False]))
 
         self.set_act_quant_dtype(quant_dtype_list[0])
         self.set_weight_quant_dtype(quant_dtype_list[-1])
@@ -264,7 +272,7 @@ class RoundToNearestPTQ(CompAlgo):
                 return cell, False
 
         ApplyProcessor(self._qat_policy).process(network)
-        if not self._is_deploy and self._config.enable_linear_w8a16:
+        if not self._is_deploy and self._config.weight_only:
             network = self.calibrate(network)
         network.update_parameters_name()
         return network
@@ -309,7 +317,7 @@ class RoundToNearestPTQ(CompAlgo):
         FixProcessor().process(network)
         network.update_parameters_name()
 
-    def convert(self, net_opt: Cell, ckpt_path="", backend: Backend = Backend.MS) -> Cell:
+    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """Implement method convert of super class."""
         if not isinstance(net_opt, Cell):
             raise TypeError(
@@ -317,6 +325,8 @@ class RoundToNearestPTQ(CompAlgo):
         if not isinstance(ckpt_path, str):
             raise TypeError(
                 f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
+        if ckpt_path:
+            logger.warning('ckpt_path in convert would be deprecated in next version')
         real_path = os.path.realpath(ckpt_path)
         if ckpt_path != "":
             if os.path.isfile(real_path):
@@ -328,18 +338,19 @@ class RoundToNearestPTQ(CompAlgo):
 
         class ConvertProcessor(Processor):
             """A network iterator for converting network to deploy network."""
-            def __init__(self, ptq_policy, is_deploy):
+            def __init__(self, ptq_policy, is_deploy, backend):
                 self._ptq_policy = ptq_policy
                 self._is_deploy = is_deploy
+                self._backend = backend
 
             def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
                     return cell, True
                 if isinstance(cell, PTQCell):
-                    cell.convert(backend, self._is_deploy)
+                    cell.convert(self._backend, self._is_deploy)
                     return cell, True
                 return cell, False
 
-        ConvertProcessor(self._qat_policy, self._is_deploy).process(net_opt)
+        ConvertProcessor(self._qat_policy, self._is_deploy, self._config.backend).process(net_opt)
         net_opt.update_parameters_name()
         return net_opt

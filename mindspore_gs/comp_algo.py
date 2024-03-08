@@ -153,17 +153,14 @@ class CompAlgo(abc.ABC):
                              f" {save_mindir_path}.")
         self._config.save_mindir_path = os.path.realpath(save_mindir_path)
 
-    def convert(self, net_opt: Cell, ckpt_path="", backend: Backend = Backend.MS) -> Cell: # for coding, convert to FakeQuantParam and then convert to target backend.
+    def convert(self, net_opt: Cell, ckpt_path="") -> Cell: # for coding, convert to FakeQuantParam and then convert to target backend.
         """
         Define how to convert a compressed network to a standard network before exporting to MindIR.
 
         Args:
             net_opt (Cell): Network to be converted which is transformed by `CompAlgo.apply`.
             ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
-                checkpoint file to `net_opt`.
-            backend (Backend): target backend, default is `Backend.MS`, it means convert to standard MindSpore Quant
-                Network with mindspore.ops.operations.FakeQuantParam. `Backend.GE_ASCEND` means use to network with
-                quant/dequant layer from GE.
+                checkpoint file to `net_opt`. this parameter would be deprecated in future version.
 
         Returns:
             An instance of Cell represents converted network.

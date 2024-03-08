@@ -23,7 +23,8 @@ from .comp_algo import CompAlgo, Backend
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 from .ghost import GhostAlgo
+from .ptq.ptq_config import PTQConfig
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
-           "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo"]
+           "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo", 'PTQConfig']
 __all__.extend(__version__)

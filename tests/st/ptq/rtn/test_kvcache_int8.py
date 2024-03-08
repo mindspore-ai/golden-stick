@@ -22,12 +22,14 @@ import numpy as np
 import mindspore
 from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype
 from mindspore.common.initializer import initializer
-from mindspore_gs import Backend
+
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
+from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.quant_cells import KVCacheMgrQuant
 from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
+from mindspore_gs.common.gs_enum import BackendTarget
 from mindformers.modules import KVCacheMgr
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
@@ -74,9 +76,13 @@ def test_apply_convert():
                                          requires_grad=False)
     network.kvcache.value_past = Parameter(initializer('ones', kv_shape, kv_dtype),
                                            name=network.kvcache.value_past.name, requires_grad=False)
-    ptq = RTN()
-    ptq.set_linear_w8a16(False)
-    ptq.set_kv_int8_quant(True)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                    backend=BackendTarget.NONE)
+    ptq = RTN(config=cfg)
+    # pylint: disable=W0212
+    ptq._config.weight_only = False
+    # pylint: disable=W0212
+    ptq._config.enable_kvcache_int8 = True
     # apply
     new_network = ptq.apply(network)
     cells: OrderedDict = new_network.name_cells()
@@ -169,12 +175,16 @@ def test_kvint8_predict_1stage(device, mode):
 
     context.set_context(device_target=device, mode=mode)
     network = SimpleNet()
-    ptq = RTN()
-    ptq.set_linear_w8a16(False)
-    ptq.set_kv_int8_quant(True)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                    backend=BackendTarget.ASCEND)
+    ptq = RTN(config=cfg)
+    # pylint: disable=W0212
+    ptq._config.weight_only = False
+    # pylint: disable=W0212
+    ptq._config.enable_kvcache_int8 = True
     quant_network = ptq.apply(network)
     quant_network = ptq.calibrate(quant_network)
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    ascend_network = ptq.convert(quant_network)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, KVCacheMgrQuant):
             continue
@@ -234,12 +244,16 @@ def test_kvint8_predict_2stage(device, mode):
 
     def quant():
         network = SimpleNet()
-        ptq = RTN()
-        ptq.set_linear_w8a16(False)
-        ptq.set_kv_int8_quant(True)
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                        backend=BackendTarget.ASCEND)
+        ptq = RTN(config=cfg)
+        # pylint: disable=W0212
+        ptq._config.weight_only = False
+        # pylint: disable=W0212
+        ptq._config.enable_kvcache_int8 = True
         quant_network = ptq.apply(network)
         quant_network = ptq.calibrate(quant_network)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         for _, cell in ascend_network.name_cells().items():
             if not isinstance(cell, KVCacheMgrQuant):
                 continue
@@ -263,12 +277,15 @@ def test_kvint8_predict_2stage(device, mode):
 
     def infer():
         network = SimpleNet()
-        ptq = RTN()
-        ptq.set_linear_w8a16(False)
-        ptq.set_kv_int8_quant(True)
-        ptq.set_deploy(True)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND)
+        ptq = RTN(config=cfg)
+        # pylint: disable=W0212
+        ptq._config.weight_only = False
+        # pylint: disable=W0212
+        ptq._config.enable_kvcache_int8 = True
         quant_network = ptq.apply(network)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         mindspore.load_checkpoint("test_kvint8_predict_2stage.ckpt", ascend_network)
 
         key = Tensor(np.ones((1, 8, 100, 16), dtype=np.float32), dtype=dtype.float32)
@@ -315,15 +332,22 @@ def test_llama2_kvint8_apply_convert(device, mode):
     context.set_context(device_target=device, mode=mode)
     network = llama2(8, 512, 1024, 2, use_past=True)
     assert check_network_contain_layer(network, KVCacheMgr)
-    ptq = RTN()
-    ptq.set_linear_w8a16(False)
-    ptq.set_kv_int8_quant(True)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                    backend=BackendTarget.ASCEND)
+    ptq = RTN(config=cfg)
+    # pylint: disable=W0212
+    ptq._config.weight_only = False
+    # pylint: disable=W0212
+    ptq._config.enable_kvcache_int8 = True
+    cfg = ptq._config
+    cfg.weight_only = False
+    cfg.enable_kvcache_int8 = True
 
     quant_network = ptq.apply(network.model)
     quant_network = ptq.calibrate(quant_network)
     assert not check_network_contain_layer(quant_network, KVCacheMgr, (KVCacheMgrQuant,))
     assert check_network_contain_layer(quant_network, KVCacheMgrQuant)
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    ascend_network = ptq.convert(quant_network)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, KVCacheMgrQuant):
             continue
@@ -363,9 +387,13 @@ def test_llama2_kvint8_predict_1stage(device, mode):
     network = llama2(8, 512, 2048, 2, use_past=True)
     fp_outputs = network(*inputs)
 
-    ptq = RTN()
-    ptq.set_linear_w8a16(False)
-    ptq.set_kv_int8_quant(True)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                    backend=BackendTarget.ASCEND)
+    ptq = RTN(config=cfg)
+    # pylint: disable=W0212
+    ptq._config.weight_only = False
+    # pylint: disable=W0212
+    ptq._config.enable_kvcache_int8 = True
 
     quant_network = ptq.apply(network.model)
     # calibrate
@@ -381,7 +409,7 @@ def test_llama2_kvint8_predict_1stage(device, mode):
                                           requires_grad=False)
     quant_network = ptq.calibrate(quant_network)
 
-    ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+    ascend_network = ptq.convert(quant_network)
     network.model = ascend_network
     quant_outputs = network(*inputs)
 
@@ -426,9 +454,13 @@ def test_llama2_kvint8_predict_2stage(device, mode):
         network = llama2(8, 512, 2048, 2, use_past=True)
         fp_outputs = network(*inputs)
 
-        ptq = RTN()
-        ptq.set_linear_w8a16(False)
-        ptq.set_kv_int8_quant(True)
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                        backend=BackendTarget.ASCEND)
+        ptq = RTN(config=cfg)
+        # pylint: disable=W0212
+        ptq._config.weight_only = False
+        # pylint: disable=W0212
+        ptq._config.enable_kvcache_int8 = True
         quant_network = ptq.apply(network.model)
         # calibrate
         for _, cell in network.name_cells().items():
@@ -443,19 +475,22 @@ def test_llama2_kvint8_predict_2stage(device, mode):
                                               name=kvcachemgr.value_past.name,
                                               requires_grad=False)
         quant_network = ptq.calibrate(quant_network)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         network.model = ascend_network
         mindspore.save_checkpoint(network, "test_llama2_kvint8_predict_2stage.ckpt")
         return fp_outputs
 
     def infer(inputs):
         network = llama2(8, 512, 2048, 2, use_past=True)
-        ptq = RTN()
-        ptq.set_linear_w8a16(False)
-        ptq.set_kv_int8_quant(True)
-        ptq.set_deploy(True)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND)
+        ptq = RTN(config=cfg)
+        # pylint: disable=W0212
+        ptq._config.weight_only = False
+        # pylint: disable=W0212
+        ptq._config.enable_kvcache_int8 = True
         quant_network = ptq.apply(network.model)
-        ascend_network = ptq.convert(quant_network, backend=Backend.GE_ASCEND)
+        ascend_network = ptq.convert(quant_network)
         network.model = ascend_network
         mindspore.load_checkpoint("test_llama2_kvint8_predict_2stage.ckpt", network)
         return network(*inputs)

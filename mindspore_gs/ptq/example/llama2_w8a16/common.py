@@ -15,10 +15,12 @@
 """Quant llama2."""
 
 
+import time
 import mindspore as ms
 from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig
-from mindspore_gs import Backend
-from mindspore_gs.ptq import RoundToNearestPTQ as RTN
+from mindspore_gs.ptq import PTQConfig, PTQMode
+from mindspore_gs.common import BackendTarget
+from mindspore_gs.ptq import RoundToNearest as RTN
 
 
 def _set_config(config_path, device_id):
@@ -45,7 +47,7 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
         use_parallel = True
         model_parallel = model_parallel
     else:
-        compute_dtype = ms.bfloat16
+        compute_dtype = ms.float16
         use_parallel = False
         model_parallel = 1
     config = _set_config(config_path, device_id)
@@ -54,8 +56,8 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     config.model.model_config.compute_dtype = compute_dtype
     config.model.model_config.layernorm_compute_type = ms.float32
     config.model.model_config.softmax_compute_type = ms.float16
-    config.model.model_config.rotary_dtype = ms.float32
-    config.model.model_config.param_init_type = ms.float32
+    config.model.model_config.rotary_dtype = ms.float16
+    config.model.model_config.param_init_type = ms.float16
     config.processor.tokenizer.vocab_file = tokenizer_path
     config.load_checkpoint = ckpt_path
     config.model.model_config.checkpoint_name_or_path = ckpt_path
@@ -64,16 +66,24 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     return config
 
 
-def quant_llama2(network: LlamaForCausalLM, backend: Backend = Backend.GE_ASCEND, is_deploy: bool = False):
+def quant_llama2(network: LlamaForCausalLM,
+                 mode: str = PTQMode.QUANTIZE,
+                 backend: str = BackendTarget.ASCEND):
     """Quant llama2 model to w8a16 with RTN algorithm."""
-    if not is_deploy:
+    if mode == PTQMode.QUANTIZE.value:
         print("Use RTN algo to quant network and weight.", flush=True)
     else:
         print("Use RTN algo to quant network.", flush=True)
-    ptq = RTN()
-    ptq.set_linear_w8a16(True)
-    ptq.set_deploy(is_deploy)
+    cfg = PTQConfig(mode=mode, backend=backend)
+    ptq = RTN(config=cfg)
+    start = time.time()
     qnet = ptq.apply(network.model)
-    qnet = ptq.convert(qnet, backend=backend)
+    end = time.time()
+    print(f'fake quantize cost time is {end - start}')
+
+    start = time.time()
+    qnet = ptq.convert(qnet)
+    end = time.time()
+    print(f'convert to real quantize cost time is {end - start}')
     network.model = qnet
     return network

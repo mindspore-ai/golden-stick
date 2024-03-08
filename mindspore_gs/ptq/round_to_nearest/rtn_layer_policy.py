@@ -20,8 +20,8 @@ from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
+from mindspore_gs.ptq.ptq_config import PTQConfig
 from mindformers import Linear
-from .rtn_config import RTNConfig
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
 from ..quant_cells import LinearQuant, KVCacheMgrQuant
 
@@ -35,9 +35,9 @@ class RTNLayerPolicy(LayerPolicy, abc.ABC):
         ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` ``one_conv_fold``.
     """
 
-    def __init__(self, weight_names: [], act_names: [], config: RTNConfig = RTNConfig()):
+    def __init__(self, weight_names: [], act_names: [], config: PTQConfig = PTQConfig()):
         super(RTNLayerPolicy, self).__init__()
-        self._config: RTNConfig = config
+        self._config: PTQConfig = config
         if config.weight_quant_dtype == QuantDtype.INT8:
             self._num_bits = 8
         else:
@@ -69,7 +69,7 @@ class RTNLayerPolicy(LayerPolicy, abc.ABC):
                                               quant_dtype=self._config.weight_quant_dtype,
                                               narrow_range=self._config.weight_narrow_range, strategy=strategy)
         weight_quantizer.set_attr("position", "weight")
-        weight_quantizer.set_attr("weight_only_quant", self._config.enable_linear_w8a16)
+        weight_quantizer.set_attr("weight_only_quant", self._config.weight_only)
         return weight_quantizer
 
     def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
@@ -86,7 +86,7 @@ class RTNLayerPolicy(LayerPolicy, abc.ABC):
         quantizer.set_attr("position", "output")
         return quantizer
 
-    def get_config(self) -> RTNConfig:
+    def get_config(self) -> PTQConfig:
         return self._config
 
     @abc.abstractmethod
@@ -98,10 +98,10 @@ class LinearLayerPolicy(RTNLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
     """
-    def __init__(self, weight_names: [], act_names: [], config: RTNConfig = RTNConfig()):
+    def __init__(self, weight_names: [], act_names: [], config: PTQConfig = PTQConfig()):
         super().__init__(weight_names, act_names, config)
         self.set_input_number(1)
-        if config.enable_linear_w8a16:
+        if config.weight_only:
             self.set_input_not_insert_fq()
             self.set_output_not_insert_fq()
 
@@ -113,7 +113,7 @@ class KVCacheMgrPolicy(RTNLayerPolicy):
     """
     Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
     """
-    def __init__(self, weight_names: [], act_names: [], config: RTNConfig = RTNConfig()):
+    def __init__(self, weight_names: [], act_names: [], config: PTQConfig = PTQConfig()):
         super().__init__(weight_names, act_names, config)
         self.set_input_number(3)
         self.set_input_not_insert_fq(2)

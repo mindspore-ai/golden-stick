@@ -17,9 +17,10 @@ import argparse
 
 import mindspore as ms
 from mindspore import context
-from mindspore_gs import Backend
 from mindformers import LlamaForCausalLM, LlamaTokenizer, BaseModel
 from common import create_mfconfig, quant_llama2
+from mindspore_gs.ptq import PTQMode
+from mindspore_gs.common import BackendTarget
 
 
 def get_args():
@@ -56,7 +57,7 @@ def chat(net: BaseModel, tokenizer_: LlamaTokenizer, max_length, use_parallel: b
 
 if __name__ == "__main__":
     uargs = get_args()
-    seq_length = 2048
+    seq_length = 256
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     config = create_mfconfig(uargs.config_path, uargs.device_id, 1, seq_length, uargs.tokenizer_path,
                              model_parallel=uargs.parallel)
@@ -64,7 +65,7 @@ if __name__ == "__main__":
     network.set_train(False)
     network.phase = 'predict'
     if uargs.quant:
-        network = quant_llama2(network, Backend.GE_ASCEND, True)
+        network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
     ms.load_checkpoint(uargs.ckpt_path, network)
     tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
     chat(network, tokenizer, seq_length, uargs.parallel > 1)
