@@ -14,12 +14,12 @@
 # ============================================================================
 """RTNNetPolicy."""
 
-from mindformers.modules import Linear, KVCacheMgr
+from mindformers.modules import Linear
 from mindspore.rewrite import PatternEngine
 
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.ptq_config import PTQConfig
-from .rtn_layer_policy import LinearLayerPolicy, KVCacheMgrPolicy
+from .rtn_layer_policy import LinearLayerPolicy
 
 
 class RTNNetPolicy(NetPolicy):
@@ -44,6 +44,4 @@ class RTNNetPolicy(NetPolicy):
             return
         if self._config.weight_only:
             self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
-        if self._config.enable_kvcache_int8:
-            self._layer_policy_map[KVCacheMgr] = KVCacheMgrPolicy([], [], self._config)
         self._build = True

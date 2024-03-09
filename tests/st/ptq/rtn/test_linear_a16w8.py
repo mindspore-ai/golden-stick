@@ -275,7 +275,6 @@ def test_llama2_woq_apply_convert(device, mode):
     assert check_network_contain_layer(network, Linear)
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = RTN(config=cfg)
-    ptq.set_linear_w8a16(True)
     quant_network = ptq.apply(network.model)
     assert not check_network_contain_layer(quant_network, Linear, (LinearQuant,))
     assert check_network_contain_layer(quant_network, LinearQuant)

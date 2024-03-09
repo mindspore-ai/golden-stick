@@ -19,11 +19,9 @@ from typing import Tuple
 
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
-from mindspore.common.dtype import QuantDtype
 import mindspore.log as logger
 
 from mindspore_gs import CompAlgo
-from mindspore_gs.validator import Validator
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.processor import Processor
@@ -62,165 +60,6 @@ class RoundToNearest(CompAlgo):
         """Create SimulatedQuantizationConfig."""
         self._config = PTQConfig()
 
-    def set_act_per_channel(self, act_per_channel):
-        """
-        Set value of act_per_channel of RoundToNearestPTQ `config`
-
-        Args:
-            act_per_channel (bool): Quantization granularity based on layer or on channel. If ``True`` then base on
-                per channel, otherwise base on per layer. Only support ``False`` now.
-
-        Raises:
-            TypeError: If `act_per_channel` is not bool.
-            ValueError: Only supported if `act_per_channel` is ``False`` yet.
-        """
-        Validator.check_bool(act_per_channel, "act_per_channel", self.__class__.__name__)
-        if act_per_channel:
-            raise ValueError(f'Only supported if `act_per_channel` is False yet.')
-        self._config.act_per_channel = act_per_channel
-
-    def set_weight_per_channel(self, weight_per_channel):
-        """
-        Set value of weight_per_channel of RoundToNearestPTQ `config`
-
-        Args:
-            weight_per_channel (bool): Quantization granularity based on layer or on channel. If ``True`` then base on
-                per channel, otherwise base on per layer.
-
-        Raises:
-            TypeError: If `weight_per_channel` is not bool.
-        """
-        Validator.check_bool(weight_per_channel, "weight_per_channel", self.__class__.__name__)
-        if not weight_per_channel:
-            raise ValueError("Only supported if `weight_per_channel` is `True` yet.")
-        self._config.weight_per_channel = weight_per_channel
-
-    def set_act_quant_dtype(self, act_quant_dtype):
-        """
-        Set value of act_quant_dtype of RoundToNearestPTQ `config`
-
-        Args:
-            act_quant_dtype (QuantDtype): Datatype used to quantize activations.
-
-        Raises:
-            TypeError: If `act_quant_dtype` is not QuantDtype.
-            ValueError: Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.
-        """
-        if not isinstance(act_quant_dtype, QuantDtype):
-            raise TypeError(f'The parameter `act quant dtype` must be isinstance of QuantDtype, '
-                            f'but got {act_quant_dtype}.')
-        if act_quant_dtype != QuantDtype.INT8:
-            raise ValueError("Only supported if `act_quant_dtype` is `QuantDtype.INT8` yet.")
-        self._config.act_quant_dtype = act_quant_dtype
-
-    def set_weight_quant_dtype(self, weight_quant_dtype):
-        """
-        Set value of weight_quant_dtype of RoundToNearestPTQ `config`.
-
-        Args:
-            weight_quant_dtype (QuantDtype): Datatype used to quantize weight.
-
-        Raises:
-            TypeError: If `weight_quant_dtype` is not QuantDtype.
-            ValueError: Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.
-        """
-        if not isinstance(weight_quant_dtype, QuantDtype):
-            raise TypeError(f'The parameter `weight quant dtype` must be isinstance of QuantDtype, '
-                            f'but got {weight_quant_dtype}.')
-        if weight_quant_dtype != QuantDtype.INT8:
-            raise ValueError("Only supported if `weight_quant_dtype` is `QuantDtype.INT8` yet.")
-        self._config.weight_quant_dtype = weight_quant_dtype
-
-    def set_act_symmetric(self, act_symmetric):
-        """
-        Set value of act_symmetric of RoundToNearestPTQ `config`.
-
-        Args:
-            act_symmetric (bool): Whether the quantization algorithm use act symmetric or not. If ``True`` then base on
-                symmetric, otherwise base on asymmetric.
-
-        Raises:
-            TypeError: If `act_symmetric` is not bool.
-        """
-        Validator.check_bool(act_symmetric, "act_symmetric", self.__class__.__name__)
-        if not act_symmetric:
-            raise ValueError("Only supported if `act_symmetric` is `True` yet.")
-        self._config.act_symmetric = act_symmetric
-
-    def set_weight_symmetric(self, weight_symmetric):
-        """
-        Set value of weight_symmetric of RoundToNearestPTQ `config`
-
-        Args:
-            weight_symmetric (bool): Whether the quantization algorithm use weight symmetric or not. If ``True`` then
-                base on symmetric, otherwise base on asymmetric.
-
-        Raises:
-            TypeError: If `weight_symmetric` is not bool.
-        """
-        Validator.check_bool(weight_symmetric, "weight_symmetric", self.__class__.__name__)
-        if not weight_symmetric:
-            raise ValueError("Only supported if `weight_symmetric` is `True` yet.")
-        self._config.weight_symmetric = weight_symmetric
-
-    def set_act_narrow_range(self, act_narrow_range):
-        """
-        Set value of act_narrow_range of RoundToNearestPTQ `config`
-
-        Args:
-            act_narrow_range (bool): Whether the quantization algorithm use act narrow_range or not. If ``True`` then
-                base on narrow_range, otherwise base on not narrow_range.
-
-        Raises:
-            TypeError: If `act_narrow_range` is not bool.
-        """
-        Validator.check_bool(act_narrow_range, "act_narrow_range", self.__class__.__name__)
-        if act_narrow_range:
-            raise ValueError("Only supported if `act_narrow_range` is `False` yet.")
-        self._config.act_narrow_range = act_narrow_range
-
-    def set_weight_narrow_range(self, weight_narrow_range):
-        """
-        Set value of weight_narrow_range of RoundToNearestPTQ `config`
-
-        Args:
-            weight_narrow_range (bool): Whether the quantization algorithm use weight narrow_range or not. If
-                ``True`` then base on narrow_range, otherwise base on not narrow_range.
-
-        Raises:
-            TypeError: If `weight_narrow_range` is not bool.
-        """
-        Validator.check_bool(weight_narrow_range, "weight_narrow_range", self.__class__.__name__)
-        if weight_narrow_range:
-            raise ValueError("Only supported if `weight_narrow_range` is `False` yet.")
-        self._config.weight_narrow_range = weight_narrow_range
-
-    def set_linear_w8a16(self, is_enable: bool):
-        """
-        Set value of weight_only of RoundToNearestPTQ `config`
-
-        Args:
-            is_enable (bool): Whether enable Linear W8A16 quant algorithm.
-
-        Raises:
-            TypeError: If `is_enable` is not bool.
-        """
-        Validator.check_bool(is_enable, "is_enable_linear_w8a16", self.__class__.__name__)
-        self._config.enable_linear_w8a16 = is_enable
-
-    def set_kv_int8_quant(self, is_enable: bool):
-        """
-        Set value of weight_only of RoundToNearestPTQ `config`
-
-        Args:
-            is_enable (bool): Whether enable KVCache Int8 quant algorithm.
-
-        Raises:
-            TypeError: If `is_enable` is not bool.
-        """
-        Validator.check_bool(is_enable, "is_enable_kvcache_int8", self.__class__.__name__)
-        self._config.enable_kvcache_int8 = is_enable
-
     @staticmethod
     def _convert2list(name, value):
         if not isinstance(value, list) and not isinstance(value, tuple):
@@ -231,24 +70,6 @@ class RoundToNearest(CompAlgo):
 
     def _update_config_from_dict(self, config: dict):
         """Create RoundToNearestPTQ `config` from a dict"""
-        quant_dtype_list = RoundToNearest. \
-            _convert2list("quant dtype", config.get("quant_dtype", [QuantDtype.INT8, QuantDtype.INT8]))
-        per_channel_list = RoundToNearest._convert2list("per channel", config.get("per_channel", [False, True]))
-        symmetric_list = RoundToNearest._convert2list("symmetric", config.get("symmetric", [True, True]))
-        narrow_range_list = RoundToNearest._convert2list("narrow range", config.get("narrow_range", [False, False]))
-
-        self.set_act_quant_dtype(quant_dtype_list[0])
-        self.set_weight_quant_dtype(quant_dtype_list[-1])
-        self.set_act_per_channel(per_channel_list[0])
-        self.set_weight_per_channel(per_channel_list[-1])
-        self.set_act_symmetric(symmetric_list[0])
-        self.set_weight_symmetric(symmetric_list[-1])
-        self.set_act_narrow_range(narrow_range_list[0])
-        self.set_weight_narrow_range(narrow_range_list[-1])
-        if config.get("enable_kvcache_int8") is not None:
-            self.set_kv_int8_quant(config["enable_kvcache_int8"])
-        if config.get("enable_linear_w8a16") is not None:
-            self.set_linear_w8a16(config["enable_linear_w8a16"])
 
     def apply(self, network: Cell) -> Cell:
         """Apply"""
@@ -292,13 +113,6 @@ class RoundToNearest(CompAlgo):
 
         _process(network)
         return network
-
-    def set_deploy(self, is_deploy: bool = True):
-        """
-        Set algorithm exchange to deploy mode. In deploy mode, algorithm will not statistic quant parameter and not
-        quant weight anymore, only load quant parameter and quanted weight from checkpoint instead.
-        """
-        self._is_deploy = is_deploy
 
     @staticmethod
     def fix_param_after_load_ckpt(network):
