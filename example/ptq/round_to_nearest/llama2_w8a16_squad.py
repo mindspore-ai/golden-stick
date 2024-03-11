@@ -16,14 +16,15 @@
 import argparse
 
 import numpy as np
-import mindspore as ms
-from mindspore import context
 from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import EmF1Metric
+import mindspore as ms
+from mindspore import context
+from mindspore import log as logger
 from mindspore_gs.datasets import create_squad_dataset
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
-from common import create_mfconfig, quant_llama2
+from .common import create_mfconfig, quant_llama2
 
 
 def evaluate(net: LlamaForCausalLM, dataset_path, vocab_file, cfg):
@@ -45,7 +46,7 @@ def evaluate(net: LlamaForCausalLM, dataset_path, vocab_file, cfg):
     total_count = ds.get_dataset_size()
     for _, inputs in enumerate(ds.create_dict_iterator()):
         data_count += 1
-        print(f"Dataset count: {data_count}/{total_count}", flush=True)
+        logger.info(f"Dataset count: {data_count}/{total_count}")
         input_ids = inputs['input_ids'].asnumpy()
         labels = inputs['labels'].asnumpy()
 
@@ -73,12 +74,12 @@ def get_args():
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--device_id', '-d', type=int, required=True)
     parser.add_argument('--ckpt_path', '-k', type=str, required=True)
-    parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
+    parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     parser.add_argument('--parallel', '-p', type=int, default=1)
     args = parser.parse_args()
-    print(f"-------------------------------------------------evaluate args: {args}", flush=True)
+    logger.info(f"-------------------------------------------------evaluate args: {args}")
     return args
 
 
@@ -89,8 +90,8 @@ if __name__ == "__main__":
                              model_parallel=uargs.parallel)
 
     network = LlamaForCausalLM(config.model.model_config)
-    network.set_train(False)
     network.phase = 'predict'
+    network.set_train(False)
 
     if uargs.quant:
         network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)

@@ -15,23 +15,25 @@
 """Quant llama2 7b to w8a16."""
 import argparse
 
-import mindspore as ms
-from mindspore import context
 from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import PerplexityMetric
+import mindspore as ms
+from mindspore import context
+from mindspore import log as logger
 from mindspore_gs.datasets import create_wikitext_dataset
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
-from common import create_mfconfig, quant_llama2
+from .common import create_mfconfig, quant_llama2
 
 
 def evaluate(net, dataset_path, bs, seq_len, vocab_file):
+    """evaluate."""
     tokenizer = LlamaTokenizer(vocab_file=vocab_file)
     ds = create_wikitext_dataset(dataset_path, bs, seq_len, tokenizer)
     metrics = {"PerplexityMetric": PerplexityMetric()}
     model = ms.Model(net, metrics=metrics, eval_network=net)
     output = model.eval(ds, dataset_sink_mode=config.runner_config.sink_mode)
-    print(f"PPL: {output}")
+    print(f"PPL: {output}", flush=True)
 
 
 def get_args():
@@ -45,7 +47,7 @@ def get_args():
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     parser.add_argument('--parallel', '-p', type=int, default=1)
     args = parser.parse_args()
-    print(f"-------------------------------------------------evaluate args: {args}", flush=True)
+    logger.info(f"-------------------------------------------------evaluate args: {args}")
     return args
 
 
