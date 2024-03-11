@@ -37,7 +37,7 @@ class MinMaxHolder(nn.Cell):
         return self._fq(x, self._min, self._max)
 
     # pylint: disable=W0613
-    def shard(self, in_strategy, out_strategy=None, parameter_plan=None, device="Ascend", level=0):
+    def shard(self, in_strategy):
         self._fq = self._fq.shard(in_strategy)
 
 
@@ -77,33 +77,42 @@ class MinMaxPerLayer(LinearFakeQuantizer):
         return x
 
     def foo_init(self):
+        """foo init"""
         self.float_min = Parameter(initializer('ones', self.float_min.shape, self.float_min.dtype),
                                    name=self.float_min.name)
         self.float_max = Parameter(initializer('ones', self.float_max.shape, self.float_max.dtype),
                                    name=self.float_max.name)
 
     def mins(self) -> Union[list, tuple]:
+        """mins"""
         return self.float_min.data.asnumpy().tolist()
 
     def maxs(self) -> Union[list, tuple]:
+        """maxs"""
         return self.float_max.data.asnumpy().tolist()
 
     def num_bits(self) -> int:
+        """num bits"""
         return 8
 
     def narrow_range(self) -> bool:
+        """narrow range"""
         return self._narrow_range
 
     def symmetric(self) -> bool:
+        """symmetric"""
         return self._symmetric
 
     def quant_dtype(self) -> QuantDtype:
+        """quant dtype"""
         return self._quant_dtype
 
     def is_per_channel(self) -> bool:
+        """is per channel"""
         return False
 
     def convert_to_ascend(self):
+        """convert to ascend"""
         fake_quant = Q.FakeQuantPerLayer(num_bits=self.num_bits(), symmetric=self.symmetric())
         fq_cell = MinMaxHolder(fake_quant, self.float_min, self.float_max)
         if self._in_strategy:

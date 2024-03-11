@@ -21,6 +21,8 @@ from mindspore.ops import operations as P
 from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
+from mindformers.modules import Linear
+
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_cell import QuantCell
@@ -29,7 +31,6 @@ from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.ptq.convert_utils import (
     convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant
 )
-from mindformers.modules import Linear
 
 
 class PTQCell(QuantCell):
@@ -168,6 +169,7 @@ class LinearQuant(PTQCell):
                 self._quant_deployed = True
 
     def calibrate(self):
+        """calibrate for weight quant"""
         logger.info(f"Calibrating weight of Linear Cell: {self._linear.weight.name}")
         self._weight_quantizer(self._linear.weight)
 

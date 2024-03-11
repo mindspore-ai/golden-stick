@@ -40,6 +40,7 @@ class AntiQuantCell(Cell):
         self.zp0 = Parameter(Tensor(0., dtype=self.outdtype), requires_grad=False)
 
     def construct(self, x):
+        """forward for antiquant"""
         x = self.anti_quant(x, self.scale1, self.zp0)
         x = self.cast(x, self.outdtype)
         x = self.add(x, self.zp_neg)
@@ -48,6 +49,7 @@ class AntiQuantCell(Cell):
         return x
 
     def shard(self, strategy):
+        """shard strategy for anti quant"""
         self.anti_quant.shard(strategy)
 
 
@@ -94,16 +96,19 @@ class QuantCell(Cell):
         self.quant = Quant(self.t_scale.asnumpy().tolist()[0], self.t_zp.asnumpy().tolist()[0])
 
     def update_ascend_quant(self):
+        """update params in quant"""
         self.quant.add_prim_attr('scale', self.t_scale.asnumpy().tolist()[0])
         self.quant.add_prim_attr('offset', self.t_zp.asnumpy().tolist()[0])
 
     def construct(self, x):
+        """construct network forward"""
         if self._is_perchannel:
             x = self.mul(x, self.mul_param)
             x = self.add(x, self.add_param)
         return self.quant(x)
 
     def shard(self, strategy):
+        """shard strategy for quant cell"""
         self.quant.shard(strategy)
 
 
@@ -134,6 +139,7 @@ class DequantCell(Cell):
 
     @staticmethod
     def _trans_fp32_to_u64(scale_fp32: list):
+        """transport fp32 data to uint64"""
         fp32_scale_deq = np.array(scale_fp32, dtype=np.float32)
         ui32_scale_deq = np.frombuffer(fp32_scale_deq, np.uint32)
         ui64_scale_deq = np.zeros(fp32_scale_deq.shape, np.uint64)
@@ -141,6 +147,7 @@ class DequantCell(Cell):
         return ui64_scale_deq.tolist()
 
     def construct(self, x):
+        """dequant forward"""
         return self.dequant(x, self.scale)
 
 
@@ -182,10 +189,12 @@ class AntiquantBMMCell(Cell):
                   x,
                   weight,
                   bias=None):
+        """forward for antiquant bmm cell"""
         out = self.weight_qbmm(x, weight, self.scale, self.zp_neg, None, None, bias)
         return self.cast(out, self.out_dtype)
 
     def shard(self, strategy):
+        """shard strategy for antiquant bmm"""
         self.weight_qbmm.shard(strategy)
 
 
