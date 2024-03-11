@@ -15,11 +15,11 @@
 """Quant llama2 7b to w8a16."""
 import argparse
 
-import mindspore as ms
 from mindformers import LlamaForCausalLM
-from common import quant_llama2, create_mfconfig
+import mindspore as ms
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
+from .common import quant_llama2, create_mfconfig
 
 
 def get_args():

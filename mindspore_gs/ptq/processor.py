@@ -36,5 +36,5 @@ class Processor(abc.ABC):
             if new_cell is not cell:
                 root.insert_child_to_cell(name, new_cell)
             if not is_end_point:
-                self.process(new_cell)
+                _ = self.process(new_cell)
         return root
