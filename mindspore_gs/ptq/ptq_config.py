@@ -85,8 +85,12 @@ class PTQConfig:
     """
     Config for post trainning quantization.
     Args:
-        mode(PTQMode): flag for ptq mode, QUANTIZATION for quantization mode, DEPLOY for deploy mode.
-        backend(BackendTarget): flag for backend target, NONE for no specific backend, ASCEND for ascend backend.
+        mode (PTQMode): Flag for ptq mode, ``QUANTIZATION`` for quantization mode, ``DEPLOY`` for deploy mode.
+        backend (BackendTarget): Flag for backend target, ``NONE`` for no specific backend, ``ASCEND`` for
+                                 ascend backend.
+    Raises:
+        ValueError: If `mode` is not in PTQMode's members.
+        ValueError: If `backend` is not in BackendTarget's members.
     Example:
         >>> from mindspore_gs import PTQConfig, PTQMode, BackendTarget
         >>> ascend_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)

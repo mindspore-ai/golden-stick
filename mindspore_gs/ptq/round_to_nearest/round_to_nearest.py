@@ -33,7 +33,13 @@ from .rtn_net_policy import RTNNetPolicy
 
 
 class RoundToNearest(CompAlgo):
-    """MinMaxPTQ"""
+    """
+    Native implementation for post training quantization based on min/max statistic values.
+    Args:
+        config(PTQConfig): config for RoundToNearst, default is ``None``.
+    Raises:
+        TypeError: If `config` type is not PTQConfig when it's not ``None``.
+    """
 
     def __init__(self, config=None):
         super(RoundToNearest, self).__init__()
