@@ -20,10 +20,13 @@ from .comp_algo import CompAlgo, Backend
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 from .ghost import GhostAlgo
-from .ptq.ptq_config import PTQConfig
+from .ptq.ptq_config import PTQConfig, PTQMode
+from .common.gs_enum import BackendTarget
+from .ptq.round_to_nearest import RoundToNearest
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
-           "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo", 'PTQConfig']
+           "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo", 'PTQConfig', 'PTQMode', 'BackendTarget',
+           "RoundToNearest"]
 
 from .version import __version__, mindspore_version_check
 mindspore_version_check()

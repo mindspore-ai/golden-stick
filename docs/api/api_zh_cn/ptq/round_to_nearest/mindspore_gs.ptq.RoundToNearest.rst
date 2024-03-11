@@ -1,7 +1,7 @@
-mindspore_gs.ptq.RoundToNearst
+mindspore_gs.ptq.RoundToNearest
 ============================================================
 
-.. py:class:: mindspore_gs.ptq.RoundToNearst(config=None)
+.. py:class:: mindspore_gs.ptq.RoundToNearest(config=None)
 
     后量化算法的基本实现，通过统计最大最小值实现模型量化。
 

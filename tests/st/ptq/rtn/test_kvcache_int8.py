@@ -125,7 +125,8 @@ def test_apply_convert():
     assert value_output_quantizer.num_bits() == 8
 
     # calibrate
-    ptq.calibrate(network)
+    # pylint: disable=W0212
+    ptq._calibrate(network)
 
     quant_params = key_input_quantizer.quant_params()
     min_data = np.array(quant_params.get("min"))
@@ -183,7 +184,7 @@ def test_kvint8_predict_1stage(device, mode):
     # pylint: disable=W0212
     ptq._config.enable_kvcache_int8 = True
     quant_network = ptq.apply(network)
-    quant_network = ptq.calibrate(quant_network)
+    quant_network = ptq._calibrate(quant_network)
     ascend_network = ptq.convert(quant_network)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, KVCacheMgrQuant):
@@ -252,7 +253,7 @@ def test_kvint8_predict_2stage(device, mode):
         # pylint: disable=W0212
         ptq._config.enable_kvcache_int8 = True
         quant_network = ptq.apply(network)
-        quant_network = ptq.calibrate(quant_network)
+        quant_network = ptq._calibrate(quant_network)
         ascend_network = ptq.convert(quant_network)
         for _, cell in ascend_network.name_cells().items():
             if not isinstance(cell, KVCacheMgrQuant):
@@ -344,7 +345,7 @@ def test_llama2_kvint8_apply_convert(device, mode):
     cfg.enable_kvcache_int8 = True
 
     quant_network = ptq.apply(network.model)
-    quant_network = ptq.calibrate(quant_network)
+    quant_network = ptq._calibrate(quant_network)
     assert not check_network_contain_layer(quant_network, KVCacheMgr, (KVCacheMgrQuant,))
     assert check_network_contain_layer(quant_network, KVCacheMgrQuant)
     ascend_network = ptq.convert(quant_network)
@@ -407,7 +408,7 @@ def test_llama2_kvint8_predict_1stage(device, mode):
                                         requires_grad=False)
         kvcachemgr.value_past = Parameter(initializer('normal', kv_shape, kv_dtype), name=kvcachemgr.value_past.name,
                                           requires_grad=False)
-    quant_network = ptq.calibrate(quant_network)
+    quant_network = ptq._calibrate(quant_network)
 
     ascend_network = ptq.convert(quant_network)
     network.model = ascend_network
@@ -474,7 +475,7 @@ def test_llama2_kvint8_predict_2stage(device, mode):
             kvcachemgr.value_past = Parameter(initializer('normal', kv_shape, kv_dtype),
                                               name=kvcachemgr.value_past.name,
                                               requires_grad=False)
-        quant_network = ptq.calibrate(quant_network)
+        quant_network = ptq._calibrate(quant_network)
         ascend_network = ptq.convert(quant_network)
         network.model = ascend_network
         mindspore.save_checkpoint(network, "test_llama2_kvint8_predict_2stage.ckpt")
