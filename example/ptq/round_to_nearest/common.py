@@ -17,6 +17,7 @@
 
 import time
 import mindspore as ms
+from mindspore import log as logger
 from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
@@ -35,7 +36,7 @@ def _set_config(config_path, device_id):
     parallel_config = TransformerOpParallelConfig(**mfconfig.parallel_config)
     mfconfig.model.model_config.parallel_config = parallel_config
     mfconfig.model.model_config.checkpoint_name_or_path = mfconfig.load_checkpoint
-    print(mfconfig)
+    logger.info(mfconfig)
     return mfconfig
 
 
@@ -45,7 +46,6 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
         # MS parallel not support bfloat16 now.
         compute_dtype = ms.float16
         use_parallel = True
-        model_parallel = model_parallel
     else:
         compute_dtype = ms.float16
         use_parallel = False
@@ -66,24 +66,22 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     return config
 
 
-def quant_llama2(network: LlamaForCausalLM,
-                 mode: str = PTQMode.QUANTIZE,
-                 backend: str = BackendTarget.ASCEND):
+def quant_llama2(network: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND):
     """Quant llama2 model to w8a16 with RTN algorithm."""
     if mode == PTQMode.QUANTIZE.value:
-        print("Use RTN algo to quant network and weight.", flush=True)
+        logger.info("Use RTN algo to quant network and weight.")
     else:
-        print("Use RTN algo to quant network.", flush=True)
+        logger.info("Use RTN algo to quant network.")
     cfg = PTQConfig(mode=mode, backend=backend)
     ptq = RTN(config=cfg)
     start = time.time()
     qnet = ptq.apply(network.model)
     end = time.time()
-    print(f'fake quantize cost time is {end - start}')
+    logger.info(f'fake quantize cost time is {end - start}')
 
     start = time.time()
     qnet = ptq.convert(qnet)
     end = time.time()
-    print(f'convert to real quantize cost time is {end - start}')
+    logger.info(f'convert to real quantize cost time is {end - start}')
     network.model = qnet
     return network
