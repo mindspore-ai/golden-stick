@@ -28,7 +28,7 @@ class SQuADDataset(GeneratorDataset):
     """SQuAD dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100):
         self.path = os.path.join(path)
-        if not mode in ("eval", "train", "test"):
+        if mode not in ("eval", "train", "test"):
             raise ValueError("Input `mode` should be 'eval', 'test' or 'train', got: ", mode)
         self.mode = mode
         self.seq_len = seq_length
@@ -67,13 +67,20 @@ class SQuADDataset(GeneratorDataset):
                 query = paragraph["qas"][0]["question"]
                 answer = paragraph["qas"][0]["answers"][0]["text"]
 
-                input_str = f"Read the passage and answer the question below.\n\n### Instruction:\n{passage}\n\n### Input:\n{query}\n\n### Response:"
+                input_str = f"Read the passage and answer the question below.\n\n### " \
+                            f"Instruction:\n{passage}\n\n### Input:\n{query}\n\n### Response:"
                 sources.append(input_str)
                 targets.append(answer)
 
         total_items = 0
+        total_items = self._dataset_based_on_mode(sources, targets, total_items)
+        logger.info("Find %d total data items", total_items)
+
+    def _dataset_based_on_mode(self, sources, targets, total_items):
+        """create dataset based on mode"""
         self.input_ids.clear()
         self.labels.clear()
+        pad_mode = 'constant'
         if self.mode == "eval":
             for prompt, answer in zip(sources, targets):
                 total_items += 1
@@ -81,11 +88,11 @@ class SQuADDataset(GeneratorDataset):
                 if len(input_ids) >= self.seq_len:
                     input_ids = input_ids[:self.seq_len]
                 else:
-                    input_ids = np.pad(input_ids, (0, self.seq_len - len(input_ids)), 'constant',
+                    input_ids = np.pad(input_ids, (0, self.seq_len - len(input_ids)), pad_mode,
                                        constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
 
                 label_id = self.tokenizer.encode(answer, add_special_tokens=False)
-                label_id = np.pad(label_id, (0, self.seq_len - len(label_id)), 'constant',
+                label_id = np.pad(label_id, (0, self.seq_len - len(label_id)), pad_mode,
                                   constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
 
                 self.input_ids.append(Tensor(input_ids, dtype=dtype.int32))
@@ -104,14 +111,14 @@ class SQuADDataset(GeneratorDataset):
                 concat_length = len(input_ids)
 
                 pad_length = self.seq_len + 1 - concat_length
-                input_ids_new = np.pad(input_ids, (0, pad_length), 'constant',
+                input_ids_new = np.pad(input_ids, (0, pad_length), pad_mode,
                                        constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
                 label_id_new = copy.deepcopy(input_ids_new)
                 label_id_new[:prompt_length] = self.ignore_token_id
                 label_id_new[-pad_length:] = self.ignore_token_id
                 self.input_ids.append(Tensor(input_ids_new, dtype=dtype.int32))
                 self.labels.append(Tensor(label_id_new, dtype=dtype.int32))
-        logger.info("Find %d total data items", total_items)
+        return total_items
 
     def __next__(self):
         return next(self.iter_input_ids), next(self.iter_labels)
@@ -125,6 +132,7 @@ class SQuADDataset(GeneratorDataset):
 
 def create_squad_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
                          ignore_token_id=-100, repeat=1):
+    """create squad dataset"""
     ds = SQuADDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")

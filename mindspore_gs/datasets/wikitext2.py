@@ -100,6 +100,7 @@ class WikiText2Dataset(GeneratorDataset):
 
 
 def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, tokenizer: callable, repeat=1):
+    """ create wikitext dataset"""
     ds = WikiText2Dataset(ds_path, seq_length, tokenizer)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
