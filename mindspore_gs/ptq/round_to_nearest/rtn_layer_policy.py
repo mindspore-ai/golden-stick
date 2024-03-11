@@ -16,12 +16,12 @@
 
 import abc
 
+from mindformers import Linear
 from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from mindspore_gs.ptq.ptq_config import PTQConfig
-from mindformers import Linear
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
 from ..quant_cells import LinearQuant, KVCacheMgrQuant
 

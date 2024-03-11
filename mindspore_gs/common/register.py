@@ -16,11 +16,10 @@
 registers for ptq
 """
 from typing import Dict
-import mindspore.log as logger
 
-import mindspore.nn as nn
 from mindformers.modules import Linear
-
+import mindspore.log as logger
+import mindspore.nn as nn
 from mindspore_gs.common.gs_enum import QuantCellType
 
 
