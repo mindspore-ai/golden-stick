@@ -19,7 +19,7 @@ from mindformers import LlamaForCausalLM
 import mindspore as ms
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
-from .common import quant_llama2, create_mfconfig
+from common import create_mfconfig, quant_llama2
 
 
 def get_args():
