@@ -107,6 +107,7 @@ class PTQConfig:
             raise ValueError(f'{self.backend} is not supported, backend shall be in '
                              f'{BackendTarget.__members__.values()}')
 
+
 @dataclass
 class InnerPTQConfig(QuantizerConfig, PTQConfig):
     """
@@ -156,6 +157,7 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
                 self.algo_args.update(asdict(args_config()))
 
     def value_check(self):
+        """value check"""
         self.__post_init__()
 
     def _parse_dict(self):
