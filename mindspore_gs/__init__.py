@@ -16,9 +16,6 @@
 MindSpore golden stick module.
 """
 
-from .version import __version__, mindspore_version_check
-mindspore_version_check()
-
 from .comp_algo import CompAlgo, Backend
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
@@ -27,4 +24,7 @@ from .ptq.ptq_config import PTQConfig
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
            "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo", 'PTQConfig']
+
+from .version import __version__, mindspore_version_check
+mindspore_version_check()
 __all__.extend(__version__)
