@@ -24,7 +24,7 @@ from mindspore import log as logger
 from mindspore_gs.datasets import create_squad_dataset
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
-from .common import create_mfconfig, quant_llama2
+from common import create_mfconfig, quant_llama2
 
 
 def evaluate(net: LlamaForCausalLM, dataset_path, vocab_file, cfg):

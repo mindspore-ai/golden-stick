@@ -18,9 +18,9 @@ import argparse
 import mindspore as ms
 from mindspore import context
 from mindformers import LlamaForCausalLM, LlamaTokenizer, BaseModel
-from common import create_mfconfig, quant_llama2
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
+from common import create_mfconfig, quant_llama2
 
 
 def get_args():

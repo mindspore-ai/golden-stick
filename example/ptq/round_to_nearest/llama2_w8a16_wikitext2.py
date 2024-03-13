@@ -23,7 +23,7 @@ from mindspore import log as logger
 from mindspore_gs.datasets import create_wikitext_dataset
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
-from .common import create_mfconfig, quant_llama2
+from common import create_mfconfig, quant_llama2
 
 
 def evaluate(net, dataset_path, bs, seq_len, vocab_file):
