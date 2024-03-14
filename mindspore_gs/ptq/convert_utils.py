@@ -20,9 +20,10 @@ from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
 from mindspore.ops.operations._inner_ops import AntiQuant, Quant, Dequant
-from mindspore.ops.auto_generate import WeightQuantBatchMatmul
+from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
+from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 
 
 class AntiQuantCell(Cell):
@@ -133,18 +134,9 @@ class DequantCell(Cell):
     """DequantCell, warp Dequant to support zero-point."""
     def __init__(self, scale: list):
         super().__init__()
-        scale_ui64 = DequantCell._trans_fp32_to_u64(scale)
+        scale_ui64 = NumpyQuantOps.trans_fp32_to_u64(scale)
         self.scale = Parameter(Tensor(scale_ui64, dtype=dtype.uint64))
         self.dequant = Dequant()
-
-    @staticmethod
-    def _trans_fp32_to_u64(scale_fp32: list):
-        """transport fp32 data to uint64"""
-        fp32_scale_deq = np.array(scale_fp32, dtype=np.float32)
-        ui32_scale_deq = np.frombuffer(fp32_scale_deq, np.uint32)
-        ui64_scale_deq = np.zeros(fp32_scale_deq.shape, np.uint64)
-        ui64_scale_deq |= np.uint64(ui32_scale_deq)
-        return ui64_scale_deq.tolist()
 
     def construct(self, x):
         """dequant forward"""
@@ -226,3 +218,28 @@ def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell,
     if strategy is not None:
         anti_quant.shard(strategy)
     return anti_quant
+
+
+class DequantBMMCell(Cell):
+    """matmul and dequant fused cell"""
+
+    def __init__(self,
+                 scale,
+                 offset=None,
+                 transpose_a=False,
+                 transpose_b=False,
+                 dst_dtype=dtype.float16):
+        super().__init__()
+        self.dbmm = QuantBatchMatmul(transpose_x1=transpose_a,
+                                     transpose_x2=transpose_b,
+                                     dtype=dst_dtype)
+        scale_ui64 = NumpyQuantOps.trans_fp32_to_u64(scale)
+        self.scale = Parameter(Tensor(np.squeeze(scale_ui64), dtype=dtype.uint64))
+        if offset is None:
+            self.offset = Parameter(Tensor(np.zeros(self.scale.shape), dtype=dtype.float32))
+        else:
+            self.offset = Parameter(Tensor(offset, dtype=dtype.float32))
+
+    def construct(self, x1, x2, bias):
+        # (matmul(x1, x2) + bias) * scale + offset
+        return self.dbmm(x1, x2, self.scale, self.offset, bias)

@@ -19,10 +19,13 @@ import numpy as np
 
 from mindspore import Parameter, context, GRAPH_MODE, Tensor
 from mindspore import dtype as mstype
+from mindspore.nn import Cell
+from mindspore.ops.operations._inner_ops import Quant
+from mindspore.ops.auto_generate import QuantBatchMatmul
 
-from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
+from mindspore_gs.ptq.convert_utils import AntiquantBMMCell, QuantCell, DequantBMMCell
+from mindspore_gs.common.numpy_quant_common import NumpyQuantOps, NumpyFullQuant
 from tests.st.test_utils import relative_tolerance_acceptable
-from .quant_common import NumpyQuantOps
 
 
 @pytest.mark.level0
@@ -47,3 +50,152 @@ def test_weight_quant_bmm_cell_as_antiquant_1p():
     fact = wqmm_cell(t_activation, p_weight).asnumpy()
 
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+def test_quant_cell_1p():
+    """
+    Feature: quant tensor from fp16 to int8
+    Description: test quant ops
+    Expectation: accuracy in tolerance
+    """
+
+    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    activation = np.array([[0.1, 1.], [0.5, 2.4]]).astype(np.float16)
+    scale = np.array([0.5]).astype(np.float16)
+    offset = np.array([-10]).astype(np.float16)
+    expect = NumpyQuantOps.quant(activation, scale, offset)
+
+    quant_cell = QuantCell(Tensor(scale, dtype=mstype.float16),
+                           Tensor(offset, dtype=mstype.float16))
+    t_activation = Tensor(activation, dtype=mstype.float16)
+    fact = quant_cell(t_activation).asnumpy()
+
+    assert relative_tolerance_acceptable(fact, expect, 3e-2)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+def test_dequant_bmm_cell_1p():
+    """
+    Feature: a fused kernel which combine matmul and dequant ops
+    Description: test deqaunt batch matmul
+    Expectation: accuracy in tolerance
+    """
+
+    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    weight = np.array([[100, 120], [10, 25]]).astype(np.int32)
+    activation = np.array([[3, 1], [2, 5]]).astype(np.int32)
+    weight_scale = np.array([0.5, 0.27]).astype(np.float16)
+    activation_scale = np.array([0.3], dtype=np.float16)
+    dequant_scale = weight_scale * activation_scale
+    bias = np.zeros([2]).astype(np.int32)
+    expect = NumpyQuantOps.dequant(np.matmul(activation, weight) + bias, dequant_scale)
+
+    dequant_bmm_cell = DequantBMMCell(dequant_scale)
+    t_activation = Tensor(activation, dtype=mstype.int8)
+    p_weight = Parameter(Tensor(weight, dtype=mstype.int8), 'weight')
+    t_bias = Tensor(bias, dtype=mstype.int32)
+    fact = dequant_bmm_cell(t_activation, p_weight, t_bias).asnumpy()
+
+    assert relative_tolerance_acceptable(fact, expect, 3e-2)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_numpy_full_quant_with_bias_correction():
+    """
+    Feature: numpy implemented full quant process
+    Description: test numpy full quant with bias correction
+    Expectation: accuracy in tolerance
+    """
+    weight = np.array([[2., 4.], [1., 3.]]).astype(np.float16)
+    activation = np.array([[1, 10.], [12, 14]]).astype(np.float16)
+    weight_scale = np.array([0.5, 0.7]).astype(np.float16)
+    act_offset = np.array([10]).astype(np.float16)
+    activation_scale = np.array([0.5], dtype=np.float16)
+    bias = np.ones([2]).astype(np.float16)
+
+    net = NumpyFullQuant(weight_scale, activation_scale, act_offset)
+    orin_out = net.orin_process(activation, weight, bias)
+    quant_out = net.process(activation, weight, bias)
+    assert relative_tolerance_acceptable(orin_out, quant_out, 7e-2)
+
+
+class QuantDequantCell(Cell):
+    """matmul and dequant fused cell"""
+    def __init__(self,
+                 weight,
+                 weight_scale,
+                 act_scale,
+                 act_offset,
+                 bias,
+                 transpose_b=False,
+                 dst_dtype=mstype.float16):
+        super().__init__()
+        self.dbmm = QuantBatchMatmul(transpose_x1=False,
+                                     transpose_x2=transpose_b,
+                                     dtype=dst_dtype)
+        self.dequant_scale = self._dequant_scale(act_scale, weight_scale)
+        self.act_scale = act_scale
+        self.act_offset = act_offset
+        self.weight_scale = weight_scale
+
+        t_scale = 1.0 / act_scale
+        self.quant = Quant(t_scale.tolist()[0], act_offset.tolist()[0])
+
+        self.quant_weight = Tensor(NumpyQuantOps.quant(weight, weight_scale, 0), dtype=mstype.int8)
+        self.bias = Tensor(self._fused_bias(bias), dtype=mstype.int32)
+        self.dequant_offset = Parameter(Tensor(np.zeros(self.bias.shape), dtype=mstype.float32))
+
+    def _dequant_scale(self, act_scale, weight_scale):
+        dequant_scale = weight_scale * act_scale
+        scale_ui64 = NumpyQuantOps.trans_fp32_to_u64(dequant_scale)
+        return Parameter(Tensor(np.squeeze(scale_ui64), dtype=mstype.uint64))
+
+    def _fused_bias(self,
+                    bias):
+        bias_int32 = (bias / (self.act_scale * self.weight_scale)).astype(np.int32)
+        add_item = - np.sum(self.act_offset.astype(np.int32) * self.quant_weight.asnumpy().astype(np.int32),
+                            axis=0).astype(np.int32)
+        return bias_int32 + add_item
+
+    def construct(self, x):
+        quant_act = self.quant(x)
+        # (matmul(quant_act, x2) + bias) * scale + offset
+        return self.dbmm(quant_act, self.quant_weight,
+                         self.dequant_scale, self.dequant_offset, self.bias)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+def test_bias_correction_transpose_b_false():
+    """
+    Feature: test quant and dequant cell with bias correction
+    Description: test quant and dequant procedure correction
+    Expectation: accuracy in tolerance
+    """
+
+    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    weight = np.array([[2., 4.], [1., 3.]]).astype(np.float16)
+    activation = np.array([[1, 10.], [12, 14]]).astype(np.float16)
+    weight_scale = np.array([0.5, 0.7]).astype(np.float16)
+    act_offset = np.array([10]).astype(np.float16)
+    activation_scale = np.array([0.5], dtype=np.float16)
+    bias = np.ones([2]).astype(np.float16)
+
+    net = NumpyFullQuant(weight_scale, activation_scale, act_offset)
+    quant_out = net.process(activation, weight, bias)
+    cell = QuantDequantCell(weight,
+                            weight_scale,
+                            activation_scale,
+                            act_offset,
+                            bias)
+    t_activation = Tensor(activation, dtype=mstype.float16)
+    ms_quant_out = cell(t_activation).asnumpy()
+    assert relative_tolerance_acceptable(quant_out, ms_quant_out, 7e-2)
