@@ -51,8 +51,9 @@ class GSQuantDtype(Enum):
 class BackendTarget(Enum):
     """
     Mindspore backend target for cell convert.
-    NONE: indicate target cell is not for specific backend.
-    ASCEND: indicate target cell is for ascend backend.
+
+    - ``NONE``: indicate target cell is not for specific backend.
+    - ``ASCEND``: indicate target cell is for ascend backend.
     """
     NONE = 'none'
     ASCEND = 'ascend'
