@@ -251,7 +251,7 @@ def test_lenet_accuracy_bnoff_w1a8(quant_bit, enable_bn_calibration, run_mode):
     context.set_context(mode=run_mode)
     mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/")
     data_path = os.path.join(mnist_path, "mnist/train")
-    ds_train = create_mnist_ds(data_path, 32, 1)
+    ds_train = create_mnist_ds(data_path, 64, 1)
     network = LeNet5(10)
 
     # convert network to quantization aware network
