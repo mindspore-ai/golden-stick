@@ -7,7 +7,7 @@ Post training quantization algorithms.
 
     import mindspore_gs.ptq as ptq
 
-RoundToNearst Algorithm
+RoundToNearest Algorithm
 --------------------------------
 
 .. autosummary::
@@ -15,7 +15,7 @@ RoundToNearst Algorithm
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.ptq.RoundToNearst
+    mindspore_gs.ptq.RoundToNearest
 
 PTQ Config
 -------------

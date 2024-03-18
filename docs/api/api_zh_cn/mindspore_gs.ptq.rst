@@ -7,7 +7,7 @@ mindspore_gs.ptq
 
     import mindspore_gs.ptq as ptq
 
-RoundToNearst 算法
+RoundToNearest 算法
 --------------------------------
 
 .. mscnautosummary::
@@ -15,7 +15,7 @@ RoundToNearst 算法
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.ptq.RoundToNearst
+    mindspore_gs.ptq.RoundToNearest
 
 PTQ 配置
 -------------

@@ -33,10 +33,24 @@ from .rtn_net_policy import RTNNetPolicy
 class RoundToNearest(CompAlgo):
     """
     Native implementation for post training quantization based on min/max statistic values.
+
     Args:
-        config(PTQConfig): config for RoundToNearst, default is ``None``.
+        config(:class:`mindspore_gs.ptq.PTQConfig`): config for RoundToNearst, default is ``None``.
+
     Raises:
         TypeError: If `config` type is not PTQConfig when it's not ``None``.
+
+    Examples:
+        >>> import mindspore_gs
+        >>> from mindspore_gs import ptq
+        >>> from mindspore_gs.ptq import RoundToNearest as rtn
+        >>> from mindspore_gs.ptq import PTQConfig
+        >>> # Define the network structure of LeNet5. Refer to
+        >>> # https://gitee.com/mindspore/docs/blob/r2.2/docs/mindspore/code/lenet.py
+        >>> ptq = rtn()
+        >>> network = LeNet5()
+        >>> fake_quant_net = ptq.apply(net_work)
+        >>> quant_net = ptq.convert(fake_quant_net)
     """
 
     def __init__(self, config=None):
@@ -66,34 +80,18 @@ class RoundToNearest(CompAlgo):
         """Create SimulatedQuantizationConfig."""
         self._config = PTQConfig()
 
-    def apply(self, network: Cell) -> Cell:
-        """Apply"""
+    @staticmethod
+    def _convert2list(name, value):
+        if not isinstance(value, list) and not isinstance(value, tuple):
+            value = [value]
+        elif len(value) > 2:
+            raise ValueError("input `{}` len should be less than 3".format(name))
+        return value
 
-        if not isinstance(self._qat_policy, NetPolicy):
-            raise RuntimeError("Derived class should provide net policy")
-        self._qat_policy.build()
+    def _update_config_from_dict(self, config: dict):
+        """Create RoundToNearestPTQ `config` from a dict"""
 
-        class ApplyProcessor(Processor):
-            """A network iterator for applying algorithm on network."""
-            def __init__(self, ptq_policy):
-                self._ptq_policy = ptq_policy
-
-            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
-                if not isinstance(cell, Cell):
-                    return cell, True
-                layer_policy = self._ptq_policy.get_layer_policy(type(cell))
-                if layer_policy:
-                    new_layer_policy = copy.deepcopy(layer_policy)
-                    return new_layer_policy.wrap_cell(cell), True
-                return cell, False
-
-        ApplyProcessor(self._qat_policy).process(network)
-        if not self._is_deploy and self._config.weight_only:
-            network = self.calibrate(network)
-        network.update_parameters_name()
-        return network
-
-    def calibrate(self, network):
+    def _calibrate(self, network):
         """
         Start calibrating network and statistic quant parameters.
         """
@@ -110,7 +108,7 @@ class RoundToNearest(CompAlgo):
         return network
 
     @staticmethod
-    def fix_param_after_load_ckpt(network):
+    def _fix_param_after_load_ckpt(network):
         """
         Fix quant param after loaded checkpoint for some quant parameter is store in attribute of primitive. QuantCell
         is an example who's quant parameter is an attribute.
@@ -126,8 +124,59 @@ class RoundToNearest(CompAlgo):
         FixProcessor().process(network)
         network.update_parameters_name()
 
+    def apply(self, network: Cell) -> Cell:
+        """
+        Define how to add fake quantizer to `network`.
+
+        Args:
+            network (Cell): Network to be fake quantized.
+
+        Returns:
+            fake quantized network.
+        """
+
+        if not isinstance(self._qat_policy, NetPolicy):
+            raise RuntimeError("Derived class should provide net policy")
+        self._qat_policy.build()
+
+        class ApplyProcessor(Processor):
+            """A network iterator for applying algorithm on network."""
+
+            def __init__(self, ptq_policy):
+                self._ptq_policy = ptq_policy
+
+            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, Cell):
+                    return cell, True
+                layer_policy = self._ptq_policy.get_layer_policy(type(cell))
+                if layer_policy:
+                    new_layer_policy = copy.deepcopy(layer_policy)
+                    return new_layer_policy.wrap_cell(cell), True
+                return cell, False
+
+        ApplyProcessor(self._qat_policy).process(network)
+        if not self._is_deploy and self._config.weight_only:
+            network = self._calibrate(network)
+        network.update_parameters_name()
+        return network
+
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
-        """Implement method convert of super class."""
+        """
+        Define how to convert a compressed network to a standard network before exporting.
+
+        Args:
+            net_opt (Cell): Network to be converted which is transformed by `RoundToNearest.apply`.
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
+                checkpoint file to `net_opt`.
+
+        Returns:
+            An instance of Cell represents converted network.
+
+        Raises:
+            TypeError: If `net_opt` is not Cell.
+            TypeError: If `ckpt_path` is not string.
+            ValueError: If `ckpt_path` is not empty and invalid.
+        """
         if not isinstance(net_opt, Cell):
             raise TypeError(
                 f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')

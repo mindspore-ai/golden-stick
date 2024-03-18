@@ -40,8 +40,9 @@ class PTQApproach(Enum):
 class PTQMode(Enum):
     """
     Mode for ptq quantizer.
-    QUANTIZE: indicate ptq quantizer in quantize mode.
-    DEPLOY: indicate ptq quantizer in deploy mode.
+
+    - ``QUANTIZE``: indicate ptq quantizer in quantize mode.
+    - ``DEPLOY``: indicate ptq quantizer in deploy mode.
     """
     QUANTIZE = 'quantize'
     DEPLOY = 'deploy'
@@ -63,7 +64,7 @@ class SmoothQuantConfig:
 @dataclass
 class RTNConfig:
     """
-    Config for round to nearest algorithms
+    Config for round to nearest algorithms.
     """
 
 
@@ -84,15 +85,23 @@ class QuantizerConfig(GSBaseConfig):
 class PTQConfig:
     """
     Config for post trainning quantization.
+
     Args:
-        mode (PTQMode): Flag for ptq mode, ``QUANTIZATION`` for quantization mode, ``DEPLOY`` for deploy mode.
-        backend (BackendTarget): Flag for backend target, ``NONE`` for no specific backend, ``ASCEND`` for
-                                 ascend backend.
+        mode (:class:`mindspore_gs.ptq.PTQMode`): Flag for ptq mode, ``QUANTIZATION`` for quantization mode,
+            ``DEPLOY`` for deploy mode.
+        backend (:class:`mindspore_gs.ptq.BackendTarget`): Flag for backend target, ``NONE`` for no specific backend,
+            ``ASCEND`` for ascend backend.
+
     Raises:
         ValueError: If `mode` is not in PTQMode's members.
         ValueError: If `backend` is not in BackendTarget's members.
+
     Example:
-        >>> from mindspore_gs import PTQConfig, PTQMode, BackendTarget
+        >>> import mindspore_gs
+        >>> from mindspore_gs import ptq
+        >>> from mindspore_gs import common
+        >>> from mindspore_gs.ptq import PTQConfig, PTQMode
+        >>> from mindspore_gs.common import BackendTarget
         >>> ascend_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         >>> print(ascend_config)
         >>> PTQConfig(mode=<PTQMode.DEPLOY: 'deploy'>, backend=<BackendTarget.ASCEND: 'ascend'>)
