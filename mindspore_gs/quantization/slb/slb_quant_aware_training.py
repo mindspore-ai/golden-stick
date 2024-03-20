@@ -456,6 +456,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.
             ValueError: If `ckpt_path` is not empty and invalid.
+            RuntimeError: If loading `ckpt_path` fails.
         """
         if not isinstance(net_opt, Cell):
             raise TypeError(f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
