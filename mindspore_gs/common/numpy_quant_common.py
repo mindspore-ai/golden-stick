@@ -59,7 +59,7 @@ class NumpyQuantOps:
     def trans_fp32_to_u64(scale_fp32: list):
         """transport fp32 data to uint64"""
         fp32_scale_deq = np.array(scale_fp32, dtype=np.float32)
-        ui32_scale_deq = np.frombuffer(fp32_scale_deq, np.uint32)
+        ui32_scale_deq = np.frombuffer(fp32_scale_deq, np.uint32).reshape(fp32_scale_deq.shape)
         ui64_scale_deq = np.zeros(fp32_scale_deq.shape, np.uint64)
         ui64_scale_deq |= np.uint64(ui32_scale_deq)
         return ui64_scale_deq.tolist()
