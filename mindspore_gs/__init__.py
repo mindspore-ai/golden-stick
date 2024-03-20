@@ -16,12 +16,13 @@
 MindSpore golden stick module.
 """
 
-from .comp_algo import CompAlgo, Backend
+
+from .comp_algo import CompAlgo
+from .common import BackendTarget
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
 from .pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo, UniPruner
 from .ghost import GhostAlgo
 from .ptq.ptq_config import PTQConfig, PTQMode
-from .common.gs_enum import BackendTarget
 from .ptq.round_to_nearest import RoundToNearest
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
