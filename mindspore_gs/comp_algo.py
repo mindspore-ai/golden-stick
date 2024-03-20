@@ -153,7 +153,7 @@ class CompAlgo(abc.ABC):
                              f" {save_mindir_path}.")
         self._config.save_mindir_path = os.path.realpath(save_mindir_path)
 
-    def convert(self, net_opt: Cell, ckpt_path="") -> Cell: # for coding, convert to FakeQuantParam and then convert to target backend.
+    def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """
         Define how to convert a compressed network to a standard network before exporting to MindIR.
 

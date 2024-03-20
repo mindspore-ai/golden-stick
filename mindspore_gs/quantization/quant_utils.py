@@ -53,8 +53,8 @@ def cal_quantization_params(input_min,
 
     if input_min.shape != input_max.shape:
         raise ValueError("input min shape should be equal to input max.")
-    if (input_min > input_max).any():
-        raise ValueError("input_min should be smaller than input_max.")
+    #if (input_min > input_max).any():
+    #    raise ValueError("input_min should be smaller than input_max.")
     if (input_max == input_min).all():
         return np.ones(input_min.shape), np.zeros(input_min.shape)
 
@@ -315,3 +315,30 @@ def compute_kl_threshold(data, bitwidth):
     if threshold < 1e-5:
         threshold = 1e-5
     return threshold
+
+
+def quant_bias_data(tensor: Tensor, scale, dtype=ms.dtype.int32):
+    r"""
+    Calculate int32 bias from fp32. the formula is defined as:
+
+    .. math::
+        int32 = round(bias / (scale_weight * scale_act))
+
+    Args:
+        tensor (Tensor): The bias tensor to be quanted
+        scale (numpy.ndarray): The dimension of channel or 1.
+        dtype(ms.dtype): default is dtype.int32
+
+    Returns:
+        quanted_bias (Tensor): quanted bias tensor
+    """
+
+    quant_scale = Tensor(np.squeeze(scale))
+    quanted_data = ms.ops.round(tensor / quant_scale)
+    print(f'quanted_data is {quanted_data.asnumpy()}')
+    quant_min = -2 ** 31
+    quant_max = 2 ** 31 - 1
+    quanted_data = ms.ops.clamp(quanted_data, quant_min, quant_max)
+    quanted_data = ms.ops.cast(quanted_data, dtype)
+    print(f'quanted data shape is {quanted_data.shape}, quant data is {quanted_data}')
+    return quanted_data
