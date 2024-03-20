@@ -24,7 +24,7 @@ from mindspore.common import initializer as init
 from mindspore.common.dtype import QuantDtype
 from mindspore.common.tensor import Tensor
 from mindspore.common import dtype as mstype
-from mindspore_gs import Backend
+from mindspore_gs.common import BackendTarget
 from mindspore_gs.quantization.quant_utils import get_quant_dtype_num_bits
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
@@ -155,10 +155,10 @@ class Conv2dSlbQuant(QuantCell):
         weights_4d = reduce_sum(weights_5d, -1)
         return weights_4d
 
-    def convert(self, backend: Backend = Backend.MS, is_deploy=False):
+    def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
         if self._converted:
             return
-        if backend is not Backend.MS:
+        if backend is not BackendTarget.NONE:
             raise ValueError("Only support convert to MS Backend now, got: ", backend)
         super(Conv2dSlbQuant, self).convert(backend, is_deploy)
         self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
