@@ -123,7 +123,7 @@ context:
   enable_graph_kernel: False
   graph_kernel_flags: "--disable_expand_ops=Softmax,Dropout --enable_parallel_fusion=true --reduce_fuse_depth=8 --enable_auto_tensor_inplace=true"
   max_call_depth: 10000
-  max_device_memory: "28GB"
+  max_device_memory: "20GB"
   save_graphs: False
   save_graphs_path: "./graph"
   device_id: 0
@@ -147,8 +147,8 @@ model:
     compute_dtype: "bfloat16"
     layernorm_compute_type: "float32"
     softmax_compute_type: "float16"
-    rotary_dtype: "float32"
-    param_init_type: "float32"
+    rotary_dtype: "float16"
+    param_init_type: "float16"
     use_past: False
     pretrain_seqlen: 4096 # seqlen of the pretrain checkpoint: 2048 for llama and 4096 for llama2
     extend_method: "None" # support "None", "PI", "NTK"
