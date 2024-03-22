@@ -123,7 +123,7 @@ context:
   enable_graph_kernel: False
   graph_kernel_flags: "--disable_expand_ops=Softmax,Dropout --enable_parallel_fusion=true --reduce_fuse_depth=8 --enable_auto_tensor_inplace=true"
   max_call_depth: 10000
-  max_device_memory: "20GB"
+  max_device_memory: "16GB"
   save_graphs: False
   save_graphs_path: "./graph"
   device_id: 0
@@ -133,7 +133,7 @@ model:
   model_config:
     type: LlamaConfig
     batch_size: 1 # add for increase predict
-    seq_length: 2048
+    seq_length: 256
     hidden_size: 4096
     num_layers: 32
     num_heads: 32

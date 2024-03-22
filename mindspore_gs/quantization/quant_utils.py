@@ -335,10 +335,8 @@ def quant_bias_data(tensor: Tensor, scale, dtype=ms.dtype.int32):
 
     quant_scale = Tensor(np.squeeze(scale))
     quanted_data = ms.ops.round(tensor / quant_scale)
-    print(f'quanted_data is {quanted_data.asnumpy()}')
     quant_min = -2 ** 31
     quant_max = 2 ** 31 - 1
     quanted_data = ms.ops.clamp(quanted_data, quant_min, quant_max)
     quanted_data = ms.ops.cast(quanted_data, dtype)
-    print(f'quanted data shape is {quanted_data.shape}, quant data is {quanted_data}')
     return quanted_data

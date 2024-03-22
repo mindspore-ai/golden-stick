@@ -28,6 +28,7 @@ class WikiText2Dataset(GeneratorDataset):
         self.path = os.path.join(path)
         self.seq_len = seq_length
         self.tokenizer = tokenizer
+        self.pad_token_id = tokenizer.pad_token_id
         if hasattr(self.tokenizer, 'add_bos_token'):
             self.tokenizer.add_bos_token = True
         if hasattr(self.tokenizer, 'add_eos_token'):
@@ -46,9 +47,10 @@ class WikiText2Dataset(GeneratorDataset):
             for para in WikiText2Dataset._clean(f.read()).split("\n\n"):
                 if para and para.strip().startswith('=') is False:
                     input_content += self.tokenizer(para)['input_ids']
-        for chunk in WikiText2Dataset._chunks(input_content, self.seq_len):
-            if len(chunk) == self.seq_len:
-                self.content.append(Tensor(np.array(chunk, dtype=np.int32)))
+        for chunk in WikiText2Dataset._chunks(input_content, self.seq_len - 1):
+            if len(chunk) == self.seq_len - 1:
+                self.content.append(Tensor(np.pad(np.array(chunk, dtype=np.int32), (0, 1), 'constant',
+                                                  constant_values=self.pad_token_id)))
 
     @staticmethod
     def _clean(string):

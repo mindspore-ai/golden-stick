@@ -254,8 +254,8 @@ def train_network(ori_model_path, model_name, model_suffix, config_name, algo_rp
     else:
         exec_train_network_shell = "cd {}; bash {} {} {} {}; cd -" \
             .format(exec_path, script_name, algo_path, config_file, train_ds_path)
-    print("=" * 10, "start training {} in {} mode".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
-    print("Train cmd: {}".format(exec_train_network_shell), flush=True)
+    logger.info(f"{'=' * 10} start training {model_name} in {config.get_run_mode()} mode {'=' * 10}")
+    logger.info(f"Train cmd: {exec_train_network_shell}")
     ret = os.system(exec_train_network_shell)
     assert ret == 0
     cmd = "ps -ef | grep python | grep train.py | grep {} | grep -v grep".format(config_name)
@@ -267,7 +267,7 @@ def train_network(ori_model_path, model_name, model_suffix, config_name, algo_rp
         else:
             os.system("echo {}".format("No train log file exist: " + log_path))
         assert ret
-    print("=" * 10, "finish training {} in {} mode.".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
+    logger.info(f"{'=' * 10} finish training {model_name} in {config.get_run_mode()} mode {'=' * 10}")
     return model_path
 
 
@@ -333,8 +333,8 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
         assert False
     exec_eval_network_shell = "cd {}; bash {} {} {} {} {}; cd -" \
         .format(exec_path, script_name, algo_path, config_file, eval_ds_path, ckpt_file)
-    print("=" * 10, "start evaluating {} in {} mode".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
-    print("Eval cmd: {}".format(exec_eval_network_shell), flush=True)
+    logger.info(f"{'=' * 10} start evaluating {model_name} in {config.get_run_mode()} mode {'=' * 10}")
+    logger.info(f"Eval cmd: {exec_eval_network_shell}")
     ret = os.system(exec_eval_network_shell)
     assert ret == 0
     cmd = "ps -ef | grep python | grep eval.py | grep {} | grep -v grep".format(config_name)
@@ -346,7 +346,7 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
         else:
             os.system("echo {}".format("No eval log file exist: " + eval_log_file))
         assert ret
-    print("=" * 10, "finish evaluating {} in {} mode.".format(model_name, config.get_run_mode()), "=" * 10, flush=True)
+    logger.info(f"{'=' * 10} finish evaluating {model_name} in {config.get_run_mode()} mode {'=' * 10}")
 
     assert os.path.exists(eval_log_file)
     results = []
@@ -356,7 +356,7 @@ def eval_network(model_path, model_name, config_name, algo_rpath, script_name, c
             if match_result is not None:
                 results.append(float(match_result.group(1)))
     assert len(results) == 1
-    print("=" * 10, "LeNet {} mode accuracy: {}".format(config.get_run_mode(), results[0]), "=" * 10, flush=True)
+    logger.info(f"{'=' * 10} LeNet {config.get_run_mode()} mode accuracy: {results[0]} {'=' * 10}")
     return results[0]
 
 
@@ -370,7 +370,7 @@ def relative_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, toleranc
     """Calculate relative tolerance and check."""
     diff = relative_tolerance(data, ground)
     max_diff = np.max(diff)
-    print(f"------- relative_tolerance: \r\n{diff}, \r\nmax: {max_diff}", flush=True)
+    logger.info(f"relative_tolerance: \r\n{diff}, \r\nmax: {max_diff}")
     return max_diff < tolerance
 
 
@@ -383,5 +383,5 @@ def absolute_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, toleranc
     """Calculate relative tolerance and check."""
     diff = absolute_tolerance(data, ground)
     max_diff = np.max(diff)
-    print(f"------- absolute_tolerance: \r\n{diff}, \r\nmax: {max_diff}", flush=True)
+    logger.info(f"absolute_tolerance: \r\n{diff}, \r\nmax: {max_diff}")
     return max_diff < tolerance
