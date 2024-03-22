@@ -60,10 +60,10 @@ class RoundToNearest(CompAlgo):
                 raise TypeError(f'Shall init RTN with PTQConfig, bug got {type(config)}')
             self._config = config
         else:
-            self._config = PTQConfig()
+            self._create_config()
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig.inner_config(self._config)
-        self._qat_policy = RoundToNearest._init_net_policy(self._config)
+        self._ptq_policy = RoundToNearest._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
         self._is_deploy: bool = self._config.mode == PTQMode.DEPLOY
@@ -135,9 +135,9 @@ class RoundToNearest(CompAlgo):
             fake quantized network.
         """
 
-        if not isinstance(self._qat_policy, NetPolicy):
+        if not isinstance(self._ptq_policy, NetPolicy):
             raise RuntimeError("Derived class should provide net policy")
-        self._qat_policy.build()
+        self._ptq_policy.build()
 
         class ApplyProcessor(Processor):
             """A network iterator for applying algorithm on network."""
@@ -154,7 +154,7 @@ class RoundToNearest(CompAlgo):
                     return new_layer_policy.wrap_cell(cell), True
                 return cell, False
 
-        ApplyProcessor(self._qat_policy).process(network)
+        ApplyProcessor(self._ptq_policy).process(network)
         if not self._is_deploy and self._config.weight_only:
             network = self._calibrate(network)
         network.update_parameters_name()
@@ -209,6 +209,6 @@ class RoundToNearest(CompAlgo):
                     return cell, True
                 return cell, False
 
-        ConvertProcessor(self._qat_policy, self._is_deploy, self._config.backend).process(net_opt)
+        ConvertProcessor(self._ptq_policy, self._is_deploy, self._config.backend).process(net_opt)
         net_opt.update_parameters_name()
         return net_opt

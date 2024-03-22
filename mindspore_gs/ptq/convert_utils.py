@@ -1,4 +1,4 @@
-# Copyright 2023 Huawei Technologies Co., Ltd
+# Copyright 2023-2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
 from mindspore.ops.operations._inner_ops import AntiQuant, Quant, Dequant
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
-
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 
@@ -142,8 +141,12 @@ class DequantCell(Cell):
         """dequant forward"""
         return self.dequant(x, self.scale)
 
+    def shard(self, strategy):
+        self.dequant.shard(strategy)
 
-def convert_to_dequant(input_fqcell: FakeQuantParamCell, weight_fqcell: FakeQuantParamCell) -> DequantCell:
+
+def convert_to_dequant(input_fqcell: FakeQuantParamCell, weight_fqcell: FakeQuantParamCell, is_transpose=False,
+                       strategy=None) -> DequantCell:
     """Convert FakeQuantParamCell to DequantCell."""
     input_fq: FakeQuantParam = input_fqcell.fq
     if not isinstance(input_fq, FakeQuantParam):
@@ -159,16 +162,18 @@ def convert_to_dequant(input_fqcell: FakeQuantParamCell, weight_fqcell: FakeQuan
         raise ValueError("Can not find scale in weight FakeQuantParamCell.")
     if len(input_scale) != 1:
         raise ValueError("Input only support perlayer quant.")
-    return DequantCell(input_scale[0] * weight_scale)
+    dequant_scale = np.array(input_scale[0]) * np.array(weight_scale)
+    if is_transpose:
+        dequant_scale = dequant_scale.transpose()
+    dequant = DequantCell(dequant_scale.tolist())
+    if strategy is not None:
+        dequant.shard(strategy)
+    return dequant
 
 
 class AntiquantBMMCell(Cell):
     """fused anti quant cell."""
-    def __init__(self,
-                 scale,
-                 offset,
-                 out_dtype=dtype.float16,
-                 transpose_x: bool = False,
+    def __init__(self, scale, offset, out_dtype=dtype.float16, transpose_x: bool = False,
                  transpose_weight: bool = False):
         super().__init__()
         self.out_dtype = out_dtype
@@ -177,10 +182,7 @@ class AntiquantBMMCell(Cell):
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_x, transpose_weight)
         self.cast = msops.Cast()
 
-    def construct(self,
-                  x,
-                  weight,
-                  bias=None):
+    def construct(self, x, weight, bias=None):
         """forward for antiquant bmm cell"""
         out = self.weight_qbmm(x, weight, self.scale, self.zp_neg, None, None, bias)
         return self.cast(out, self.out_dtype)
@@ -190,10 +192,7 @@ class AntiquantBMMCell(Cell):
         self.weight_qbmm.shard(strategy)
 
 
-def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell,
-                                transpose_weight=False,
-                                transpose_x=False,
-                                strategy=None,
+def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell, transpose_weight=False, transpose_x=False, strategy=None,
                                 dst_dtype=None) -> AntiquantBMMCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
     fq: FakeQuantParam = fqcell.fq
@@ -210,10 +209,7 @@ def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell,
             dst_dtype = dtype.float16
         else:
             dst_dtype = dtype.float32
-    anti_quant = AntiquantBMMCell(scale,
-                                  zp,
-                                  out_dtype=dst_dtype,
-                                  transpose_x=transpose_x,
+    anti_quant = AntiquantBMMCell(scale, zp, out_dtype=dst_dtype, transpose_x=transpose_x,
                                   transpose_weight=transpose_weight)
     if strategy is not None:
         anti_quant.shard(strategy)
@@ -223,16 +219,9 @@ def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell,
 class DequantBMMCell(Cell):
     """matmul and dequant fused cell"""
 
-    def __init__(self,
-                 scale,
-                 offset=None,
-                 transpose_a=False,
-                 transpose_b=False,
-                 dst_dtype=dtype.float16):
+    def __init__(self, scale, offset=None, transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
         super().__init__()
-        self.dbmm = QuantBatchMatmul(transpose_x1=transpose_a,
-                                     transpose_x2=transpose_b,
-                                     dtype=dst_dtype)
+        self.dbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
         scale_ui64 = NumpyQuantOps.trans_fp32_to_u64(scale)
         self.scale = Parameter(Tensor(np.squeeze(scale_ui64), dtype=dtype.uint64))
         if offset is None:
@@ -243,3 +232,31 @@ class DequantBMMCell(Cell):
     def construct(self, x1, x2, bias):
         # (matmul(x1, x2) + bias) * scale + offset
         return self.dbmm(x1, x2, self.scale, self.offset, bias)
+
+    def shard(self, strategy):
+        self.dbmm.shard(strategy)
+
+
+def convert_to_dequant_bmm(input_fqcell, weight_fqcell, offset=None, dst_dtype=dtype.float16, transpose_a=False,
+                           transpose_b=False, strategy=None):
+    """convert_to_dequant_bmm."""
+    input_fq: FakeQuantParam = input_fqcell.fq
+    if not isinstance(input_fq, FakeQuantParam):
+        raise ValueError("Only support convert FakeQuantParam to DeQuant.")
+    weight_fq: FakeQuantParam = weight_fqcell.fq
+    if not isinstance(weight_fq, FakeQuantParam):
+        raise ValueError("Only support convert FakeQuantParam to DeQuant.")
+    input_scale = input_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
+    weight_scale = weight_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
+    if input_scale is None:
+        raise ValueError("Can not find scale in input FakeQuantParamCell.")
+    if weight_scale is None:
+        raise ValueError("Can not find scale in weight FakeQuantParamCell.")
+    if len(input_scale) != 1:
+        raise ValueError("Input only support perlayer quant.")
+    # dequant_scale = int32_act * act_scale * weight_scale
+    dequant_scale = np.array(input_scale[0], dtype=np.float32) * np.array(weight_scale, dtype=np.float32)
+    dbmm_cell = DequantBMMCell(dequant_scale, offset, transpose_a, transpose_b, dst_dtype)
+    if strategy is not None:
+        dbmm_cell.shard(strategy)
+    return dbmm_cell

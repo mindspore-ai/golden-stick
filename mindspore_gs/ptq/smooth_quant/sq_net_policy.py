@@ -1,4 +1,4 @@
-# Copyright 2023 Huawei Technologies Co., Ltd
+# Copyright 2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""RTNNetPolicy."""
+"""SQNetPolicy."""
 
-from mindformers.modules import Linear, KVCacheMgr
+from mindformers.modules import Linear
 from mindspore.rewrite import PatternEngine
 
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
-from .rtn_layer_policy import LinearLayerPolicy, KVCacheMgrPolicy
+from .sq_layer_policy import LinearLayerPolicy
 
 
-class RTNNetPolicy(NetPolicy):
+class SQNetPolicy(NetPolicy):
     """
-    Derived class of NetworkQConfig. RoundToNearestPTQ config.
+    Derived class of NetworkQConfig. SmoothQuant config.
 
     Supported Config:
         ``quant_delay`` ``quant_dtype`` ``per_channel`` ``symmetric`` ``narrow_range`` .
@@ -42,8 +42,5 @@ class RTNNetPolicy(NetPolicy):
         """Initialize `RTNNetPolicy`. A `RTNNetPolicy` can only be built once."""
         if self._build:
             return
-        if self._config.weight_only:
-            self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
-        if self._config.enable_kvcache_int8:
-            self._layer_policy_map[KVCacheMgr] = KVCacheMgrPolicy([], [], self._config)
+        self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
         self._build = True
