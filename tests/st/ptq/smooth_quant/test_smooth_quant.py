@@ -18,7 +18,10 @@ import sys
 from collections import OrderedDict
 import pytest
 import numpy as np
-from mindspore import (Tensor, context, save_checkpoint, load_checkpoint)
+import mindspore.communication.management as D
+from mindspore.context import ParallelMode
+from mindspore.parallel import set_algo_parameters
+from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model
 from mindspore import nn, Parameter, GRAPH_MODE, dtype
 from mindspore.common.dtype import QuantDtype
 from mindformers.modules import Linear
@@ -96,6 +99,7 @@ def test_apply_convert():
     weight_fake_quant = quant_cell.weight_quantizer()
     assert isinstance(weight_fake_quant, MinMaxPerChannel)
     assert weight_fake_quant.symmetric()
+    assert weight_fake_quant.signed()
     assert weight_fake_quant.quant_dtype() == QuantDtype.INT8
     assert weight_fake_quant.is_per_channel()
     assert not weight_fake_quant.narrow_range()
@@ -104,9 +108,28 @@ def test_apply_convert():
     assert isinstance(act_fake_quant, MinMaxPerLayer)
     assert isinstance(act_fake_quant.symmetric(), bool) and not act_fake_quant.symmetric()
     assert act_fake_quant.quant_dtype() == QuantDtype.INT8
-    assert not act_fake_quant.is_per_channel()
-    assert not act_fake_quant.narrow_range()
+    assert isinstance(act_fake_quant.is_per_channel(), bool) and not act_fake_quant.is_per_channel()
+    assert isinstance(act_fake_quant.narrow_range(), bool) and not act_fake_quant.narrow_range()
+    assert act_fake_quant.signed()
     assert act_fake_quant.num_bits() == 8
+    act_observer = quant_cell._act_observer
+    assert isinstance(act_observer, MinMaxPerChannel)
+    assert act_observer.symmetric()
+    assert act_observer.quant_dtype() == QuantDtype.INT8
+    assert act_observer.is_per_channel()
+    assert isinstance(act_observer.narrow_range(), bool) and not act_observer.narrow_range()
+    assert act_observer.signed()
+    assert act_observer.num_bits() == 8
+    assert act_observer.axis == 1
+    weight_in_observer = quant_cell._weight_in_observer
+    assert isinstance(weight_in_observer, MinMaxPerChannel)
+    assert weight_in_observer.symmetric()
+    assert weight_in_observer.quant_dtype() == QuantDtype.INT8
+    assert weight_in_observer.is_per_channel()
+    assert isinstance(weight_in_observer.narrow_range(), bool) and not weight_in_observer.narrow_range()
+    assert weight_in_observer.signed()
+    assert weight_in_observer.num_bits() == 8
+    assert weight_in_observer.axis == 1 if network.linear._linear.transpose_b else 0
     assert quant_cell.output_quantizer() is None
 
     network = ptq.convert(network)
@@ -124,6 +147,7 @@ def test_apply_convert():
     assert isinstance(network.linear._weight_in_observer.float_max, Parameter)
     assert isinstance(network.linear._linear.weight, Parameter)
     assert network.linear._linear.weight.dtype == dtype.int8
+    assert network.linear._linear.has_bias
 
 
 @pytest.mark.level0
@@ -264,11 +288,94 @@ def test_sq_predict_simplenet_2stage(device, mode):
         network = SimpleNet(in_channels=act_in, out_channels=act_out)
         network = ptq.apply(network)
         network = ptq.convert(network)
+        assert network.linear._linear.has_bias
         load_checkpoint(ckpt_path, network)
         ptq.fix_param_after_load_ckpt(network)
         return network(input_)
 
     example = Tensor(np.load(input_path), dtype=dtype.float16)
+    foutput = quant(example)
+    qoutput = infer(example)
+    assert relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 7e-3)
+    assert absolute_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 11e-5)
+
+
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_sq_predict_simplenet_2stage_2p(device, mode):
+    """
+    Feature: test smooth quant adjust parameter in two stages.
+    Description: Feed invalid type of bn_fold to convert function.
+    Expectation: adjust error is in certain range.
+    """
+
+    act_in, act_out = 16, 12
+    weight_in, weight_out = 16, 10
+    model_parallel = 2
+    transpose_b = False
+    rank_id = os.getenv('RANK_ID')
+    cur_dir, _ = os.path.split(os.path.abspath(__file__))
+    fp_ckpt_path = os.path.join(cur_dir, "../../../data/test_ckpt/test_sq_predict_simplenet_2stage_2p.ckpt")
+    ckpt_path = f"test_sq_predict_simplenet_2stage_2p_{rank_id}.ckpt"
+    strategy_ckpt_save_file = "test_sq_predict_simplenet_2stage_2p_parallel_strategy.ckpt"
+
+    context.reset_auto_parallel_context()
+    context.set_context(device_target=device, mode=mode)
+    D.init()
+    context.set_auto_parallel_context(parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
+                                      full_batch=True, strategy_ckpt_save_file=strategy_ckpt_save_file)
+    set_algo_parameters(elementwise_op_strategy_follow=True)
+    if transpose_b:
+        p_strategy = ((1, model_parallel), (1, model_parallel))
+        # p_strategy = ((1, 1), (model_parallel, 1))
+    else:
+        p_strategy = ((1, model_parallel), (model_parallel, 1))
+        # p_strategy = ((1, 1), (1, model_parallel))
+        # p_strategy = ((model_parallel, 1), (1, model_parallel))
+
+    def quant(input_):
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+        ptq = SmoothQuant(cfg)
+
+        network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
+                            strategy=p_strategy)
+        load_checkpoint(fp_ckpt_path, network)
+        network = ptq.apply(network)
+
+        def _calibrate(net, calibrate_size):
+            for _ in range(calibrate_size):
+                example = Tensor(np.random.normal(size=(act_out, act_in)), dtype=dtype.float16)
+                _ = net(example)
+
+        _calibrate(network, 2)
+        network = ptq.convert(network)
+        save_checkpoint(network, ckpt_path)
+
+        fp_network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
+                               strategy=p_strategy)
+        load_checkpoint(fp_ckpt_path, fp_network)
+        return fp_network(input_)
+
+    def infer(input_):
+        strategy_filename = 'simplenet_strategy.ckpt'
+        context.set_auto_parallel_context(strategy_ckpt_config={'save_file': strategy_filename})
+        context.set_context(device_target=device, mode=mode)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        ptq = SmoothQuant(cfg)
+        network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
+                            strategy=p_strategy)
+        network = ptq.apply(network)
+        network = ptq.convert(network)
+        load_checkpoint(ckpt_path, network)
+        ptq.fix_param_after_load_ckpt(network)
+        model = Model(network)
+        model.infer_predict_layout(input_)
+        load_checkpoint(ckpt_path, network)
+        return network(input_)
+
+    example = Tensor(np.random.normal(size=(act_out, act_in)), dtype=dtype.float16)
     foutput = quant(example)
     qoutput = infer(example)
     assert relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 3.784)

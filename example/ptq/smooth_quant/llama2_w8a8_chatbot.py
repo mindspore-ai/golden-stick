@@ -28,6 +28,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--device_id', '-d', type=int, required=True)
+    parser.add_argument('--rank_id', '-r', type=int, required=True)
     parser.add_argument('--ckpt_path', '-k', type=str, required=True)
     parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
@@ -37,14 +38,17 @@ def get_args():
 
 
 def chat(net: BaseModel, tokenizer_: LlamaTokenizer, max_length):
+    """chat."""
     while True:
-        question = input("Please input question:")
-        if question == "exit":
-            break
+        # question = input("Please input question:")
+        # if question == "exit":
+        #     break
+        question = "Hello"
         input_ids = tokenizer_(question)['input_ids']
         outputs = net.generate(input_ids, do_sample=False, max_length=max_length, top_p=1, top_k=3)
         answer = tokenizer_.decode(outputs, skip_special_tokens=True)
         print(f"Answer: {answer}\r\n", flush=True)
+        break
 
 
 if __name__ == "__main__":
