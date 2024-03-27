@@ -529,6 +529,9 @@ class SQLinearWrapper(PTQCell):
             # quant weight to int8, bias to int32
             self._input_quantizer = self._input_quantizer.convert_to_fakequantparam()
             self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+            weight_quant = None
+            bias_quant = None
+            bias_name = self._linear.weight.name + "_bias"
             if not self._is_deploy:
                 weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
                 if hasattr(self._linear, "dtype"):
@@ -545,27 +548,30 @@ class SQLinearWrapper(PTQCell):
                     zp = zp.transpose()
                 weight_quant = quant_tensor_data(weight, scale, zp, quant_min, quant_max,
                                                  self._weight_axis)
-                self._linear.weight = Parameter(
-                    Tensor(weight_quant, dtype=dtype.int8), name=self._linear.weight.name
-                )
+                self._linear.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8), name=self._linear.weight.name)
                 input_quantizer = self._input_quantizer.fq
                 act_scale = np.array(input_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale])
                 dequant_scale = scale * act_scale
                 if self._linear.has_bias:
                     bias_quant = quant_bias_data(self._linear.bias, dequant_scale)
-                    self._linear.bias = Parameter(
-                        Tensor(bias_quant, dtype=dtype.int32), name=self._linear.bias.name
-                    )
-            self._output_quantizer = convert_to_dequant_bmm(self._input_quantizer,
-                                                            self._weight_quantizer,
-                                                            dst_dtype=self._linear.dtype,
-                                                            transpose_a=False,
-                                                            transpose_b=self._linear.transpose_b,
-                                                            strategy=self.antiquant_bmm_strategy(
-                                                                act_strategy=self._act_strategy,
-                                                                weight_strategy=self._weight_strategy,
-                                                                has_bias=True,
-                                                                is_transpose=self._linear.transpose_b))
+                    bias_name = self._linear.bias.name
+                    self._linear.bias = Parameter(bias_quant, name=bias_name)
+            param_bias_quant = bias_quant.asnumpy() if bias_quant is not None else None
+            self._output_quantizer, bias = convert_to_dequant_bmm(self._input_quantizer,
+                                                                  self._weight_quantizer,
+                                                                  weight_quant,
+                                                                  param_bias_quant,
+                                                                  dst_dtype=self._linear.dtype,
+                                                                  transpose_a=False,
+                                                                  transpose_b=self._linear.transpose_b,
+                                                                  strategy=self.antiquant_bmm_strategy(
+                                                                      act_strategy=self._act_strategy,
+                                                                      weight_strategy=self._weight_strategy,
+                                                                      has_bias=True,
+                                                                      is_transpose=self._linear.transpose_b))
+            self._linear.has_bias = bias is not None
+            if self._linear.has_bias:
+                self._linear.bias = Parameter(Tensor(bias, dtype=dtype.int32), name=bias_name)
             self._input_quantizer = convert_to_quant(self._input_quantizer,
                                                      strategy=(self._act_strategy,) if self._act_strategy else None)
 

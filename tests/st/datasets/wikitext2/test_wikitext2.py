@@ -28,7 +28,7 @@ def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
     ds = create_wikitext_dataset(ds_path, bs, seq_length, tokenizer, repeat)
 
     wiki_len = 311980
-    wiki_items = wiki_len // seq_length
+    wiki_items = wiki_len // (seq_length - 1)
 
     assert ds.get_repeat_count() == repeat
     assert ds.output_types()[0] == np.int32

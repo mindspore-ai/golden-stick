@@ -61,15 +61,19 @@ def llama2(batch_size: int = 32,
     return LlamaForCausalLM(llama2_config)
 
 
-def _dummy_tensor(shape, dt):
+def _dummy_tensor(shape, dt, is_ones=True):
     """create dummy tensor"""
+    if is_ones:
+        data = np.ones(shape=tuple(shape))
+    else:
+        data = np.random.normal(size=tuple(shape))
     if None in shape:
-        return Tensor(shape=shape, dtype=dt)
-    return Tensor(np.ones(shape=tuple(shape)), dtype=dt)
+        return Tensor(data, dtype=dt)
+    return Tensor(data, dtype=dt)
 
 
 def create_dummy_inputs(bs=None, seqlen=None, activate_len_shape=None):
-    input_ids = _dummy_tensor(shape=[bs, seqlen], dt=dtype.int32)
+    input_ids = _dummy_tensor(shape=[bs, seqlen], dt=dtype.int32, is_ones=False)
     input_position = _dummy_tensor(shape=[bs], dt=dtype.int32)
     batch_valid_length = _dummy_tensor(shape=[bs], dt=dtype.int64)
     batch_index = _dummy_tensor(shape=[bs], dt=dtype.int64)

@@ -237,9 +237,19 @@ class DequantBMMCell(Cell):
         self.dbmm.shard(strategy)
 
 
-def convert_to_dequant_bmm(input_fqcell, weight_fqcell, offset=None, dst_dtype=dtype.float16, transpose_a=False,
-                           transpose_b=False, strategy=None):
+def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, bias_quant, offset=None, dst_dtype=dtype.float16,
+                           transpose_a=False, transpose_b=False, strategy=None):
     """convert_to_dequant_bmm."""
+
+    def _fused_bias(quant_weight, quant_bias, act_offset):
+        if quant_weight is None:
+            return None
+        new_bias = - np.sum(act_offset.astype(np.int32) * quant_weight.asnumpy().astype(np.int32),
+                            axis=1 if transpose_b else 0).astype(np.int32)
+        if quant_bias is not None:
+            new_bias = quant_bias.astype(np.int32) + new_bias
+        return new_bias
+
     input_fq: FakeQuantParam = input_fqcell.fq
     if not isinstance(input_fq, FakeQuantParam):
         raise ValueError("Only support convert FakeQuantParam to DeQuant.")
@@ -247,6 +257,7 @@ def convert_to_dequant_bmm(input_fqcell, weight_fqcell, offset=None, dst_dtype=d
     if not isinstance(weight_fq, FakeQuantParam):
         raise ValueError("Only support convert FakeQuantParam to DeQuant.")
     input_scale = input_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
+    input_zp = input_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
     weight_scale = weight_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
     if input_scale is None:
         raise ValueError("Can not find scale in input FakeQuantParamCell.")
@@ -256,7 +267,9 @@ def convert_to_dequant_bmm(input_fqcell, weight_fqcell, offset=None, dst_dtype=d
         raise ValueError("Input only support perlayer quant.")
     # dequant_scale = int32_act * act_scale * weight_scale
     dequant_scale = np.array(input_scale[0], dtype=np.float32) * np.array(weight_scale, dtype=np.float32)
+    bias_data = _fused_bias(weight_quant, bias_quant, np.array(input_zp))
+    bias = Tensor(bias_data, dtype=dtype.int32) if bias_data is not None else None
     dbmm_cell = DequantBMMCell(dequant_scale, offset, transpose_a, transpose_b, dst_dtype)
     if strategy is not None:
         dbmm_cell.shard(strategy)
-    return dbmm_cell
+    return dbmm_cell, bias

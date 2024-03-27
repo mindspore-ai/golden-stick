@@ -18,6 +18,7 @@ import argparse
 import mindspore as ms
 from mindspore import context
 from mindspore_gs import BackendTarget
+from mindspore_gs.ptq.smooth_quant.smooth_quant import SmoothQuant
 from mindformers import LlamaForCausalLM, LlamaTokenizer, BaseModel
 from common import create_mfconfig, quant_llama2
 
@@ -59,4 +60,6 @@ if __name__ == "__main__":
         network = quant_llama2(network, is_deploy=True, backend=BackendTarget.ASCEND, max_length=2048,
                                tokernizer=tokenizer)
     ms.load_checkpoint(uargs.ckpt_path, network)
+    if uargs.quant:
+        SmoothQuant.fix_param_after_load_ckpt(network)
     chat(network, tokenizer, seq_length)
