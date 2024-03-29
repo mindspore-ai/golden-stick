@@ -155,6 +155,7 @@ class RoundToNearest(CompAlgo):
                 return cell, False
 
         ApplyProcessor(self._ptq_policy).process(network)
+        network.update_parameters_name()
         if not self._is_deploy and self._config.weight_only:
             network = self._calibrate(network)
         network.update_parameters_name()

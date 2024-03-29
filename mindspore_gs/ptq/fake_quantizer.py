@@ -19,7 +19,6 @@ import numpy as np
 from mindspore import Parameter, Tensor, QuantDtype, nn
 from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
-from mindspore.ops.operations import _quant_ops as Q
 from mindspore import ops
 from mindspore import dtype as mstype
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
@@ -49,12 +48,11 @@ class MinMaxPerLayer(LinearFakeQuantizer):
         self._symmetric = symmetric
         self._narrow_range = narrow_range
         self._quant_dtype = quant_dtype
-        if not self.symmetric:
-            raise ValueError("Not support un-symmetric now.")
         if self._narrow_range:
             raise ValueError("Not support narrow_range now.")
         if self._quant_dtype != QuantDtype.INT8:
             raise ValueError("Only support quant to int8 now.")
+        self._signed = quant_dtype == QuantDtype.INT8
         self.float_min = Parameter(Tensor(np.array([float("inf")]), mstype.float32), name="float_min")
         self.float_max = Parameter(Tensor(np.array([-float("inf")]), mstype.float32), name="float_max")
         self._in_strategy = strategy
@@ -103,6 +101,10 @@ class MinMaxPerLayer(LinearFakeQuantizer):
         """symmetric"""
         return self._symmetric
 
+    def signed(self) -> bool:
+        # for ascend backend, only support int8
+        return self._signed
+
     def quant_dtype(self) -> QuantDtype:
         """quant dtype"""
         return self._quant_dtype
@@ -110,14 +112,6 @@ class MinMaxPerLayer(LinearFakeQuantizer):
     def is_per_channel(self) -> bool:
         """is per channel"""
         return False
-
-    def convert_to_ascend(self):
-        """convert to ascend"""
-        fake_quant = Q.FakeQuantPerLayer(num_bits=self.num_bits(), symmetric=self.symmetric())
-        fq_cell = MinMaxHolder(fake_quant, self.float_min, self.float_max)
-        if self._in_strategy:
-            fq_cell.shard((self._in_strategy, (1,), (1,)))
-        return fq_cell
 
     def __repr__(self):
         fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={}, first_el="\
@@ -140,12 +134,11 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         self._narrow_range = narrow_range
         self._quant_dtype = quant_dtype
         self._data_rank = data_rank
-        if not self.symmetric:
-            raise ValueError("Not support un-symmetric now.")
         if self._narrow_range:
             raise ValueError("Not support narrow_range now.")
         if self._quant_dtype != QuantDtype.INT8:
             raise ValueError("Only support quant to int8 now.")
+        self._signed = quant_dtype == QuantDtype.INT8
         self.float_min = Parameter(Tensor(np.array([float("inf")] * output_channel), mstype.float32),
                                    name="float_min")
         self.float_max = Parameter(Tensor(np.array([-float("inf")] * output_channel), mstype.float32),
@@ -212,6 +205,10 @@ class MinMaxPerChannel(LinearFakeQuantizer):
     def narrow_range(self) -> bool:
         return self._narrow_range
 
+    def signed(self) -> bool:
+        # for ascend backend, only support int8
+        return self._signed
+
     def symmetric(self) -> bool:
         return self._symmetric
 
@@ -223,14 +220,6 @@ class MinMaxPerChannel(LinearFakeQuantizer):
 
     def channel_axis(self) -> int:
         return self.axis
-
-    def convert_to_ascend(self):
-        fake_quant = Q.FakeQuantPerChannel(num_bits=self.num_bits(), symmetric=self.symmetric(), channel_axis=self.axis)
-        fq_cell = MinMaxHolder(fake_quant, self.float_min, self.float_max)
-        if self._in_strategy:
-            minmax_strategy = self._in_strategy[self.axis]
-            fq_cell.shard((self._in_strategy, (minmax_strategy,), (minmax_strategy,)))
-        return fq_cell
 
     def __repr__(self):
         fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={}, first_el="\

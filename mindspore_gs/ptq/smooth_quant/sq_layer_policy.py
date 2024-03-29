@@ -102,10 +102,8 @@ class LinearLayerPolicy(SQLayerPolicy):
         rank = perchannel_args.rank
         if num_channels == -1:
             raise RuntimeError("Please provide channel number for observer.")
-        perchannel_observer = MinMaxPerChannel(axis=channel_axis,
-                                               output_channel=num_channels,
-                                               data_rank=rank,
-                                               strategy=strategy)
+        perchannel_observer = MinMaxPerChannel(symmetric=True, narrow_range=False, axis=channel_axis, data_rank=rank,
+                                               output_channel=num_channels, strategy=strategy)
         return perchannel_observer
 
     def wrap_cell(self, handler: Linear) -> Cell:

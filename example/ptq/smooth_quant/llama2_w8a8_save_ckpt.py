@@ -31,6 +31,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--fp_ckpt_path', '-k', type=str, required=True)
+    parser.add_argument('--rank_id', '-r', type=int, required=True)
     parser.add_argument('--device_id', '-d', type=int, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     parser.add_argument('--calib_ds_path', '-s', type=str, required=True)
@@ -43,14 +44,14 @@ if __name__ == "__main__":
     uargs = get_args()
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     bs = 1
-    seq_len = 256
+    seq_len = 2048
     config = create_mfconfig(uargs.config_path, uargs.device_id, bs, seq_len, ckpt_path=uargs.fp_ckpt_path)
     network = LlamaForCausalLM(config.model.model_config)
     tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
     network.set_train(False)
     network.phase = 'predict'
 
-    print('------------ quant llama2 to W8A16 ------------', flush=True)
+    print('------------ quant llama2 to W8A8 ------------', flush=True)
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = SmoothQuant(cfg)
     network.model = ptq.apply(network.model)
@@ -63,4 +64,4 @@ if __name__ == "__main__":
         input_ids = inputs['input_ids'].asnumpy()
         _ = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
     network.model = ptq.convert(network.model)
-    ms.save_checkpoint(network, f"llama2-w8a8-dev{uargs.device_id}.ckpt")
+    ms.save_checkpoint(network, f"llama2-w8a8-dev{uargs.rank_id}.ckpt")

@@ -73,7 +73,7 @@ eval_dataset_task:
   type: CausalLanguageModelDataset
   dataset_config: *eval_dataset
 
-use_parallel: False
+use_parallel: True
 # parallel context config
 parallel:
   parallel_mode: 1 # 0-data parallel, 1-semi-auto parallel, 2-auto parallel, 3-hybrid parallel
@@ -88,8 +88,8 @@ parallel:
     parallel_optimizer_threshold: 64
 # default parallel of device num = 8 for Atlas 800T A2
 parallel_config:
-  data_parallel: 8
-  model_parallel: 1
+  data_parallel: 1
+  model_parallel: 2
   pipeline_stage: 1
   use_seq_parallel: False
   micro_batch_num: 4
@@ -133,7 +133,7 @@ model:
   model_config:
     type: LlamaConfig
     batch_size: 1 # add for increase predict
-    seq_length: 256
+    seq_length: 2048
     hidden_size: 4096
     num_layers: 32
     num_heads: 32

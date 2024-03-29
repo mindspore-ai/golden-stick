@@ -408,7 +408,11 @@ class SQLinearWrapper(PTQCell):
         self._act_mul = P.Mul()
         self._weight_mul = P.Mul()
         self._weight_div = P.Div()
+        self._smooth_act_maximum = P.Maximum()
+        self._smooth_act_abs = P.Abs()
         self._act_pow = P.Pow()
+        self._smooth_weight_maximum = P.Maximum()
+        self._smooth_weight_abs = P.Abs()
         self._weight_pow = P.Pow()
         self._pow_div = P.Div()
         self._div = P.Div()
@@ -434,8 +438,12 @@ class SQLinearWrapper(PTQCell):
             self._weight_mul.shard((self._weight_strategy, (weight_in_strategy[0], 1)))
             self._weight_div.shard((self._weight_strategy, (weight_in_strategy[0], 1)))
         # act observer pow, activation in
+        self._smooth_act_maximum.shard((mul_strategy, mul_strategy))
+        self._smooth_act_abs.shard((mul_strategy,))
         self._act_pow.shard((mul_strategy, ()))
         # weight observer pow, weight channel in
+        self._smooth_weight_maximum.shard((weight_in_strategy, weight_in_strategy))
+        self._smooth_weight_abs.shard((weight_in_strategy,))
         self._weight_pow.shard((weight_in_strategy, ()))
         # act_max_pow / weight_max_pow
         self._pow_div.shard((mul_strategy, weight_in_strategy))
@@ -496,10 +504,11 @@ class SQLinearWrapper(PTQCell):
 
     def _calc_input_scale(self):
         """calc_input_scale"""
-        act_max = P.Maximum()(P.Abs()(self._act_observer.float_max), P.Abs()(self._act_observer.float_min))
+        act_max = self._smooth_act_maximum(self._smooth_act_abs(self._act_observer.float_max),
+                                           self._smooth_act_abs(self._act_observer.float_min))
         input_max_pow = self._act_pow(act_max, self._alpha)
-        weight_max = P.Maximum()(P.Abs()(self._weight_in_observer.float_max),
-                                 P.Abs()(self._weight_in_observer.float_min))
+        weight_max = self._smooth_weight_maximum(self._smooth_weight_abs(self._weight_in_observer.float_max),
+                                                 self._smooth_weight_abs(self._weight_in_observer.float_min))
         weight_max_pow = self._weight_pow(weight_max, 1 - self._alpha)
         input_scale = self._pow_div(input_max_pow, weight_max_pow).clip(1e-5)
 
@@ -538,9 +547,10 @@ class SQLinearWrapper(PTQCell):
                     weight = self._linear.cast(self._linear.weight, self._linear.dtype)
                 else:
                     weight = self._linear.weight
-                quant_min, quant_max = get_quant_min_max(weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
-                                                         weight_quantizer.attrs[
-                                                             LinearFakeQuantizer.attr_key_narrow_range])
+                quant_min, quant_max = get_quant_min_max(
+                    num_bits=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
+                    signed=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_signed],
+                    narrow_range=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
                 scale = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale])
                 zp = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point])
                 if not self._linear.transpose_b:
@@ -567,10 +577,10 @@ class SQLinearWrapper(PTQCell):
                                                                   strategy=self.antiquant_bmm_strategy(
                                                                       act_strategy=self._act_strategy,
                                                                       weight_strategy=self._weight_strategy,
-                                                                      has_bias=True,
+                                                                      has_bias=bias_quant is not None,
                                                                       is_transpose=self._linear.transpose_b))
-            self._linear.has_bias = bias is not None
-            if self._linear.has_bias:
+            self._linear.has_bias = True
+            if bias is not None:
                 self._linear.bias = Parameter(Tensor(bias, dtype=dtype.int32), name=bias_name)
             self._input_quantizer = convert_to_quant(self._input_quantizer,
                                                      strategy=(self._act_strategy,) if self._act_strategy else None)
