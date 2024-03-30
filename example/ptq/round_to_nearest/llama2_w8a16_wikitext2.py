@@ -20,6 +20,8 @@ from mindformers.core.metric import PerplexityMetric
 import mindspore as ms
 from mindspore import context
 from mindspore import log as logger
+from mindspore.communication import get_rank
+from mindspore.train.callback import LossMonitor, TimeMonitor
 from mindspore_gs.datasets import create_wikitext_dataset
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
@@ -32,7 +34,11 @@ def evaluate(net, dataset_path, bs, seq_len, vocab_file):
     ds = create_wikitext_dataset(dataset_path, bs, seq_len, tokenizer)
     metrics = {"PerplexityMetric": PerplexityMetric()}
     model = ms.Model(net, metrics=metrics, eval_network=net)
-    output = model.eval(ds, dataset_sink_mode=config.runner_config.sink_mode)
+    step_size = ds.get_dataset_size()
+    time_cb = TimeMonitor(data_size=step_size)
+    loss_cb = LossMonitor()
+    cb = [time_cb, loss_cb]
+    output = model.eval(ds, dataset_sink_mode=config.runner_config.sink_mode, callbacks=cb)
     print(f"PPL: {output}", flush=True)
 
 
@@ -40,7 +46,6 @@ def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
-    parser.add_argument('--device_id', '-d', type=int, required=True)
     parser.add_argument('--ckpt_path', '-k', type=str, required=True)
     parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
@@ -56,15 +61,21 @@ if __name__ == "__main__":
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     batch_size = 1
     seq_length = 2048
-    config = create_mfconfig(uargs.config_path, uargs.device_id, batch_size, seq_length, uargs.tokenizer_path,
+    config = create_mfconfig(uargs.config_path, -1, batch_size, seq_length, uargs.tokenizer_path,
                              model_parallel=uargs.parallel)
+    rank_id = get_rank()
+    print(f"start wikitext2 evaluate: rank {rank_id}, bs {batch_size}, seq_len {seq_length}, config {uargs}.",
+          flush=True)
     network = LlamaForCausalLM(config.model.model_config)
     network.set_train(False)
     network.phase = 'predict'
     if uargs.quant:
         network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         if not uargs.ckpt_path:
-            uargs.ckpt_path = "llama2-w8a16.ckpt"
+            if uargs.parallel == 1:
+                uargs.ckpt_path = "llama2-w8a16.ckpt"
+            else:
+                uargs.ckpt_path = f"llama2-w8a16-r{rank_id}.ckpt"
         print('------------ eval W8A16 quant llama2 ------------', flush=True)
     else:
         print('------------ eval llama2 ------------', flush=True)
