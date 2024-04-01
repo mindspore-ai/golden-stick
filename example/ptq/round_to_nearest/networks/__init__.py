@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,24 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""networks."""
 
+from .network import NetworkRegister, BaseNetwork
+from .baichuan2 import BaiChuanNetwork
+from .glm3 import ChatGLM3Network
+from .llama2 import Llama2Network
+from .qwen import QWENNetwork
 
-network=$1
-device_id=$2
-config_file="./run_llama2_7b_910b.yaml"
-tokenizer_file="tokenizer.model"
-calib_ds_file="wiki.valid.tokens"
-
-rm -rf msrun_log
-mkdir msrun_log
-
-did_str=${device_id}
-for ((i=1; i<4; i++)); do
-  did_str="${did_str},$((i+device_id))"
-done
-
-export GRAPH_OP_RUN=1
-export ASCEND_RT_VISIBLE_DEVICES=${did_str}
-msrun --worker_num=4 --local_worker_num=4 --master_port=8123 --log_dir=msrun_log --join=True --cluster_time_out=300 \
-      python llama2_w8a16_wikitext2.py -c ${config_file} -k "llama2-w8a16.ckpt" -t ${tokenizer_file} \
-                                       -s ${calib_ds_file} -q 1 -p 4 -n ${network}
+NetworkRegister.instance().reg("baichuan2_13b", BaiChuanNetwork)
+NetworkRegister.instance().reg("glm3_6b", ChatGLM3Network)
+NetworkRegister.instance().reg("qwen_14b", QWENNetwork)
+NetworkRegister.instance().reg("llama2_7b", Llama2Network)
+NetworkRegister.instance().reg("llama2_13b", Llama2Network)
+NetworkRegister.instance().reg("llama2_70b", Llama2Network)
