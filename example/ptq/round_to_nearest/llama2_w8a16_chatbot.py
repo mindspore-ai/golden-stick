@@ -17,10 +17,10 @@ import argparse
 
 import mindspore as ms
 from mindspore import context
-from mindformers import LlamaForCausalLM, LlamaTokenizer, BaseModel
+from mindformers import Tokenizer, BaseModel
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
-from common import create_mfconfig, quant_llama2
+from networks import NetworkRegister, BaseNetwork
 
 
 def get_args():
@@ -32,12 +32,14 @@ def get_args():
     parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     parser.add_argument('--parallel', '-p', type=int, default=1)
+    parser.add_argument('--network', '-n', type=str, default="llama2_7b",
+                        help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, glm3_6b, qwen_14b.")
     args = parser.parse_args()
     print(f"-------------------------------------------------evaluate args: {args}", flush=True)
     return args
 
 
-def chat(net: BaseModel, tokenizer_: LlamaTokenizer, max_length, use_parallel: bool):
+def chat(net: BaseModel, tokenizer_: Tokenizer, max_length, use_parallel: bool):
     """chat."""
     if use_parallel:
         input_ids = tokenizer_("Hello.")['input_ids']
@@ -57,15 +59,17 @@ def chat(net: BaseModel, tokenizer_: LlamaTokenizer, max_length, use_parallel: b
 
 if __name__ == "__main__":
     uargs = get_args()
+    net_mgr: BaseNetwork = NetworkRegister.instance().get(uargs.network)
+    if net_mgr is None:
+        raise RuntimeError(f"Unsupported network: {uargs.network}, available: llama2_7b, llama2_13b, llama2_70b, "
+                           "baichuan2_13b, glm3_6b, qwen_14b.")
     seq_length = 256
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, seq_length, uargs.tokenizer_path,
-                             model_parallel=uargs.parallel)
-    network = LlamaForCausalLM(config.model.model_config)
-    network.set_train(False)
-    network.phase = 'predict'
+    config = net_mgr.create_mfconfig(uargs.config_path, uargs.device_id, 1, seq_length, uargs.tokenizer_path,
+                                     model_parallel=uargs.parallel)
+    network = net_mgr.create_network(config.model.model_config)
     if uargs.quant:
-        network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        network = net_mgr.quant_network(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
     ms.load_checkpoint(uargs.ckpt_path, network)
-    tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
+    tokenizer = net_mgr.create_tokenizer(uargs.tokenizer_path)
     chat(network, tokenizer, seq_length, uargs.parallel > 1)

@@ -15,7 +15,6 @@
 """Quant llama2 7b to w8a16."""
 import argparse
 
-from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import PerplexityMetric
 import mindspore as ms
 from mindspore import context
@@ -25,12 +24,11 @@ from mindspore.train.callback import LossMonitor, TimeMonitor
 from mindspore_gs.datasets import create_wikitext_dataset
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
-from common import create_mfconfig, quant_llama2
+from networks import NetworkRegister, BaseNetwork
 
 
-def evaluate(net, dataset_path, bs, seq_len, vocab_file):
+def evaluate(net, dataset_path, bs, seq_len, tokenizer):
     """evaluate."""
-    tokenizer = LlamaTokenizer(vocab_file=vocab_file)
     ds = create_wikitext_dataset(dataset_path, bs, seq_len, tokenizer)
     metrics = {"PerplexityMetric": PerplexityMetric()}
     model = ms.Model(net, metrics=metrics, eval_network=net)
@@ -51,6 +49,8 @@ def get_args():
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     parser.add_argument('--parallel', '-p', type=int, default=1)
+    parser.add_argument('--network', '-n', type=str, default="llama2_7b",
+                        help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, glm3_6b, qwen_14b.")
     args = parser.parse_args()
     logger.info(f"-------------------------------------------------evaluate args: {args}")
     return args
@@ -58,19 +58,21 @@ def get_args():
 
 if __name__ == "__main__":
     uargs = get_args()
+    net_mgr: BaseNetwork = NetworkRegister.instance().get(uargs.network)
+    if net_mgr is None:
+        raise RuntimeError(f"Unsupported network: {uargs.network}, available: llama2_7b, llama2_13b, llama2_70b, "
+                           "baichuan2_13b, glm3_6b, qwen_14b.")
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     batch_size = 1
     seq_length = 2048
-    config = create_mfconfig(uargs.config_path, -1, batch_size, seq_length, uargs.tokenizer_path,
-                             model_parallel=uargs.parallel)
-    rank_id = get_rank()
+    config = net_mgr.create_mfconfig(uargs.config_path, -1, batch_size, seq_length, uargs.tokenizer_path,
+                                     model_parallel=uargs.parallel)
+    rank_id = 0 if uargs.parallel == 1 else get_rank()
     print(f"start wikitext2 evaluate: rank {rank_id}, bs {batch_size}, seq_len {seq_length}, config {uargs}.",
           flush=True)
-    network = LlamaForCausalLM(config.model.model_config)
-    network.set_train(False)
-    network.phase = 'predict'
+    network = net_mgr.create_network(config)
     if uargs.quant:
-        network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        network = net_mgr.quant_network(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         if not uargs.ckpt_path:
             if uargs.parallel == 1:
                 uargs.ckpt_path = "llama2-w8a16.ckpt"
@@ -80,4 +82,4 @@ if __name__ == "__main__":
     else:
         print('------------ eval llama2 ------------', flush=True)
     ms.load_checkpoint(uargs.ckpt_path, network)
-    evaluate(network, uargs.dataset_path, batch_size, seq_length, uargs.tokenizer_path)
+    evaluate(network, uargs.dataset_path, batch_size, seq_length, net_mgr.create_tokenizer(uargs.tokenizer_path))
