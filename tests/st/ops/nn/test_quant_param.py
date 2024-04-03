@@ -20,7 +20,7 @@ import pytest
 import numpy as np
 
 import mindspore
-from mindspore import QuantDtype, Tensor, dtype, context, GRAPH_MODE, nn, Parameter
+from mindspore import QuantDtype, Tensor, dtype, context, GRAPH_MODE, nn, Parameter, PYNATIVE_MODE
 from mindspore.ops.operations import FakeQuantParam, BatchMatMul, MatMul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell
@@ -57,7 +57,7 @@ def test_fake_quant_cell():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
 def test_quant_cell_pertensor(mode):
     """
     Feature: QuantCell.
@@ -65,6 +65,7 @@ def test_quant_cell_pertensor(mode):
     Expectation: Success.
     """
 
+    os.environ['GRAPH_OP_RUN'] = "1"
     context.set_context(device_target="Ascend", mode=mode)
     scale = 2.0
     zp = 1.0
@@ -83,13 +84,15 @@ def test_quant_cell_pertensor(mode):
     mindspore.load_checkpoint("test_quant_cell_pertensor.ckpt", qcell2)
     qcell2.update_ascend_quant()
     output2 = qcell2(x)
+    os.environ.pop('GRAPH_OP_RUN')
+
     assert (expect == output2.asnumpy()).all()
 
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
 def test_quant_cell_perchannel(mode):
     """
     Feature: QuantCell.
@@ -97,6 +100,7 @@ def test_quant_cell_perchannel(mode):
     Expectation: Success.
     """
 
+    os.environ['GRAPH_OP_RUN'] = "1"
     context.set_context(device_target="Ascend", mode=mode)
     scale = [2.0, 3.0]
     zp = [1.0, 2.0]
@@ -115,6 +119,7 @@ def test_quant_cell_perchannel(mode):
     mindspore.load_checkpoint("test_quant_cell_perchannel.ckpt", qcell2)
     qcell2.update_ascend_quant()
     output2 = qcell2(x)
+    os.environ.pop('GRAPH_OP_RUN')
     assert (expect == output2.asnumpy()).all()
 
 

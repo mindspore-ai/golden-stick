@@ -14,10 +14,11 @@
 # ============================================================================
 """test quant cells."""
 
+import os
 import pytest
 import numpy as np
 
-from mindspore import Parameter, context, GRAPH_MODE, Tensor
+from mindspore import Parameter, context, GRAPH_MODE, Tensor, PYNATIVE_MODE
 from mindspore import dtype as mstype
 from mindspore.nn import Cell
 from mindspore.ops.operations._inner_ops import Quant
@@ -31,14 +32,16 @@ from tests.st.test_utils import relative_tolerance_acceptable
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_weight_quant_bmm_cell_as_antiquant_1p():
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_weight_quant_bmm_cell_as_antiquant_1p(mode):
     """
     Feature: weight quant bmm cell for antiquant
     Description: test antiquant using weight quant bmm cell
     Expectation: accuracy in tolerance
     """
 
-    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
     weight = np.array([[100, 200], [10, 25]]).astype(np.int8)
     activation = np.array([[0.1, 1.], [0.5, 2.4]]).astype(np.float16)
     scale = np.array([0.5, 0.27]).astype(np.float16)
@@ -48,6 +51,7 @@ def test_weight_quant_bmm_cell_as_antiquant_1p():
     t_activation = Tensor(activation, dtype=mstype.float16)
     p_weight = Parameter(Tensor(weight, dtype=mstype.int8), 'weight')
     fact = wqmm_cell(t_activation, p_weight).asnumpy()
+    os.environ.pop('GRAPH_OP_RUN')
 
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
@@ -55,14 +59,16 @@ def test_weight_quant_bmm_cell_as_antiquant_1p():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_quant_cell_1p():
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_quant_cell_1p(mode):
     """
     Feature: quant tensor from fp16 to int8
     Description: test quant ops
     Expectation: accuracy in tolerance
     """
 
-    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
     activation = np.array([[0.1, 1.], [0.5, 2.4]]).astype(np.float16)
     scale = np.array([0.5]).astype(np.float16)
     offset = np.array([-10]).astype(np.float16)
@@ -72,6 +78,7 @@ def test_quant_cell_1p():
                            Tensor(offset, dtype=mstype.float16))
     t_activation = Tensor(activation, dtype=mstype.float16)
     fact = quant_cell(t_activation).asnumpy()
+    os.environ.pop('GRAPH_OP_RUN')
 
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
@@ -79,14 +86,16 @@ def test_quant_cell_1p():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_dequant_bmm_cell_1p():
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_dequant_bmm_cell_1p(mode):
     """
     Feature: a fused kernel which combine matmul and dequant ops
     Description: test deqaunt batch matmul
     Expectation: accuracy in tolerance
     """
 
-    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
     weight = np.array([[100, 120], [10, 25]]).astype(np.int32)
     activation = np.array([[3, 1], [2, 5]]).astype(np.int32)
     weight_scale = np.array([0.5, 0.27]).astype(np.float16)
@@ -100,6 +109,7 @@ def test_dequant_bmm_cell_1p():
     p_weight = Parameter(Tensor(weight, dtype=mstype.int8), 'weight')
     t_bias = Tensor(bias, dtype=mstype.int32)
     fact = dequant_bmm_cell(t_activation, p_weight, t_bias).asnumpy()
+    os.environ.pop('GRAPH_OP_RUN')
 
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
@@ -174,14 +184,15 @@ class QuantDequantCell(Cell):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_bias_correction_transpose_b_false():
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_bias_correction_transpose_b_false(mode):
     """
     Feature: test quant and dequant cell with bias correction
     Description: test quant and dequant procedure correction
     Expectation: accuracy in tolerance
     """
-
-    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
     weight = np.array([[2., 4.], [1., 3.]]).astype(np.float16)
     activation = np.array([[1, 10.], [12, 14]]).astype(np.float16)
     weight_scale = np.array([0.5, 0.7]).astype(np.float16)
@@ -198,4 +209,6 @@ def test_bias_correction_transpose_b_false():
                             bias)
     t_activation = Tensor(activation, dtype=mstype.float16)
     ms_quant_out = cell(t_activation).asnumpy()
+    os.environ.pop('GRAPH_OP_RUN')
+
     assert relative_tolerance_acceptable(quant_out, ms_quant_out, 7e-2)

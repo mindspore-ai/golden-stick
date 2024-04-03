@@ -1,4 +1,4 @@
 mindspore:
-  '/mindspore/mindspore/version/202403/20240329/r2.3.q1_20240329201233_74d5a7d9d87eebc31e94d2c4a71b80d1ff87492b/'
+  '/mindspore/mindspore/version/202404/20240403/feature-quantop-kbk_20240403100655_bd74025ae20300039a98c30f4293e77045d1337d/'
 mindformers:
   '/mindspore/mindformers/version/202403/20240322/r1.1.tr5_20240322145526_e61f4a0e72e69c1f5397ad77126a00a14c61b0c8/'

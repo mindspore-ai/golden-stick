@@ -106,14 +106,14 @@ def test_apply_convert():
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
 def test_woq_predict_1stage(device, mode):
     """
     Feature: RoundToNearestPTQ algorithm set functions.
     Description: Apply, Convert and Predict RoundToNearestPTQ on SimpleNet.
     Expectation: Execute success.
     """
-
+    os.environ['GRAPH_OP_RUN'] = "1"
     context.set_context(device_target=device, mode=mode)
     network = SimpleNet()
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
@@ -136,13 +136,14 @@ def test_woq_predict_1stage(device, mode):
     assert output.shape == (5, 6)
     for ele in output.flatten():
         assert ele == 5.
+    os.environ.pop('GRAPH_OP_RUN')
 
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
 def test_woq_predict_2stage(device, mode):
     """
     Feature: RoundToNearestPTQ algorithm set functions.
@@ -184,8 +185,10 @@ def test_woq_predict_2stage(device, mode):
         for ele in output.flatten():
             assert ele == 5.
 
+    os.environ['GRAPH_OP_RUN'] = "1"
     quant()
     infer()
+    os.environ.pop('GRAPH_OP_RUN')
 
 
 class LinearsNet(nn.Cell):
@@ -208,7 +211,7 @@ class LinearsNet(nn.Cell):
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
 def test_linears_woq_predict_2stage(device, mode):
     """
     Feature: RoundToNearestPTQ A16W8 algorithm.
@@ -240,6 +243,7 @@ def test_linears_woq_predict_2stage(device, mode):
         mindspore.load_checkpoint("test_linears_woq_predict_2stage.ckpt", ascend_network)
         return ascend_network(*inputs)
 
+    os.environ['GRAPH_OP_RUN'] = "1"
     arr = np.array([[-1.02, 2.03, 3.04, -4.54, 5.55], [6.78, 0.02, 0.005, 6.77, 3.22],
                     [-4.44, -5.55, -6.66, -1.11, -2.22], [9.87, 8.45, 3.67, -2.22, 3.21],
                     [0.12, 4.00, -0.94, -3.89, -1.29]], dtype=np.float16)
@@ -251,7 +255,7 @@ def test_linears_woq_predict_2stage(device, mode):
     assert fp_output.dtype == dtype.float16
     assert quant_output.shape == (5, 5)
     assert quant_output.dtype == dtype.float16
-
+    os.environ.pop('GRAPH_OP_RUN')
     context.set_context(device_target="CPU", mode=mode)
     assert relative_tolerance_acceptable(quant_output.asnumpy(), fp_output.asnumpy(), 0.1587)
 
@@ -269,7 +273,7 @@ def test_llama2_woq_apply_convert(device, mode):
 
     Disabled because of miss of RMSNorm ops in mindspore2.3.
     """
-
+    os.environ['GRAPH_OP_RUN'] = "1"
     context.set_context(device_target=device, mode=mode)
     network = llama2(8, 512, 1024, 2)
     assert check_network_contain_layer(network, Linear)
@@ -290,6 +294,7 @@ def test_llama2_woq_apply_convert(device, mode):
         assert isinstance(weight, Parameter)
         assert weight.dtype == dtype.int8
         assert weight.value().dtype == dtype.int8
+    os.environ.pop('GRAPH_OP_RUN')
 
 
 @pytest.mark.platform_arm_ascend910b_training
