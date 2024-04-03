@@ -14,8 +14,9 @@
 # ============================================================================
 """test fake-quantizer cells."""
 
+import os
 import pytest
-from mindspore import Parameter, context, GRAPH_MODE
+from mindspore import Parameter, context, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.common.initializer import initializer
 from mindspore import dtype as mstype
 from mindspore.common.dtype import QuantDtype
@@ -25,14 +26,15 @@ from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_minmaxperchannel():
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_minmaxperchannel(mode):
     """
     Feature: MinMaxPerChannel.
     Description: Call forward function of MinMaxPerChannel.
     Expectation: Forward successful.
     """
-
-    context.set_context(device_target="Ascend", mode=GRAPH_MODE)
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
     shape = (5, 6)
     rank = 2
     axis = 1
@@ -49,3 +51,4 @@ def test_minmaxperchannel():
     maxs = fq.float_max.value().asnumpy()
     for max_ in maxs:
         assert max_ == 1
+    os.environ.pop('GRAPH_OP_RUN')
