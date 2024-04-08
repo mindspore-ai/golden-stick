@@ -2,6 +2,26 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 0.4.0 Release Notes
+
+### Major Features and Improvements
+
+* Added post-training weight quantization W8A16 algorithm `RoundToNearest`, which realizes the lossless compression parameters of Llama2 7B/13B/70B and Baichuan2 13B networks by over 40%.
+
+### API Change
+
+* Added `PTQConfig` to configure the post-training quantization algorithm.
+* Added `PTQMode` enumeration class, which can be configured in 'PTQConfig', is used to distinguish between the two phases of the quantization algorithm: the quantization phase and the deployment phase.
+* Added `BackendTarget` enumeration class, which can be configured in `PTQConfig`, to indicate the backend to which the quantized network will eventually be deployed. For example, 'BackendTarget.Ascend' indicates that it will eventually be deployed to the Ascend backend of MindSpore.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+zhuxiaoxion, hangangqiang
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 0.3.0 Release Notes
 
 ### Bug fixes

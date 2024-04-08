@@ -2,6 +2,26 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 0.4.0 Release Notes
+
+### 主要特性和增强
+
+* 新增W8A16训练后权重量化算法`RoundToNearest`，实现对Llama2 7B/13B/70B、Baichuan2 13B网络无损压缩参数40%+。
+
+### API变更
+
+* 新增`PTQConfig`，用于配置训练后量化算法。
+* 新增`PTQMode`枚举类，可以在`PTQConfig`中进行配置，用于区分量化算法的两个阶段：量化阶段和部署阶段。
+* 新增`BackendTarget`枚举类，可以在`PTQConfig`中进行配置，表达量化的网络最终要部署到什么后端，比如`BackendTarget.Ascend`表示最终要部署到MindSpore的昇腾后端上。
+
+### 贡献者
+
+感谢以下人员做出的贡献:
+
+zhuxiaoxiong, hangangqiang
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 0.3.0 Release Notes
 
 ### Bug修复
