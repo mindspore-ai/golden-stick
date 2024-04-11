@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Quant llama2 7b to w8a16."""
+import os
 import argparse
 
 from mindformers.core.metric import PerplexityMetric
@@ -65,8 +66,9 @@ if __name__ == "__main__":
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     batch_size = 1
     seq_length = 2048
-    config = net_mgr.create_mfconfig(uargs.config_path, -1, batch_size, seq_length, uargs.tokenizer_path,
-                                     model_parallel=uargs.parallel)
+    device_id = int(os.getenv('DEVICE_ID', '0'))
+    config = net_mgr.create_mfconfig(uargs.config_path, "Ascend", device_id, batch_size, seq_length,
+                                     uargs.tokenizer_path, model_parallel=uargs.parallel)
     rank_id = 0 if uargs.parallel == 1 else get_rank()
     print(f"start wikitext2 evaluate: rank {rank_id}, bs {batch_size}, seq_len {seq_length}, config {uargs}.",
           flush=True)

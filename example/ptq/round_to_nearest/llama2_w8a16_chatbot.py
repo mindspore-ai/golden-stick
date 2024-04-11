@@ -65,7 +65,7 @@ if __name__ == "__main__":
                            "baichuan2_13b, glm3_6b, qwen_14b.")
     seq_length = 256
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = net_mgr.create_mfconfig(uargs.config_path, uargs.device_id, 1, seq_length, uargs.tokenizer_path,
+    config = net_mgr.create_mfconfig(uargs.config_path, "Ascend", uargs.device_id, 1, seq_length, uargs.tokenizer_path,
                                      model_parallel=uargs.parallel)
     network = net_mgr.create_network(config.model.model_config)
     if uargs.quant:
