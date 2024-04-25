@@ -18,7 +18,7 @@
 
 Thanks goes to these wonderful people:
 
-zhuxiaoxion, hangangqiang
+zhuxiaoxiong, hangangqiang
 
 Contributions of any kind are welcome!
 

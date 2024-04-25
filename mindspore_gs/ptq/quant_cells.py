@@ -421,8 +421,43 @@ class SQLinearWrapper(PTQCell):
         if "in_strategy" in self._linear.matmul.get_attr_dict():
             self.shard()
 
+    def _get_bias_reduce_num(self):
+        """
+        1. matmul may have four kind of in_strategy: (1,m)(m,1);(m,1)(1,1);(1,1)(1,m);(1,1)(1,1). We can find that
+         (1,m)(m,1) will add allreduce after matmul, (m,1)(1,1) and (1,1)(1,m) will add allgather after matmul.
+         (1,1)(1,1) will not add any operation after matmul.
+        2. We can simplify Linear construct to matmul + bias + act, and quant-linear construct to matmulint8 + bias +
+         dequant + act. In allreduce-parallel mode, allreduce should insert as matmulint8 + allreduce + bias + dequant +
+         act, while in allgather-parallel mode: matmulint8 + allgather + bias + dequant + act or
+         matmulint8 + bias + allgather + dequant + act or matmulint8 + bias + dequant + allgather + act.
+        3. If matmulint8 + bias + dequant use fused kernel QuantBatchMatmul, in allreduce-paralle mode, allreduce can
+         not be inserted between matmul and bias anymore, so bias will act on more than one time. To correct this issue,
+         we can move bias out of fused kernel or divide value in bias by x. This function is designed to find out the x.
+        """
+
+        if "in_strategy" not in self._linear.matmul.get_attr_dict():
+            return 1
+        if self._linear.matmul.in_strategy is None:
+            return 1
+        act_strategy = self._linear.matmul.in_strategy[0]
+        weight_strategy = self._linear.matmul.in_strategy[1]
+        weight_strategy_0 = weight_strategy[1] if self._linear.transpose_b else weight_strategy[0]
+        weight_strategy_1 = weight_strategy[0] if self._linear.transpose_b else weight_strategy[1]
+        # allreduce
+        if act_strategy[0] == 1 and act_strategy[1] != 1 and weight_strategy_0 != 1 and weight_strategy_1 == 1:
+            if act_strategy[1] != weight_strategy_0:
+                raise RuntimeError(f"Invalid in_strategy for matmul: {self._linear.matmul.in_strategy}.")
+            return act_strategy[1]
+        # allgather or no-parallel
+        if act_strategy[1] == 1 and weight_strategy_0 == 1:
+            return 1
+        raise RuntimeError(f"Invalid in_strategy for matmul: {self._linear.matmul.in_strategy}.")
+
     def shard(self):
-        """shard."""
+        """
+        shard.
+        should consider out_strategy.
+        """
         self._act_strategy = self._linear.matmul.in_strategy[0]
         self._weight_strategy = self._linear.matmul.in_strategy[1]
         mul_strategy = (self._act_strategy[1],)
@@ -577,10 +612,13 @@ class SQLinearWrapper(PTQCell):
                                                                   strategy=self.antiquant_bmm_strategy(
                                                                       act_strategy=self._act_strategy,
                                                                       weight_strategy=self._weight_strategy,
-                                                                      has_bias=bias_quant is not None,
+                                                                      has_bias=True,  # offset correct by bias
                                                                       is_transpose=self._linear.transpose_b))
             self._linear.has_bias = True
             if bias is not None:
+                bn = self._get_bias_reduce_num()
+                # refer to docstring of _get_bias_reduce_num for the reason of this divide operation.
+                bias = bias / bn
                 self._linear.bias = Parameter(Tensor(bias, dtype=dtype.int32), name=bias_name)
             self._input_quantizer = convert_to_quant(self._input_quantizer,
                                                      strategy=(self._act_strategy,) if self._act_strategy else None)

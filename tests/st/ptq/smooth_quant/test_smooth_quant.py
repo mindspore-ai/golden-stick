@@ -21,7 +21,7 @@ import numpy as np
 import mindspore.communication.management as D
 from mindspore.context import ParallelMode
 from mindspore.parallel import set_algo_parameters
-from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model
+from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model, load_param_into_net
 from mindspore import nn, Parameter, GRAPH_MODE, dtype
 from mindspore.common.dtype import QuantDtype
 from mindformers.modules import Linear
@@ -241,30 +241,39 @@ def test_sq_linear_wrapper(device, mode, transpose_b):
     assert np.allclose(t_w_restored.asnumpy(), n_w_restored)
 
 
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_sq_predict_simplenet_2stage(device, mode):
-    """
-    Feature: test smooth quant adjust parameter in two stages.
-    Description: Feed invalid type of bn_fold to convert function.
-    Expectation: adjust error is in certain range.
-    """
-
+def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_strategy):
+    """test_sq_predict_simplenet_2stage"""
+    print(f"---------------- Testing params: {device} {mode} {transpose_b} {model_parallel} {p_strategy}", flush=True)
+    use_parallel = model_parallel > 1
     act_in, act_out = 4, 8
+    weight_in, weight_out = act_in, act_out
+    rank_id = 0
+    if use_parallel:
+        rank_id = os.getenv('RANK_ID')
+        strategy_ckpt_save_file = "test_sq_predict_simplenet_2stage_parallel_strategy.ckpt"
+
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     fp_ckpt_path = os.path.join(cur_dir, "../../../data/test_ckpt/test_sq_predict_simplenet_2stage_fp.ckpt")
     input_path = os.path.join(cur_dir, "../../../data/test_input/test_sq_predict_simplenet_2stage.npy")
-    ckpt_path = "test_sq_predict_simplenet_2stage_int8.ckpt"
+    ckpt_path = f"test_sq_predict_simplenet_2stage_int8_rank{rank_id}.ckpt"
+    if transpose_b:
+        fp_ckpt_path = os.path.join(cur_dir, "../../../data/test_ckpt/test_sq_predict_simplenet_2stage_fp.ckpt")
+    else:
+        fp_ckpt_path = os.path.join(cur_dir, "../../../data/test_ckpt/test_sq_predict_simplenet_2stage_fp_notranb.ckpt")
+
+    context.set_context(device_target=device, mode=mode)
+    if use_parallel:
+        D.init()
+        context.set_auto_parallel_context(parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
+                                          full_batch=True, strategy_ckpt_save_file=strategy_ckpt_save_file)
+        set_algo_parameters(elementwise_op_strategy_follow=True)
 
     def quant(input_):
-        context.set_context(device_target=device, mode=mode)
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
         ptq = SmoothQuant(cfg)
 
-        network = SimpleNet(in_channels=act_in, out_channels=act_out)
+        network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
+                            strategy=p_strategy)
         load_checkpoint(fp_ckpt_path, network)
         network = ptq.apply(network)
 
@@ -275,83 +284,7 @@ def test_sq_predict_simplenet_2stage(device, mode):
 
         _calibrate(network, 2)
         network = ptq.convert(network)
-        save_checkpoint(network, ckpt_path)
-
-        fp_network = SimpleNet(in_channels=act_in, out_channels=act_out)
-        load_checkpoint(fp_ckpt_path, fp_network)
-        return fp_network(input_)
-
-    def infer(input_):
-        context.set_context(device_target=device, mode=mode)
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
-        ptq = SmoothQuant(cfg)
-        network = SimpleNet(in_channels=act_in, out_channels=act_out)
-        network = ptq.apply(network)
-        network = ptq.convert(network)
-        assert network.linear._linear.has_bias
-        load_checkpoint(ckpt_path, network)
-        ptq.fix_param_after_load_ckpt(network)
-        return network(input_)
-
-    example = Tensor(np.load(input_path), dtype=dtype.float16)
-    foutput = quant(example)
-    qoutput = infer(example)
-    assert relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 7e-3)
-    assert absolute_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 11e-5)
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_sq_predict_simplenet_2stage_2p(device, mode):
-    """
-    Feature: test smooth quant adjust parameter in two stages.
-    Description: Feed invalid type of bn_fold to convert function.
-    Expectation: adjust error is in certain range.
-    """
-
-    act_in, act_out = 16, 12
-    weight_in, weight_out = 16, 10
-    model_parallel = 2
-    transpose_b = False
-    rank_id = os.getenv('RANK_ID')
-    cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    fp_ckpt_path = os.path.join(cur_dir, "../../../data/test_ckpt/test_sq_predict_simplenet_2stage_2p.ckpt")
-    ckpt_path = f"test_sq_predict_simplenet_2stage_2p_{rank_id}.ckpt"
-    strategy_ckpt_save_file = "test_sq_predict_simplenet_2stage_2p_parallel_strategy.ckpt"
-
-    context.reset_auto_parallel_context()
-    context.set_context(device_target=device, mode=mode)
-    D.init()
-    context.set_auto_parallel_context(parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
-                                      full_batch=True, strategy_ckpt_save_file=strategy_ckpt_save_file)
-    set_algo_parameters(elementwise_op_strategy_follow=True)
-    if transpose_b:
-        p_strategy = ((1, model_parallel), (1, model_parallel))
-        # p_strategy = ((1, 1), (model_parallel, 1))
-    else:
-        p_strategy = ((1, model_parallel), (model_parallel, 1))
-        # p_strategy = ((1, 1), (1, model_parallel))
-        # p_strategy = ((model_parallel, 1), (1, model_parallel))
-
-    def quant(input_):
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
-        ptq = SmoothQuant(cfg)
-
-        network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
-                            strategy=p_strategy)
-        load_checkpoint(fp_ckpt_path, network)
-        network = ptq.apply(network)
-
-        def _calibrate(net, calibrate_size):
-            for _ in range(calibrate_size):
-                example = Tensor(np.random.normal(size=(act_out, act_in)), dtype=dtype.float16)
-                _ = net(example)
-
-        _calibrate(network, 2)
-        network = ptq.convert(network)
-        save_checkpoint(network, ckpt_path)
+        save_checkpoint(network.parameters_dict(), ckpt_path, integrated_save=False)
 
         fp_network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
                                strategy=p_strategy)
@@ -359,27 +292,81 @@ def test_sq_predict_simplenet_2stage_2p(device, mode):
         return fp_network(input_)
 
     def infer(input_):
-        strategy_filename = 'simplenet_strategy.ckpt'
-        context.set_auto_parallel_context(strategy_ckpt_config={'save_file': strategy_filename})
-        context.set_context(device_target=device, mode=mode)
+        context.set_context(mode=mode)
         cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         ptq = SmoothQuant(cfg)
         network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
                             strategy=p_strategy)
         network = ptq.apply(network)
         network = ptq.convert(network)
-        load_checkpoint(ckpt_path, network)
+        assert network.linear._linear.has_bias
+        if use_parallel:
+            model = Model(network)
+            model.infer_predict_layout(input_)
+        param_dict = load_checkpoint(ckpt_path)
+        unused_param_names = ['linear._scale_store', 'linear._act_observer.float_min', 'linear._act_observer.float_max',
+                              'linear._weight_in_observer.float_min', 'linear._weight_in_observer.float_max']
+        for item in unused_param_names:
+            param_dict.pop(item)
+        load_param_into_net(network, param_dict)
         ptq.fix_param_after_load_ckpt(network)
-        model = Model(network)
-        model.infer_predict_layout(input_)
-        load_checkpoint(ckpt_path, network)
         return network(input_)
 
-    example = Tensor(np.random.normal(size=(act_out, act_in)), dtype=dtype.float16)
+    example = Tensor(np.load(input_path), dtype=dtype.float16)
     foutput = quant(example)
     qoutput = infer(example)
-    assert relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 3.784)
-    assert absolute_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 0.064)
+    res = relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 7e-3)
+    if not res:
+        return False
+    return absolute_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 11e-5)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+@pytest.mark.parametrize("transpose_b", [True, False])
+def test_sq_predict_simplenet_2stage(device, mode, transpose_b):
+    """
+    Feature: test smooth quant adjust parameter in two stages.
+    Description: Feed invalid type of bn_fold to convert function.
+    Expectation: adjust error is in certain range.
+    """
+
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
+    if model_parallel == 1:
+        assert sq_predict_simplenet_2stage(device, mode, transpose_b, 1, None)
+        return
+
+    p_strategies = [((1, model_parallel), (model_parallel, 1)),
+                    ((1, 1), (1, model_parallel)),
+                    ((model_parallel, 1), (1, 1)),
+                    ((1, 1), (1, 1))]
+    for p_strategy in p_strategies:
+        if transpose_b and p_strategy is not None:
+            weight_strategy = p_strategy[1]
+            new_weight_strategy = (weight_strategy[1], weight_strategy[0])
+            p_strategy = (p_strategy[0], new_weight_strategy)
+        assert sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_strategy)
+
+
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_sq_predict_simplenet_2stage_2p():
+    """
+    Feature: test smooth quant adjust parameter in two stages with two cards.
+    Description: apply SQ on simplenet and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = 2
+    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    return_code = os.system(
+        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_sq_predict_simplenet_logs "
+        "pytest -s test_smooth_quant.py::test_sq_predict_simplenet_2stage"
+    )
+    assert return_code == 0
 
 
 @pytest.mark.platform_arm_ascend910b_training
