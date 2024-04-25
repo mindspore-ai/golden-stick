@@ -63,4 +63,8 @@ class NetworkRegister:
 
     def get(self, type_: str):
         """get."""
-        return self._map.get(type_)
+        base_network = self._map.get(type_)
+        if base_network is None:
+            raise RuntimeError(f"Unsupported network: {type_}, available: llama2_7b, llama2_13b, llama2_70b, "
+                               "baichuan2_13b, qwen_14b.")
+        return base_network

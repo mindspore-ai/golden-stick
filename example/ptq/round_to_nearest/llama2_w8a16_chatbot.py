@@ -60,9 +60,6 @@ def chat(net: BaseModel, tokenizer_: Tokenizer, max_length, use_parallel: bool):
 if __name__ == "__main__":
     uargs = get_args()
     net_mgr: BaseNetwork = NetworkRegister.instance().get(uargs.network)
-    if net_mgr is None:
-        raise RuntimeError(f"Unsupported network: {uargs.network}, available: llama2_7b, llama2_13b, llama2_70b, "
-                           "baichuan2_13b, glm3_6b, qwen_14b.")
     seq_length = 256
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     config = net_mgr.create_mfconfig(uargs.config_path, "Ascend", uargs.device_id, 1, seq_length, uargs.tokenizer_path,

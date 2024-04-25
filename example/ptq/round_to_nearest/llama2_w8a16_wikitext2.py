@@ -28,9 +28,9 @@ from mindspore_gs.common import BackendTarget
 from networks import NetworkRegister, BaseNetwork
 
 
-def evaluate(net, dataset_path, bs, seq_len, tokenizer):
+def evaluate(net, dataset_path, bs, seq_len, max_new_tokens_, tokenizer):
     """evaluate."""
-    ds = create_wikitext_dataset(dataset_path, bs, seq_len, tokenizer)
+    ds = create_wikitext_dataset(dataset_path, bs, seq_len, max_new_tokens_, tokenizer)
     metrics = {"PerplexityMetric": PerplexityMetric()}
     model = ms.Model(net, metrics=metrics, eval_network=net)
     step_size = ds.get_dataset_size()
@@ -51,7 +51,7 @@ def get_args():
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     parser.add_argument('--parallel', '-p', type=int, default=1)
     parser.add_argument('--network', '-n', type=str, default="llama2_7b",
-                        help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, glm3_6b, qwen_14b.")
+                        help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, qwen_14b.")
     args = parser.parse_args()
     logger.info(f"-------------------------------------------------evaluate args: {args}")
     return args
@@ -60,9 +60,6 @@ def get_args():
 if __name__ == "__main__":
     uargs = get_args()
     net_mgr: BaseNetwork = NetworkRegister.instance().get(uargs.network)
-    if net_mgr is None:
-        raise RuntimeError(f"Unsupported network: {uargs.network}, available: llama2_7b, llama2_13b, llama2_70b, "
-                           "baichuan2_13b, glm3_6b, qwen_14b.")
     context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
     batch_size = 1
     seq_length = 2048
@@ -84,4 +81,6 @@ if __name__ == "__main__":
     else:
         print('------------ eval llama2 ------------', flush=True)
     ms.load_checkpoint(uargs.ckpt_path, network)
-    evaluate(network, uargs.dataset_path, batch_size, seq_length, net_mgr.create_tokenizer(uargs.tokenizer_path))
+    max_new_tokens = uargs.max_new_tokens or seq_length // 2
+    evaluate(network, uargs.dataset_path, batch_size, seq_length, max_new_tokens,
+             net_mgr.create_tokenizer(uargs.tokenizer_path))

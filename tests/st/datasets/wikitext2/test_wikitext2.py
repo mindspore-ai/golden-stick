@@ -22,13 +22,13 @@ from mindformers import LlamaTokenizer
 from mindspore_gs.datasets import create_wikitext_dataset
 
 
-def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
+def check_ds(ds_path: str, bs: int, seq_length: int, max_decode_len: int, vocab_file: str, repeat):
     """Create and check wikitext-2 dataset."""
     tokenizer = LlamaTokenizer(vocab_file=vocab_file)
-    ds = create_wikitext_dataset(ds_path, bs, seq_length, tokenizer, repeat)
+    ds = create_wikitext_dataset(ds_path, bs, seq_length, max_decode_len, tokenizer, repeat)
 
     wiki_len = 311980
-    wiki_items = wiki_len // (seq_length - 1)
+    wiki_items = wiki_len // (seq_length - max_decode_len)
 
     assert ds.get_repeat_count() == repeat
     assert ds.output_types()[0] == np.int32
@@ -55,6 +55,6 @@ def test_wikitext2(device):
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     wiki_ds = os. path.join(cur_dir, "../../../data/wikitext2-dataset/wiki.test.tokens")
     vocab_file = os. path.join(cur_dir, "../../../data/llama2-tokenizer.model")
-    check_ds(wiki_ds, 1, 500, vocab_file, 1)
-    check_ds(wiki_ds, 2, 501, vocab_file, 1)
-    check_ds(wiki_ds, 1, 502, vocab_file, 2)
+    check_ds(wiki_ds, 1, 500, 100, vocab_file, 1)
+    check_ds(wiki_ds, 2, 501, 100, vocab_file, 1)
+    check_ds(wiki_ds, 1, 502, 100, vocab_file, 2)

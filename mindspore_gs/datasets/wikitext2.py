@@ -24,9 +24,10 @@ from mindspore.dataset import GeneratorDataset
 
 class WikiText2Dataset(GeneratorDataset):
     """Wikitext-2 dataset."""
-    def __init__(self, path: str, seq_length: int, tokenizer: callable):
+    def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable):
         self.path = os.path.join(path)
         self.seq_len = seq_length
+        self.max_new_tokens = max_new_tokens
         self.tokenizer = tokenizer
         self.pad_token_id = tokenizer.pad_token_id
         if hasattr(self.tokenizer, 'add_bos_token'):
@@ -47,9 +48,9 @@ class WikiText2Dataset(GeneratorDataset):
             for para in WikiText2Dataset._clean(f.read()).split("\n\n"):
                 if para and para.strip().startswith('=') is False:
                     input_content += self.tokenizer(para)['input_ids']
-        for chunk in WikiText2Dataset._chunks(input_content, self.seq_len - 1):
-            if len(chunk) == self.seq_len - 1:
-                self.content.append(Tensor(np.pad(np.array(chunk, dtype=np.int32), (0, 1), 'constant',
+        for chunk in WikiText2Dataset._chunks(input_content, self.seq_len - self.max_new_tokens):
+            if len(chunk) == self.seq_len - self.max_new_tokens:
+                self.content.append(Tensor(np.pad(np.array(chunk, dtype=np.int32), (0, self.max_new_tokens), 'constant',
                                                   constant_values=self.pad_token_id)))
 
     @staticmethod
@@ -101,9 +102,13 @@ class WikiText2Dataset(GeneratorDataset):
         return self
 
 
-def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, tokenizer: callable, repeat=1):
+def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, max_new_tokens: int, tokenizer: callable,
+                            repeat=1):
     """ create wikitext dataset"""
-    ds = WikiText2Dataset(ds_path, seq_length, tokenizer)
+    if max_new_tokens >= seq_length:
+        raise RuntimeError(f"max_decode_len should less than seq_length, but got max_new_tokens: {max_new_tokens}, "
+                           f"seq_length: {seq_length}.")
+    ds = WikiText2Dataset(ds_path, seq_length, max_new_tokens, tokenizer)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.batch(bs, drop_remainder=True)

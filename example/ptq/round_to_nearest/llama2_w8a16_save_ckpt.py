@@ -27,7 +27,7 @@ def get_args():
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--fp_ckpt_path', '-k', type=str, required=True)
     parser.add_argument('--network', '-n', type=str, default="llama2_7b",
-                        help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, glm3_6b, qwen_14b.")
+                        help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, qwen_14b.")
     args = parser.parse_args()
     print(f"-------------------------------------------------quant args: {args}", flush=True)
     return args
@@ -36,9 +36,6 @@ def get_args():
 if __name__ == "__main__":
     uargs = get_args()
     net_mgr: BaseNetwork = NetworkRegister.instance().get(uargs.network)
-    if net_mgr is None:
-        raise RuntimeError(f"Unsupported network: {uargs.network}, available: llama2_7b, llama2_13b, llama2_70b, "
-                           "baichuan2_13b, glm3_6b, qwen_14b.")
     config = net_mgr.create_mfconfig(uargs.config_path, "CPU", -1, 1, 2048, ckpt_path=uargs.fp_ckpt_path)
     network = net_mgr.create_network(config)
     network.set_train(False)

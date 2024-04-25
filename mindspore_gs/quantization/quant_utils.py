@@ -66,7 +66,7 @@ def cal_quantization_params(input_min,
 
     # calculate zero point
     zp_double = quant_min - input_min / scale
-    zp = np.round(zp_double).astype(np.int)
+    zp = np.round(zp_double).astype(np.int32)
 
     return scale, zp
 
