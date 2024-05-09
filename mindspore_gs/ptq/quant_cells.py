@@ -602,6 +602,10 @@ class SQLinearWrapper(PTQCell):
                     bias_name = self._linear.bias.name
                     self._linear.bias = Parameter(bias_quant, name=bias_name)
             param_bias_quant = bias_quant.asnumpy() if bias_quant is not None else None
+            if param_bias_quant is not None:
+                bn = self._get_bias_reduce_num()
+                # refer to docstring of _get_bias_reduce_num for the reason of this divide operation.
+                param_bias_quant = param_bias_quant / bn
             self._output_quantizer, bias = convert_to_dequant_bmm(self._input_quantizer,
                                                                   self._weight_quantizer,
                                                                   weight_quant,
@@ -616,9 +620,6 @@ class SQLinearWrapper(PTQCell):
                                                                       is_transpose=self._linear.transpose_b))
             self._linear.has_bias = True
             if bias is not None:
-                bn = self._get_bias_reduce_num()
-                # refer to docstring of _get_bias_reduce_num for the reason of this divide operation.
-                bias = bias / bn
                 self._linear.bias = Parameter(Tensor(bias, dtype=dtype.int32), name=bias_name)
             self._input_quantizer = convert_to_quant(self._input_quantizer,
                                                      strategy=(self._act_strategy,) if self._act_strategy else None)
