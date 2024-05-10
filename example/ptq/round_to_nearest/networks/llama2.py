@@ -77,20 +77,20 @@ class Llama2Network(BaseNetwork):
     @staticmethod
     def quant_network(network: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND):
         """Quant llama2 model to w8a16 with RTN algorithm."""
+        start = time.time()
         if mode == PTQMode.QUANTIZE.value:
             logger.info("Use RTN algo to quant network and weight.")
         else:
             logger.info("Use RTN algo to quant network.")
         cfg = PTQConfig(mode=mode, backend=backend)
         ptq = RTN(config=cfg)
+        logger.info(f'Create PTQ cost time is {time.time() - start} s.')
         start = time.time()
         qnet = ptq.apply(network.model)
-        end = time.time()
-        logger.info(f'fake quantize cost time is {end - start}')
+        logger.info(f'Apply PTQ cost time is {time.time() - start} s.')
 
         start = time.time()
         qnet = ptq.convert(qnet)
-        end = time.time()
-        logger.info(f'convert to real quantize cost time is {end - start}')
+        logger.info(f'Convert to real quantize cost time is {time.time() - start} s.')
         network.model = qnet
         return network
