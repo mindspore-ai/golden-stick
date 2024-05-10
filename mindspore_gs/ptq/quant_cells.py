@@ -14,7 +14,7 @@
 # ============================================================================
 """ptq quant cells."""
 import abc
-
+import time
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
@@ -115,10 +115,13 @@ class LinearQuant(PTQCell):
         pass
 
     def convert(self, backend: str = BackendTarget.NONE, is_deploy=False):
+        start = time.time()
         if backend == BackendTarget.NONE:
             super(LinearQuant, self).convert(backend)
             if self._weight_quantizer:
                 self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+            logger.info(
+                f"Converted weight of Linear Cell: {self._linear.weight.name}, time cost: {time.time() - start} s.")
             return
         if backend == BackendTarget.ASCEND:
             weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
@@ -147,7 +150,9 @@ class LinearQuant(PTQCell):
                 zp = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point]
                 weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
                                                  quant_min, quant_max, self._weight_axis, dtype.int8)
-                self._linear.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8),
+                np_weight_quant = weight_quant.asnumpy()
+                del weight_quant
+                self._linear.weight = Parameter(Tensor(np_weight_quant, dtype=dtype.int8),
                                                 name=self._linear.weight.name)
             else:
                 self._linear.weight = Parameter(initializer('ones', self._linear.weight.shape, dtype.int8),
@@ -167,11 +172,15 @@ class LinearQuant(PTQCell):
                                                 self._linear.transpose_b)
                 )
                 self._quant_deployed = True
+        logger.info(
+            f"Converted weight of Linear Cell: {self._linear.weight.name}, time cost: {time.time() - start} s.")
 
     def calibrate(self):
         """calibrate for weight quant"""
-        logger.info(f"Calibrating weight of Linear Cell: {self._linear.weight.name}")
+        start = time.time()
         self._weight_quantizer(self._linear.weight)
+        logger.info(
+            f"Calibrated weight of Linear Cell: {self._linear.weight.name}, time cost: {time.time() - start} s.")
 
     # pylint: disable=W0221
     def construct(self, x):

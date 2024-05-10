@@ -15,6 +15,7 @@
 """Quant llama2 7b to w8a16."""
 import os
 import argparse
+import time
 
 from mindformers.core.metric import PerplexityMetric
 import mindspore as ms
@@ -50,6 +51,7 @@ def get_args():
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
     parser.add_argument('--parallel', '-p', type=int, default=1)
+    parser.add_argument('--max_new_tokens', '-m', type=int, default=1)
     parser.add_argument('--network', '-n', type=str, default="llama2_7b",
                         help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, qwen_14b.")
     args = parser.parse_args()
@@ -71,12 +73,14 @@ if __name__ == "__main__":
           flush=True)
     network = net_mgr.create_network(config)
     if uargs.quant:
+        start = time.time()
         network = net_mgr.quant_network(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
         if not uargs.ckpt_path:
             if uargs.parallel == 1:
                 uargs.ckpt_path = "llama2-w8a16.ckpt"
             else:
                 uargs.ckpt_path = f"llama2-w8a16-r{rank_id}.ckpt"
+        logger.info(f"Deploy quant network, time cost: {time.time() - start} s.")
         print('------------ eval W8A16 quant llama2 ------------', flush=True)
     else:
         print('------------ eval llama2 ------------', flush=True)
