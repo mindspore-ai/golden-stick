@@ -50,8 +50,8 @@ if __name__ == "__main__":
 
     print('------------ quant llama2 to W8A16 ------------', flush=True)
     start = time.time()
-    config = MindFormerConfig(uargs.config_path)
-    ms.set_context(device_target=config.context.device_target)
+    device_config = MindFormerConfig(uargs.config_path)
+    ms.set_context(device_target=device_config.context.device_target)
     network = net_mgr.quant_network(network, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     logger.info(f'Quant Network cost time is {time.time() - start} s.')
     start = time.time()
