@@ -14,7 +14,7 @@
 # ============================================================================
 """SQNetPolicy."""
 
-from mindformers.modules import Linear
+from mindformers.modules.layers import Linear
 from mindspore.rewrite import PatternEngine
 
 from mindspore_gs.quantization.net_policy import NetPolicy

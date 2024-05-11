@@ -16,7 +16,6 @@
 
 import abc
 
-from mindformers import Linear
 from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
@@ -106,5 +105,5 @@ class LinearLayerPolicy(SQLayerPolicy):
                                                output_channel=num_channels, strategy=strategy)
         return perchannel_observer
 
-    def wrap_cell(self, handler: Linear) -> Cell:
+    def wrap_cell(self, handler) -> Cell:
         return SQLinearWrapper(handler, self, self._config)

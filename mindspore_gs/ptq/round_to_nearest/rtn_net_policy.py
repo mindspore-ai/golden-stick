@@ -14,7 +14,8 @@
 # ============================================================================
 """RTNNetPolicy."""
 
-from mindformers.modules import Linear, KVCacheMgr
+from mindformers.modules.layers import Linear
+from mindformers.modules.kvcache_mgr import KVCacheMgr
 from mindspore.rewrite import PatternEngine
 
 from mindspore_gs.quantization.net_policy import NetPolicy

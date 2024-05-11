@@ -22,8 +22,8 @@ from mindspore.ops.operations import FakeQuantParam
 from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
-from mindformers.modules import Linear
-from mindformers.modules import KVCacheMgr
+from mindformers.modules.layers import Linear
+from mindformers.modules.kvcache_mgr import KVCacheMgr
 
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer

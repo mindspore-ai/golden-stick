@@ -16,7 +16,6 @@
 
 import abc
 
-from mindformers import Linear
 from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
@@ -105,7 +104,7 @@ class LinearLayerPolicy(RTNLayerPolicy):
             self.set_input_not_insert_fq()
             self.set_output_not_insert_fq()
 
-    def wrap_cell(self, handler: Linear) -> Cell:
+    def wrap_cell(self, handler) -> Cell:
         return LinearQuant(handler, self)
 
 
@@ -159,5 +158,5 @@ class KVCacheMgrPolicy(RTNLayerPolicy):
         quantizer.set_attr("position", "output")
         return quantizer
 
-    def wrap_cell(self, handler: Linear) -> Cell:
+    def wrap_cell(self, handler) -> Cell:
         return KVCacheMgrQuant(handler, self)
