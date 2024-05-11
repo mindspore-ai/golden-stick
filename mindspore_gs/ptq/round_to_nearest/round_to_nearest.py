@@ -18,6 +18,7 @@ import os
 from typing import Tuple
 
 from mindspore.nn import Cell
+from mindspore import context
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 import mindspore.log as logger
 
@@ -104,7 +105,10 @@ class RoundToNearest(CompAlgo):
                     continue
                 cell.calibrate()
 
+        restore_device_target = context.get_context("device_target")
+        context.set_context(device_target="CPU")
         _process(network)
+        context.set_context(device_target=restore_device_target)
         return network
 
     @staticmethod
