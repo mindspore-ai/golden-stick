@@ -240,6 +240,31 @@ def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell, transpose_weight=Fal
         anti_quant.shard(strategy)
     return anti_quant
 
+def convert_to_fusion_antiquant_for_deploy(axis, output_channel, data_rank, is_per_channel,
+                                           transpose_weight=False, transpose_x=False, strategy=None,
+                                           dst_dtype=None) -> AntiquantBMMCell:
+    """convert_to_fusion_antiquant_for_deploy."""
+    if not dst_dtype:
+        if context.get_context("device_target") == "Ascend":
+            dst_dtype = dtype.float16
+        else:
+            dst_dtype = dtype.float32
+    if axis < 0:
+        axis += data_rank
+    pre_dims = axis
+    post_dims = data_rank - axis - 1
+    param_shape = [1] * pre_dims + [-1] + [1] * post_dims
+    if is_per_channel:
+        scale = np.ones(output_channel).reshape(param_shape).tolist()
+        zp = np.zeros(output_channel).reshape(param_shape).tolist()
+    else:
+        scale = np.ones(1).reshape(param_shape).tolist()
+        zp = np.zeros(1).reshape(param_shape).tolist()
+    anti_quant = AntiquantBMMCell(scale, zp, out_dtype=dst_dtype, transpose_x=transpose_x,
+                                  transpose_weight=transpose_weight)
+    if strategy is not None:
+        anti_quant.shard(strategy)
+    return anti_quant
 
 class DequantBMMCell(Cell):
     """matmul and dequant fused cell"""

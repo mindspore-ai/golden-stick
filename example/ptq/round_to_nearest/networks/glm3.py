@@ -29,7 +29,8 @@ from .network import BaseNetwork
 class ChatGLM3Network(BaseNetwork):
     """ChatGLM3Network."""
     @staticmethod
-    def create_mfconfig(config_path, device, device_id, bs, seq_len, tokenizer_path="", ckpt_path="", model_parallel=1):
+    def create_mfconfig(config_path, device, device_id, bs, seq_len, tokenizer_path="", ckpt_path="",
+                        ckpt_strategy_file="", model_parallel=1):
         """Create mindformers config for llama2 network for example."""
         if model_parallel > 1:
             # MS parallel not support bfloat16 now.

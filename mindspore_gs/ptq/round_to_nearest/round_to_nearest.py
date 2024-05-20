@@ -138,7 +138,6 @@ class RoundToNearest(CompAlgo):
         Returns:
             fake quantized network.
         """
-
         if not isinstance(self._ptq_policy, NetPolicy):
             raise RuntimeError("Derived class should provide net policy")
         self._ptq_policy.build()
