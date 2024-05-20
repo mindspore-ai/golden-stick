@@ -32,7 +32,8 @@ from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tenso
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.ptq.ptq_config import PTQMode
 from mindspore_gs.ptq.convert_utils import (
-    convert_to_antiquant, convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant, convert_to_dequant_bmm
+    convert_to_antiquant, convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
+    convert_to_dequant_bmm, convert_to_fusion_antiquant_for_deploy
 )
 
 
@@ -115,31 +116,24 @@ class LinearQuant(PTQCell):
         pass
 
     def convert(self, backend: str = BackendTarget.NONE, is_deploy=False):
-        start = time.time()
         if backend == BackendTarget.NONE:
             super(LinearQuant, self).convert(backend)
             if self._weight_quantizer:
                 self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
-            logger.info(
-                f"Converted weight of Linear Cell: {self._linear.weight.name}, time cost: {time.time() - start} s.")
             return
         if backend == BackendTarget.ASCEND:
             weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
-                          self._weight_quantizer.get_attr("weight_only_quant", False)
+                        self._weight_quantizer.get_attr("weight_only_quant", False)
             all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
                         isinstance(self._input_quantizer, LinearFakeQuantizer)
             if not all_quant and not weight_only:
                 logger.info(f"LinearQuant {self} is not quanted.")
                 return
-            if is_deploy:
-                if isinstance(self._input_quantizer, LinearFakeQuantizer):
-                    self._input_quantizer.foo_init()
-                if isinstance(self._weight_quantizer, LinearFakeQuantizer):
-                    self._weight_quantizer.foo_init()
+
             super(LinearQuant, self).convert(backend)
-            self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
             # quant weight to int8
             if not is_deploy:
+                self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
                 weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
                 weight = self._linear.cast(self._linear.weight, self._cast_dtype)
                 quant_min, quant_max = get_quant_min_max(
@@ -154,27 +148,40 @@ class LinearQuant(PTQCell):
                 del weight_quant
                 self._linear.weight = Parameter(Tensor(np_weight_quant, dtype=dtype.int8),
                                                 name=self._linear.weight.name)
+                if not all_quant:
+                    self._input_quantizer = None
+                    self._output_quantizer = None
+                    self._weight_quantizer = convert_to_fusion_antiquant(
+                        self._weight_quantizer, transpose_weight=self._linear.transpose_b,
+                        dst_dtype=self._cast_dtype, strategy=
+                        self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
+                                                    False, self._linear.transpose_b)
+                    )
             else:
+                if isinstance(self._input_quantizer, LinearFakeQuantizer):
+                    self._input_quantizer.foo_init()
+                if isinstance(self._weight_quantizer, LinearFakeQuantizer):
+                    self._weight_quantizer.foo_init()
                 self._linear.weight = Parameter(initializer('ones', self._linear.weight.shape, dtype.int8),
                                                 name=self._linear.weight.name)
-            # convert to ascend quant layer
+                if not all_quant:
+                    self._input_quantizer = None
+                    self._output_quantizer = None
+                    self._weight_quantizer = convert_to_fusion_antiquant_for_deploy(
+                        axis=self._weight_axis, output_channel=self._linear.out_channels,
+                        data_rank=len(self._linear.weight.shape),
+                        is_per_channel=self._weight_quantizer.is_per_channel(),
+                        transpose_weight=self._linear.transpose_b,
+                        dst_dtype=self._cast_dtype,
+                        strategy=self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
+                                                             False, self._linear.transpose_b)
+                    )
             if all_quant:
                 self._output_quantizer = convert_to_dequant(self._input_quantizer, self._weight_quantizer)
                 self._input_quantizer = convert_to_quant(self._input_quantizer)
                 self._quant_deployed = True
-            else:
-                self._input_quantizer = None
-                self._output_quantizer = None
-                self._weight_quantizer = convert_to_fusion_antiquant(
-                    self._weight_quantizer, transpose_weight=self._linear.transpose_b,
-                    dst_dtype=self._cast_dtype, strategy=
-                    self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy, False,
-                                                self._linear.transpose_b)
-                )
-                self._quant_deployed = True
-        logger.info(
-            f"Converted weight of Linear Cell: {self._linear.weight.name}, time cost: {time.time() - start} s.")
-
+                raise RuntimeError(f'current version not support all quantization, only for weight quantization')
+            self._quant_deployed = True
     def calibrate(self):
         """calibrate for weight quant"""
         start = time.time()
