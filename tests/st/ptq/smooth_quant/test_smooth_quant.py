@@ -309,16 +309,12 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
         for item in unused_param_names:
             param_dict.pop(item)
         load_param_into_net(network, param_dict)
-        ptq.fix_param_after_load_ckpt(network)
         return network(input_)
 
     example = Tensor(np.load(input_path), dtype=dtype.float16)
     foutput = quant(example)
     qoutput = infer(example)
-    if use_parallel:
-        res = relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 1.2)
-    else:
-        res = relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 7e-3)
+    res = relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 7e-3)
     if not res:
         return False
     if use_parallel:
@@ -422,7 +418,6 @@ def test_sq_predict_llama2_2stage(device, mode):
         network = ptq.apply(network)
         network = ptq.convert(network)
         load_checkpoint(ckpt_path, network)
-        ptq.fix_param_after_load_ckpt(network)
         return network(*inputs)
 
     inputs = create_dummy_inputs(2, 512, 512)

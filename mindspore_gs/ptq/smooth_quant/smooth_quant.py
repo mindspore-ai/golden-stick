@@ -25,7 +25,6 @@ from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig
 from mindspore_gs.ptq.quant_cells import SQLinearWrapper
 from mindspore_gs.common.register import cell_type_dicts
-from mindspore_gs.ptq.convert_utils import QuantCell
 from mindspore_gs.ptq.smooth_quant.sq_net_policy import SQNetPolicy
 
 
@@ -74,26 +73,6 @@ class SmoothQuant(CompAlgo):
         ApplyProcessor(self._ptq_policy).process(network)
         network.update_parameters_name()
         return network
-
-    @staticmethod
-    def fix_param_after_load_ckpt(network):
-        """
-        Fix quant param after loaded checkpoint for some quant parameter is store in attribute of primitive. QuantCell
-        is an example who's quant parameter is an attribute.
-        """
-
-        class FixProcessor(Processor):
-            """A network iterator for fix parameter after load ckpt."""
-
-            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
-                if isinstance(cell, SQLinearWrapper):
-                    return cell, False
-                if isinstance(cell, QuantCell):
-                    cell.update_ascend_quant()
-                return cell, True
-
-        FixProcessor().process(network)
-        network.update_parameters_name()
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """convert"""

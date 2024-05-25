@@ -82,7 +82,6 @@ def test_quant_cell_pertensor(mode):
 
     qcell2 = QuantCell(Tensor([1.0], dtype=dtype.float32), Tensor([0.0], dtype=dtype.float32))
     mindspore.load_checkpoint("test_quant_cell_pertensor.ckpt", qcell2)
-    qcell2.update_ascend_quant()
     output2 = qcell2(x)
     os.environ.pop('GRAPH_OP_RUN')
 
@@ -117,7 +116,6 @@ def test_quant_cell_perchannel(mode):
 
     qcell2 = QuantCell(Tensor([1.0, 1.0], dtype=dtype.float32), Tensor([0.0, 0.0], dtype=dtype.float32))
     mindspore.load_checkpoint("test_quant_cell_perchannel.ckpt", qcell2)
-    qcell2.update_ascend_quant()
     output2 = qcell2(x)
     os.environ.pop('GRAPH_OP_RUN')
     assert (expect == output2.asnumpy()).all()
