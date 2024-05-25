@@ -19,7 +19,7 @@ from mindspore import Parameter, Tensor, dtype, context
 from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
-from mindspore.ops.operations._inner_ops import AntiQuant, Quant, Dequant
+from mindspore.ops.operations._inner_ops import AntiQuant, Dequant
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
@@ -77,64 +77,34 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=No
 
 class QuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
-    def __init__(self, t_scale: Tensor, t_zp: Tensor, use_fusion=True):
+    def __init__(self, t_scale: Tensor, t_zp: Tensor):
         super().__init__()
         if t_scale.shape != t_zp.shape:
             raise ValueError(f"Size of scale({t_scale.shape}) should be equal to size of zp({t_zp.shape}).")
         t_scale = 1 / t_scale
         self._is_perchannel: bool = t_scale.shape != (1,)
-        self._use_fusion = use_fusion
-        if self._use_fusion:
-            if self._is_perchannel:
-                self.t_scale = Parameter(Tensor([1.0], dtype=dtype.float32))
-                self.t_zp = Parameter(Tensor([0.0], dtype=dtype.float32))
-                self.mul = msops.Mul()
-                self.add = msops.Add()
-                self.mul_param = Parameter(t_scale)
-                self.add_param = Parameter(t_zp)
-            else:
-                self.t_scale = Parameter(t_scale)
-                self.t_zp = Parameter(t_zp)
-            self.quant = Quant(self.t_scale.asnumpy().tolist()[0], self.t_zp.asnumpy().tolist()[0])
-        else:
-            self.mul_param = Parameter(t_scale)
-            self.add_param = Parameter(t_zp)
-            self.mul = msops.Mul()
-            self.add = msops.Add()
-            self.round = msops.Round()
-            self.cast = msops.Cast()
+        self.t_scale = Parameter(t_scale)
+        self.t_zp = Parameter(t_zp)
+        self.mul = msops.Mul()
+        self.add = msops.Add()
+        self.round = msops.Round()
+        self.cast = msops.Cast()
 
-    def update_ascend_quant(self):
-        """update params in quant"""
-        if self._use_fusion:
-            self.quant.add_prim_attr('scale', self.t_scale.asnumpy().tolist()[0])
-            self.quant.add_prim_attr('offset', self.t_zp.asnumpy().tolist()[0])
 
     def construct(self, x):
         """construct network forward"""
-        if self._use_fusion:
-            if self._is_perchannel:
-                x = self.mul(x, self.mul_param)
-                x = self.add(x, self.add_param)
-            return self.quant(x)
-        x = self.mul(x, self.mul_param)
-        x = self.add(x, self.add_param)
+        x = self.mul(x, self.t_scale)
+        x = self.add(x, self.t_zp)
         x = self.round(x)
         x = self.cast(x, dtype.int8)
         return x
 
     def shard(self, strategy):
         """shard strategy for quant cell"""
-        if self._use_fusion:
-            self.quant.shard(strategy)
-            if self._is_perchannel:
-                self.mul.shard((strategy[0], (1,)))
-                self.add.shard((strategy[0], (1,)))
-        else:
-            self.mul.shard((strategy[0], (1,)))
-            self.add.shard((strategy[0], (1,)))
-            self.round.shard(strategy)
-            self.cast.shard(strategy)
+        self.mul.shard((strategy[0], (1,)))
+        self.add.shard((strategy[0], (1,)))
+        self.round.shard(strategy)
+        self.cast.shard(strategy)
 
 
 def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:

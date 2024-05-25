@@ -122,7 +122,6 @@ class RoundToNearest(CompAlgo):
             def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, QuantCell):
                     return cell, True
-                cell.update_ascend_quant()
                 return cell, False
 
         FixProcessor().process(network)
