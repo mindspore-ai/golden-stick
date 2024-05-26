@@ -182,6 +182,7 @@ class LinearQuant(PTQCell):
                 self._quant_deployed = True
                 raise RuntimeError(f'current version not support all quantization, only for weight quantization')
             self._quant_deployed = True
+
     def calibrate(self):
         """calibrate for weight quant"""
         start = time.time()
@@ -212,6 +213,7 @@ class LinearQuant(PTQCell):
             x = self._weight_quantizer(x, self._linear.weight)
         else:
             weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+            weight = self._weight_quantizer(weight)
             x = self._linear.matmul(x, weight)
         if self._linear.has_bias:
             x = self._linear.bias_add(x, self._linear.cast(self._linear.bias, self._linear.dtype))

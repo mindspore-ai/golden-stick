@@ -64,6 +64,8 @@ def test_apply_convert():
     ptq = RTN()
     # apply & calibrate
     new_network = ptq.apply(network)
+    fakeinput = np.ones((1, 5), dtype=np.float16)
+    new_network(Tensor(fakeinput))
     cells: OrderedDict = new_network.name_cells()
     quant_cell = cells.get("linear", None)
     assert isinstance(quant_cell, LinearQuant)
@@ -119,6 +121,8 @@ def test_woq_predict_1stage(device, mode):
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = RTN(config=cfg)
     quant_network = ptq.apply(network)
+    fakeinput = np.ones((1, 5), dtype=np.float16)
+    quant_network(Tensor(fakeinput))
     ascend_network = ptq.convert(quant_network)
     for _, cell in ascend_network.name_cells().items():
         if not isinstance(cell, LinearQuant):
@@ -158,6 +162,8 @@ def test_woq_predict_2stage(device, mode):
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
+        fakeinput = np.ones((1, 5), dtype=np.float16)
+        quant_network(Tensor(fakeinput))
         ascend_network = ptq.convert(quant_network)
         for _, cell in ascend_network.name_cells().items():
             if not isinstance(cell, LinearQuant):
@@ -230,6 +236,8 @@ def test_linears_woq_predict_2stage(device, mode):
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
+        fakeinput = np.ones((1, 5), dtype=np.float16)
+        quant_network(Tensor(fakeinput))
         ascend_network = ptq.convert(quant_network)
         mindspore.save_checkpoint(ascend_network, "test_linears_woq_predict_2stage.ckpt")
         return fp_outputs
@@ -260,7 +268,6 @@ def test_linears_woq_predict_2stage(device, mode):
     assert relative_tolerance_acceptable(quant_output.asnumpy(), fp_output.asnumpy(), 0.1587)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])

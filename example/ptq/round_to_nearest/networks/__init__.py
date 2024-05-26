@@ -21,4 +21,5 @@ from .llama2 import Llama2Network
 NetworkRegister.instance().reg("glm3_6b", ChatGLM3Network)
 NetworkRegister.instance().reg("llama2_7b", Llama2Network)
 NetworkRegister.instance().reg("llama2_13b", Llama2Network)
+NetworkRegister.instance().reg("llama2_57b", Llama2Network)
 NetworkRegister.instance().reg("llama2_70b", Llama2Network)
