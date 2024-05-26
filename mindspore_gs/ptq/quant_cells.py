@@ -207,12 +207,6 @@ class LinearQuant(PTQCell):
                 x = P.Reshape()(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
         ori_dtype = F.dtype(x)
 
-        bias = None
-        if self._linear.has_bias:
-            if hasattr(self._linear, "dtype"):
-                bias = self._linear.cast(self._linear.bias, self._linear.dtype)
-            else:
-                bias = self._linear.cast(self._linear.bias, x.dtype)
         x = self._linear.cast(x, self._cast_dtype)
         if self._quant_deployed:
             x = self._weight_quantizer(x, self._linear.weight)
@@ -220,7 +214,7 @@ class LinearQuant(PTQCell):
             weight = self._linear.cast(self._linear.weight, self._cast_dtype)
             x = self._linear.matmul(x, weight)
         if self._linear.has_bias:
-            x = self._linear.bias_add(x, bias)
+            x = self._linear.bias_add(x, self._linear.cast(self._linear.bias, self._linear.dtype))
         if self._linear.activation_flag:
             x = self._linear.activation(x)
         x = F.cast(x, ori_dtype)
