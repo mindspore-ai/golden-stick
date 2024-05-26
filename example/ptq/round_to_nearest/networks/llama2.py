@@ -32,22 +32,17 @@ class Llama2Network(BaseNetwork):
     def create_mfconfig(config_path, device, device_id, bs, seq_len, tokenizer_path="", ckpt_path="",
                         ckpt_strategy_file="", model_parallel=1):
         """Create mindformers config for llama2 network for example."""
-        if model_parallel > 1:
-            # MS parallel not support bfloat16 now.
-            compute_dtype = ms.float16
-            use_parallel = True
-        else:
-            compute_dtype = ms.float16
-            use_parallel = False
-            model_parallel = 1
         config = MindFormerConfig(config_path)
+        if model_parallel == -1:
+            model_parallel = config.parallel_config.model_parallel
+        use_parallel = model_parallel > 1
         if device_id != -1:
             config.context.device_id = device_id
         config.context.device_target = device
         config.model.model_config.batch_size = bs
         if seq_len != -1:
             config.model.model_config.seq_length = seq_len
-        config.model.model_config.compute_dtype = compute_dtype
+        config.model.model_config.compute_dtype = ms.float16
         config.model.model_config.layernorm_compute_type = ms.float32
         config.model.model_config.softmax_compute_type = ms.float16
         config.model.model_config.rotary_dtype = ms.float16
@@ -91,7 +86,10 @@ class Llama2Network(BaseNetwork):
         start = time.time()
         qnet = ptq.apply(network.model)
         logger.info(f'Apply PTQ cost time is {time.time() - start} s.')
-
+        start = time.time()
+        fake_input_ids = np.ones((1, 2), dtype=np.int64)
+        network.generate(fake_input_ids.tolist(), ma_length=2048)
+        logger.info(f'Calibrate cost time is {time.time() - start} s.')
         start = time.time()
         qnet = ptq.convert(qnet)
         logger.info(f'Convert to real quantize cost time is {time.time() - start} s.')
@@ -128,10 +126,6 @@ class Llama2Network(BaseNetwork):
         slot_mapping = Llama2Network.get_slots(bs, block_size, prefill_max_len, True, block_tables,
                                                valid_length_each_example)
         input_ids = np.ones(input_seq_len, dtype=np.int64).reshape(bs, -1)
-        # def construct(self, input_ids, labels=None, input_position=None, position_ids=None, attention_mask=None,
-        #               input_embeds=None, init_reset=True, batch_valid_length=None, batch_index=None, zactivate_len=None,
-        #               block_tables=None, slot_mapping=None):
-        # return [input_ids, None, input_position, None, None, None, None, batch_valid_length, batch_index, activate_len, block_tables, slot_mapping]
 
         return [input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping]
     

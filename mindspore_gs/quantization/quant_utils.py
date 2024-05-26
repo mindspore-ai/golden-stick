@@ -53,8 +53,6 @@ def cal_quantization_params(input_min,
 
     if input_min.shape != input_max.shape:
         raise ValueError("input min shape should be equal to input max.")
-    #if (input_min > input_max).any():
-    #    raise ValueError("input_min should be smaller than input_max.")
     if (input_max == input_min).all():
         return np.ones(input_min.shape), np.zeros(input_min.shape)
 
@@ -107,7 +105,8 @@ def quant_tensor_data(tensor: Tensor, scale, zero_point, quant_min, quant_max, d
     if scale.shape[0] < 0:
         raise ValueError("`scale` and `zero_point` shape should be greater than zero.")
     if tensor.shape[data_axis] != scale.shape[0]:
-        raise ValueError("Dim of `data`'s `data_axis` should be equal to `scale`'s shape.")
+        raise ValueError(f"Dim({tensor.shape[data_axis]}) of `data`'s `data_axis`({data_axis}) should be equal to "
+                         f"`scale`'s shape({scale.shape}[0]).")
     if data_axis >= len(tensor.shape):
         raise ValueError("`data_axis` out of range of `data`'s shape.")
 
