@@ -17,8 +17,9 @@
 import time
 import math
 import numpy as np
-import mindspore as ms
 from mindspore import log as logger
+from mindspore import Tensor
+from mindspore import dtype as mstype
 from mindformers import LlamaForCausalLM, LlamaTokenizer, MindFormerConfig, LlamaConfig, init_context, \
     TransformerOpParallelConfig
 from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -26,33 +27,14 @@ from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import RoundToNearest as RTN
 from .network import BaseNetwork
 
+
 class Llama2Network(BaseNetwork):
     """Llama2Network."""
     @staticmethod
-    def create_mfconfig(config_path, device, device_id, bs, seq_len, tokenizer_path="", ckpt_path="",
+    def create_mfconfig(config_path, device="", device_id=-1, bs=-1, seq_len=-1, tokenizer_path="", ckpt_path="",
                         ckpt_strategy_file="", model_parallel=1):
         """Create mindformers config for llama2 network for example."""
         config = MindFormerConfig(config_path)
-        if model_parallel == -1:
-            model_parallel = config.parallel_config.model_parallel
-        use_parallel = model_parallel > 1
-        if device_id != -1:
-            config.context.device_id = device_id
-        config.context.device_target = device
-        config.model.model_config.batch_size = bs
-        if seq_len != -1:
-            config.model.model_config.seq_length = seq_len
-        config.model.model_config.compute_dtype = ms.float16
-        config.model.model_config.layernorm_compute_type = ms.float32
-        config.model.model_config.softmax_compute_type = ms.float16
-        config.model.model_config.rotary_dtype = ms.float16
-        config.model.model_config.param_init_type = ms.float16
-        config.processor.tokenizer.vocab_file = tokenizer_path
-        config.load_checkpoint = ckpt_path
-        config.model.model_config.checkpoint_name_or_path = ckpt_path
-        config.src_strategy_path_or_dir = ckpt_strategy_file
-        config.use_parallel = use_parallel
-        config.parallel_config.model_parallel = model_parallel
         config.model.model_config = LlamaConfig(**config.model.model_config)
 
         init_context(use_parallel=config.use_parallel, context_config=config.context, parallel_config=config.parallel)
@@ -127,5 +109,13 @@ class Llama2Network(BaseNetwork):
                                                valid_length_each_example)
         input_ids = np.ones(input_seq_len, dtype=np.int64).reshape(bs, -1)
 
-        return [input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping]
+        input_ids = Tensor(input_ids, mstype.int32)
+        input_position = Tensor(input_seq_len, mstype.int32)
+        init_reset = Tensor([False], mstype.bool_)
+        batch_valid_length = Tensor([valid_length_each_example], mstype.int32)
+        block_tables = Tensor(block_tables, mstype.int32)
+        slot_mapping = Tensor(slot_mapping, mstype.int32)
+
+        return [input_ids, None, input_position, None, None, None, init_reset, batch_valid_length, None, None,
+                block_tables, slot_mapping]
     
