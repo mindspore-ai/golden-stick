@@ -23,7 +23,7 @@ from mindspore_gs.common import BackendTarget
 class BaseNetwork:
     """BaseNetwork."""
     @staticmethod
-    def create_mfconfig(config_path, device, device_id, bs, seq_len, tokenizer_path="", ckpt_path="",
+    def create_mfconfig(config_path, device="", device_id=-1, bs=-1, seq_len=-1, tokenizer_path="", ckpt_path="",
                         ckpt_strategy_file="", model_parallel=1):
         """create_mfconfig."""
         raise NotImplementedError

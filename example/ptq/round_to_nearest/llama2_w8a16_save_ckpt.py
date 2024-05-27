@@ -19,6 +19,7 @@ import time
 
 import mindspore as ms
 from mindspore import log as logger
+from mindspore import Model
 from mindspore.communication import get_rank
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
@@ -45,20 +46,21 @@ if __name__ == "__main__":
     net_mgr: BaseNetwork = NetworkRegister.instance().get(uargs.network)
     if not uargs.fp_ckpt_path:
         logger.warning(f'Float checkpoint path is empty, will quantize random init network.')
-    config = net_mgr.create_mfconfig(uargs.config_path, "Ascend", -1, 1, -1, model_parallel=-1)
+    config = net_mgr.create_mfconfig(uargs.config_path)
     network = net_mgr.create_network(config)
     network.set_train(False)
     network.phase = 'predict'
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     start = time.time()
     rank_id = get_rank()
-    for _, param in network.parameters_dict().items():
-        param.asnumpy()
+    model = Model(network)
+    model.infer_predict_layout(*(net_mgr.gen_fake_inputs(1, 4096, 128)))
     if os.path.isdir(uargs.fp_ckpt_path):
         for file in os.listdir(os.path.join(uargs.fp_ckpt_path, f"rank_{rank_id}")):
             if not file.endswith(".ckpt"):
                 continue
             uargs.fp_ckpt_path = os.path.join(uargs.fp_ckpt_path, f"rank_{rank_id}", file)
+    logger.info(f'Load ckpt :{uargs.fp_ckpt_path}.')
     ms.load_checkpoint(uargs.fp_ckpt_path, network)
     logger.info(f'Load ckpt cost time is {time.time() - start} s.')
     print('------------------------- Quantize-ing network...', flush=True)
