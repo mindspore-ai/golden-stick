@@ -62,6 +62,7 @@ if __name__ == "__main__":
             uargs.fp_ckpt_path = os.path.join(uargs.fp_ckpt_path, f"rank_{rank_id}", file)
     logger.info(f'Load ckpt :{uargs.fp_ckpt_path}.')
     ms.load_checkpoint(uargs.fp_ckpt_path, network)
+    ms.ms_memory_recycle()
     logger.info(f'Load ckpt cost time is {time.time() - start} s.')
     print('------------------------- Quantize-ing network...', flush=True)
     start = time.time()
