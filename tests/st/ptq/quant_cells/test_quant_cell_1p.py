@@ -24,7 +24,7 @@ from mindspore.nn import Cell
 from mindspore.ops.operations._inner_ops import Quant
 from mindspore.ops.auto_generate import QuantBatchMatmul
 
-from mindspore_gs.ptq.convert_utils import AntiquantBMMCell, QuantCell, DequantBMMCell
+from mindspore_gs.ptq.convert_utils import AntiquantBMMCell, QuantCell, DequantBMMCell, SmoothAndQuantCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps, NumpyFullQuant
 from tests.st.test_utils import relative_tolerance_acceptable
 
@@ -76,6 +76,33 @@ def test_quant_cell_1p(mode):
 
     quant_cell = QuantCell(Tensor(scale, dtype=mstype.float16),
                            Tensor(offset, dtype=mstype.float16))
+    t_activation = Tensor(activation, dtype=mstype.float16)
+    fact = quant_cell(t_activation).asnumpy()
+    os.environ.pop('GRAPH_OP_RUN')
+
+    assert relative_tolerance_acceptable(fact, expect, 3e-2)
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_smooth_quant_cell_1p(mode):
+    """
+    Feature: quant tensor from fp16 to int8
+    Description: test quant ops
+    Expectation: accuracy in tolerance
+    """
+
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
+    activation = np.array([[0.1, 1.], [0.5, 2.4]]).astype(np.float16)
+    smooth_scale = np.array([0.6, 0.3]).astype(np.float16)
+    scale = np.array([0.5]).astype(np.float16)
+    offset = np.array([-10]).astype(np.float16)
+    final_scale = smooth_scale * scale
+    expect = NumpyQuantOps.quant(activation, final_scale, offset)
+
+    quant_cell = SmoothAndQuantCell(smooth_scale, scale, offset)
     t_activation = Tensor(activation, dtype=mstype.float16)
     fact = quant_cell(t_activation).asnumpy()
     os.environ.pop('GRAPH_OP_RUN')

@@ -32,7 +32,7 @@ from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.smooth_quant.smooth_quant import SmoothQuant
 from mindspore_gs.ptq.smooth_quant.sq_layer_policy import LinearLayerPolicy
 from mindspore_gs.ptq.quant_cells import SQLinearWrapper
-from mindspore_gs.ptq.convert_utils import QuantCell, DequantBMMCell
+from mindspore_gs.ptq.convert_utils import SmoothAndQuantCell, DequantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
@@ -135,7 +135,7 @@ def test_apply_convert():
     network = ptq.convert(network)
     assert not check_network_contain_layer(network, Linear, (SQLinearWrapper,))
     assert isinstance(network.linear, SQLinearWrapper)
-    assert isinstance(network.linear._input_quantizer, QuantCell)
+    assert isinstance(network.linear._input_quantizer, SmoothAndQuantCell)
     assert isinstance(network.linear._input_quantizer.t_scale, Parameter)
     assert isinstance(network.linear._input_quantizer.t_zp, Parameter)
     assert isinstance(network.linear._output_quantizer, DequantBMMCell)
@@ -192,7 +192,7 @@ def test_sq_linear_wrapper(device, mode, transpose_b):
     assert np.allclose(weight_obv_min, weight_obv_min_expect)
     assert np.allclose(weight_obv_max, weight_obv_max_expect)
     # calculate smooth scale
-    t_smooth_scale = sqlinear._calc_input_scale()
+    t_smooth_scale = sqlinear._calc_smooth_scale()
     act_maxnorm = np.maximum(np.abs(act_obv_min), np.abs(act_obv_max))
     act_maxnorm_pow = np.power(act_maxnorm, sqlinear._alpha)
     weight_maxnorm = np.maximum(np.abs(weight_obv_min), np.abs(weight_obv_max))

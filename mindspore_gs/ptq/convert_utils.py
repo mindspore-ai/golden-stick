@@ -15,11 +15,13 @@
 """Convert network to target backend quant network from mindposre quant network."""
 
 import numpy as np
+import mindspore as ms
 from mindspore import Parameter, Tensor, dtype, context
 from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
 from mindspore.ops.operations._inner_ops import AntiQuant, Dequant
+from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
@@ -119,6 +121,49 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
     quant_cell = QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32))
+    if strategy is not None:
+        quant_cell.shard(strategy)
+    return quant_cell
+
+class SmoothAndQuantCell(Cell):
+    """QuantCell, warp Quant to support serialize and deserialize."""
+    def __init__(self, smooth_scale: list, t_scale: list, t_zp: list):
+        super().__init__()
+        t_scale = t_scale * smooth_scale
+        t_scale = 1 / t_scale
+        if len(t_zp) == 1 and len(t_scale) != 1:
+            t_zp = Tensor(np.array([t_zp[0]] * len(t_scale)), dtype=dtype.float16)
+        else:
+            t_zp = Tensor(np.array(t_zp), dtype=dtype.float16)
+        t_scale = Tensor(np.array(t_scale), dtype=dtype.float16)
+        # QuantV2 ops only support per channel quant
+        if t_scale.shape != t_zp.shape or t_scale.shape == (1,):
+            raise ValueError(f"Size of scale({t_scale.shape}) should be equal to size of ' \
+                            f'zp({t_zp.shape}) and t_scale.shape can't be (1,).")
+        self.t_scale = Parameter(t_scale)
+        self.t_zp = Parameter(t_zp)
+        self.quant = QuantV2()
+
+    def construct(self, x):
+        """construct network forward"""
+        return self.quant(x, self.t_scale, self.t_zp, False, "ROUND", ms.int8)
+
+    def shard(self, strategy):
+        """shard strategy for quant cell"""
+        self.quant.shard((strategy[0], (strategy[0][-1],), (strategy[0][-1],)))
+
+def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter, strategy=None) -> QuantCell:
+    """Convert FakeQuantParamCell to Quant."""
+    fq: FakeQuantParam = fqcell.fq
+    if not isinstance(fq, FakeQuantParam):
+        raise ValueError("Only support convert FakeQuantParam to Quant.")
+    scale = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
+    zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
+    if scale is None:
+        raise ValueError("Can not find scale in FakeQuantParamCell.")
+    if zp is None:
+        raise ValueError("Can not find zp in FakeQuantParamCell.")
+    quant_cell = SmoothAndQuantCell(smooth_scale.asnumpy(), scale, zp)
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell
