@@ -15,7 +15,8 @@
 """BaseNetwork."""
 
 
-from mindformers import BaseModel
+import numpy as np
+from mindformers import BaseModel, MindFormerConfig
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import BackendTarget
 
@@ -23,8 +24,7 @@ from mindspore_gs.common import BackendTarget
 class BaseNetwork:
     """BaseNetwork."""
     @staticmethod
-    def create_mfconfig(config_path, device="", device_id=-1, bs=-1, seq_len=-1, tokenizer_path="", ckpt_path="",
-                        ckpt_strategy_file="", model_parallel=1):
+    def create_mfconfig(config_path):
         """create_mfconfig."""
         raise NotImplementedError
 
@@ -39,14 +39,14 @@ class BaseNetwork:
         raise NotImplementedError
 
     @staticmethod
-    def quant_network(network: BaseModel, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND):
+    def quant_network(network: BaseModel, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, **kwargs):
         """quant_network."""
         raise NotImplementedError
 
     @staticmethod
-    def gen_fake_inputs(bs, seq, block_size):
-        """gen_fake_inputs."""
-        return None
+    def assemble_inputs(input_ids: np.ndarray, config: MindFormerConfig):
+        """quant_network."""
+        raise NotImplementedError
 
 
 class NetworkRegister:
@@ -74,3 +74,7 @@ class NetworkRegister:
             raise RuntimeError(f"Unsupported network: {type_}, available: llama2_7b, llama2_13b, llama2_70b, "
                                "baichuan2_13b, qwen_14b.")
         return base_network
+
+    def from_config(self, config_path):
+        config = MindFormerConfig(config_path)
+        return self.get(config.trainer.model_name)

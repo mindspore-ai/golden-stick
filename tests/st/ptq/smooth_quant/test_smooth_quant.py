@@ -299,7 +299,7 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
                             strategy=p_strategy)
         network = ptq.apply(network)
         network = ptq.convert(network)
-        assert network.linear._linear.has_bias
+        assert network.linear._linear.has_bias and network.linear._linear.bias is not None
         if use_parallel:
             model = Model(network)
             model.infer_predict_layout(input_)
@@ -327,14 +327,14 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
-@pytest.mark.parametrize("transpose_b", [True, False])
-def test_sq_predict_simplenet_2stage(device, mode, transpose_b):
+def test_sq_predict_simplenet_2stage_transb_true(device, mode):
     """
     Feature: test smooth quant adjust parameter in two stages.
     Description: Feed invalid type of bn_fold to convert function.
     Expectation: adjust error is in certain range.
     """
 
+    transpose_b = True
     model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
     if model_parallel == 1:
         assert sq_predict_simplenet_2stage(device, mode, transpose_b, 1, None)
@@ -353,8 +353,37 @@ def test_sq_predict_simplenet_2stage(device, mode, transpose_b):
 
 
 @pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_sq_predict_simplenet_2stage_transb_false(device, mode):
+    """
+    Feature: test smooth quant adjust parameter in two stages.
+    Description: Feed invalid type of bn_fold to convert function.
+    Expectation: adjust error is in certain range.
+    """
+    transpose_b = False
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
+    if model_parallel == 1:
+        assert sq_predict_simplenet_2stage(device, mode, transpose_b, 1, None)
+        return
+
+    p_strategies = [((1, model_parallel), (model_parallel, 1)),
+                    ((1, 1), (1, model_parallel)),
+                    ((model_parallel, 1), (1, 1)),
+                    ((1, 1), (1, 1))]
+    for p_strategy in p_strategies:
+        if transpose_b and p_strategy is not None:
+            weight_strategy = p_strategy[1]
+            new_weight_strategy = (weight_strategy[1], weight_strategy[0])
+            p_strategy = (p_strategy[0], new_weight_strategy)
+        assert sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_strategy)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_sq_predict_simplenet_2stage_2p():
+def test_sq_predict_simplenet_2stage_2p_true():
     """
     Feature: test smooth quant adjust parameter in two stages with two cards.
     Description: apply SQ on simplenet and check accuracy.
@@ -365,7 +394,32 @@ def test_sq_predict_simplenet_2stage_2p():
     return_code = os.system(
         "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_sq_predict_simplenet_logs "
-        "pytest -s test_smooth_quant.py::test_sq_predict_simplenet_2stage"
+        "pytest -s test_smooth_quant.py::test_sq_predict_simplenet_2stage_transb_true"
+    )
+    if return_code != 0:
+        log_file = open("./test_sq_predict_simplenet_logs/worker_1.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+
+    assert return_code == 0
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_sq_predict_simplenet_2stage_2p_false():
+    """
+    Feature: test smooth quant adjust parameter in two stages with two cards.
+    Description: apply SQ on simplenet and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = 2
+    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    return_code = os.system(
+        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_sq_predict_simplenet_logs "
+        "pytest -s test_smooth_quant.py::test_sq_predict_simplenet_2stage_transb_false"
     )
     if return_code != 0:
         log_file = open("./test_sq_predict_simplenet_logs/worker_1.log", "r", encoding="utf-8")

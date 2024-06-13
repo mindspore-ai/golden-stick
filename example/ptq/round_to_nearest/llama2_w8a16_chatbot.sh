@@ -15,19 +15,11 @@
 # ============================================================================
 
 
-network=$1
-device_id=$2
-pnum=$3
-config_file="./run_llama2_7b_910b.yaml"
-tokenizer_file=""
-
-rm -rf split_msrun_log
-mkdir split_msrun_log
-rm -rf quant_ckpt
-mkdir quant_ckpt
-for ((i=0; i<${pnum}; i++)); do
-  mkdir "quant_ckpt/rank_${i}"
-done
+config_file=$1
+run_mf_path=$2
+question=$3
+device_id=$4
+pnum=$5
 
 did_str=${device_id}
 for ((i=1; i<${pnum}; i++)); do
@@ -36,5 +28,6 @@ done
 
 export GRAPH_OP_RUN=1
 export ASCEND_RT_VISIBLE_DEVICES=${did_str}
-msrun --worker_num=${pnum} --local_worker_num=${pnum} --master_port=8190 --log_dir=msrun_log --join=True --cluster_time_out=300 \
-      python llama2_split_ckpt.py -c ${config_file} -k "llama2-w8a16.ckpt" -p ${pnum} -n ${network} -t ${tokenizer_file}
+msrun --worker_num=${pnum} --local_worker_num=${pnum} --master_port=8123 --log_dir=msrun_log \
+      --join=True --cluster_time_out=300 python ${run_mf_path} --config ${config_file} --run_mode predict \
+      --predict_data ${question} > log_msrun 2>&1 &

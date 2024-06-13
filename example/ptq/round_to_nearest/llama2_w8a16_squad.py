@@ -13,21 +13,21 @@
 # limitations under the License.
 # ============================================================================
 """Quant llama2 to w8a16."""
-import argparse
 
+import os
+import argparse
+import time
 import numpy as np
-from mindformers import LlamaForCausalLM, LlamaTokenizer
 from mindformers.core.metric import EmF1Metric
 import mindspore as ms
-from mindspore import context
 from mindspore import log as logger
+from mindspore import Model
+from mindspore.communication import get_rank
 from mindspore_gs.datasets import create_squad_dataset
-from mindspore_gs.ptq import PTQMode
-from mindspore_gs.common import BackendTarget
-from common import create_mfconfig, quant_llama2
+from networks import NetworkRegister, BaseNetwork
 
 
-def evaluate(net: LlamaForCausalLM, dataset_path, vocab_file, cfg):
+def evaluate(net, dataset_path, cfg, net_helper: BaseNetwork):
     """evaluate `net` with dataset from `dataset_path`."""
     top_k = cfg.model.model_config.top_k
     top_p = cfg.model.model_config.top_p
@@ -35,20 +35,20 @@ def evaluate(net: LlamaForCausalLM, dataset_path, vocab_file, cfg):
     batch_size = cfg.model.model_config.batch_size
     seq_length = cfg.model.model_config.seq_length
     ignore_token_id = cfg.model.model_config.ignore_token_id
+    pad_token_id = cfg.model.model_config.pad_token_id
 
-    tokenizer = LlamaTokenizer(vocab_file=vocab_file)
+    tokenizer = net_helper.create_tokenizer(cfg.processor.tokenizer.vocab_file)
     ds = create_squad_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id)
     metric = EmF1Metric()
     metric.clear()
 
-    pad_token_id = tokenizer.pad_token_id
     data_count = 0
     total_count = ds.get_dataset_size()
-    for _, inputs in enumerate(ds.create_dict_iterator()):
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
         data_count += 1
         logger.info(f"Dataset count: {data_count}/{total_count}")
-        input_ids = inputs['input_ids'].asnumpy()
-        labels = inputs['labels'].asnumpy()
+        input_ids = ds_item['input_ids'].asnumpy()
+        labels = ds_item['labels'].asnumpy()
 
         valid_length_each_example = []
         for j in range(input_ids.shape[0]):
@@ -72,33 +72,38 @@ def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
-    parser.add_argument('--device_id', '-d', type=int, required=True)
-    parser.add_argument('--ckpt_path', '-k', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
-    parser.add_argument('--quant', '-q', type=int, required=True)
-    parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
-    parser.add_argument('--parallel', '-p', type=int, default=1)
     args = parser.parse_args()
     logger.info(f"-------------------------------------------------evaluate args: {args}")
     return args
 
 
 if __name__ == "__main__":
+    start = time.time()
     uargs = get_args()
-    context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    config = create_mfconfig(uargs.config_path, uargs.device_id, 1, 2048, uargs.tokenizer_path,
-                             model_parallel=uargs.parallel)
-
-    network = LlamaForCausalLM(config.model.model_config)
-    network.phase = 'predict'
+    print('------------------------- Creating network...', flush=True)
+    net_mgr: BaseNetwork = NetworkRegister.instance().from_config(uargs.config_path)
+    config = net_mgr.create_mfconfig(uargs.config_path)
+    network = net_mgr.create_network(config)
     network.set_train(False)
-
-    if uargs.quant:
-        network = quant_llama2(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
-        if not uargs.ckpt_path:
-            uargs.ckpt_path = "llama2-w8a16.ckpt"
-        print('------------ eval W8A16 quant llama2 ------------', flush=True)
-    else:
-        print('------------ eval llama2 ------------', flush=True)
-    ms.load_checkpoint(uargs.ckpt_path, network)
-    evaluate(network, uargs.dataset_path, uargs.tokenizer_path, config)
+    network.phase = 'predict'
+    logger.info(f'Create Network cost time is {time.time() - start} s.')
+    start = time.time()
+    rank_id = get_rank() or 0
+    ckpt_path = config.load_checkpoint
+    bs = config.model.model_config.batch_size
+    seq = config.model.model_config.seq_length
+    block_size = config.model.model_config.block_size
+    if os.path.isdir(ckpt_path):
+        for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):
+            if not file.endswith(".ckpt"):
+                continue
+            ckpt_path = os.path.join(ckpt_path, f"rank_{rank_id}", file)
+            model = Model(network)
+            inputs = network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))
+            model.infer_predict_layout(*inputs)
+            break
+    logger.info(f'Loading ckpt :{ckpt_path}.')
+    ms.load_checkpoint(ckpt_path, network)
+    logger.info(f'Load ckpt cost time is {time.time() - start} s.')
+    evaluate(network, uargs.dataset_path, config, net_mgr)
