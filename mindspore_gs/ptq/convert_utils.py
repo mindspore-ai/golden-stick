@@ -246,7 +246,7 @@ class DequantBMMCell(Cell):
         scale_ui64 = NumpyQuantOps.trans_fp32_to_u64(scale)
         self.scale = Parameter(Tensor(np.squeeze(scale_ui64), dtype=dtype.uint64))
         if offset is None:
-            self.offset = Parameter(Tensor(np.zeros(self.scale.shape), dtype=dtype.float32))
+            self.offset = None
         else:
             self.offset = Parameter(Tensor(offset, dtype=dtype.float32))
 

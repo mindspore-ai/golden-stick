@@ -2,6 +2,21 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 0.4.1 Release Notes
+
+### 主要特性和增强
+
+* 优化`RoundToNearest`算法量化checkpoint的耗时。
+* 优化`RoundToNearest`量化网络推理时的图编译耗时。
+
+### 贡献者
+
+感谢以下人员做出的贡献:
+
+changshaozhong, yourifan, hangangqiang
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 0.4.0 Release Notes
 
 ### 主要特性和增强

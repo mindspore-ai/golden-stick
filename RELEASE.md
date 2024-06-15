@@ -2,6 +2,21 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 0.4.1 Release Notes
+
+### Major Features and Improvements
+
+* Optimize the time taken by RoundToNearest algorithm to quantify weights.
+* Optimize the compilation time of RoundToNearest quantization network.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+changshaozhong, yourifan, hangangqiang
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 0.4.0 Release Notes
 
 ### Major Features and Improvements
