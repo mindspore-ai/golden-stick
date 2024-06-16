@@ -316,7 +316,6 @@ def test_kvint8_predict_2stage(device, mode):
     infer()
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])
