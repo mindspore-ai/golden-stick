@@ -24,7 +24,10 @@ from mindspore.parallel import set_algo_parameters
 from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model, load_param_into_net
 from mindspore import nn, Parameter, GRAPH_MODE, dtype
 from mindspore.common.dtype import QuantDtype
+from mindspore.communication import get_rank
 from mindformers.modules import Linear
+from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
+from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig
 
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -427,3 +430,170 @@ def test_sq_predict_llama2_2stage(device, mode):
     print(f"-------------------qoutput {qoutput}", flush=True)
     print(f"rel error: {relative_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 10)}")
     print(f"abs error: {absolute_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 10)}")
+
+
+def _set_config(config_path):
+    """setup MindFormerConfig"""
+    mfconfig = MindFormerConfig(config_path)
+    mfconfig.model.model_config = LlamaConfig(**mfconfig.model.model_config)
+    init_context(use_parallel=mfconfig.use_parallel, context_config=mfconfig.context, parallel_config=mfconfig.parallel)
+    if mfconfig.use_parallel:
+        parallel_config = TransformerOpParallelConfig(**mfconfig.parallel_config)
+        mfconfig.model.model_config.parallel_config = parallel_config
+    mfconfig.model.model_config.checkpoint_name_or_path = mfconfig.load_checkpoint
+    return mfconfig
+
+
+def load_distribut_checkpoint(config, ckpt_path, network):
+    """load ckpt to multi card"""
+    rank_id = get_rank() or 0
+    bs = config.model.model_config.batch_size
+    seq = config.model.model_config.seq_length
+    if os.path.isdir(ckpt_path):
+        for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):
+            if not file.endswith(".ckpt"):
+                continue
+            ckpt_path = os.path.join(ckpt_path, f"rank_{rank_id}", file)
+            model = Model(network)
+            inputs = network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))
+            model.infer_predict_layout(*inputs)
+            break
+    print(f'Loading ckpt :{ckpt_path}.')
+    load_checkpoint(ckpt_path, network)
+    return network
+
+
+def sq_predict_llama2_2stage(device, mode, model_parallel):
+    """test_sq_predict_llama2_2stage"""
+    print(f"---------------- Testing params: {device} {mode} ", flush=True)
+    context.set_context(device_target=device, mode=mode)
+    if model_parallel == 1:
+        fp16_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_1p.yaml"
+        w8a8_config_path = "../../../data/test_llama2/run_llama2_13b_w8a8_910b_1p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16-1decoder.ckpt"
+        w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8-1decoder.ckpt"
+    else:
+        fp16_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_2p.yaml"
+        w8a8_config_path = "../../../data/test_llama2/run_llama2_13b_w8a8_910b_2p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
+        w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8"
+    cur_dir, _ = os.path.split(os.path.abspath(__file__))
+    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    fp16_config_path = os.path.join(cur_dir, fp16_config_path)
+    w8a8_config_path = os.path.join(cur_dir, w8a8_config_path)
+    fp16_ckpt_path = os.path.join(cur_dir, fp16_ckpt_path)
+    w8a8_ckpt_path = os.path.join(cur_dir, w8a8_ckpt_path)
+
+    def quant(ckpt_path, config_path):
+        config = _set_config(config_path)
+        network = LlamaForCausalLM(config.model.model_config)
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+        ptq = SmoothQuant(config=cfg)
+        network.model = ptq.apply(network.model)
+
+        def _calibrate(net):
+            seq_len = 1024
+            input_ids = tokenizer("Hello")['input_ids']
+            outputs = net.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+            answer = tokenizer.decode(outputs, skip_special_tokens=True)
+            print('answer: ', answer)
+
+        _calibrate(network)
+        network = ptq.convert(network)
+        if model_parallel == 1:
+            save_checkpoint(network.parameters_dict(), w8a8_ckpt_path, integrated_save=False)
+        else:
+            rank_id = get_rank() or 0
+            save_path = os.path.join(w8a8_ckpt_path, f"rank_{rank_id}")
+            os.makedirs(save_path, exist_ok=True)
+            save_checkpoint(network.parameters_dict(), os.path.join(save_path, "w8a8.ckpt"),
+                            choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
+
+    def w8a8_infer(input_, ckpt_path, config_path):
+        config = _set_config(config_path)
+        network = LlamaForCausalLM(config.model.model_config)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        ptq = SmoothQuant(config=cfg)
+        network.model = ptq.apply(network.model)
+        network.model = ptq.convert(network.model)
+
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        seq_len = 500
+        input_ids = tokenizer(input_)['input_ids']
+        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+        answer = tokenizer.decode(outputs, skip_special_tokens=True)
+        return outputs, answer
+
+    def fp16_infer(input_, ckpt_path, config_path):
+        config = _set_config(config_path)
+        network = LlamaForCausalLM(config.model.model_config)
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        seq_len = 500
+        input_ids = tokenizer(input_)['input_ids']
+        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+        answer = tokenizer.decode(outputs, skip_special_tokens=True)
+        return outputs, answer
+    example = "Hello"
+    quant(fp16_ckpt_path, fp16_config_path)
+    foutput, fanswer = fp16_infer(example, fp16_ckpt_path, fp16_config_path)
+    qoutput, qanswer = w8a8_infer(example, w8a8_ckpt_path, w8a8_config_path)
+    print(f"-------------------foutput {foutput}, fanswer {fanswer}, type {type(foutput)}", flush=True)
+    print(f"-------------------qoutput {qoutput}, qanswer {qanswer}, type {type(qoutput)}", flush=True)
+    print(f"rel error: {relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 200)}")
+    print(f"abs error: {absolute_tolerance_acceptable(np.array(qoutput), np.array(foutput), 5000)}")
+    if model_parallel == 1:
+        return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
+    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 21.6)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_sq_llama2_predict_2stage_1p(device, mode):
+    """
+    Feature: test smooth quant adjust parameter in two stages with one cards.
+    Description: apply SQ on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
+    assert sq_predict_llama2_2stage(device, mode, model_parallel)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_sq_llama2_predict_2stage_2p():
+    """
+    Feature: test smooth quant adjust parameter in two stages with two cards.
+    Description: apply SQ on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = 2
+    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    return_code = os.system(
+        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
+        "pytest -s test_smooth_quant.py::test_sq_llama2_predict_2stage_1p"
+    )
+    if return_code != 0:
+        log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+
+    assert return_code == 0

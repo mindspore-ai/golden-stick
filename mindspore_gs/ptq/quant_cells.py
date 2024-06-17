@@ -709,7 +709,7 @@ class SQLinearWrapper(PTQCell):
             else:
                 weight = self._linear.weight
                 x = self._linear.cast(x, self._linear.weight.dtype)
-
+            weight = self._weight_quantizer(weight)
             x = self._linear.matmul(x, weight)
             if self._linear.has_bias:
                 if hasattr(self._linear, "dtype"):

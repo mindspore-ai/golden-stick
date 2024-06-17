@@ -25,6 +25,8 @@ from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
+from mindspore_gs.quantization.quant_utils import get_quant_min_max
+from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 
 
 class AntiQuantCell(Cell):
@@ -79,7 +81,7 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=No
 
 class QuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
-    def __init__(self, t_scale: Tensor, t_zp: Tensor):
+    def __init__(self, t_scale: Tensor, t_zp: Tensor, quant_min, quant_max):
         super().__init__()
         if t_scale.shape != t_zp.shape:
             raise ValueError(f"Size of scale({t_scale.shape}) should be equal to size of zp({t_zp.shape}).")
@@ -87,6 +89,8 @@ class QuantCell(Cell):
         self._is_perchannel: bool = t_scale.shape != (1,)
         self.t_scale = Parameter(t_scale)
         self.t_zp = Parameter(t_zp)
+        self.quant_min = quant_min
+        self.quant_max = quant_max
         self.mul = msops.Mul()
         self.add = msops.Add()
         self.round = msops.Round()
@@ -97,6 +101,7 @@ class QuantCell(Cell):
         x = self.mul(x, self.t_scale)
         x = self.add(x, self.t_zp)
         x = self.round(x)
+        x = x.clip(self.quant_min, self.quant_max)
         x = self.cast(x, dtype.int8)
         return x
 
@@ -119,7 +124,11 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32))
+    quant_min, quant_max = get_quant_min_max(
+        num_bits=fq.attrs[LinearFakeQuantizer.attr_key_num_bits],
+        signed=fq.attrs[LinearFakeQuantizer.attr_key_signed],
+        narrow_range=fq.attrs[LinearFakeQuantizer.attr_key_narrow_range])
+    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32), quant_min, quant_max)
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell

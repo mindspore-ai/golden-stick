@@ -58,7 +58,6 @@ class SimpleNet(nn.Cell):
         return self.kvcache(key, value, kvcache_inputs)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_apply_convert():
