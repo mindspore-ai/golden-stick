@@ -58,7 +58,7 @@ class PTQCell(QuantCell):
         return anti_strategy
 
     @staticmethod
-    def antiquant_bmm_strategy(act_strategy, weight_strategy, has_bias=False, is_transpose=False):
+    def antiquant_bmm_strategy(act_strategy, weight_strategy, has_bias=False, has_offset=True, is_transpose=False):
         """parallel strategy for antiquant bmm"""
         if act_strategy is None or weight_strategy is None:
             return None
@@ -68,9 +68,13 @@ class PTQCell(QuantCell):
             scale_strategy = (weight_strategy[1],)
         offset_strategy = scale_strategy
         if not has_bias:
-            return act_strategy, weight_strategy, scale_strategy, offset_strategy
+            if has_offset:
+                return act_strategy, weight_strategy, scale_strategy, offset_strategy
+            return act_strategy, weight_strategy, scale_strategy
         bias_strategy = scale_strategy
-        return act_strategy, weight_strategy, scale_strategy, offset_strategy, bias_strategy
+        if has_offset:
+            return act_strategy, weight_strategy, scale_strategy, offset_strategy, bias_strategy
+        return act_strategy, weight_strategy, scale_strategy, bias_strategy
 
 
 class LinearQuant(PTQCell):
@@ -629,10 +633,15 @@ class SQLinearWrapper(PTQCell):
                                                                       act_strategy=self._act_strategy,
                                                                       weight_strategy=self._weight_strategy,
                                                                       has_bias=True,  # offset correct by bias
+                                                                      has_offset=False,
                                                                       is_transpose=self._linear.transpose_b))
             self._linear.has_bias = True
             if bias is not None:
                 self._linear.bias = Parameter(Tensor(bias, dtype=dtype.int32), name=bias_name)
+            else:
+                bias_shape = [self._linear.weight.shape[0] if self._linear.transpose_b else
+                              self._linear.weight.shape[1]]
+                self._linear.bias = Parameter(initializer('ones', bias_shape, dtype=dtype.int32), name=bias_name)
             self._input_quantizer = convert_to_quant(self._input_quantizer,
                                                      strategy=(self._act_strategy,) if self._act_strategy else None)
 

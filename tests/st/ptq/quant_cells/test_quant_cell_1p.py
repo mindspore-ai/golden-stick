@@ -160,7 +160,7 @@ class QuantDequantCell(Cell):
 
         self.quant_weight = Tensor(NumpyQuantOps.quant(weight, weight_scale, 0), dtype=mstype.int8)
         self.bias = Tensor(self._fused_bias(bias), dtype=mstype.int32)
-        self.dequant_offset = Parameter(Tensor(np.zeros(self.bias.shape), dtype=mstype.float32))
+        self.dequant_offset = None
 
     def _dequant_scale(self, act_scale, weight_scale):
         dequant_scale = weight_scale * act_scale

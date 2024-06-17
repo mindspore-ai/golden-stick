@@ -352,7 +352,6 @@ def test_sq_predict_simplenet_2stage(device, mode, transpose_b):
         assert sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_strategy)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_sq_predict_simplenet_2stage_2p():
