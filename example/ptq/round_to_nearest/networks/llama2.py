@@ -31,8 +31,7 @@ from .network import BaseNetwork
 class Llama2Network(BaseNetwork):
     """Llama2Network."""
     @staticmethod
-    def create_mfconfig(config_path, device="", device_id=-1, bs=-1, seq_len=-1, tokenizer_path="", ckpt_path="",
-                        ckpt_strategy_file="", model_parallel=1):
+    def create_mfconfig(config_path):
         """Create mindformers config for llama2 network for example."""
         config = MindFormerConfig(config_path)
         config.model.model_config = LlamaConfig(**config.model.model_config)
@@ -55,7 +54,7 @@ class Llama2Network(BaseNetwork):
         return LlamaTokenizer(vocab_file=vocab_file)
 
     @staticmethod
-    def quant_network(network: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND):
+    def quant_network(network: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, **kwargs):
         """Quant llama2 model to w8a16 with RTN algorithm."""
         start = time.time()
         if mode == PTQMode.QUANTIZE.value:
@@ -69,7 +68,9 @@ class Llama2Network(BaseNetwork):
         qnet = ptq.apply(network.model)
         logger.info(f'Apply PTQ cost time is {time.time() - start} s.')
         start = time.time()
-        network(*(Llama2Network.gen_fake_inputs(1, 4096, 128)))
+        bs = kwargs.get("batch_size", 1)
+        seq = kwargs.get("seq_length", 4096)
+        network(*(network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))))
         logger.info(f'Calibrate cost time is {time.time() - start} s.')
         start = time.time()
         qnet = ptq.convert(qnet)
@@ -78,7 +79,7 @@ class Llama2Network(BaseNetwork):
         return network
 
     @staticmethod
-    def get_slots(bs, block_size, prefill_max_len, is_prefill, block_tables, valid_length_example):
+    def _get_slots(bs, block_size, prefill_max_len, is_prefill, block_tables, valid_length_example):
         """get_slots."""
         slot_mapping = []
         for i in range(bs):
@@ -98,23 +99,36 @@ class Llama2Network(BaseNetwork):
         return np.array(slot_mapping, copy=False, dtype=np.int32)
 
     @staticmethod
-    def gen_fake_inputs(bs, seq, block_size):
-        input_seq_len = seq // 2 + 1
-        valid_length_each_example = np.array([input_seq_len])
+    def _get_pa_inputs(bs, seq, block_size, valid_length):
+        """_get_pa_inputs"""
+        valid_length_each_example = np.array([valid_length])
         prefill_max_len = max(valid_length_each_example)
-        required_block_num = math.ceil(input_seq_len / block_size)
+        required_block_num = math.ceil(seq / block_size)
         block_tables = np.arange(required_block_num, dtype=np.int32).reshape(bs, -1)
-        slot_mapping = Llama2Network.get_slots(bs, block_size, prefill_max_len, True, block_tables,
-                                               valid_length_each_example)
-        input_ids = np.ones(input_seq_len, dtype=np.int64).reshape(bs, -1)
-
-        input_ids = Tensor(input_ids, mstype.int32)
-        input_position = Tensor(input_seq_len, mstype.int32)
-        init_reset = Tensor([False], mstype.bool_)
-        batch_valid_length = Tensor([valid_length_each_example], mstype.int32)
+        slot_mapping = Llama2Network._get_slots(bs, block_size, prefill_max_len, True, block_tables,
+                                                valid_length_each_example)
         block_tables = Tensor(block_tables, mstype.int32)
         slot_mapping = Tensor(slot_mapping, mstype.int32)
+        return block_tables, slot_mapping
 
-        return [input_ids, None, input_position, None, None, None, init_reset, batch_valid_length, None, None,
-                block_tables, slot_mapping]
-    
+    @staticmethod
+    def assemble_inputs(input_ids: np.ndarray, config: MindFormerConfig):
+        """quant_network."""
+        shape = input_ids.shape
+        if len(shape) > 2:
+            raise ValueError(f"Only support two-dimension(bs, seq_length) input_ids, got: {shape}.")
+        bs = config.model.model_config.batch_size
+        seq = config.model.model_config.seq_length
+        if shape[0] > bs or shape[1] > seq:
+            raise ValueError(f"Input input_ids shape({shape}) out of max shape({bs}, {seq}).")
+        pad_token_id = config.model.model_config.pad_token_id
+        use_past = config.model.model_config.use_past
+        input_ids = np.pad(input_ids, ((0, bs - shape[0]), (0, seq - shape[1])), 'constant',
+                           constant_values=pad_token_id)
+        t_input_ids = Tensor(input_ids)
+        if not use_past:
+            return t_input_ids, None, None, None, None, None, None, None, None, None, None, None
+        block_size = config.model.model_config.block_size
+
+        block_tables, slot_mapping = Llama2Network._get_pa_inputs(bs, seq, block_size, shape[1])
+        return t_input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping

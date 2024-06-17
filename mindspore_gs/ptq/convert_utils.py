@@ -90,7 +90,6 @@ class QuantCell(Cell):
         self.round = msops.Round()
         self.cast = msops.Cast()
 
-
     def construct(self, x):
         """construct network forward"""
         x = self.mul(x, self.t_scale)
@@ -210,6 +209,7 @@ def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell, transpose_weight=Fal
         anti_quant.shard(strategy)
     return anti_quant
 
+
 def convert_to_fusion_antiquant_for_deploy(axis, output_channel, data_rank, is_per_channel,
                                            transpose_weight=False, transpose_x=False, strategy=None,
                                            dst_dtype=None) -> AntiquantBMMCell:
@@ -235,6 +235,7 @@ def convert_to_fusion_antiquant_for_deploy(axis, output_channel, data_rank, is_p
     if strategy is not None:
         anti_quant.shard(strategy)
     return anti_quant
+
 
 class DequantBMMCell(Cell):
     """matmul and dequant fused cell"""

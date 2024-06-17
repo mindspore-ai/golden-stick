@@ -13,78 +13,79 @@
 # limitations under the License.
 # ============================================================================
 """Quant llama2 7b to w8a16."""
+
 import os
 import argparse
 import time
-
-from mindformers.core.metric import PerplexityMetric
+import numpy as np
 import mindspore as ms
-from mindspore import context
 from mindspore import log as logger
+from mindspore import Model
+from mindspore import ops
+from mindspore.train.metrics import Perplexity
 from mindspore.communication import get_rank
-from mindspore.train.callback import LossMonitor, TimeMonitor
 from mindspore_gs.datasets import create_wikitext_dataset
-from mindspore_gs.ptq import PTQMode
-from mindspore_gs.common import BackendTarget
 from networks import NetworkRegister, BaseNetwork
 
 
-def evaluate(net, dataset_path, bs, seq_len, max_new_tokens_, tokenizer):
+def evaluate(net, dataset_path, config_, net_helper: BaseNetwork):
     """evaluate."""
-    ds = create_wikitext_dataset(dataset_path, bs, seq_len, max_new_tokens_, tokenizer)
-    metrics = {"PerplexityMetric": PerplexityMetric()}
-    model = ms.Model(net, metrics=metrics, eval_network=net)
-    step_size = ds.get_dataset_size()
-    time_cb = TimeMonitor(data_size=step_size)
-    loss_cb = LossMonitor()
-    cb = [time_cb, loss_cb]
-    output = model.eval(ds, dataset_sink_mode=config.runner_config.sink_mode, callbacks=cb)
-    print(f"PPL: {output}", flush=True)
+    bs_ = config_.model.model_config.batch_size
+    seq_ = config_.model.model_config.seq_length
+    tokenizer = net_helper.create_tokenizer(config_.processor.tokenizer.vocab_file)
+    ds = create_wikitext_dataset(dataset_path, bs_, seq_, 1, tokenizer)
+    metric = Perplexity()
+    data_count = 0
+    total_count = ds.get_dataset_size()
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        data_count += 1
+        logger.info(f"Dataset count: {data_count}/{total_count}")
+        input_ids = ds_item['input_ids'].asnumpy()
+        net_inputs = net_helper.assemble_inputs(input_ids, config_)
+        output = net(*net_inputs)
+        output = ops.squeeze(output)[:-1, :]
+        label = input_ids[:, 1:]
+        metric.update(output, label)
+    print('...........Evaluate Over!...............', flush=True)
+    print(f"PPL: {metric.eval()}", flush=True)
 
 
 def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
-    parser.add_argument('--ckpt_path', '-k', type=str, required=True)
-    parser.add_argument('--quant', '-q', type=int, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
-    parser.add_argument('--tokenizer_path', '-t', type=str, required=True)
-    parser.add_argument('--parallel', '-p', type=int, default=1)
-    parser.add_argument('--max_new_tokens', '-m', type=int, default=1)
-    parser.add_argument('--network', '-n', type=str, default="llama2_7b",
-                        help="optional: llama2_7b, llama2_13b, llama2_70b, baichuan2_13b, qwen_14b.")
     args = parser.parse_args()
     logger.info(f"-------------------------------------------------evaluate args: {args}")
     return args
 
 
 if __name__ == "__main__":
+    start = time.time()
     uargs = get_args()
-    net_mgr: BaseNetwork = NetworkRegister.instance().get(uargs.network)
-    context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE)
-    batch_size = 1
-    seq_length = 2048
-    device_id = int(os.getenv('DEVICE_ID', '0'))
-    config = net_mgr.create_mfconfig(uargs.config_path, "Ascend", device_id, batch_size, seq_length,
-                                     uargs.tokenizer_path, model_parallel=uargs.parallel)
-    rank_id = 0 if uargs.parallel == 1 else get_rank()
-    print(f"start wikitext2 evaluate: rank {rank_id}, bs {batch_size}, seq_len {seq_length}, config {uargs}.",
-          flush=True)
+    print('------------------------- Creating network...', flush=True)
+    net_mgr: BaseNetwork = NetworkRegister.instance().from_config(uargs.config_path)
+    config = net_mgr.create_mfconfig(uargs.config_path)
     network = net_mgr.create_network(config)
-    if uargs.quant:
-        start = time.time()
-        network = net_mgr.quant_network(network, mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
-        if not uargs.ckpt_path:
-            if uargs.parallel == 1:
-                uargs.ckpt_path = "llama2-w8a16.ckpt"
-            else:
-                uargs.ckpt_path = f"llama2-w8a16-r{rank_id}.ckpt"
-        logger.info(f"Deploy quant network, time cost: {time.time() - start} s.")
-        print('------------ eval W8A16 quant llama2 ------------', flush=True)
-    else:
-        print('------------ eval llama2 ------------', flush=True)
-    ms.load_checkpoint(uargs.ckpt_path, network)
-    max_new_tokens = uargs.max_new_tokens or seq_length // 2
-    evaluate(network, uargs.dataset_path, batch_size, seq_length, max_new_tokens,
-             net_mgr.create_tokenizer(uargs.tokenizer_path))
+    network.set_train(False)
+    network.phase = 'predict'
+    logger.info(f'Create Network cost time is {time.time() - start} s.')
+    start = time.time()
+    rank_id = get_rank() or 0
+    ckpt_path = config.load_checkpoint
+    bs = config.model.model_config.batch_size
+    seq = config.model.model_config.seq_length
+    block_size = config.model.model_config.block_size
+    if os.path.isdir(ckpt_path):
+        for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):
+            if not file.endswith(".ckpt"):
+                continue
+            ckpt_path = os.path.join(ckpt_path, f"rank_{rank_id}", file)
+            model = Model(network)
+            inputs = network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))
+            model.infer_predict_layout(*inputs)
+            break
+    logger.info(f'Loading ckpt :{ckpt_path}.')
+    ms.load_checkpoint(ckpt_path, network)
+    logger.info(f'Load ckpt cost time is {time.time() - start} s.')
+    evaluate(network, uargs.dataset_path, config, net_mgr)

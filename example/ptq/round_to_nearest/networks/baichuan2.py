@@ -16,13 +16,14 @@
 import sys
 import os
 import time
-
+import numpy as np
 # pylint: disable=wrong-import-position
 sys.path.append(os.path.abspath("/path/to/mindformers/research/baichuan2"))
 from mindspore import log as logger
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import RoundToNearest as RTN
+from mindformers import MindFormerConfig
 from baichuan2_13b import Baichuan13BV2ForCausalLM
 from baichuan2_tokenizer import Baichuan2Tokenizer
 from .llama2 import Llama2Network
@@ -42,7 +43,7 @@ class BaiChuanNetwork(Llama2Network):
         return Baichuan2Tokenizer(vocab_file=vocab_file)
 
     @staticmethod
-    def quant_network(network: Baichuan13BV2ForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND):
+    def quant_network(network: Baichuan13BV2ForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, **kwargs):
         """Quant llama2 model to w8a16 with RTN algorithm."""
         if mode == PTQMode.QUANTIZE.value:
             logger.info("Use RTN algo to quant network and weight.")
@@ -61,3 +62,7 @@ class BaiChuanNetwork(Llama2Network):
         logger.info(f'convert to real quantize cost time is {end - start}')
         network.model = qnet
         return network
+
+    @staticmethod
+    def assemble_inputs(input_ids: np.ndarray, config: MindFormerConfig):
+        raise NotImplementedError
