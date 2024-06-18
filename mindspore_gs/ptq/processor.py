@@ -23,7 +23,7 @@ from mindspore.nn import Cell
 class Processor(abc.ABC):
     """A network iterator for transforming network."""
     @abc.abstractmethod
-    def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+    def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
         """Callback function when visiting to each cell."""
         raise NotImplementedError
 
@@ -32,7 +32,7 @@ class Processor(abc.ABC):
         if root is None:
             return root
         for name, cell in root.name_cells().items():
-            new_cell, is_end_point = self.process_cell(cell)
+            new_cell, is_end_point = self.process_cell(name, cell)
             if new_cell is not cell:
                 root.insert_child_to_cell(name, new_cell)
             if not is_end_point:

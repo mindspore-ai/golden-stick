@@ -58,19 +58,24 @@ class SmoothQuant(CompAlgo):
         class ApplyProcessor(Processor):
             """A network iterator for applying algorithm on network."""
 
-            def __init__(self, ptq_policy):
+            def __init__(self, ptq_policy, config):
                 self._ptq_policy = ptq_policy
+                self._config = config
 
-            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
                     return cell, True
+                for exclude_name in self._config.opname_blacklist:
+                    if exclude_name in cell_name:
+                        logger.info(f"Setting {cell_name} being no-quant.")
+                        return cell, True
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
                     return new_layer_policy.wrap_cell(cell), True
                 return cell, False
 
-        ApplyProcessor(self._ptq_policy).process(network)
+        ApplyProcessor(self._ptq_policy, self._config).process(network)
         network.update_parameters_name()
         return network
 

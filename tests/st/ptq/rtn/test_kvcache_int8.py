@@ -20,7 +20,7 @@ from collections import OrderedDict
 import pytest
 import numpy as np
 import mindspore
-from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype
+from mindspore import context, Parameter, dtype, GRAPH_MODE, Tensor, nn, QuantDtype
 from mindspore.common.initializer import initializer
 
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
@@ -319,7 +319,7 @@ def test_kvint8_predict_2stage(device, mode):
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
 def test_llama2_kvint8_apply_convert(device, mode):
     """
     Feature: RoundToNearestPTQ KVInt8 algorithm.

@@ -1,4 +1,4 @@
-# Copyright 2023 Huawei Technologies Co., Ltd
+# Copyright 2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick SmoothQuant Algorithm.
-"""
+"""networks."""
 
-from .smooth_quant import SmoothQuant
+from .network import NetworkRegister, BaseNetwork
+from .llama2 import Llama2Network
+
+NetworkRegister.instance().reg("llama2_7b", Llama2Network)
+NetworkRegister.instance().reg("llama2_13b", Llama2Network)
+NetworkRegister.instance().reg("llama2_57b", Llama2Network)
+NetworkRegister.instance().reg("llama2_70b", Llama2Network)

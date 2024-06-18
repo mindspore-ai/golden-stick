@@ -24,7 +24,8 @@ from mindformers import LlamaForCausalLM, LlamaTokenizer, MindFormerConfig, Llam
     TransformerOpParallelConfig
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import RoundToNearest as RTN
+from mindspore_gs.ptq import SmoothQuant as SQ
+from mindspore_gs.datasets import create_wikitext_dataset
 from .network import BaseNetwork
 
 
@@ -61,16 +62,33 @@ class Llama2Network(BaseNetwork):
             logger.info("Use RTN algo to quant network and weight.")
         else:
             logger.info("Use RTN algo to quant network.")
-        cfg = PTQConfig(mode=mode, backend=backend)
-        ptq = RTN(config=cfg)
+        cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2"])
+        ptq = SQ(config=cfg)
         logger.info(f'Create PTQ cost time is {time.time() - start} s.')
         start = time.time()
         qnet = ptq.apply(network.model)
         logger.info(f'Apply PTQ cost time is {time.time() - start} s.')
         start = time.time()
-        bs = kwargs.get("batch_size", 1)
-        seq = kwargs.get("seq_length", 4096)
-        network(*(network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))))
+        ds_path = kwargs.get("ds_path", "")
+        if not ds_path:
+            raise ValueError("Please provide datasets for calibrating.")
+        mfconfig = kwargs.get("mfconfig", None)
+        if not mfconfig:
+            raise ValueError("Please provide mfconfig for calibrating.")
+        bs = mfconfig.model.model_config.batch_size
+        seq = mfconfig.model.model_config.seq_length
+        max_decode_length = mfconfig.model.model_config.max_decode_length
+        top_p = mfconfig.model.model_config.top_p
+        top_k = mfconfig.model.model_config.top_k
+        tokenizer = Llama2Network.create_tokenizer(mfconfig.processor.tokenizer.vocab_file)
+        ds = create_wikitext_dataset(ds_path, bs, seq, max_decode_length, tokenizer)
+        data_count = 0
+        total_count = ds.get_dataset_size()
+        for _, ds_item in enumerate(ds.create_dict_iterator()):
+            data_count += 1
+            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+            input_ids = ds_item['input_ids'].asnumpy()
+            network.generate(input_ids, do_sample=False, max_length=seq, top_p=top_p, top_k=top_k)
         logger.info(f'Calibrate cost time is {time.time() - start} s.')
         start = time.time()
         qnet = ptq.convert(qnet)
