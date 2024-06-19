@@ -138,11 +138,12 @@ class SmoothAndQuantCell(Cell):
     def __init__(self, smooth_scale: list, t_scale: list, t_zp: list):
         super().__init__()
         t_scale = t_scale * smooth_scale
-        t_scale = 1 / t_scale
+        if max(t_zp) > 127 or min(t_zp) < -128:
+            raise ValueError(f"max(t_zp):({max(t_zp)}) min(t_zp):({min(t_zp)}) is outside the data range of int8.")
         if len(t_zp) == 1 and len(t_scale) != 1:
-            t_zp = Tensor(np.array([t_zp[0]] * len(t_scale)), dtype=dtype.float16)
+            t_zp = Tensor(np.array([t_zp[0]] * len(t_scale)).astype(np.int8), dtype=dtype.int8)
         else:
-            t_zp = Tensor(np.array(t_zp), dtype=dtype.float16)
+            t_zp = Tensor(np.array(t_zp).astype(np.int8), dtype=dtype.int8)
         t_scale = Tensor(np.array(t_scale), dtype=dtype.float16)
         # QuantV2 ops only support per channel quant
         if t_scale.shape != t_zp.shape or t_scale.shape == (1,):
@@ -298,8 +299,8 @@ class DequantBMMCell(Cell):
         super().__init__()
         self._use_fusion = True
         self.dbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
-        scale_ui64 = NumpyQuantOps.trans_fp32_to_u64(scale)
-        self.scale = Parameter(Tensor(np.squeeze(scale_ui64), dtype=dtype.uint64))
+        scale_i64 = NumpyQuantOps.trans_fp32_to_i64(scale)
+        self.scale = Parameter(Tensor(np.squeeze(scale_i64), dtype=dtype.int64))
         if offset is None:
             self.offset = None
         else:
