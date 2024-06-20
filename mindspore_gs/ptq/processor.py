@@ -27,7 +27,7 @@ class Processor(abc.ABC):
         """Callback function when visiting to each cell."""
         raise NotImplementedError
 
-    def process(self, root: Cell):
+    def process(self, root: Cell, name_prefix: str = "root"):
         """Iterate the whole network and call callback function `process_cell`."""
         if root is None:
             return root

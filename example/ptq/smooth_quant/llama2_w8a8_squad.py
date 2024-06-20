@@ -12,33 +12,69 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Quant llama2 7b to w8a8."""
+"""Eval w8a8 llama2 with squad1.1 datasets."""
+
 import os
 import argparse
 import time
-
 import numpy as np
+from mindformers.core.metric import EmF1Metric
 import mindspore as ms
 from mindspore import log as logger
 from mindspore import Model
 from mindspore.communication import get_rank
-from mindspore_gs.ptq import PTQMode
-from mindspore_gs.common import BackendTarget
+from mindspore_gs.datasets import create_squad_dataset
 from networks import NetworkRegister, BaseNetwork
+
+
+def evaluate(net, dataset_path, cfg, net_helper: BaseNetwork):
+    """evaluate `net` with dataset from `dataset_path`."""
+    top_k = cfg.model.model_config.top_k
+    top_p = cfg.model.model_config.top_p
+    do_sample = cfg.model.model_config.do_sample
+    batch_size = cfg.model.model_config.batch_size
+    seq_length = cfg.model.model_config.seq_length
+    ignore_token_id = cfg.model.model_config.ignore_token_id
+    pad_token_id = cfg.model.model_config.pad_token_id
+
+    tokenizer = net_helper.create_tokenizer(cfg.processor.tokenizer.vocab_file)
+    ds = create_squad_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id)
+    metric = EmF1Metric()
+    metric.clear()
+
+    data_count = 0
+    total_count = ds.get_dataset_size()
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        data_count += 1
+        logger.info(f"Dataset count: {data_count}/{total_count}")
+        input_ids = ds_item['input_ids'].asnumpy()
+        labels = ds_item['labels'].asnumpy()
+
+        valid_length_each_example = []
+        for j in range(input_ids.shape[0]):
+            # As the nonzero returns the index and we need length
+            valid_length_each_example.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
+        valid_length_each_example = np.array(valid_length_each_example)
+
+        outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length, top_p=top_p, top_k=top_k)
+        output_ids = []
+        for j in range(input_ids.shape[0]):
+            output_ids.append(outputs[j][int(valid_length_each_example[j]):])
+
+        pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
+        labels_str = tokenizer.decode(labels, skip_special_tokens=True)
+        metric.update(pres_str, labels_str)
+    metric.eval()
+    print('...........Evaluate Over!...............', flush=True)
 
 
 def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
-    parser.add_argument('--dataset_type', '-t', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     args = parser.parse_args()
-    args.dataset_type = args.dataset_type.lower()
-    if args.dataset_type not in ('wiki', 'wikitext', 'wiki2', 'wikitext2', 'squad', 'squad1.1'):
-        raise ValueError(f"Only support wikitext2 or squad1.1 datasets now, got {args.dataset_type}.")
-    args.dataset_type = 'squad1.1' if 'squad' in args.dataset_type else 'wikitext2'
-    print(f"-------------------------------------------------quant args: {args}", flush=True)
+    logger.info(f"-------------------------------------------------evaluate args: {args}")
     return args
 
 
@@ -55,32 +91,19 @@ if __name__ == "__main__":
     start = time.time()
     rank_id = get_rank() or 0
     ckpt_path = config.load_checkpoint
+    bs = config.model.model_config.batch_size
+    seq = config.model.model_config.seq_length
+    block_size = config.model.model_config.block_size
     if os.path.isdir(ckpt_path):
         for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):
             if not file.endswith(".ckpt"):
                 continue
             ckpt_path = os.path.join(ckpt_path, f"rank_{rank_id}", file)
             model = Model(network)
-            bs = config.model.model_config.batch_size
-            seq = config.model.model_config.seq_length
             inputs = network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))
             model.infer_predict_layout(*inputs)
             break
     logger.info(f'Loading ckpt :{ckpt_path}.')
     ms.load_checkpoint(ckpt_path, network)
-    ms.ms_memory_recycle()
     logger.info(f'Load ckpt cost time is {time.time() - start} s.')
-    print('------------------------- Quantize-ing network...', flush=True)
-    start = time.time()
-    network = net_mgr.quant_network(network, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
-                                    ds_path=uargs.dataset_path, ds_type=uargs.dataset_type, mfconfig=config)
-    logger.info(f'Quant Network cost time is {time.time() - start} s.')
-    print('------------------------- Saving checkpoint...', flush=True)
-    start = time.time()
-    save_ckpt_path = os.path.join(config.output_dir, "w8a8_ckpt")
-    save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
-    os.makedirs(save_path, exist_ok=True)
-    ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, "w8a8.ckpt"),
-                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
-    logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-    print(f'------------------------- Checkpoint saved to {save_path}...', flush=True)
+    evaluate(network, uargs.dataset_path, config, net_mgr)

@@ -15,19 +15,19 @@
 # ============================================================================
 
 
-SR=$1
-ER=$2
+config_file=$1
+run_mf_path=$2
+question=$3
+device_id=$4
+pnum=$5
 
-export RANK_TABLE_FILE=hccl_2p_${SR}${ER}_10.170.27.69.json
-config_file="./run_llama2_7b_910b.yaml"
-tokenizer_file="tokenizer.model"
+did_str=${device_id}
+for ((i=1; i<${pnum}; i++)); do
+  did_str="${did_str},$((i+device_id))"
+done
 
-export RANK_ID=0
-export DEVICE_ID=${SR}
-python llama2_w8a8_chatbot.py -c ${config_file} -k "llama2-w8a8-dev0.ckpt" -d ${DEVICE_ID} -r ${RANK_ID} -t ${tokenizer_file} -q 1 > chat-log${RANK_ID} 2>&1 &
-export RANK_ID=1
-export DEVICE_ID=${ER}
-python llama2_w8a8_chatbot.py -c ${config_file} -k "llama2-w8a8-dev1.ckpt" -d ${DEVICE_ID} -r ${RANK_ID} -t ${tokenizer_file} -q 1 > chat-log${RANK_ID} 2>&1 &
-
-pid=$(ps -u | grep "python llama2_w8a8_chatbot.py -c" | grep -v grep | head -n 1 | awk -F ' ' '{print $2}')
-tail -f --pid=$pid chat-log0
+export GRAPH_OP_RUN=1
+export ASCEND_RT_VISIBLE_DEVICES=${did_str}
+msrun --worker_num=${pnum} --local_worker_num=${pnum} --master_port=8123 --log_dir=msrun_log \
+      --join=True --cluster_time_out=300 python ${run_mf_path} --config ${config_file} --run_mode predict \
+      --predict_data ${question} > log_msrun 2>&1 &

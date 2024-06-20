@@ -25,7 +25,7 @@ from mindformers import LlamaForCausalLM, LlamaTokenizer, MindFormerConfig, Llam
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import SmoothQuant as SQ
-from mindspore_gs.datasets import create_wikitext_dataset
+from mindspore_gs.datasets import create_wikitext_dataset, create_squad_dataset
 from .network import BaseNetwork
 
 
@@ -72,16 +72,25 @@ class Llama2Network(BaseNetwork):
         ds_path = kwargs.get("ds_path", "")
         if not ds_path:
             raise ValueError("Please provide datasets for calibrating.")
+        ds_type = kwargs.get("ds_type", "")
+        if not ds_type:
+            raise ValueError("Please provide datasets type for calibrating.")
+        if ds_type not in ('wikitext2', 'squad1.1'):
+            raise ValueError(f"Only support wikitext2 or squad1.1 datasets now, got {ds_type}.")
         mfconfig = kwargs.get("mfconfig", None)
         if not mfconfig:
             raise ValueError("Please provide mfconfig for calibrating.")
         bs = mfconfig.model.model_config.batch_size
         seq = mfconfig.model.model_config.seq_length
-        max_decode_length = mfconfig.model.model_config.max_decode_length
         top_p = mfconfig.model.model_config.top_p
         top_k = mfconfig.model.model_config.top_k
         tokenizer = Llama2Network.create_tokenizer(mfconfig.processor.tokenizer.vocab_file)
-        ds = create_wikitext_dataset(ds_path, bs, seq, max_decode_length, tokenizer)
+        if ds_type == 'wikitext2':
+            max_decode_length = mfconfig.model.model_config.max_decode_length
+            ds = create_wikitext_dataset(ds_path, bs, seq, max_decode_length, tokenizer)
+        else:
+            ignore_token_id = mfconfig.model.model_config.ignore_token_id
+            ds = create_squad_dataset(ds_path, "eval", bs, seq, tokenizer, ignore_token_id)
         data_count = 0
         total_count = ds.get_dataset_size()
         for _, ds_item in enumerate(ds.create_dict_iterator()):
