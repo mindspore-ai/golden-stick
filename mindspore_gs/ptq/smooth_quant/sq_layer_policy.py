@@ -22,7 +22,7 @@ from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
-from ..quant_cells import SQLinearWrapper
+from .quant_cells import SQLinearActObserver
 
 
 class SQLayerPolicy(LayerPolicy, abc.ABC):
@@ -106,4 +106,4 @@ class LinearLayerPolicy(SQLayerPolicy):
         return perchannel_observer
 
     def wrap_cell(self, handler) -> Cell:
-        return SQLinearWrapper(handler, self, self._config)
+        return SQLinearActObserver(handler, self, self._config)

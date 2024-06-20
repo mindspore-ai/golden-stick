@@ -133,6 +133,7 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
         quant_cell.shard(strategy)
     return quant_cell
 
+
 class SmoothAndQuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
     def __init__(self, smooth_scale: list, t_scale: list, t_zp: list):
@@ -160,6 +161,7 @@ class SmoothAndQuantCell(Cell):
     def shard(self, strategy):
         """shard strategy for quant cell"""
         self.quant.shard((strategy[0], (strategy[0][-1],), (strategy[0][-1],)))
+
 
 def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter, strategy=None) -> QuantCell:
     """Convert FakeQuantParamCell to Quant."""

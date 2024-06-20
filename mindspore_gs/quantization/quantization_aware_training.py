@@ -146,7 +146,7 @@ class QuantizationAwareTraining(CompAlgo):
                 quant_cell.update_parameters_name(node.get_name() + '.')
                 QuantizationAwareTraining._replace_node(net_transformer, node, quant_cell)
 
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, **kwargs) -> Cell:
         """
         Apply QAT-Algorithm on `network`, use the following steps to make `network` available for quantization aware
         training:

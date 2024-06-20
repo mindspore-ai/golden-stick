@@ -424,7 +424,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
         self.set_one_conv_fold(config.get("one_conv_fold", True))
         self.set_freeze_bn(config.get("freeze_bn", 10000000))
 
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, **kwargs) -> Cell:
         """
         Apply SimQAT Algorithm on `network`, use the following steps to make `network` available for quantization aware
         training:

@@ -34,7 +34,7 @@ from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.smooth_quant.smooth_quant import SmoothQuant
 from mindspore_gs.ptq.smooth_quant.sq_layer_policy import LinearLayerPolicy
-from mindspore_gs.ptq.quant_cells import SQLinearWrapper
+from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
 from mindspore_gs.ptq.convert_utils import SmoothAndQuantCell, DequantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel
 
@@ -94,7 +94,6 @@ def test_apply_convert():
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = SmoothQuant(cfg)
     network = SimpleNet()
-
     network = ptq.apply(network)
     cells: OrderedDict = network.name_cells()
     quant_cell = cells.get("linear", None)
@@ -124,7 +123,7 @@ def test_apply_convert():
     assert act_observer.signed()
     assert act_observer.num_bits() == 8
     assert act_observer.axis == 1
-    weight_in_observer = quant_cell._weight_in_observer
+    weight_in_observer = quant_cell._weight_observer
     assert isinstance(weight_in_observer, MinMaxPerChannel)
     assert weight_in_observer.symmetric()
     assert weight_in_observer.quant_dtype() == QuantDtype.INT8
@@ -145,9 +144,9 @@ def test_apply_convert():
     assert isinstance(network.linear._act_observer, MinMaxPerChannel)
     assert isinstance(network.linear._act_observer.float_min, Parameter)
     assert isinstance(network.linear._act_observer.float_max, Parameter)
-    assert isinstance(network.linear._weight_in_observer, MinMaxPerChannel)
-    assert isinstance(network.linear._weight_in_observer.float_min, Parameter)
-    assert isinstance(network.linear._weight_in_observer.float_max, Parameter)
+    assert isinstance(network.linear._weight_observer, MinMaxPerChannel)
+    assert isinstance(network.linear._weight_observer.float_min, Parameter)
+    assert isinstance(network.linear._weight_observer.float_max, Parameter)
     assert isinstance(network.linear._linear.weight, Parameter)
     assert network.linear._linear.weight.dtype == dtype.int8
     assert network.linear._linear.has_bias
@@ -156,16 +155,15 @@ def test_apply_convert():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("device", ["CPU", "Ascend"])
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
 @pytest.mark.parametrize("transpose_b", [True, False])
-def test_sq_linear_wrapper(device, mode, transpose_b):
+def test_sq_linear_wrapper(mode, transpose_b):
     """
     Feature: test FakeQuantizer in SQLinearWrapper.
     Description: Input fake data and check output of each FakeQuantizer.
     Expectation: Same with numpy.
     """
-    context.set_context(device_target=device, mode=mode)
+    context.set_context(device_target="Ascend", mode=mode)
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     inner_cfg = InnerPTQConfig.inner_config(cfg)
     act_in = 5
@@ -173,38 +171,62 @@ def test_sq_linear_wrapper(device, mode, transpose_b):
     linear = Linear(in_channels=act_in, out_channels=act_out, transpose_b=transpose_b, bias_init="normal",
                     weight_init="normal")
     policy = LinearLayerPolicy([], [], inner_cfg)
-    sqlinear = SQLinearWrapper(linear, policy, inner_cfg)
+    sq_act_obs = SQLinearActObserver(linear, policy, inner_cfg)
     t_x = Tensor(np.random.normal(size=(act_in, act_in)), dtype=dtype.float16)
-    t_w = sqlinear._linear.weight
+    t_w = sq_act_obs._linear.weight
     # observe x
-    t_x_fq = sqlinear._act_observer(t_x)
+    t_x_fq = sq_act_obs._act_observer(t_x)
     n_x_fq = t_x.asnumpy()
-    act_obv_min = sqlinear._act_observer.float_min.asnumpy()
-    act_obv_max = sqlinear._act_observer.float_max.asnumpy()
+    act_obv_min = sq_act_obs._act_observer.float_min.asnumpy()
+    act_obv_max = sq_act_obs._act_observer.float_max.asnumpy()
     act_obv_min_expect = np.min(t_x.asnumpy(), axis=0)
     act_obv_max_expect = np.max(t_x.asnumpy(), axis=0)
     assert np.allclose(act_obv_max, act_obv_max_expect)
     assert np.allclose(act_obv_min, act_obv_min_expect)
     # observe w
-    t_w_fq = sqlinear._weight_in_observer(t_w)
+    sq_weight_obs = SQLinearWeightObserver(sq_act_obs)
+    t_w_fq = sq_weight_obs._weight_observer(t_w)
     n_w_fq = t_w.asnumpy()
-    weight_obv_min = sqlinear._weight_in_observer.float_min.asnumpy()
-    weight_obv_max = sqlinear._weight_in_observer.float_max.asnumpy()
+    weight_obv_min = sq_weight_obs._weight_observer.float_min.asnumpy()
+    weight_obv_max = sq_weight_obs._weight_observer.float_max.asnumpy()
     weight_obv_min_expect = np.min(t_w.asnumpy(), axis=0 if transpose_b else 1)
     weight_obv_max_expect = np.max(t_w.asnumpy(), axis=0 if transpose_b else 1)
     assert np.allclose(weight_obv_min, weight_obv_min_expect)
     assert np.allclose(weight_obv_max, weight_obv_max_expect)
     # calculate smooth scale
-    t_smooth_scale = sqlinear._calc_smooth_scale()
+    t_smooth_scale = sq_weight_obs._calc_smooth_scale()
     act_maxnorm = np.maximum(np.abs(act_obv_min), np.abs(act_obv_max))
-    act_maxnorm_pow = np.power(act_maxnorm, sqlinear._alpha)
+    act_maxnorm_pow = np.power(act_maxnorm, sq_weight_obs._alpha)
     weight_maxnorm = np.maximum(np.abs(weight_obv_min), np.abs(weight_obv_max))
-    weight_maxnorm_pow = np.power(weight_maxnorm, sqlinear._alpha)
+    weight_maxnorm_pow = np.power(weight_maxnorm, sq_weight_obs._alpha)
     n_smooth_scale = np.clip(act_maxnorm_pow / weight_maxnorm_pow, 1e-5, None)
     n_smooth_scale[act_maxnorm_pow == 0] = 1.0
     n_smooth_scale[weight_maxnorm_pow == 0] = 1.0
     assert np.allclose(t_smooth_scale.asnumpy(), n_smooth_scale)
+    # smooth w and fq w
+    if transpose_b:
+        t_w_smooth_scale = t_smooth_scale
+        n_w_smooth_scale = n_smooth_scale
+    else:
+        t_w_smooth_scale = sq_weight_obs._expand(t_smooth_scale, 1)
+        n_w_smooth_scale = np.expand_dims(n_smooth_scale, 1)
+    n_w_smooth = n_w_fq * n_w_smooth_scale
+    t_w_smooth = sq_weight_obs._weight_mul(t_w_fq, t_w_smooth_scale)
+    assert np.allclose(t_w_smooth.asnumpy(), n_w_smooth)
+    n_w_smooth_fq = n_w_smooth
+    t_w_smooth_fq = sq_weight_obs._weight_quantizer(t_w_smooth)
+    assert np.allclose(t_w_smooth_fq.asnumpy(), n_w_smooth_fq)
+    weight_q_min = sq_weight_obs._weight_quantizer.float_min.asnumpy()
+    weight_q_max = sq_weight_obs._weight_quantizer.float_max.asnumpy()
+    weight_q_min_expect = np.min(n_w_smooth_fq, axis=1 if transpose_b else 0)
+    weight_q_max_expect = np.max(n_w_smooth_fq, axis=1 if transpose_b else 0)
+    assert np.allclose(weight_q_min, weight_q_min_expect)
+    assert np.allclose(weight_q_max, weight_q_max_expect)
+    t_w_restored = sq_weight_obs._weight_div(t_w_smooth_fq, t_w_smooth_scale)
+    n_w_restored = n_w_smooth_fq / n_w_smooth_scale
+    assert np.allclose(t_w_restored.asnumpy(), n_w_restored)
     # smooth x and fq x
+    sqlinear = SQLinearWrapper(sq_weight_obs)
     n_x_smooth = n_x_fq / n_smooth_scale
     t_x_smooth = sqlinear._act_mul(t_x_fq, sqlinear._div(1.0, t_smooth_scale))
     assert np.allclose(t_x_smooth.asnumpy(), n_x_smooth)
@@ -220,28 +242,6 @@ def test_sq_linear_wrapper(device, mode, transpose_b):
     t_x_restored = sqlinear._act_mul(t_x_smooth_fq, t_smooth_scale)
     n_x_restored = n_x_smooth_fq * n_smooth_scale
     assert np.allclose(t_x_restored.asnumpy(), n_x_restored)
-    # smooth w and fq w
-    if transpose_b:
-        t_w_smooth_scale = t_smooth_scale
-        n_w_smooth_scale = n_smooth_scale
-    else:
-        t_w_smooth_scale = sqlinear._expand(t_smooth_scale, 1)
-        n_w_smooth_scale = np.expand_dims(n_smooth_scale, 1)
-    n_w_smooth = n_w_fq * n_w_smooth_scale
-    t_w_smooth = sqlinear._weight_mul(t_w_fq, t_w_smooth_scale)
-    assert np.allclose(t_w_smooth.asnumpy(), n_w_smooth)
-    n_w_smooth_fq = n_w_smooth
-    t_w_smooth_fq = sqlinear._weight_quantizer(t_w_smooth)
-    assert np.allclose(t_w_smooth_fq.asnumpy(), n_w_smooth_fq)
-    weight_q_min = sqlinear._weight_quantizer.float_min.asnumpy()
-    weight_q_max = sqlinear._weight_quantizer.float_max.asnumpy()
-    weight_q_min_expect = np.min(n_w_smooth_fq, axis=1 if transpose_b else 0)
-    weight_q_max_expect = np.max(n_w_smooth_fq, axis=1 if transpose_b else 0)
-    assert np.allclose(weight_q_min, weight_q_min_expect)
-    assert np.allclose(weight_q_max, weight_q_max_expect)
-    t_w_restored = sqlinear._weight_div(t_w_smooth_fq, t_w_smooth_scale)
-    n_w_restored = n_w_smooth_fq / n_w_smooth_scale
-    assert np.allclose(t_w_restored.asnumpy(), n_w_restored)
 
 
 def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_strategy):
@@ -308,7 +308,7 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
             model.infer_predict_layout(input_)
         param_dict = load_checkpoint(ckpt_path)
         unused_param_names = ['linear._scale_store', 'linear._act_observer.float_min', 'linear._act_observer.float_max',
-                              'linear._weight_in_observer.float_min', 'linear._weight_in_observer.float_max']
+                              'linear._weight_observer.float_min', 'linear._weight_observer.float_max']
         for item in unused_param_names:
             param_dict.pop(item)
         load_param_into_net(network, param_dict)

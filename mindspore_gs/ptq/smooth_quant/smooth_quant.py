@@ -15,6 +15,7 @@
 """SmoothQuant algorithm."""
 import os
 import copy
+import numpy as np
 from typing import Tuple
 
 from mindspore.nn import Cell
@@ -23,9 +24,10 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig
-from mindspore_gs.ptq.quant_cells import SQLinearWrapper
+from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
 from mindspore_gs.common.register import cell_type_dicts
 from mindspore_gs.ptq.smooth_quant.sq_net_policy import SQNetPolicy
+from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 
 class SmoothQuant(CompAlgo):
@@ -48,14 +50,12 @@ class SmoothQuant(CompAlgo):
     def _init_net_policy(config):
         return SQNetPolicy(config)
 
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
         """Apply"""
-
         if not isinstance(self._ptq_policy, SQNetPolicy):
             raise RuntimeError("Derived class should provide net policy")
-        self._ptq_policy.build()
 
-        class ApplyProcessor(Processor):
+        class InsertActObserver(Processor):
             """A network iterator for applying algorithm on network."""
 
             def __init__(self, ptq_policy, config):
@@ -75,8 +75,64 @@ class SmoothQuant(CompAlgo):
                     return new_layer_policy.wrap_cell(cell), True
                 return cell, False
 
-        ApplyProcessor(self._ptq_policy, self._config).process(network)
+        def insert_weight_observer_and_quant(root: Cell):
+            if root is None:
+                return
+            for name, cell in root.name_cells().items():
+                if isinstance(cell, SQLinearActObserver):
+                    root.insert_child_to_cell(name, SQLinearWeightObserver(cell))
+                else:
+                    insert_weight_observer_and_quant(cell)
+
+        def insert_act_quant(root: Cell):
+            if root is None:
+                return
+            for name, cell in root.name_cells().items():
+                if isinstance(cell, SQLinearWeightObserver):
+                    root.insert_child_to_cell(name, SQLinearWrapper(cell))
+                else:
+                    insert_act_quant(cell)
+
+        self._ptq_policy.build()
+        InsertActObserver(self._ptq_policy, self._config).process(network)
         network.update_parameters_name()
+
+        if ds:
+            if not network_helper:
+                raise ValueError("Please provide network_helper when datasets is given for calibrating.")
+            ds_count = kwargs.get("ds_count", "")
+            if ds_count:
+                ds_count = int(ds_count)
+            total_count = ds.get_dataset_size()
+            total_count = ds_count if ds_count < total_count else total_count
+            os.environ['NETWORK_PHASE'] = "actobs"
+            data_count = 1
+            for _, ds_item in enumerate(ds.create_dict_iterator()):
+                logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+                input_ids = ds_item['input_ids'].asnumpy()
+                network_helper.generate(network, input_ids, max_new_tokens=1)
+                if data_count >= total_count:
+                    break
+                data_count += 1
+        insert_weight_observer_and_quant(network)
+        network.update_parameters_name()
+        if ds:
+            os.environ['NETWORK_PHASE'] = "weightobs"
+            network.phase = "prefill_weightobs"
+            bs = network_helper.get_spec('batch_size')
+            network_helper.generate(network, np.ones([bs, 1], dtype=np.int32), max_new_tokens=1)
+        insert_act_quant(network)
+        network.update_parameters_name()
+        if ds:
+            os.environ['NETWORK_PHASE'] = "quant"
+            data_count = 1
+            for _, ds_item in enumerate(ds.create_dict_iterator()):
+                logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+                input_ids = ds_item['input_ids'].asnumpy()
+                network_helper.generate(network, input_ids, max_new_tokens=1)
+                if data_count >= total_count:
+                    break
+                data_count += 1
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:

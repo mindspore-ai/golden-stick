@@ -69,7 +69,7 @@ class CompAlgo(abc.ABC):
         """Update config for specific algo. If derived class has extra attributes, Should be over-writed."""
 
     @abc.abstractmethod
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, **kwargs) -> Cell:
         """
         Define how to compress input `network`. This method must be overridden by all subclasses.
 

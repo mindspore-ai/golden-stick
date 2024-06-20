@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick datasets.
-"""
+"""Network helpers."""
 
-from .wikitext2 import create_wikitext_dataset
-from .squad import create_squad_dataset
-from .factory import get_datasets
+from .network_helper import NetworkHelper
