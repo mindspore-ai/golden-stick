@@ -100,7 +100,6 @@ class WikiText2Dataset(GeneratorDataset):
         return next(self.iterator)
 
     def __iter__(self):
-        """tokenize wikitext-2/wikitext-103 dataset"""
         self.iterator = iter(self.content)
         return self
 

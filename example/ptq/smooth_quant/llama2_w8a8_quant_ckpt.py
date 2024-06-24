@@ -35,9 +35,6 @@ def get_args():
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     args = parser.parse_args()
     args.dataset_type = args.dataset_type.lower()
-    if args.dataset_type not in ('wiki', 'wikitext', 'wiki2', 'wikitext2', 'squad', 'squad1.1'):
-        raise ValueError(f"Only support wikitext2 or squad1.1 datasets now, got {args.dataset_type}.")
-    args.dataset_type = 'squad1.1' if 'squad' in args.dataset_type else 'wikitext2'
     print(f"-------------------------------------------------quant args: {args}", flush=True)
     return args
 

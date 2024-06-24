@@ -74,8 +74,6 @@ class Llama2Network(BaseNetwork):
         ds_type = kwargs.get("ds_type", "")
         if not ds_type:
             raise ValueError("Please provide datasets type for calibrating.")
-        if ds_type not in ('wikitext2', 'squad1.1'):
-            raise ValueError(f"Only support wikitext2 or squad1.1 datasets now, got {ds_type}.")
         mfconfig = kwargs.get("mfconfig", None)
         if not mfconfig:
             raise ValueError("Please provide mfconfig for calibrating.")
