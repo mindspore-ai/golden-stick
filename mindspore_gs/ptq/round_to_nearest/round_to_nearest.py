@@ -119,7 +119,7 @@ class RoundToNearest(CompAlgo):
         """
         class FixProcessor(Processor):
             """A network iterator for fix parameter after load ckpt."""
-            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, QuantCell):
                     return cell, True
                 return cell, False
@@ -147,7 +147,7 @@ class RoundToNearest(CompAlgo):
             def __init__(self, ptq_policy):
                 self._ptq_policy = ptq_policy
 
-            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
                     return cell, True
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
@@ -201,7 +201,7 @@ class RoundToNearest(CompAlgo):
                 self._is_deploy = is_deploy
                 self._backend = backend
 
-            def process_cell(self, cell: Cell) -> Tuple[Cell, bool]:
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
                     return cell, True
                 if isinstance(cell, PTQCell):

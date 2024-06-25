@@ -112,6 +112,7 @@ class PTQConfig:
     backend: BackendTarget = field(default=BackendTarget.NONE,
                                    metadata={'valid_values': BackendTarget.__members__.values()}
                                    )
+    opname_blacklist: List[str] = field(default_factory=lambda: [])
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():
@@ -119,6 +120,7 @@ class PTQConfig:
         if self.backend not in BackendTarget.__members__.values():
             raise ValueError(f'backend shall be in '
                              f'{BackendTarget.__members__.values()}')
+        value_check('opname_blacklist', self.opname_blacklist, str)
 
 
 @dataclass
@@ -140,6 +142,7 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
     weight_symmetric: bool = True
     act_narrow_range: bool = False
     weight_narrow_range: bool = False
+    opname_blacklist: List[str] = field(default_factory=lambda: [])
     op_types: List[str] = field(default_factory=lambda: [QuantCellType.MF_LINEAR.value],
                                 metadata={'choices': [
                                     item.value for item in QuantCellType.__members__.values()
@@ -156,6 +159,7 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
         value_check('act_symmetric', self.weight_symmetric, bool)
         value_check('act_narrow_range', self.act_narrow_range, bool)
         value_check('weight_narrow_range', self.weight_narrow_range, bool)
+        value_check('opname_blacklist', self.opname_blacklist, str)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
         support_op_types = {
@@ -181,6 +185,7 @@ class InnerPTQConfig(QuantizerConfig, PTQConfig):
         parsed_dict['backend'] = self.backend.name
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
+        parsed_dict['opname_blacklist'] = self.opname_blacklist
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
