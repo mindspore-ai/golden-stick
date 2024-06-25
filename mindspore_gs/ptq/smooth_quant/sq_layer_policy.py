@@ -20,9 +20,9 @@ from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
-from .quant_cells import SQLinearActObserver
+from .quant_cells import SQLinearActObserver, SQLinearDeploy
 
 
 class SQLayerPolicy(LayerPolicy, abc.ABC):
@@ -92,6 +92,7 @@ class LinearLayerPolicy(SQLayerPolicy):
     def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
         super().__init__(weight_names, act_names, config)
         self.set_input_number(1)
+        self._is_deploy = config.mode == PTQMode.DEPLOY
 
     def create_observer_perchannel(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
         """create_observer_perchannel."""
@@ -106,4 +107,6 @@ class LinearLayerPolicy(SQLayerPolicy):
         return perchannel_observer
 
     def wrap_cell(self, handler) -> Cell:
+        if self._is_deploy:
+            return SQLinearDeploy(handler, self, self._config)
         return SQLinearActObserver(handler, self, self._config)

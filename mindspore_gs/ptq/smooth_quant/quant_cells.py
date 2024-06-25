@@ -14,28 +14,22 @@
 # ============================================================================
 """ptq quant cells."""
 
-import abc
-import time
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
-from mindspore.ops.operations import FakeQuantParam
-from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
-from mindformers.modules.kvcache_mgr import KVCacheMgr
 
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
-from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data, quant_bias_data
-from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
+from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.ptq_config import PTQMode
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.convert_utils import (
-    convert_to_antiquant, convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
-    convert_to_dequant_bmm, convert_to_fusion_antiquant_for_deploy, convert_to_smooth_quant
+    convert_to_dequant_bmm_for_deploy, convert_to_dequant_bmm, convert_to_smooth_quant_for_deploy,
+    convert_to_smooth_quant
 )
 
 
@@ -46,22 +40,21 @@ class SQLinearActObserver(PTQCell):
         super().__init__(linear, policy)
         if not isinstance(linear, Linear):
             raise ValueError(f'only Linear cell is supported, but got {type(linear)}')
-        self._policy = policy
-        self._cfg = cfg
+        self.cfg = cfg
         input_fq_args = {}
         if "in_strategy" in linear.matmul.get_attr_dict():
             input_fq_args["strategy"] = (linear.matmul.in_strategy[0],)
         act_rank = 2
-        self._act_observer = policy.create_observer_perchannel(
+        self.act_observer = policy.create_observer_perchannel(
             perchannel_args=PerChannelArgs(linear.in_channels, -1, act_rank), **input_fq_args)
         prex = ""
         for _, param in linear.parameters_and_names():
             prex = param.name.rsplit(".", 1)[0]
-        self._act_observer.float_min.data.name = prex + "_act_observer_float_min"
-        self._act_observer.float_max.data.name = prex + "_act_observer_float_max"
+        self.act_observer.float_min.data.name = prex + "_act_observer_float_min"
+        self.act_observer.float_max.data.name = prex + "_act_observer_float_max"
 
     def weight_quantizer(self):
-        return self._weight_quantizer
+        raise NotImplementedError("Inner Error: should not call SQLinearActObserver.weight_quantizer().")
 
     def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
         raise NotImplementedError("Inner Error: should not call SQLinearActObserver.convert().")
@@ -91,10 +84,10 @@ class SQLinearActObserver(PTQCell):
         ori_dtype = F.dtype(x)
         weight = self._handler.cast(self._handler.weight, self._handler.dtype)
         x = self._handler.cast(x, self._handler.dtype)
-        x = self._act_observer(x)
+        x = self.act_observer(x)
         x = self._handler.matmul(x, weight)
         if self._handler.has_bias:
-            x = self._handler.bias_add(x, self._handler.cast(self._handler.bias, self.dtype))
+            x = self._handler.bias_add(x, self._handler.cast(self._handler.bias, self._handler.dtype))
         if self._handler.activation_flag:
             x = self._handler.activation(x)
         x = F.cast(x, ori_dtype)
@@ -108,9 +101,9 @@ class SQLinearWeightObserver(PTQCell):
     def __init__(self, act_observer: SQLinearActObserver):
         if not isinstance(act_observer, SQLinearActObserver):
             raise ValueError(f'only SQLinearActObserver cell is supported, but got {type(act_observer)}')
-        policy = act_observer._policy
+        policy = act_observer.policy()
         linear = act_observer.handler()
-        self._cfg = act_observer._cfg
+        self.cfg = act_observer.cfg
         super().__init__(linear, policy)
         rank = len(linear.weight.shape)
         self._weight_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
@@ -120,23 +113,23 @@ class SQLinearWeightObserver(PTQCell):
         self._weight_strategy = None
         if "in_strategy" in linear.matmul.get_attr_dict():
             weight_fq_args["strategy"] = (linear.matmul.in_strategy[1],)
-        self._weight_quantizer = policy.get_weight_quantizer(linear.weight.name, weight_perchannel_args,
+        self.weight_quantizer_ = policy.get_weight_quantizer(linear.weight.name, weight_perchannel_args,
                                                              **weight_fq_args)
 
         weight_observer_axis = 1 if linear.matmul.transpose_b else 0
-        self._act_observer = act_observer._act_observer
-        self._weight_observer = policy.create_observer_perchannel(
+        self.act_observer = act_observer.act_observer
+        self.weight_observer = policy.create_observer_perchannel(
             perchannel_args=PerChannelArgs(linear.in_channels, weight_observer_axis, rank), **weight_fq_args)
         prex = ""
         for _, param in linear.parameters_and_names():
             prex = param.name.rsplit(".", 1)[0]
-        self._weight_quantizer.float_min.data.name = prex + "_weight_float_min"
-        self._weight_quantizer.float_max.data.name = prex + "_weight_float_max"
-        self._weight_observer.float_min.data.name = prex + "_weight_observer_float_min"
-        self._weight_observer.float_max.data.name = prex + "_weight_observer_float_max"
-        self._scale_store = Parameter(Tensor([1.0] * linear.in_channels), name=f'{prex}_scale_store')
+        self.weight_quantizer_.float_min.data.name = prex + "_weight_float_min"
+        self.weight_quantizer_.float_max.data.name = prex + "_weight_float_max"
+        self.weight_observer.float_min.data.name = prex + "_weight_observer_float_min"
+        self.weight_observer.float_max.data.name = prex + "_weight_observer_float_max"
+        self.scale_store = Parameter(Tensor([1.0] * linear.in_channels), name=f'{prex}_scale_store')
 
-        self._alpha = self._cfg.algo_args.get('alpha', None)
+        self._alpha = self.cfg.algo_args.get('alpha', None)
         if self._alpha is None:
             self._alpha = 0.5
 
@@ -204,11 +197,11 @@ class SQLinearWeightObserver(PTQCell):
 
     def _calc_smooth_scale(self):
         """calc_smooth_scale"""
-        act_max = self._smooth_act_maximum(self._smooth_act_abs(self._act_observer.float_max),
-                                           self._smooth_act_abs(self._act_observer.float_min))
+        act_max = self._smooth_act_maximum(self._smooth_act_abs(self.act_observer.float_max),
+                                           self._smooth_act_abs(self.act_observer.float_min))
         input_max_pow = self._act_pow(act_max, self._alpha)
-        weight_max = self._smooth_weight_maximum(self._smooth_weight_abs(self._weight_observer.float_max),
-                                                 self._smooth_weight_abs(self._weight_observer.float_min))
+        weight_max = self._smooth_weight_maximum(self._smooth_weight_abs(self.weight_observer.float_max),
+                                                 self._smooth_weight_abs(self.weight_observer.float_min))
         weight_max_pow = self._weight_pow(weight_max, 1 - self._alpha)
         smooth_scale = self._pow_div(input_max_pow, weight_max_pow).clip(1e-5)
 
@@ -218,14 +211,14 @@ class SQLinearWeightObserver(PTQCell):
         return smooth_scale
 
     def weight_quantizer(self):
-        return self._weight_quantizer
+        return self.weight_quantizer_
 
     def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
         raise NotImplementedError("Inner Error: should not call SQLinearWeightObserver.convert().")
 
     def calibrate(self):
         weight = self._handler.cast(self._handler.weight, self._handler.dtype)
-        self._weight_quantizer(weight)
+        self.weight_quantizer_(weight)
 
     def core_construct(self, *args):
         pass
@@ -250,20 +243,20 @@ class SQLinearWeightObserver(PTQCell):
         weight = self._handler.cast(self._handler.weight, self._handler.dtype)
         x = self._handler.cast(x, self._handler.dtype)
 
-        weight = self._weight_observer(weight)
+        weight = self.weight_observer(weight)
         smooth_scale = self._calc_smooth_scale()
-        self._assign(self._scale_store, smooth_scale)
+        self._assign(self.scale_store, smooth_scale)
         if self._handler.transpose_b:
             weight = self._weight_mul(weight, smooth_scale)
-            weight = self._weight_quantizer(weight)
+            weight = self.weight_quantizer_(weight)
             weight = self._weight_div(weight, smooth_scale)
         else:
             # now only Matmul is supported, shall generalize to bmm
             weight_scale = self._expand(smooth_scale, 1)
             weight = self._weight_mul(weight, weight_scale)
-            weight = self._weight_quantizer(weight)
+            weight = self.weight_quantizer_(weight)
             weight = self._weight_div(weight, weight_scale)
-        weight = self._handler.cast(self._handler.weight, self._handler.dtype)
+        weight = self._handler.cast(weight, self._handler.dtype)
         x = self._handler.matmul(x, weight)
         if self._handler.has_bias:
             x = self._handler.bias_add(x, self._handler.cast(self._handler.bias, self._handler.dtype))
@@ -280,9 +273,9 @@ class SQLinearWrapper(PTQCell):
     def __init__(self, weight_observer_cell: SQLinearWeightObserver):
         if not isinstance(weight_observer_cell, SQLinearWeightObserver):
             raise ValueError(f'only SQLinearWeightObserver cell is supported, but got {type(weight_observer_cell)}')
-        policy = weight_observer_cell._policy
+        policy = weight_observer_cell.policy()
         linear = weight_observer_cell.handler()
-        self._cfg = weight_observer_cell._cfg
+        self.cfg = weight_observer_cell.cfg
         super().__init__(linear, policy)
         self._weight_observer_cell = weight_observer_cell
         rank = len(linear.weight.shape)
@@ -294,9 +287,9 @@ class SQLinearWrapper(PTQCell):
             input_fq_args["strategy"] = (linear.matmul.in_strategy[0],)
 
         self._input_quantizer = policy.get_input_quantizer(**input_fq_args)
-        self._weight_quantizer = weight_observer_cell._weight_quantizer
-        self._act_observer = weight_observer_cell._act_observer
-        self._weight_observer = weight_observer_cell._weight_observer
+        self._weight_quantizer = weight_observer_cell.weight_quantizer_
+        self.act_observer = weight_observer_cell.act_observer
+        self.weight_observer = weight_observer_cell.weight_observer
         self._output_quantizer = None
         prex = ""
         for _, param in linear.parameters_and_names():
@@ -305,12 +298,11 @@ class SQLinearWrapper(PTQCell):
             self._input_quantizer.float_min.data.name = prex + "_input_float_min"
             self._input_quantizer.float_max.data.name = prex + "_input_float_max"
 
-        mode = self._cfg.mode
+        mode = self.cfg.mode
         self._is_deploy = mode == PTQMode.DEPLOY
-        self._alpha = self._cfg.algo_args.get('alpha', None)
+        self._alpha = self.cfg.algo_args.get('alpha', None)
         if self._alpha is None:
             self._alpha = 0.5
-            # raise ValueError(f'Shall input alpha in smooth quant args, but is None')
         if self._is_deploy:
             self._handler.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8),
                                              name=linear.weight.name)
@@ -398,8 +390,7 @@ class SQLinearWrapper(PTQCell):
         return (strategy[1],)
 
     def _adjust_parameter(self):
-        # self._assign(self._smooth_scale, self._weight_observer_cell._scale_store.data)
-        weight_scale = self._expand(self._weight_observer_cell._scale_store, 0)
+        weight_scale = self._expand(self._weight_observer_cell.scale_store, 0)
         if not self._handler.transpose_b:
             weight_scale = weight_scale.transpose()
         orin_dtype = self._handler.weight.dtype
@@ -414,7 +405,7 @@ class SQLinearWrapper(PTQCell):
         if not self._is_deploy:
             self._adjust_parameter()
 
-        if self._cfg.backend == BackendTarget.ASCEND:
+        if self.cfg.backend == BackendTarget.ASCEND:
             # quant weight to int8, bias to int32
             self._input_quantizer = self._input_quantizer.convert_to_fakequantparam()
             self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
@@ -471,10 +462,10 @@ class SQLinearWrapper(PTQCell):
                 bias_shape = [self._handler.weight.shape[0] if self._handler.transpose_b else
                               self._handler.weight.shape[1]]
                 self._handler.bias = Parameter(initializer('ones', bias_shape, dtype=dtype.int32), name=bias_name)
+            iq_strategy = (self._act_strategy,) if self._act_strategy else None
             self._input_quantizer = convert_to_smooth_quant(self._input_quantizer,
-                                                            self._weight_observer_cell._scale_store,
-                                                            strategy=
-                                                            (self._act_strategy,) if self._act_strategy else None)
+                                                            self._weight_observer_cell.scale_store,
+                                                            strategy=iq_strategy)
 
     def calibrate(self):
         if hasattr(self._handler, "dtype"):
@@ -514,13 +505,91 @@ class SQLinearWrapper(PTQCell):
         else:
             weight = self._handler.cast(self._handler.weight, self._handler.dtype)
             x = self._handler.cast(x, self._handler.dtype)
-            x = self._act_mul(x, self._div(1.0, self._weight_observer_cell._scale_store))
+            x = self._act_mul(x, self._div(1.0, self._weight_observer_cell.scale_store))
             x = self._input_quantizer(x)
-            x = self._act_mul(x, self._weight_observer_cell._scale_store)
+            x = self._act_mul(x, self._weight_observer_cell.scale_store)
             x = self._handler.cast(x, self._handler.dtype)
             x = self._handler.matmul(x, weight)
             if self._handler.has_bias:
                 x = self._handler.bias_add(x, self._handler.cast(self._handler.bias, self._handler.dtype))
+        if self._handler.activation_flag:
+            x = self._handler.activation(x)
+        x = F.cast(x, ori_dtype)
+        output = P.Reshape()(x, out_shape)
+        return output
+
+
+class SQLinearDeploy(PTQCell):
+    """Linear layer wrapper with min max"""
+
+    def __init__(self, linear: Linear, policy=None, cfg=None):
+        super().__init__(linear, policy)
+        if not isinstance(linear, Linear):
+            raise ValueError(f'only Linear cell is supported, but got {type(linear)}')
+        self.cfg = cfg
+
+        rank = len(linear.weight.shape)
+        ic_axis = rank - 1 if linear.matmul.transpose_b else rank - 2
+        self._weight_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
+        ic = linear.weight.shape[ic_axis]
+        oc = linear.weight.shape[self._weight_axis]
+
+        self._act_strategy = None
+        self._weight_strategy = None
+        if "in_strategy" in linear.matmul.get_attr_dict():
+            self._act_strategy = linear.matmul.in_strategy[0]
+            self._weight_strategy = linear.matmul.in_strategy[1]
+
+        self._handler.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
+        if linear.has_bias:
+            self._handler.bias = Parameter(initializer("ones", linear.bias.shape, dtype.int32), name=linear.bias.name)
+        else:
+            linear.has_bias = True
+            bias_shape = [linear.weight.shape[0] if linear.transpose_b else linear.weight.shape[1]]
+            bias_name = linear.weight.name + "_bias"
+            self._handler.bias = Parameter(initializer('ones', bias_shape, dtype=dtype.int32), name=bias_name)
+        iq_strategy = (self._act_strategy,) if self._act_strategy else None
+        self._input_quantizer = convert_to_smooth_quant_for_deploy(ic, strategy=iq_strategy)
+        oq_strategy = self.antiquant_bmm_strategy(act_strategy=self._act_strategy,
+                                                  weight_strategy=self._weight_strategy,
+                                                  has_bias=True,  # offset correct by bias
+                                                  has_offset=False, is_transpose=linear.transpose_b)
+        self._output_quantizer = convert_to_dequant_bmm_for_deploy(oc, dst_dtype=linear.dtype,
+                                                                   transpose_b=linear.transpose_b,
+                                                                   strategy=oq_strategy)
+
+    def weight_quantizer(self):
+        raise RuntimeError("Inner error, should not invoke SQLinearDeploy.weight_quantizer().")
+
+    def calibrate(self):
+        raise RuntimeError("Inner error, should not invoke SQLinearDeploy.calibrate().")
+
+    def core_construct(self, *args):
+        raise RuntimeError("Inner error, should not invoke SQLinearDeploy.core_construct().")
+
+    # pylint: disable=W0221
+    def construct(self, x):
+        """
+        Defines the computation of LinearWithMinMax to be performed.
+
+        Returns:
+            Tensor, returns the computed result.
+        """
+        out_shape = P.Shape()(x)[:-1] + (self._handler.out_channels,)
+        x = P.Reshape()(x, (-1, self._handler.in_channels))
+        if hasattr(self._handler, "expert_flag") and self._handler.expert_flag:
+            if self._handler.use_expert_group_size is True:
+                x = P.Reshape()(x, (-1, self._handler.expert_num, self._handler.expert_group_size,
+                                    self._handler.in_channels))
+            else:
+                x = P.Reshape()(x, (self._handler.outer_batch, self._handler.expert_num, -1, self._handler.in_channels))
+        ori_dtype = F.dtype(x)
+
+        x = self._input_quantizer(x)
+        bias = None
+        if self._handler.has_bias:
+            bias = self._handler.bias
+        x = self._output_quantizer(x, self._handler.weight, bias)
         if self._handler.activation_flag:
             x = self._handler.activation(x)
         x = F.cast(x, ori_dtype)

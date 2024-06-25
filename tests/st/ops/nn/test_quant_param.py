@@ -112,12 +112,15 @@ def test_quant_cell_perchannel(mode):
     x = Tensor(origin, dtype=dtype.float32)
     t_scale = Tensor(scale, dtype=dtype.float32)
     t_zp = Tensor(zp, dtype=dtype.float32)
-    qcell = QuantCell(t_scale, t_zp)
+    quant_min = -128
+    quant_max = 127
+    qcell = QuantCell(t_scale, t_zp, quant_min, quant_max)
     output = qcell(x)
     assert (expect == output.asnumpy()).all()
     mindspore.save_checkpoint(qcell, "test_quant_cell_perchannel.ckpt")
 
-    qcell2 = QuantCell(Tensor([1.0, 1.0], dtype=dtype.float32), Tensor([0.0, 0.0], dtype=dtype.float32))
+    qcell2 = QuantCell(Tensor([1.0, 1.0], dtype=dtype.float32), Tensor([0.0, 0.0], dtype=dtype.float32),
+                       quant_min, quant_max)
     mindspore.load_checkpoint("test_quant_cell_perchannel.ckpt", qcell2)
     output2 = qcell2(x)
     os.environ.pop('GRAPH_OP_RUN')

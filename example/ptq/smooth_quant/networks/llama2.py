@@ -14,7 +14,6 @@
 # ============================================================================
 """Llama2Network."""
 
-import os
 import time
 import math
 import numpy as np

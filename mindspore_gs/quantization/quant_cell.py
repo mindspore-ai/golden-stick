@@ -49,6 +49,9 @@ class QuantCell(Cell):
     def handler(self):
         return self._handler
 
+    def policy(self):
+        return self._policy
+
     def input_quantizer(self):
         return self._input_quantizer
 

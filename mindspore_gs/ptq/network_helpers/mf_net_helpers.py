@@ -26,6 +26,7 @@ from .network_helper import NetworkHelper
 
 
 class MFNetworkHelper(NetworkHelper):
+    """MFNetworkHelper"""
     def __init__(self, config: MindFormerConfig = None):
         self.mf_config = config
 
@@ -41,6 +42,7 @@ class MFNetworkHelper(NetworkHelper):
         """create_tokenizer."""
         return LlamaTokenizer(vocab_file=self.get_spec('vocab_file'))
 
+    # pylint: disable=arguments-differ
     def generate(self, mf_network: PreTrainedModel, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
         do_sample = self.mf_config.model.model_config.do_sample
         seq = self.mf_config.model.model_config.seq_length
@@ -54,6 +56,7 @@ class MFNetworkHelper(NetworkHelper):
 
 
 class MFLlama2Helper(MFNetworkHelper):
+    """MFLlama2Helper"""
     @staticmethod
     def _get_slots(bs, block_size, prefill_max_len, is_prefill, block_tables, valid_length_example):
         """get_slots."""

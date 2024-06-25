@@ -14,15 +14,16 @@
 # ============================================================================
 """SmoothQuant algorithm."""
 import os
+from typing import Tuple
 import copy
 import numpy as np
-from typing import Tuple
 
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
-
-from mindspore_gs.ptq.processor import Processor
+from mindspore import log as logger
 from mindspore_gs.comp_algo import CompAlgo
+from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq import PTQMode
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig
 from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
 from mindspore_gs.common.register import cell_type_dicts
@@ -45,11 +46,14 @@ class SmoothQuant(CompAlgo):
         self._config = InnerPTQConfig.inner_config(self._config)
         self._ptq_policy = SmoothQuant._init_net_policy(self._config)
         self._op_types = tuple({cell_type_dicts[item] for item in self._config.op_types})
+        mode = self._config.mode
+        self._is_deploy = mode == PTQMode.DEPLOY
 
     @staticmethod
     def _init_net_policy(config):
         return SQNetPolicy(config)
 
+    # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
         """Apply"""
         if not isinstance(self._ptq_policy, SQNetPolicy):
@@ -96,15 +100,16 @@ class SmoothQuant(CompAlgo):
         self._ptq_policy.build()
         InsertActObserver(self._ptq_policy, self._config).process(network)
         network.update_parameters_name()
-
+        if self._is_deploy:
+            return network
         if ds:
             if not network_helper:
                 raise ValueError("Please provide network_helper when datasets is given for calibrating.")
-            ds_count = kwargs.get("ds_count", "")
+            ds_count = kwargs.get("ds_count", None)
             if ds_count:
                 ds_count = int(ds_count)
             total_count = ds.get_dataset_size()
-            total_count = ds_count if ds_count < total_count else total_count
+            total_count = ds_count if ds_count and ds_count < total_count else total_count
             os.environ['NETWORK_PHASE'] = "actobs"
             data_count = 1
             for _, ds_item in enumerate(ds.create_dict_iterator()):

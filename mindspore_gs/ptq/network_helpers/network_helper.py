@@ -20,6 +20,7 @@ from mindspore.nn import Cell
 
 
 class NetworkHelper:
+    """NetworkHelper"""
     def get_spec(self, name: str):
         raise NotImplementedError
 

@@ -32,9 +32,10 @@ class Processor(abc.ABC):
         if root is None:
             return root
         for name, cell in root.name_cells().items():
-            new_cell, is_end_point = self.process_cell(name, cell)
+            full_cell_name = f"{name_prefix}.{name}"
+            new_cell, is_end_point = self.process_cell(full_cell_name, cell)
             if new_cell is not cell:
                 root.insert_child_to_cell(name, new_cell)
             if not is_end_point:
-                _ = self.process(new_cell)
+                _ = self.process(new_cell, full_cell_name)
         return root

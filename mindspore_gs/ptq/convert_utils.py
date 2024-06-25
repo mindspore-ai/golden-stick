@@ -136,7 +136,7 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
 
 class SmoothAndQuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
-    def __init__(self, smooth_scale: list, t_scale: list, t_zp: list):
+    def __init__(self, smooth_scale: np.ndarray, t_scale: list, t_zp: list):
         super().__init__()
         t_scale = t_scale * smooth_scale
         if max(t_zp) > 127 or min(t_zp) < -128:
@@ -175,6 +175,17 @@ def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter,
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
     quant_cell = SmoothAndQuantCell(smooth_scale.asnumpy(), scale, zp)
+    if strategy is not None:
+        quant_cell.shard(strategy)
+    return quant_cell
+
+
+def convert_to_smooth_quant_for_deploy(ic, strategy=None) -> QuantCell:
+    """Convert FakeQuantParamCell to Quant."""
+    scale = [1]
+    zp = [0]
+    smooth_scale = np.ones([ic], dtype=np.int32)
+    quant_cell = SmoothAndQuantCell(smooth_scale, scale, zp)
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell
@@ -352,3 +363,13 @@ def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, bias_quant
     if strategy is not None:
         dbmm_cell.shard(strategy)
     return dbmm_cell, bias
+
+
+def convert_to_dequant_bmm_for_deploy(oc, offset=None, dst_dtype=dtype.float16, transpose_a=False,
+                                      transpose_b=False, strategy=None):
+    """convert_to_dequant_bmm."""
+    dequant_scale = np.ones(shape=[oc], dtype=np.float32)
+    dbmm_cell = DequantBMMCell(dequant_scale, offset, transpose_a, transpose_b, dst_dtype)
+    if strategy is not None:
+        dbmm_cell.shard(strategy)
+    return dbmm_cell

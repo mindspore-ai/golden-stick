@@ -44,6 +44,7 @@ class WikiText2Dataset(GeneratorDataset):
         return len(self.content)
 
     def _load(self):
+        """_load"""
         input_content = []
         with open(self.path, 'r', encoding='utf-8') as f:
             for para in WikiText2Dataset._clean(f.read()).split("\n\n"):
