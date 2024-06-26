@@ -33,7 +33,7 @@ from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.ptq.ptq_config import PTQMode
 from mindspore_gs.ptq.convert_utils import (
     convert_to_antiquant, convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
-    convert_to_dequant_bmm, convert_to_fusion_antiquant_for_deploy
+    convert_to_dequant_bmm, convert_to_fusion_antiquant_for_deploy, convert_to_smooth_quant
 )
 
 
@@ -406,7 +406,7 @@ class SQLinearWrapper(PTQCell):
         self._act_observer.float_max.data.name = prex + "_act_observer_float_max"
         self._weight_in_observer.float_min.data.name = prex + "_weight_in_observer_float_min"
         self._weight_in_observer.float_max.data.name = prex + "_weight_in_observer_float_max"
-        self._input_scale = Parameter(Tensor([1.0] * self._linear.in_channels), name=f'{prex}_input_scale')
+        self._smooth_scale = Parameter(Tensor([1.0] * self._linear.in_channels), name=f'{prex}_smooth_scale')
         self._scale_store = Parameter(Tensor([1.0] * self._linear.in_channels), name=f'{prex}_scale_store')
         mode = self._cfg.mode
         self._is_deploy = mode == PTQMode.DEPLOY
@@ -553,24 +553,24 @@ class SQLinearWrapper(PTQCell):
             scale_weight_strategy = (1,) + scale_weight_strategy
         return scale_weight_strategy
 
-    def _calc_input_scale(self):
-        """calc_input_scale"""
+    def _calc_smooth_scale(self):
+        """calc_smooth_scale"""
         act_max = self._smooth_act_maximum(self._smooth_act_abs(self._act_observer.float_max),
                                            self._smooth_act_abs(self._act_observer.float_min))
         input_max_pow = self._act_pow(act_max, self._alpha)
         weight_max = self._smooth_weight_maximum(self._smooth_weight_abs(self._weight_in_observer.float_max),
                                                  self._smooth_weight_abs(self._weight_in_observer.float_min))
         weight_max_pow = self._weight_pow(weight_max, 1 - self._alpha)
-        input_scale = self._pow_div(input_max_pow, weight_max_pow).clip(1e-5)
+        smooth_scale = self._pow_div(input_max_pow, weight_max_pow).clip(1e-5)
 
         # set 0 or nan to 1.0 to avoid quantization error
-        input_scale[input_max_pow == 0] = 1.0
-        input_scale[weight_max_pow == 0] = 1.0
-        return input_scale
+        smooth_scale[input_max_pow == 0] = 1.0
+        smooth_scale[weight_max_pow == 0] = 1.0
+        return smooth_scale
 
     def _adjust_parameter(self):
-        self._assign(self._input_scale, self._scale_store.data)
-        weight_scale = self._expand(self._input_scale, 0)
+        self._assign(self._smooth_scale, self._scale_store.data)
+        weight_scale = self._expand(self._smooth_scale, 0)
         if not self._linear.transpose_b:
             weight_scale = weight_scale.transpose()
         orin_dtype = self._linear.weight.dtype
@@ -642,8 +642,8 @@ class SQLinearWrapper(PTQCell):
                 bias_shape = [self._linear.weight.shape[0] if self._linear.transpose_b else
                               self._linear.weight.shape[1]]
                 self._linear.bias = Parameter(initializer('ones', bias_shape, dtype=dtype.int32), name=bias_name)
-            self._input_quantizer = convert_to_quant(self._input_quantizer,
-                                                     strategy=(self._act_strategy,) if self._act_strategy else None)
+            self._input_quantizer = convert_to_smooth_quant(self._input_quantizer, self._smooth_scale, strategy=
+                                                            (self._act_strategy,) if self._act_strategy else None)
 
     def calibrate(self):
         if hasattr(self._linear, "dtype"):
@@ -672,30 +672,29 @@ class SQLinearWrapper(PTQCell):
             else:
                 x = P.Reshape()(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
         ori_dtype = F.dtype(x)
-        # make activation shallow, would take effect in deploy mode
-        x = self._act_mul(x, self._div(1.0, self._input_scale))
         weight = self._linear.weight
 
         if self._is_deploy:
             x = self._input_quantizer(x)
         else:
+            x = self._act_mul(x, self._div(1.0, self._smooth_scale))
             x = self._act_observer(x)
             weight = self._weight_in_observer(weight)
-            input_scale = self._calc_input_scale()
-            self._assign(self._scale_store, input_scale)
+            smooth_scale = self._calc_smooth_scale()
+            self._assign(self._scale_store, smooth_scale)
             if self._linear.transpose_b:
-                weight = self._weight_mul(weight, input_scale)
+                weight = self._weight_mul(weight, smooth_scale)
                 weight = self._weight_quantizer(weight)
-                weight = self._weight_div(weight, input_scale)
+                weight = self._weight_div(weight, smooth_scale)
             else:
                 # now only Matmul is supported, shall generalize to bmm
-                weight_scale = self._expand(input_scale, 1)
+                weight_scale = self._expand(smooth_scale, 1)
                 weight = self._weight_mul(weight, weight_scale)
                 weight = self._weight_quantizer(weight)
                 weight = self._weight_div(weight, weight_scale)
-            x = self._act_mul(x, self._div(1.0, input_scale))
+            x = self._act_mul(x, self._div(1.0, smooth_scale))
             x = self._input_quantizer(x)
-            x = self._act_mul(x, input_scale)
+            x = self._act_mul(x, smooth_scale)
 
         if self._is_deploy:
             # (matmul(x, int8_weight) + int32_bias) * dequant_scale
