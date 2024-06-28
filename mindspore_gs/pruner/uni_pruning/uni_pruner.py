@@ -213,7 +213,7 @@ class UniPruner(CompAlgo):
                                            device_target=config["device_target"])
         self.graph_anaylzer = None
 
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, **kwargs) -> Cell:
         """
         Analyze network computational graph.
         Currently supported networks:

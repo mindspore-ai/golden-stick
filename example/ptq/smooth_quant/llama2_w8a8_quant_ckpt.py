@@ -31,8 +31,10 @@ def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
+    parser.add_argument('--dataset_type', '-t', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     args = parser.parse_args()
+    args.dataset_type = args.dataset_type.lower()
     print(f"-------------------------------------------------quant args: {args}", flush=True)
     return args
 
@@ -68,7 +70,7 @@ if __name__ == "__main__":
     print('------------------------- Quantize-ing network...', flush=True)
     start = time.time()
     network = net_mgr.quant_network(network, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
-                                    ds_path=uargs.dataset_path, tokenizer_path=config.processor.tokenizer.vocab_file)
+                                    ds_path=uargs.dataset_path, ds_type=uargs.dataset_type, mfconfig=config)
     logger.info(f'Quant Network cost time is {time.time() - start} s.')
     print('------------------------- Saving checkpoint...', flush=True)
     start = time.time()

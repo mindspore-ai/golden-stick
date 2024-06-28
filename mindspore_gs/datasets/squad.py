@@ -26,7 +26,7 @@ from mindspore.dataset import GeneratorDataset
 
 class SQuADDataset(GeneratorDataset):
     """SQuAD dataset."""
-    def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100):
+    def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100, need_pad=True):
         self.path = os.path.join(path)
         if mode not in ("eval", "train", "test"):
             raise ValueError("Input `mode` should be 'eval', 'test' or 'train', got: ", mode)
@@ -34,6 +34,7 @@ class SQuADDataset(GeneratorDataset):
         self.seq_len = seq_length
         self.ignore_token_id = ignore_token_id
         self.tokenizer = tokenizer
+        self.need_pad = need_pad
         if mode in ("eval", "test"):
             if hasattr(self.tokenizer, 'add_bos_token'):
                 self.tokenizer.add_bos_token = True
@@ -81,19 +82,21 @@ class SQuADDataset(GeneratorDataset):
         self.input_ids.clear()
         self.labels.clear()
         pad_mode = 'constant'
-        if self.mode == "eval":
+        if self.mode in ("eval", "test"):
             for prompt, answer in zip(sources, targets):
                 total_items += 1
                 input_ids = self.tokenizer.encode(prompt, add_special_tokens=True)
+                label_id = self.tokenizer.encode(answer, add_special_tokens=False)
                 if len(input_ids) >= self.seq_len:
                     input_ids = input_ids[:self.seq_len]
-                else:
+                if len(label_id) >= self.seq_len:
+                    label_id = label_id[:self.seq_len]
+
+                if self.need_pad:
                     input_ids = np.pad(input_ids, (0, self.seq_len - len(input_ids)), pad_mode,
                                        constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
-
-                label_id = self.tokenizer.encode(answer, add_special_tokens=False)
-                label_id = np.pad(label_id, (0, self.seq_len - len(label_id)), pad_mode,
-                                  constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
+                    label_id = np.pad(label_id, (0, self.seq_len - len(label_id)), pad_mode,
+                                      constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
 
                 self.input_ids.append(Tensor(input_ids, dtype=dtype.int32))
                 self.labels.append(Tensor(label_id, dtype=dtype.int32))
@@ -110,13 +113,15 @@ class SQuADDataset(GeneratorDataset):
                 prompt_length = len(prompt_ids)
                 concat_length = len(input_ids)
 
-                pad_length = self.seq_len + 1 - concat_length
-                input_ids_new = np.pad(input_ids, (0, pad_length), pad_mode,
+                if self.need_pad:
+                    pad_length = self.seq_len + 1 - concat_length
+                    input_ids = np.pad(input_ids, (0, pad_length), pad_mode,
                                        constant_values=(self.tokenizer.pad_token_id, self.tokenizer.pad_token_id))
-                label_id_new = copy.deepcopy(input_ids_new)
+                label_id_new = copy.deepcopy(input_ids)
                 label_id_new[:prompt_length] = self.ignore_token_id
-                label_id_new[-pad_length:] = self.ignore_token_id
-                self.input_ids.append(Tensor(input_ids_new, dtype=dtype.int32))
+                if self.need_pad:
+                    label_id_new[-pad_length:] = self.ignore_token_id
+                self.input_ids.append(Tensor(input_ids, dtype=dtype.int32))
                 self.labels.append(Tensor(label_id_new, dtype=dtype.int32))
         return total_items
 
@@ -124,16 +129,15 @@ class SQuADDataset(GeneratorDataset):
         return next(self.iter_input_ids), next(self.iter_labels)
 
     def __iter__(self):
-        """tokenize wikitext-2/wikitext-103 dataset"""
         self.iter_input_ids = iter(self.input_ids)
         self.iter_labels = iter(self.labels)
         return self
 
 
 def create_squad_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
-                         ignore_token_id=-100, repeat=1):
+                         ignore_token_id=-100, repeat=1, need_pad=True):
     """create squad dataset"""
-    ds = SQuADDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id)
+    ds = SQuADDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.map(operations=type_cast_op, input_columns="labels")

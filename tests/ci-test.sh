@@ -28,8 +28,11 @@ elif [[ ${backend} == 'gpu' ]]; then
   echo "Please ensure dataset path is exported to env. for example, cifar10 is installed in: /path/to/ds/cifar/cifar-10-batches-bin/xxx.bin, and mnist is installed in: /path/to/ds/mnist/train/xxx-ubyte, you should export DATASET_PATH=/path/to/ds."
   # shellcheck disable=SC2038
   find ${sub_dir} -name 'test_*.py' -type f|xargs -r grep -A 6 'pytest.mark.level0'|grep 'pytest.mark.platform_x86_gpu_training'|awk -F'-' '{print $1}'|uniq|xargs python -m pytest -vrt -q -m 'level0 and platform_x86_gpu_training'
+elif [[ ${backend} == 'ascend' ]]; then
+  # shellcheck disable=SC2038
+  find ${sub_dir} -name 'test_*.py' -type f|xargs -r grep -A 6 'pytest.mark.level0'|grep 'pytest.mark.platform_arm_ascend910b_training'|awk -F'-' '{print $1}'|uniq|xargs python -m pytest -vrt -q -m 'level0 and platform_arm_ascend910b_training'
 else
-  echo "There is no ${backend} backend testcases, available: cpu, gpu."
+  echo "There is no ${backend} backend testcases, available: cpu, gpu, ascend."
 fi
 cd - || exit 1
 exit 0

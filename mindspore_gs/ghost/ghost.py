@@ -217,7 +217,7 @@ class GhostAlgo(CompAlgo):
         _inject(net._cells)
         return net
 
-    def apply(self, network):
+    def apply(self, network, **kwargs):
         """
         Transform input `network` to a Ghost network.
 

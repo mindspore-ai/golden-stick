@@ -37,7 +37,7 @@ class AbstractHeadPruner(CompAlgo, ABC):
         self.model_config = config['model_config']
         self.l0_penalty = config['l0_penalty']
 
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, **kwargs) -> Cell:
         """
         Define how to compress input `network`. This method must be overridden by all subclasses.
 

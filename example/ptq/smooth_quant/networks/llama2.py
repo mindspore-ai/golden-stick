@@ -25,7 +25,8 @@ from mindformers import LlamaForCausalLM, LlamaTokenizer, MindFormerConfig, Llam
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import SmoothQuant as SQ
-from mindspore_gs.datasets import create_wikitext_dataset
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from mindspore_gs.datasets import get_datasets
 from .network import BaseNetwork
 
 
@@ -62,38 +63,32 @@ class Llama2Network(BaseNetwork):
             logger.info("Use RTN algo to quant network and weight.")
         else:
             logger.info("Use RTN algo to quant network.")
-        cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2"])
+        cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2", "lm_head"])
         ptq = SQ(config=cfg)
         logger.info(f'Create PTQ cost time is {time.time() - start} s.')
-        start = time.time()
-        qnet = ptq.apply(network.model)
-        logger.info(f'Apply PTQ cost time is {time.time() - start} s.')
         start = time.time()
         ds_path = kwargs.get("ds_path", "")
         if not ds_path:
             raise ValueError("Please provide datasets for calibrating.")
+        ds_type = kwargs.get("ds_type", "")
+        if not ds_type:
+            raise ValueError("Please provide datasets type for calibrating.")
         mfconfig = kwargs.get("mfconfig", None)
         if not mfconfig:
             raise ValueError("Please provide mfconfig for calibrating.")
-        bs = mfconfig.model.model_config.batch_size
-        seq = mfconfig.model.model_config.seq_length
-        max_decode_length = mfconfig.model.model_config.max_decode_length
-        top_p = mfconfig.model.model_config.top_p
-        top_k = mfconfig.model.model_config.top_k
-        tokenizer = Llama2Network.create_tokenizer(mfconfig.processor.tokenizer.vocab_file)
-        ds = create_wikitext_dataset(ds_path, bs, seq, max_decode_length, tokenizer)
-        data_count = 0
-        total_count = ds.get_dataset_size()
-        for _, ds_item in enumerate(ds.create_dict_iterator()):
-            data_count += 1
-            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
-            input_ids = ds_item['input_ids'].asnumpy()
-            network.generate(input_ids, do_sample=False, max_length=seq, top_p=top_p, top_k=top_k)
-        logger.info(f'Calibrate cost time is {time.time() - start} s.')
+        net_helper = MFLlama2Helper(mfconfig)
+        bs = net_helper.get_spec('batch_size')
+        seq = net_helper.get_spec('seq_length')
+        max_decode_length = net_helper.get_spec('max_decode_length')
+        ignore_token_id = net_helper.get_spec('ignore_token_id')
+        tokenizer = net_helper.create_tokenizer()
+        ds = get_datasets(ds_type, ds_path, "train", bs, seq, max_decode_length, tokenizer, ignore_token_id, 1, False)
+        network = ptq.apply(network, net_helper, ds=ds, ds_count=100)
+        logger.info(f'Apply PTQ cost time is {time.time() - start} s.')
         start = time.time()
-        qnet = ptq.convert(qnet)
+        network.phase = "quant_convert"
+        network = ptq.convert(network)
         logger.info(f'Convert to real quantize cost time is {time.time() - start} s.')
-        network.model = qnet
         return network
 
     @staticmethod

@@ -351,7 +351,7 @@ class LearnedStepSizeQuantizationAwareTraining(SimQAT):
         """
         super(LearnedStepSizeQuantizationAwareTraining, self).set_enable_fusion(enable_fusion)
 
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, **kwargs) -> Cell:
         """
         Apply LSQ Algorithm on `network`, use the following steps to make `network` available for quantization aware
         training:

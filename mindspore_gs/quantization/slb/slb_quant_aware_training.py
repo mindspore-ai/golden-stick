@@ -420,7 +420,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         cb.extend(super(SlbQuantAwareTraining, self).callbacks())
         return cb
 
-    def apply(self, network: Cell) -> Cell:
+    def apply(self, network: Cell, **kwargs) -> Cell:
         """
         Apply SLB quantization Algorithm on `network`, use the following steps to make `network` available for
         quantization aware training:

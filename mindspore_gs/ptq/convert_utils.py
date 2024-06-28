@@ -25,6 +25,8 @@ from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
+from mindspore_gs.quantization.quant_utils import get_quant_min_max
+from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 
 
 class AntiQuantCell(Cell):
@@ -79,7 +81,7 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=No
 
 class QuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
-    def __init__(self, t_scale: Tensor, t_zp: Tensor):
+    def __init__(self, t_scale: Tensor, t_zp: Tensor, quant_min, quant_max):
         super().__init__()
         if t_scale.shape != t_zp.shape:
             raise ValueError(f"Size of scale({t_scale.shape}) should be equal to size of zp({t_zp.shape}).")
@@ -87,6 +89,8 @@ class QuantCell(Cell):
         self._is_perchannel: bool = t_scale.shape != (1,)
         self.t_scale = Parameter(t_scale)
         self.t_zp = Parameter(t_zp)
+        self.quant_min = quant_min
+        self.quant_max = quant_max
         self.mul = msops.Mul()
         self.add = msops.Add()
         self.round = msops.Round()
@@ -97,6 +101,7 @@ class QuantCell(Cell):
         x = self.mul(x, self.t_scale)
         x = self.add(x, self.t_zp)
         x = self.round(x)
+        x = x.clip(self.quant_min, self.quant_max)
         x = self.cast(x, dtype.int8)
         return x
 
@@ -119,21 +124,27 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32))
+    quant_min, quant_max = get_quant_min_max(
+        num_bits=fq.attrs[LinearFakeQuantizer.attr_key_num_bits],
+        signed=fq.attrs[LinearFakeQuantizer.attr_key_signed],
+        narrow_range=fq.attrs[LinearFakeQuantizer.attr_key_narrow_range])
+    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32), quant_min, quant_max)
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell
 
+
 class SmoothAndQuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
-    def __init__(self, smooth_scale: list, t_scale: list, t_zp: list):
+    def __init__(self, smooth_scale: np.ndarray, t_scale: list, t_zp: list):
         super().__init__()
         t_scale = t_scale * smooth_scale
-        t_scale = 1 / t_scale
+        if max(t_zp) > 127 or min(t_zp) < -128:
+            raise ValueError(f"max(t_zp):({max(t_zp)}) min(t_zp):({min(t_zp)}) is outside the data range of int8.")
         if len(t_zp) == 1 and len(t_scale) != 1:
-            t_zp = Tensor(np.array([t_zp[0]] * len(t_scale)), dtype=dtype.float16)
+            t_zp = Tensor(np.array([t_zp[0]] * len(t_scale)).astype(np.int8), dtype=dtype.int8)
         else:
-            t_zp = Tensor(np.array(t_zp), dtype=dtype.float16)
+            t_zp = Tensor(np.array(t_zp).astype(np.int8), dtype=dtype.int8)
         t_scale = Tensor(np.array(t_scale), dtype=dtype.float16)
         # QuantV2 ops only support per channel quant
         if t_scale.shape != t_zp.shape or t_scale.shape == (1,):
@@ -151,6 +162,7 @@ class SmoothAndQuantCell(Cell):
         """shard strategy for quant cell"""
         self.quant.shard((strategy[0], (strategy[0][-1],), (strategy[0][-1],)))
 
+
 def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter, strategy=None) -> QuantCell:
     """Convert FakeQuantParamCell to Quant."""
     fq: FakeQuantParam = fqcell.fq
@@ -163,6 +175,17 @@ def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter,
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
     quant_cell = SmoothAndQuantCell(smooth_scale.asnumpy(), scale, zp)
+    if strategy is not None:
+        quant_cell.shard(strategy)
+    return quant_cell
+
+
+def convert_to_smooth_quant_for_deploy(ic, strategy=None) -> QuantCell:
+    """Convert FakeQuantParamCell to Quant."""
+    scale = [1]
+    zp = [0]
+    smooth_scale = np.ones([ic], dtype=np.int32)
+    quant_cell = SmoothAndQuantCell(smooth_scale, scale, zp)
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell
@@ -289,8 +312,8 @@ class DequantBMMCell(Cell):
         super().__init__()
         self._use_fusion = True
         self.dbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
-        scale_ui64 = NumpyQuantOps.trans_fp32_to_u64(scale)
-        self.scale = Parameter(Tensor(np.squeeze(scale_ui64), dtype=dtype.uint64))
+        scale_i64 = NumpyQuantOps.trans_fp32_to_i64(scale)
+        self.scale = Parameter(Tensor(np.squeeze(scale_i64), dtype=dtype.int64))
         if offset is None:
             self.offset = None
         else:
@@ -340,3 +363,13 @@ def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, bias_quant
     if strategy is not None:
         dbmm_cell.shard(strategy)
     return dbmm_cell, bias
+
+
+def convert_to_dequant_bmm_for_deploy(oc, offset=None, dst_dtype=dtype.float16, transpose_a=False,
+                                      transpose_b=False, strategy=None):
+    """convert_to_dequant_bmm."""
+    dequant_scale = np.ones(shape=[oc], dtype=np.float32)
+    dbmm_cell = DequantBMMCell(dequant_scale, offset, transpose_a, transpose_b, dst_dtype)
+    if strategy is not None:
+        dbmm_cell.shard(strategy)
+    return dbmm_cell
