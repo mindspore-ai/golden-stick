@@ -318,6 +318,7 @@ def test_kvint8_predict_2stage(device, mode):
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])
+# FIXME @hangangqiang wait for debug on recompute in LLamaRMSNorm: @pytest.mark.parametrize("mode", [PYNATIVE_MODE])
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
 def test_llama2_kvint8_apply_convert(device, mode):
     """

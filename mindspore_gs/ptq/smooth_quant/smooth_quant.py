@@ -111,6 +111,7 @@ class SmoothQuant(CompAlgo):
             total_count = ds.get_dataset_size()
             total_count = ds_count if ds_count and ds_count < total_count else total_count
             os.environ['NETWORK_PHASE'] = "actobs"
+            network.phase = "prefill_actobs"
             data_count = 1
             for _, ds_item in enumerate(ds.create_dict_iterator()):
                 logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
@@ -130,6 +131,7 @@ class SmoothQuant(CompAlgo):
         network.update_parameters_name()
         if ds:
             os.environ['NETWORK_PHASE'] = "quant"
+            network.phase = "prefill_quant"
             data_count = 1
             for _, ds_item in enumerate(ds.create_dict_iterator()):
                 logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")

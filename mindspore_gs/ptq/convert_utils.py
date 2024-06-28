@@ -16,7 +16,7 @@
 
 import numpy as np
 import mindspore as ms
-from mindspore import Parameter, Tensor, dtype, context
+from mindspore import Parameter, Tensor, dtype, context, JitConfig
 from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
@@ -175,6 +175,7 @@ def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter,
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
     quant_cell = SmoothAndQuantCell(smooth_scale.asnumpy(), scale, zp)
+    quant_cell.set_jit_config(JitConfig(jit_level="O0", infer_boost="on"))
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell
