@@ -21,8 +21,10 @@ from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq import PTQMode
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
-from ..quant_cells import LinearQuant, KVCacheMgrQuant
+from ..quant_cells import KVCacheMgrQuant
+from .quant_cells import LinearQuant, LinearDeploy
 
 
 class RTNLayerPolicy(LayerPolicy, abc.ABC):
@@ -103,8 +105,11 @@ class LinearLayerPolicy(RTNLayerPolicy):
         if config.weight_only:
             self.set_input_not_insert_fq()
             self.set_output_not_insert_fq()
+        self.is_deploy = config.mode == PTQMode.DEPLOY
 
     def wrap_cell(self, handler) -> Cell:
+        if self.is_deploy:
+            return LinearDeploy(handler, self)
         return LinearQuant(handler, self)
 
 

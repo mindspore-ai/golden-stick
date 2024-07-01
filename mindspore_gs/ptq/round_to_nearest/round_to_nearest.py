@@ -16,6 +16,7 @@
 import copy
 import os
 from typing import Tuple
+import numpy as np
 
 from mindspore.nn import Cell
 from mindspore import context
@@ -28,7 +29,9 @@ from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.convert_utils import QuantCell
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.network_helpers import NetworkHelper
 from .rtn_net_policy import RTNNetPolicy
+from .quant_cells import LinearQuant
 
 
 class RoundToNearest(CompAlgo):
@@ -127,7 +130,8 @@ class RoundToNearest(CompAlgo):
         FixProcessor().process(network)
         network.update_parameters_name()
 
-    def apply(self, network: Cell) -> Cell:
+    # pylint: disable=arguments-differ
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, **kwargs) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -144,20 +148,31 @@ class RoundToNearest(CompAlgo):
         class ApplyProcessor(Processor):
             """A network iterator for applying algorithm on network."""
 
-            def __init__(self, ptq_policy):
+            def __init__(self, ptq_policy, config):
                 self._ptq_policy = ptq_policy
+                self._config = config
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
                     return cell, True
+                for exclude_name in self._config.opname_blacklist:
+                    if exclude_name in cell_name:
+                        logger.info(f"Setting {cell_name} being no-quant")
+                        return cell, True
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
                     return new_layer_policy.wrap_cell(cell), True
                 return cell, False
 
-        ApplyProcessor(self._ptq_policy).process(network)
+        ApplyProcessor(self._ptq_policy, self._config).process(network)
         network.update_parameters_name()
+        if self._is_deploy:
+            return network
+        if network_helper:
+            bs = network_helper.get_spec("batch_size") if network_helper.get_spec("batch_size") else 1
+            seq = network_helper.get_spec("seq_length") if network_helper.get_spec("seq_length") else 4096
+            network(*(network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))))
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
@@ -194,21 +209,15 @@ class RoundToNearest(CompAlgo):
                 raise ValueError(
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
 
-        class ConvertProcessor(Processor):
-            """A network iterator for converting network to deploy network."""
-            def __init__(self, ptq_policy, is_deploy, backend):
-                self._ptq_policy = ptq_policy
-                self._is_deploy = is_deploy
-                self._backend = backend
+        def _convert(root: Cell):
+            if root is None:
+                return
+            for _, cell in root.name_cells().items():
+                if isinstance(cell, LinearQuant):
+                    cell.convert(self._config.backend, self._is_deploy)
+                else:
+                    _convert(cell)
 
-            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                if not isinstance(cell, Cell):
-                    return cell, True
-                if isinstance(cell, PTQCell):
-                    cell.convert(self._backend, self._is_deploy)
-                    return cell, True
-                return cell, False
-
-        ConvertProcessor(self._ptq_policy, self._is_deploy, self._config.backend).process(net_opt)
+        _convert(net_opt)
         net_opt.update_parameters_name()
         return net_opt

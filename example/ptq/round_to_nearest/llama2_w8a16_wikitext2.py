@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Quant llama2 7b to w8a16."""
+"""Quant llama2 7b to w8a16, please set use_past=False."""
 
 import os
 import argparse

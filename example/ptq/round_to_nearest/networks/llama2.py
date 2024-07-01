@@ -25,6 +25,7 @@ from mindformers import LlamaForCausalLM, LlamaTokenizer, MindFormerConfig, Llam
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import RoundToNearest as RTN
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 from .network import BaseNetwork
 
 
@@ -61,21 +62,20 @@ class Llama2Network(BaseNetwork):
             logger.info("Use RTN algo to quant network and weight.")
         else:
             logger.info("Use RTN algo to quant network.")
-        cfg = PTQConfig(mode=mode, backend=backend)
+        cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["lm_head"])
         ptq = RTN(config=cfg)
         logger.info(f'Create PTQ cost time is {time.time() - start} s.')
         start = time.time()
-        qnet = ptq.apply(network.model)
+        mfconfig = kwargs.get("mfconfig", None)
+        if not mfconfig:
+            raise ValueError("Please provide mfconfig for calibrating.")
+        network_helper = MFLlama2Helper(mfconfig)
+        network = ptq.apply(network, network_helper)
         logger.info(f'Apply PTQ cost time is {time.time() - start} s.')
         start = time.time()
-        bs = kwargs.get("batch_size", 1)
-        seq = kwargs.get("seq_length", 4096)
-        network(*(network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))))
-        logger.info(f'Calibrate cost time is {time.time() - start} s.')
-        start = time.time()
-        qnet = ptq.convert(qnet)
+        network.phase = "quant_convert"
+        network = ptq.convert(network)
         logger.info(f'Convert to real quantize cost time is {time.time() - start} s.')
-        network.model = qnet
         return network
 
     @staticmethod
