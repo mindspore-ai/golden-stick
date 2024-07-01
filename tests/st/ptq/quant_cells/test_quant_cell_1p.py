@@ -82,7 +82,8 @@ def test_quant_cell_1p(mode):
 
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
-# FIXME @hangangqiang @need internal QuantPerChannel @pytest.mark.level0
+
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
@@ -94,6 +95,9 @@ def test_smooth_quant_cell_1p(mode):
     """
 
     os.environ['GRAPH_OP_RUN'] = "1"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     context.set_context(device_target="Ascend", mode=mode)
     activation = np.array([[0.1, 1.], [0.5, 2.4]]).astype(np.float16)
     smooth_scale = np.array([0.6, 0.3]).astype(np.float16)
