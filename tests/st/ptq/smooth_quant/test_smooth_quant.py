@@ -378,27 +378,24 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
 @pytest.mark.parametrize("device", ["Ascend"])
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
 @pytest.mark.parametrize("transpose_b", [True, False])
-@pytest.mark.parametrize("p_strategy", [((1, 2), (2, 1)), ((1, 1), (1, 2)), ((2, 1), (1, 1)), ((1, 1), (1, 1))])
-def test_sq_predict_simplenet_2stage(device, mode, transpose_b, p_strategy):
+def test_sq_predict_simplenet_2stage(device, mode, transpose_b):
     """
     Feature: test smooth quant adjust parameter in two stages.
     Description: Feed invalid type of bn_fold to convert function.
     Expectation: adjust error is in certain range.
     """
-    os.environ['GRAPH_OP_RUN'] = "1"
-    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    if not ascend_path:
-        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     use_parallel = os.environ.get("sq_test_use_parallel", '0')
     if use_parallel == '0':
         assert sq_predict_simplenet_2stage(device, mode, transpose_b, 1, None)
         return
 
-    if transpose_b and p_strategy is not None:
-        weight_strategy = p_strategy[1]
-        new_weight_strategy = (weight_strategy[1], weight_strategy[0])
-        p_strategy = (p_strategy[0], new_weight_strategy)
-    assert sq_predict_simplenet_2stage(device, mode, transpose_b, 2, p_strategy)
+    p_strategies = [((1, 2), (2, 1)), ((1, 1), (1, 2)), ((2, 1), (1, 1)), ((1, 1), (1, 1))]
+    for p_strategy in p_strategies:
+        if transpose_b and p_strategy is not None:
+            weight_strategy = p_strategy[1]
+            new_weight_strategy = (weight_strategy[1], weight_strategy[0])
+            p_strategy = (p_strategy[0], new_weight_strategy)
+        assert sq_predict_simplenet_2stage(device, mode, transpose_b, 2, p_strategy)
 
 
 # @pytest.mark.level0
@@ -410,10 +407,6 @@ def test_sq_predict_simplenet_2stage_2p():
     Description: apply SQ on simplenet and check accuracy.
     Expectation: accuracy is good.
     """
-    os.environ['GRAPH_OP_RUN'] = "1"
-    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    if not ascend_path:
-        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     os.environ['sq_test_use_parallel'] = '1'
     return_code = os.system(
         "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
@@ -590,7 +583,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
 
 
-# @pytest.mark.level0
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
@@ -601,15 +594,11 @@ def test_sq_llama2_predict_2stage_1p(device, mode):
     Description: apply SQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
-    os.environ['GRAPH_OP_RUN'] = "1"
-    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    if not ascend_path:
-        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
     assert sq_predict_llama2_2stage(device, mode, model_parallel)
 
 
-# @pytest.mark.level0
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_sq_llama2_predict_2stage_2p():
@@ -618,10 +607,6 @@ def test_sq_llama2_predict_2stage_2p():
     Description: apply SQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
-    os.environ['GRAPH_OP_RUN'] = "1"
-    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    if not ascend_path:
-        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     model_parallel = 2
     os.environ['sq_test_model_parallel'] = str(model_parallel)
     return_code = os.system(
