@@ -295,11 +295,11 @@ def convert_to_fusion_antiquant_for_deploy(axis, output_channel, data_rank, is_p
     post_dims = data_rank - axis - 1
     param_shape = [1] * pre_dims + [-1] + [1] * post_dims
     if is_per_channel:
-        scale = np.ones(output_channel).reshape(param_shape).tolist()
-        zp = np.zeros(output_channel).reshape(param_shape).tolist()
+        scale = np.ones(output_channel).reshape(param_shape)
+        zp = np.zeros(output_channel).reshape(param_shape)
     else:
-        scale = np.ones(1).reshape(param_shape).tolist()
-        zp = np.zeros(1).reshape(param_shape).tolist()
+        scale = np.ones(1).reshape(param_shape)
+        zp = np.zeros(1).reshape(param_shape)
     anti_quant = AntiquantBMMCell(scale, zp, out_dtype=dst_dtype, transpose_x=transpose_x,
                                   transpose_weight=transpose_weight)
     if strategy is not None:

@@ -66,7 +66,7 @@ if __name__ == "__main__":
     logger.info(f'Load ckpt cost time is {time.time() - start} s.')
     print('------------------------- Quantize-ing network...', flush=True)
     start = time.time()
-    network = net_mgr.quant_network(network, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+    network = net_mgr.quant_network(network, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, mfconfig=config)
     logger.info(f'Quant Network cost time is {time.time() - start} s.')
     print('------------------------- Saving checkpoint...', flush=True)
     start = time.time()
