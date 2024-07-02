@@ -160,7 +160,8 @@ class SmoothAndQuantCell(Cell):
 
     def shard(self, strategy):
         """shard strategy for quant cell"""
-        self.quant.shard((strategy[0], (strategy[0][-1],), (strategy[0][-1],)))
+        # FIXME (1, *strategy[0]) only support 2D input such as llama network
+        self.quant.shard(((1, *strategy[0]), (strategy[0][-1],), (strategy[0][-1],)))
 
 
 def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter, strategy=None) -> QuantCell:

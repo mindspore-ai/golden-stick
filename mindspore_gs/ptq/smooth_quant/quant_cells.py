@@ -575,6 +575,8 @@ class SQLinearDeploy(PTQCell):
         Returns:
             Tensor, returns the computed result.
         """
+        ori_dtype = F.dtype(x)
+        x = self._input_quantizer(x)
         out_shape = P.Shape()(x)[:-1] + (self._handler.out_channels,)
         x = P.Reshape()(x, (-1, self._handler.in_channels))
         if hasattr(self._handler, "expert_flag") and self._handler.expert_flag:
@@ -583,9 +585,7 @@ class SQLinearDeploy(PTQCell):
                                     self._handler.in_channels))
             else:
                 x = P.Reshape()(x, (self._handler.outer_batch, self._handler.expert_num, -1, self._handler.in_channels))
-        ori_dtype = F.dtype(x)
 
-        x = self._input_quantizer(x)
         bias = None
         if self._handler.has_bias:
             bias = self._handler.bias
