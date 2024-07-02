@@ -18,30 +18,29 @@ import os
 import argparse
 import time
 import numpy as np
-from mindformers.core.metric import EmF1Metric
 import mindspore as ms
 from mindspore import log as logger
 from mindspore import Model
 from mindspore.communication import get_rank
+import mindspore.common.dtype as mstype
+from mindspore.common.tensor import Tensor
 from mindspore_gs.datasets import create_boolq_dataset
+from mindformers.generation.text_generator import GenerationMixin
 from networks import NetworkRegister, BaseNetwork
 
 
 def evaluate(net, dataset_path, cfg, net_helper: BaseNetwork):
     """evaluate `net` with dataset from `dataset_path`."""
-    top_k = cfg.model.model_config.top_k
-    top_p = cfg.model.model_config.top_p
-    do_sample = cfg.model.model_config.do_sample
     batch_size = cfg.model.model_config.batch_size
     seq_length = cfg.model.model_config.seq_length
     ignore_token_id = cfg.model.model_config.ignore_token_id
     pad_token_id = cfg.model.model_config.pad_token_id
-
     tokenizer = net_helper.create_tokenizer(cfg.processor.tokenizer.vocab_file)
     ds = create_boolq_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id)
-    metric = EmF1Metric()
-    metric.clear()
+    choice_tokens = [tokenizer.encode("yes", add_special_tokens=False)[0],
+                     tokenizer.encode("no", add_special_tokens=False)[0]]
 
+    correct = 0
     data_count = 0
     total_count = ds.get_dataset_size()
     for _, ds_item in enumerate(ds.create_dict_iterator()):
@@ -49,24 +48,30 @@ def evaluate(net, dataset_path, cfg, net_helper: BaseNetwork):
         logger.info(f"Dataset count: {data_count}/{total_count}")
         input_ids = ds_item['input_ids'].asnumpy()
         labels = ds_item['labels'].asnumpy()
-
         valid_length_each_example = []
         for j in range(input_ids.shape[0]):
             # As the nonzero returns the index and we need length
             valid_length_each_example.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
         valid_length_each_example = np.array(valid_length_each_example)
 
-        outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length, top_p=top_p, top_k=top_k,
-                               max_new_tokens=5)
-        output_ids = []
-        for j in range(input_ids.shape[0]):
-            output_ids.append(outputs[j][int(valid_length_each_example[j]):])
+        logits, current_index = net.forward(
+            input_ids=input_ids,
+            valid_length_each_example=valid_length_each_example,
+            use_past=cfg.model.model_config.use_past)
+        logit_logsoftmax = GenerationMixin.process_logits(
+            GenerationMixin, logits[0], Tensor(current_index, dtype=mstype.int32))
 
-        pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
-        labels_str = tokenizer.decode(labels, skip_special_tokens=True)
-        pres_str = [pres_str[0].split(' ')[0].lower().strip().strip(',').strip('.').strip('-').strip('_')]
-        metric.update(pres_str, labels_str)
-    metric.eval()
+        logit_logsoftmax = logit_logsoftmax[:, choice_tokens]
+        if logit_logsoftmax[0, 0] > logit_logsoftmax[0, 1]:
+            choice = choice_tokens[0]
+        else:
+            choice = choice_tokens[1]
+        acc = choice == labels[0][0]
+        if acc:
+            correct += 1
+        if data_count % 10 == 0:
+            print("acc: ", correct / data_count)
+    print("total acc: ", correct / data_count)
     print('...........Evaluate Over!...............', flush=True)
 
 
@@ -86,6 +91,7 @@ if __name__ == "__main__":
     print('------------------------- Creating network...', flush=True)
     net_mgr: BaseNetwork = NetworkRegister.instance().from_config(uargs.config_path)
     config = net_mgr.create_mfconfig(uargs.config_path)
+    config.model.model_config.use_past = False
     network = net_mgr.create_network(config)
     network.set_train(False)
     network.phase = 'predict'
