@@ -1,4 +1,4 @@
-# Copyright 2023-2024 Huawei Technologies Co., Ltd
+# Copyright 2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -92,56 +92,36 @@ class LinearQuant(PTQCell):
 
             super(LinearQuant, self).convert(backend)
             # quant weight to int8
-            if not is_deploy:
-                self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
-                weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
-                weight = self._linear.cast(self._linear.weight, self._cast_dtype)
-                quant_min, quant_max = get_quant_min_max(
-                    weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
-                    weight_quantizer.attrs[LinearFakeQuantizer.attr_key_symmetric],
-                    weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
-                scale = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale]
-                zp = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point]
-                weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
-                                                 quant_min, quant_max, self._weight_axis, dtype.int8)
-                np_weight_quant = weight_quant.asnumpy()
-                del weight_quant
-                self._linear.weight = Parameter(Tensor(np_weight_quant, dtype=dtype.int8),
-                                                name=self._linear.weight.name)
-                if not all_quant:
-                    self._input_quantizer = None
-                    self._output_quantizer = None
-                    self._weight_quantizer = convert_to_fusion_antiquant(
-                        self._weight_quantizer, transpose_weight=self._linear.transpose_b,
-                        dst_dtype=self._cast_dtype, strategy=
-                        self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
-                                                    False, self._linear.transpose_b)
-                    )
+            self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+            weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
+            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+            quant_min, quant_max = get_quant_min_max(
+                weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
+                weight_quantizer.attrs[LinearFakeQuantizer.attr_key_symmetric],
+                weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
+            scale = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale]
+            zp = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point]
+            weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
+                                             quant_min, quant_max, self._weight_axis, dtype.int8)
+            np_weight_quant = weight_quant.asnumpy()
+            del weight_quant
+            self._linear.weight = Parameter(Tensor(np_weight_quant, dtype=dtype.int8),
+                                            name=self._linear.weight.name)
+            if not all_quant:
+                self._input_quantizer = None
+                self._output_quantizer = None
+                self._weight_quantizer = convert_to_fusion_antiquant(
+                    self._weight_quantizer, transpose_weight=self._linear.transpose_b,
+                    dst_dtype=self._cast_dtype, strategy=
+                    self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
+                                                False, self._linear.transpose_b)
+                )
+                self._quant_deployed = True
             else:
-                if isinstance(self._input_quantizer, LinearFakeQuantizer):
-                    self._input_quantizer.foo_init()
-                if isinstance(self._weight_quantizer, LinearFakeQuantizer):
-                    self._weight_quantizer.foo_init()
-                self._linear.weight = Parameter(initializer('ones', self._linear.weight.shape, dtype.int8),
-                                                name=self._linear.weight.name)
-                if not all_quant:
-                    self._input_quantizer = None
-                    self._output_quantizer = None
-                    self._weight_quantizer = convert_to_fusion_antiquant_for_deploy(
-                        axis=self._weight_axis, output_channel=self._linear.out_channels,
-                        data_rank=len(self._linear.weight.shape),
-                        is_per_channel=self._weight_quantizer.is_per_channel(),
-                        transpose_weight=self._linear.transpose_b,
-                        dst_dtype=self._cast_dtype,
-                        strategy=self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
-                                                             False, self._linear.transpose_b)
-                    )
-            if all_quant:
                 self._output_quantizer = convert_to_dequant(self._input_quantizer, self._weight_quantizer)
                 self._input_quantizer = convert_to_quant(self._input_quantizer)
                 self._quant_deployed = True
                 raise RuntimeError(f'current version not support all quantization, only for weight quantization')
-            self._quant_deployed = True
 
     def calibrate(self):
         """calibrate for weight quant"""
@@ -169,12 +149,10 @@ class LinearQuant(PTQCell):
         ori_dtype = F.dtype(x)
 
         x = self._linear.cast(x, self._cast_dtype)
-        if self._quant_deployed:
-            x = self._weight_quantizer(x, self._linear.weight)
-        else:
-            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+        weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+        if not self._quant_deployed:
             weight = self._weight_quantizer(weight)
-            x = self._linear.matmul(x, weight)
+        x = self._linear.matmul(x, weight)
         if self._linear.has_bias:
             x = self._linear.bias_add(x, self._linear.cast(self._linear.bias, self._linear.dtype))
         if self._linear.activation_flag:
