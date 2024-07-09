@@ -39,3 +39,19 @@ class Processor(abc.ABC):
             if not is_end_point:
                 _ = self.process(new_cell, full_cell_name)
         return root
+
+
+def network_replace(network: Cell, src_layer: type, dst_layer_fn: callable, opname_blacklist: list):
+    """network replace"""
+    class Replacer(Processor):
+        """A network iterator for one-to-one sub-cell replace."""
+        def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+            if not isinstance(cell, src_layer):
+                return cell, False
+            for opname in opname_blacklist:
+                if opname in cell_name:
+                    return cell, True
+            dst_layer = dst_layer_fn(cell_name, cell)
+            return dst_layer, True
+
+    Replacer().process(network)

@@ -90,7 +90,7 @@ class SimpleNet(nn.Cell):
     def construct(self, x):
         return self.linear(x)
 
-
+#pylint: disable=w0223
 class SimpleNetworkHelper(NetworkHelper):
     """SimpleNetworkHelper"""
     def __init__(self, **kwargs):
@@ -529,13 +529,13 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     print(f"---------------- Testing params: {device} {mode} ", flush=True)
     context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
     if model_parallel == 1:
-        fp16_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_1p.yaml"
-        w8a8_config_path = "../../../data/test_llama2/run_llama2_13b_w8a8_910b_1p.yaml"
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
+        w8a8_config_path = "../../../data/test_llama2/predict_llama2_13b_w8a8_910b_1p.yaml"
         fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16-1decoder.ckpt"
         w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8-1decoder.ckpt"
     else:
-        fp16_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_2p.yaml"
-        w8a8_config_path = "../../../data/test_llama2/run_llama2_13b_w8a8_910b_2p.yaml"
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
+        w8a8_config_path = "../../../data/test_llama2/predict_llama2_13b_w8a8_910b_2p.yaml"
         fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
         w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8"
     cur_dir, _ = os.path.split(os.path.abspath(__file__))

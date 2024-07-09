@@ -19,10 +19,13 @@ import math
 import numpy as np
 from mindspore import dtype as mstype
 from mindspore import Tensor
+from mindspore_gs.common.validator import Validator
 from mindformers.models.modeling_utils import PreTrainedModel
 from mindformers.tools.register.config import MindFormerConfig
+from mindformers.models.llama import LlamaForCausalLM, LlamaModel
 from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
-from mindspore_gs.common.validator import Validator
+from mindformers.models.llama.llama_transformer import LLamaDecodeLayer, LLamaAttention
+from mindformers.models.llama.llama_layer import LlamaFeedForward
 from .network_helper import NetworkHelper
 
 
@@ -127,3 +130,34 @@ class MFLlama2Helper(MFNetworkHelper):
 
         block_tables, slot_mapping = MFLlama2Helper._get_pa_inputs(bs, seq, block_size, shape[1])
         return t_input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping
+
+    def get_decoder_layers(self, network: LlamaForCausalLM):
+        model: LlamaModel = network.model
+        return model.layers
+
+    # pylint: disable=protected-access
+    def offload_embedding(self, network: LlamaForCausalLM):
+        model: LlamaModel = network.model
+        model.casual_mask.lower_triangle_mask._offload()
+        model.tok_embeddings.embedding_weight._offload()
+
+    def get_linears(self, decoder_layer: LLamaDecodeLayer):
+        attention: LLamaAttention = decoder_layer.attention
+        if not isinstance(attention, LLamaAttention):
+            raise RuntimeError(f"Only support LLamaAttention as attention but got {attention}")
+        qkv_concat = attention.qkv_concat
+        ffn: LlamaFeedForward = decoder_layer.feed_forward
+        if not isinstance(ffn, LlamaFeedForward):
+            raise RuntimeError(f"Only support LlamaFeedForward as FFN but got {ffn}")
+        ffn_concat = ffn.ffn_concat
+        linears = []
+        if qkv_concat:
+            linears.extend([attention.w_qkv, attention.wo])
+        else:
+            linears.extend([attention.wq, attention.wk, attention.wv, attention.wo])
+
+        if ffn_concat:
+            linears.extend([ffn.w_gate_hidden, ffn.w2])
+        else:
+            linears.extend([ffn.w1, ffn.w3, ffn.w2])
+        return qkv_concat, ffn_concat, linears
