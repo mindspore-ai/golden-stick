@@ -114,7 +114,7 @@ class LinearQuant(PTQCell):
                     self._weight_quantizer, transpose_weight=self._linear.transpose_b,
                     dst_dtype=self._cast_dtype, strategy=
                     self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
-                                                False, self._linear.transpose_b)
+                                                False, is_transpose=self._linear.transpose_b)
                 )
                 self._quant_deployed = True
             else:
@@ -189,7 +189,7 @@ class LinearDeploy(PTQCell):
             transpose_weight=self._linear.transpose_b,
             dst_dtype=self._cast_dtype,
             strategy=self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
-                                                 False, self._linear.transpose_b)
+                                                 False, is_transpose=self._linear.transpose_b)
             )
 
     def weight_quantizer(self):
@@ -228,4 +228,3 @@ class LinearDeploy(PTQCell):
         x = F.cast(x, ori_dtype)
         output = P.Reshape()(x, out_shape)
         return output
-    
