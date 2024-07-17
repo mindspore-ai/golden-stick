@@ -2,6 +2,39 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 0.5.1 Release Notes
+
+### Major Features and Improvements
+
+### API Change
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+ccsszz, yyyyrf, hangangqiang
+
+Contributions of any kind are welcome!
+
+## MindSpore Golden Stick 0.5.0 Release Notes
+
+### Major Features and Improvements
+
+* Added post-training quantization W8A8 algorithm `SmoothQuant` mainly for Llama2 network.
+
+### API Change
+
+* Added `kwargs` to `apply` api of `CompAlgo` class as extensible parameter for subclasses.
+* Added `SmoothQuant` class as entry of SmoothQuant algorithm.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+ccsszz, yyyyrf, hangangqiang
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 0.4.1 Release Notes
 
 ### Major Features and Improvements
@@ -13,7 +46,7 @@
 
 Thanks goes to these wonderful people:
 
-changshaozhong, yourifan, hangangqiang
+ccsszz, yyyyrf, hangangqiang
 
 Contributions of any kind are welcome!
 
