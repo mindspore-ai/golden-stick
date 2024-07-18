@@ -15,13 +15,12 @@
 """RTNNetPolicy."""
 
 from mindformers.modules.layers import Linear
-from mindformers.modules.kvcache_mgr import KVCacheMgr
+from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindspore.rewrite import PatternEngine
 
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
-from .rtn_layer_policy import LinearLayerPolicy, KVCacheMgrPolicy
-
+from .rtn_layer_policy import LinearLayerPolicy, PagedAttentionMgrPolicy
 
 class RTNNetPolicy(NetPolicy):
     """
@@ -46,5 +45,5 @@ class RTNNetPolicy(NetPolicy):
         if self._config.weight_only:
             self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
         if self._config.enable_kvcache_int8:
-            self._layer_policy_map[KVCacheMgr] = KVCacheMgrPolicy([], [], self._config)
+            self._layer_policy_map[PagedAttentionMgr] = PagedAttentionMgrPolicy([], [], self._config)
         self._build = True

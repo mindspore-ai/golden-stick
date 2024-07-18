@@ -31,7 +31,7 @@ from mindspore_gs.ptq.convert_utils import QuantCell
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode, PTQApproach, BackendTarget
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from .rtn_net_policy import RTNNetPolicy
-from .quant_cells import LinearQuant
+from .quant_cells import LinearQuant, PagedAttentionQuant
 
 
 class RoundToNearest(CompAlgo):
@@ -88,6 +88,11 @@ class RoundToNearest(CompAlgo):
         """Create SimulatedQuantizationConfig."""
         self._config = PTQConfig()
 
+    @property
+    def config(self):
+        """get config."""
+        return self._config
+
     @staticmethod
     def _convert2list(name, value):
         if not isinstance(value, list) and not isinstance(value, tuple):
@@ -135,7 +140,7 @@ class RoundToNearest(CompAlgo):
         network.update_parameters_name()
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -181,6 +186,18 @@ class RoundToNearest(CompAlgo):
             bs = network_helper.get_spec("batch_size") if network_helper.get_spec("batch_size") else 1
             seq = network_helper.get_spec("seq_length") if network_helper.get_spec("seq_length") else 4096
             network(*(network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))))
+        if ds and self._config.enable_kvcache_int8:
+            if not network_helper:
+                raise ValueError("Please provide network_helper when datasets is given for calibrating.")
+            total_count = ds.get_dataset_size()
+            os.environ['NETWORK_PHASE'] = "kvcacheobs"
+            network.phase = "prefill_kvcacheobs"
+            data_count = 1
+            for _, ds_item in enumerate(ds.create_dict_iterator()):
+                logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+                input_ids = ds_item['input_ids'].asnumpy()
+                network_helper.generate(network, input_ids)
+                data_count += 1
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
@@ -221,7 +238,7 @@ class RoundToNearest(CompAlgo):
             if root is None:
                 return
             for _, cell in root.name_cells().items():
-                if isinstance(cell, LinearQuant):
+                if isinstance(cell, (LinearQuant, PagedAttentionQuant)):
                     cell.convert(self._config.backend, self._is_deploy)
                 else:
                     _convert(cell)

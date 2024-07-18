@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """ptq quant cells."""
+import copy
 import time
 import numpy as np
 from mindspore.ops import functional as F
@@ -20,6 +21,7 @@ from mindspore.ops import operations as P
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
+from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.common import logger
@@ -29,7 +31,8 @@ from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.convert_utils import (
     convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
-    convert_to_fusion_antiquant_for_deploy
+    convert_to_fusion_antiquant_for_deploy, convert_to_quant_for_deploy,
+    convert_to_antiquant_for_deploy
 )
 
 
@@ -228,3 +231,170 @@ class LinearDeploy(PTQCell):
         x = F.cast(x, ori_dtype)
         output = P.Reshape()(x, out_shape)
         return output
+
+class PagedAttentionQuant(PTQCell):
+    """Linear layer wrapper with min max"""
+
+    def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
+        super(PagedAttentionQuant, self).__init__(kvcache, policy)
+        self._kvcache = kvcache
+
+        # KVCacheMgr's shape is BSH currently.
+        n = kvcache.n_heads
+        d = kvcache.head_dim
+        key_fq_args = {}
+        value_fq_args = {}
+        self._key_strategy = None
+        self._value_strategy = None
+        self.key_t_scale = None
+        self.key_t_zp = None
+        self.value_t_scale = None
+        self.value_t_zp = None
+        perchannel_args = PerChannelArgs(n * d, 2, 3)
+
+        if "in_strategy" in kvcache.reshape_and_cache.get_attr_dict():
+            self._key_strategy = kvcache.reshape_and_cache.in_strategy[0]
+            self._value_strategy = kvcache.reshape_and_cache.in_strategy[1]
+            perchannel_args = PerChannelArgs(n * d * self._key_strategy[2], 2, 3)
+            key_fq_args["strategy"] = (kvcache.reshape_and_cache.in_strategy[0],)
+            value_fq_args["strategy"] = (kvcache.reshape_and_cache.in_strategy[1],)
+
+        self._key_input_quantizer = self._policy.get_input_quantizer(input_index=0, perchannel_args=perchannel_args,
+                                                                     **key_fq_args)
+        self._value_input_quantizer = self._policy.get_input_quantizer(input_index=1, perchannel_args=perchannel_args,
+                                                                       **value_fq_args)
+        self._weight_quantizer = None
+        prex = ""
+        for _, param in kvcache.parameters_and_names():
+            prex = param.name.rsplit(".", 1)[0]
+        if self._key_input_quantizer:
+            self._key_input_quantizer.float_min.data.name = prex + "_key_input_float_min"
+            self._key_input_quantizer.float_max.data.name = prex + "_key_input_float_max"
+        if self._value_input_quantizer:
+            self._value_input_quantizer.float_min.data.name = prex + "_value_input_float_min"
+            self._value_input_quantizer.float_max.data.name = prex + "_value_input_float_max"
+
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
+    def core_construct(self, *args):
+        pass
+
+    def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
+        if backend == BackendTarget.ASCEND:
+            self._key_input_quantizer = self._key_input_quantizer.convert_to_fakequantparam()
+            self._value_input_quantizer = self._value_input_quantizer.convert_to_fakequantparam()
+            self._key_input_quantizer = convert_to_quant(self._key_input_quantizer, self._key_strategy)
+            self._value_input_quantizer = convert_to_quant(self._value_input_quantizer, self._value_strategy)
+            self.key_t_scale = copy.deepcopy(self._key_input_quantizer.t_scale)
+            self.key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
+            self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
+            self.value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
+
+            self._kvcache.key_cache = Parameter(Tensor(np.zeros(self._kvcache.key_cache.shape), dtype=dtype.int8),
+                                                name=self._kvcache.key_cache.name, requires_grad=False)
+            self._kvcache.value_cache = Parameter(Tensor(np.zeros(self._kvcache.value_cache.shape), dtype=dtype.int8),
+                                                  name=self._kvcache.value_cache.name, requires_grad=False)
+        else:
+            raise ValueError("Only support convert PagedAttentionMgr to MS backend.")
+
+    def calibrate(self):
+        raise ValueError("Inner error, should not invoke PagedAttentionQuant.calibrate().")
+
+    # pylint: disable=W0221
+    def construct(self, key, value, slot_mapping):
+        """
+        Defines the computation of PagedAttentionQuant to be performed.
+
+        Returns:
+            Tensor, returns the computed result.
+        """
+        key = self._key_input_quantizer(key)
+        value = self._value_input_quantizer(value)
+        return self._kvcache.reshape_and_cache(key, value, self._kvcache.key_cache, self._kvcache.value_cache,
+                                               slot_mapping)
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        return self._kvcache.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache, block_tables,
+                                             batch_valid_length)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        return self._kvcache.paged_attention_with_alibi(query, self._kvcache.key_cache, self._kvcache.value_cache,
+                                                        block_tables, batch_valid_length, alibi_tensor)
+
+class PagedAttentionDeploy(PTQCell):
+    """Linear layer wrapper with min max"""
+
+    def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
+        super(PagedAttentionDeploy, self).__init__(kvcache, policy)
+        self._kvcache = kvcache
+
+        # KVCacheMgr's shape is BSH currently.
+        n = kvcache.n_heads
+        d = kvcache.head_dim
+        self._key_in_strategy = None
+        self._value_in_strategy = None
+        self._key_out_strategy = None
+        self._value_out_strategy = None
+
+        ic = n * d
+        if "in_strategy" in kvcache.reshape_and_cache.get_attr_dict():
+            self._key_in_strategy = kvcache.reshape_and_cache.in_strategy[0]
+            self._value_in_strategy = kvcache.reshape_and_cache.in_strategy[1]
+            ic = n * d * self._key_in_strategy[2]
+            self._key_out_strategy = kvcache.reshape_and_cache.in_strategy[2]
+            self._value_out_strategy = kvcache.reshape_and_cache.in_strategy[3]
+
+        self._key_input_quantizer = convert_to_quant_for_deploy(ic, self._key_in_strategy)
+        self._value_input_quantizer = convert_to_quant_for_deploy(ic, self._value_in_strategy)
+        self._weight_quantizer = None
+        self.key_t_scale = copy.deepcopy(self._key_input_quantizer.t_scale)
+        self.key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
+        self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
+        self.value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
+        dst_type = self._kvcache.key_cache.dtype
+        self._key_output_quantizer = convert_to_antiquant_for_deploy(n * self._key_in_strategy[2], d,
+                                                                     self._key_out_strategy, dst_type)
+        self._value_output_quantizer = convert_to_antiquant_for_deploy(n * self._key_in_strategy[2], d,
+                                                                       self._value_out_strategy, dst_type)
+        self._kvcache.key_cache = Parameter(Tensor(np.zeros(self._kvcache.key_cache.shape), dtype=dtype.int8),
+                                            name=self._kvcache.key_cache.name, requires_grad=False)
+        self._kvcache.value_cache = Parameter(Tensor(np.zeros(self._kvcache.value_cache.shape), dtype=dtype.int8),
+                                              name=self._kvcache.value_cache.name, requires_grad=False)
+
+
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
+    def core_construct(self, *args):
+        pass
+
+    def calibrate(self):
+        raise ValueError("Inner error, should not invoke PagedAttentionDeploy.calibrate().")
+
+    # pylint: disable=W0221
+    def construct(self, key, value, slot_mapping):
+        """
+        Defines the computation of PagedAttentionQuant to be performed.
+
+        Returns:
+            Tensor, returns the computed result.
+        """
+        key = self._key_input_quantizer(key)
+        value = self._value_input_quantizer(value)
+        return self._kvcache.reshape_and_cache(key, value, self._kvcache.key_cache, self._kvcache.value_cache,
+                                               slot_mapping)
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        kcache = self._key_output_quantizer(self._kvcache.key_cache, self.key_t_zp, self.key_t_scale)
+        vcache = self._value_output_quantizer(self._kvcache.value_cache, self.value_t_zp, self.value_t_scale)
+        return self._kvcache.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        kcache = self._key_output_quantizer(self._kvcache.key_cache, self.key_t_zp, self.key_t_scale)
+        vcache = self._value_output_quantizer(self._kvcache.value_cache, self.value_t_zp, self.value_t_scale)
+        return self.paged_attention_with_alibi(query, kcache, vcache, block_tables, batch_valid_length, alibi_tensor)

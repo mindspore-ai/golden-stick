@@ -20,7 +20,7 @@ from mindspore import Parameter, Tensor, dtype, context, JitConfig
 from mindspore.nn import Cell
 from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
-from mindspore.ops.operations._inner_ops import AntiQuant, Dequant
+from mindspore.ops.operations._inner_ops import Dequant
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
@@ -33,33 +33,31 @@ from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 
 class AntiQuantCell(Cell):
     """AntiQuantCell, warp AntiQuant to support per-channel AntiQuant."""
-    def __init__(self, scale: list, zp: list, dst_dtype=dtype.float16, sqrt_mode=False):
+    def __init__(self, n: int, d: int, dst_dtype=dtype.float16):
         super().__init__()
         self.outdtype = dst_dtype
-        self.scale = Parameter(Tensor(scale, dtype=self.outdtype))
-        self.zp_neg = Parameter(Tensor(np.array(zp) * -1, dtype=self.outdtype))
-        self.anti_quant = AntiQuant(sqrt_mode)
-        self.mul = msops.Mul()
-        self.add = msops.Add()
+        self.div = msops.Div()
+        self.sub = msops.Sub()
         self.cast = msops.Cast()
-        self.scale1 = Parameter(Tensor(1., dtype=self.outdtype), requires_grad=False)
-        self.zp0 = Parameter(Tensor(0., dtype=self.outdtype), requires_grad=False)
+        self.reshape = msops.Reshape()
+        self._pre_shape = (n, d)
 
-    def construct(self, x):
+    def construct(self, x, zp, scale):
         """forward for antiquant"""
-        x = self.anti_quant(x, self.scale1, self.zp0)
+        scale = self.reshape(scale, self._pre_shape)
+        zp = self.reshape(zp, self._pre_shape)
         x = self.cast(x, self.outdtype)
-        x = self.add(x, self.zp_neg)
-        x = self.mul(x, self.scale)
+        x = self.sub(x, zp)
+        x = self.div(x, scale)
         x = self.cast(x, self.outdtype)
         return x
 
     def shard(self, strategy):
         """shard strategy for anti quant"""
-        self.anti_quant.shard(strategy)
+        self.sub.shard((strategy, (strategy[-2], strategy[-1],)))
+        self.div.shard((strategy, (strategy[-2], strategy[-1],)))
 
-
-def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=None) -> AntiQuantCell:
+def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
     fq: FakeQuantParam = fqcell.fq
     if not isinstance(fq, FakeQuantParam):
@@ -70,16 +68,17 @@ def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=No
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    if not dst_dtype:
-        if context.get_context("device_target") == "Ascend":
-            dst_dtype = dtype.float16
-        else:
-            dst_dtype = dtype.float32
     anti_quant = AntiQuantCell(scale, zp, dst_dtype=dst_dtype)
     if strategy is not None:
         anti_quant.shard(strategy)
     return anti_quant
 
+def convert_to_antiquant_for_deploy(n, d, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
+    """Convert to AntiQuantCell For deploy."""
+    anti_quant = AntiQuantCell(n, d, dst_dtype)
+    if strategy is not None:
+        anti_quant.shard(strategy)
+    return anti_quant
 
 class QuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
@@ -109,10 +108,20 @@ class QuantCell(Cell):
 
     def shard(self, strategy):
         """shard strategy for quant cell"""
-        self.mul.shard((strategy[0], (1,)))
-        self.add.shard((strategy[0], (1,)))
-        self.round.shard(strategy)
-        self.cast.shard(strategy)
+        self.mul.shard((strategy, (strategy[-1],)))
+        self.add.shard((strategy, (strategy[-1],)))
+        self.round.shard((strategy,))
+        self.cast.shard((strategy,))
+
+def convert_to_quant_for_deploy(ic, strategy=None) -> QuantCell:
+    """Convert to Quant for deploy."""
+    scale = np.ones([ic], dtype=np.float16)
+    zp = np.ones([ic], dtype=np.float16)
+    quant_min, quant_max = get_quant_min_max()
+    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float16), Tensor(zp, dtype=dtype.float16), quant_min, quant_max)
+    if strategy is not None:
+        quant_cell.shard(strategy)
+    return quant_cell
 
 
 def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
@@ -130,7 +139,7 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
         num_bits=fq.attrs[LinearFakeQuantizer.attr_key_num_bits],
         signed=fq.attrs[LinearFakeQuantizer.attr_key_signed],
         narrow_range=fq.attrs[LinearFakeQuantizer.attr_key_narrow_range])
-    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float32), Tensor(zp, dtype=dtype.float32), quant_min, quant_max)
+    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float16), Tensor(zp, dtype=dtype.float16), quant_min, quant_max)
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell

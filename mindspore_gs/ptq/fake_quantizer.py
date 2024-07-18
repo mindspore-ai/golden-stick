@@ -138,8 +138,6 @@ class MinMaxPerChannel(LinearFakeQuantizer):
             raise ValueError("Not support narrow_range now.")
         if self._quant_dtype != QuantDtype.INT8:
             raise ValueError("Only support quant to int8 now.")
-        if self._data_rank > 2:
-            raise ValueError("Only support data rank less than or equal to 2 now.")
         self._signed = quant_dtype == QuantDtype.INT8
         self.float_min = Parameter(Tensor(np.array([float("inf")] * output_channel), mstype.float32),
                                    name="float_min")
@@ -165,16 +163,14 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         if axis < 0:
             axis += data_rank
         self.axis = axis
-        perm_shape = [axis]
+        self.min_max_axis = []
         for i in range(data_rank):
             if i != axis:
-                perm_shape.append(i)
-        self._perm_shape = tuple(perm_shape)
+                self.min_max_axis.append(i)
 
         pre_dims = axis
         post_dims = data_rank - axis - 1
         self._param_shape = [1] * pre_dims + [-1] + [1] * post_dims
-        self.min_max_axis = 0 if self.axis else 1
 
     def foo_init(self):
         self.float_min = Parameter(initializer('ones', self.float_min.shape, self.float_min.dtype),
