@@ -21,9 +21,9 @@ import os
 import pathlib
 import numpy as np
 from mindspore import dtype, Tensor
-from mindspore import log as logger
 import mindspore.dataset.transforms as C
 from mindspore.dataset import GeneratorDataset
+from mindspore_gs.common import logger
 
 
 class BoolQDataset(GeneratorDataset):

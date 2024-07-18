@@ -16,7 +16,7 @@
 define the head pruner factory class
 """
 
-from mindspore_gs.validator import Validator
+from mindspore_gs.common import Validator
 from .lrp.bert.head_pruner_bert import HeadPrunerBertLRP
 from .lrp.gpt.head_pruner_gpt import HeadPrunerGPTLRP
 from .type import PruningType

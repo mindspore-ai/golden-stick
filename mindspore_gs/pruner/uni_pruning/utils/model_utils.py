@@ -16,8 +16,8 @@
 import os
 import json
 import numpy as np
-from mindspore import log as logger
 from mindspore import nn, float32 as ms_f32, Tensor, load, export, save_checkpoint
+from mindspore_gs.common import logger
 
 
 def get_model_size(groups, layer_mask):

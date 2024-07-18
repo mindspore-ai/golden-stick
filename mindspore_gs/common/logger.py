@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick MinMaxPTQ Algorithm.
-"""
+""" logger for golden-stick """
 
-from .gs_enum import BackendTarget
-from .logger import logger
-from .validator import Validator, Rel
+# pylint: disable=unused-import
+from mindspore import log as logger

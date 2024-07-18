@@ -18,8 +18,8 @@ MindSpore golden stick simulated-quantization ops FakeQuantPerLayerGrad.
 import os
 
 from mindspore.ops import DataType
-from mindspore import log as logger
-from mindspore_gs.validator import Validator as validator
+from mindspore_gs.common import Validator as validator
+from mindspore_gs.common import logger
 from mindspore_gs.ops import GSCustom, custom_op_attr_register
 
 

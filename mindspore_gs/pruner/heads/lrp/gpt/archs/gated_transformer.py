@@ -31,7 +31,6 @@ from mindspore.ops import operations as P
 from mindspore.ops import functional as F
 from mindspore.nn.cell import Cell
 from mindspore import _checkparam as Validator
-from mindspore import log as logger
 from mindspore.parallel._utils import _get_parallel_mode
 from mindspore.context import ParallelMode
 from mindspore.log import _LogActionOnce
@@ -43,6 +42,7 @@ from mindspore.parallel._transformer.op_parallel_config import default_dpmp_conf
 from mindspore.parallel._transformer.moe import default_moe_config, MoE, _check_moe_config
 
 from mindspore_gs.pruner.heads.lrp.utils import ConcreteGate
+from mindspore_gs.common import logger
 
 __all__ = [
     "AttentionMask",

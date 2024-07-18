@@ -23,7 +23,7 @@ from mindspore.train.callback import Callback
 from mindspore import Tensor
 from mindspore.ops import constexpr
 from mindspore import Parameter
-from mindspore_gs.validator import Validator, Rel
+from mindspore_gs.common import Validator, Rel
 from ...comp_algo import CompAlgo, CompAlgoConfig
 
 

@@ -18,7 +18,7 @@ definition of pruner abstract class
 from abc import ABC, abstractmethod
 from mindspore.nn import Cell
 from mindspore_gs import CompAlgo
-from mindspore_gs.validator import Validator
+from mindspore_gs.common import Validator
 
 
 class AbstractHeadPruner(CompAlgo, ABC):

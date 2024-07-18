@@ -20,13 +20,13 @@ import numpy as np
 
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
-from mindspore import log as logger
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig
 from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
 from mindspore_gs.common.register import cell_type_dicts
+from mindspore_gs.common import logger
 from mindspore_gs.ptq.smooth_quant.sq_net_policy import SQNetPolicy
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 
@@ -105,11 +105,7 @@ class SmoothQuant(CompAlgo):
         if ds:
             if not network_helper:
                 raise ValueError("Please provide network_helper when datasets is given for calibrating.")
-            ds_count = kwargs.get("ds_count", None)
-            if ds_count:
-                ds_count = int(ds_count)
             total_count = ds.get_dataset_size()
-            total_count = ds_count if ds_count and ds_count < total_count else total_count
             os.environ['NETWORK_PHASE'] = "actobs"
             network.phase = "prefill_actobs"
             data_count = 1
@@ -117,8 +113,6 @@ class SmoothQuant(CompAlgo):
                 logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
                 input_ids = ds_item['input_ids'].asnumpy()
                 network_helper.generate(network, input_ids, max_new_tokens=1)
-                if data_count >= total_count:
-                    break
                 data_count += 1
         insert_weight_observer_and_quant(network)
         network.update_parameters_name()
@@ -137,8 +131,6 @@ class SmoothQuant(CompAlgo):
                 logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
                 input_ids = ds_item['input_ids'].asnumpy()
                 network_helper.generate(network, input_ids, max_new_tokens=1)
-                if data_count >= total_count:
-                    break
                 data_count += 1
         return network
 

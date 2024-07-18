@@ -27,11 +27,11 @@ from mindspore.train.callback import ModelCheckpoint, CheckpointConfig, TimeMoni
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.train.train_thor import ConvertModelUtils
 from mindspore.nn.optim import Lamb, Momentum, AdamWeightDecay, thor
-from mindspore import log as logger
 from mindspore.common import set_seed
 from mindspore_gs.pruner.heads.lrp.bert.samples.bert_pretrain_gates_sample import BertPreTrainingForGates
 from mindspore_gs.pruner.heads import PruningType, HeadPruningFactory
 from mindspore_gs.pruner.heads.supported import SupportedModels
+from mindspore_gs.common import logger
 
 from official.nlp.Bert.src.dataset import create_bert_dataset, create_eval_dataset
 
