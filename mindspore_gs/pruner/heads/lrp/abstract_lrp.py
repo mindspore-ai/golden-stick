@@ -18,7 +18,7 @@ import random
 from abc import ABC, abstractmethod
 from mindspore import save_checkpoint
 from mindspore.nn import Cell
-from mindspore_gs.validator import Validator
+from mindspore_gs.common import Validator
 from ..abstract import AbstractHeadPruner
 
 

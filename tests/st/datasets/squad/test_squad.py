@@ -42,6 +42,10 @@ def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
         assert input_ids.dtype == dtype.int32
         assert labels.dtype == dtype.int32
 
+    n_samples = 3
+    ds = create_squad_dataset(ds_path, "eval", bs, seq_length, tokenizer, repeat=repeat, n_samples=n_samples)
+    assert ds.get_dataset_size() == n_samples // bs * repeat
+
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -55,8 +59,8 @@ def test_squad(device):
     """
     context.set_context(device_target=device)
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    wiki_ds = os. path.join(cur_dir, "../../../data/squad-dataset/dev-v1.1.json")
+    squad_ds = os. path.join(cur_dir, "../../../data/squad-dataset/dev-v1.1.json")
     vocab_file = os. path.join(cur_dir, "../../../data/llama2-tokenizer.model")
-    check_ds(wiki_ds, 1, 500, vocab_file, 1)
-    check_ds(wiki_ds, 2, 501, vocab_file, 1)
-    check_ds(wiki_ds, 1, 502, vocab_file, 2)
+    check_ds(squad_ds, 1, 500, vocab_file, 1)
+    check_ds(squad_ds, 2, 501, vocab_file, 1)
+    check_ds(squad_ds, 1, 502, vocab_file, 2)

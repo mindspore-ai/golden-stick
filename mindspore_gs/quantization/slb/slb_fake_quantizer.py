@@ -23,10 +23,11 @@ import mindspore.context as context
 from mindspore.ops.operations import _quant_ops as Q
 from mindspore.common.parameter import Parameter
 from mindspore.common.tensor import Tensor
+from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
 from mindspore.ops.operations._quant_ops import FakeQuantParam
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs.validator import Validator
+from mindspore_gs.common import Validator
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer, LinearFakeQuantizer
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params
 
@@ -160,6 +161,12 @@ class SlbActQuantizer(LinearFakeQuantizer):
                                     name="float_min", requires_grad=False)
         self._float_max = Parameter(Tensor(np.array([6]).astype(np.float32), mindspore.float32),
                                     name="float_max", requires_grad=False)
+
+    def foo_init(self):
+        self.float_min = Parameter(initializer('ones', self.float_min.shape, self.float_min.dtype),
+                                   name=self.float_min.name)
+        self.float_max = Parameter(initializer('ones', self.float_max.shape, self.float_max.dtype),
+                                   name=self.float_max.name)
 
     def _init_fake_quant_func(self, quant_func):
         """

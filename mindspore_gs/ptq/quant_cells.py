@@ -17,11 +17,11 @@ import abc
 import numpy as np
 from mindspore.ops import operations as P
 from mindspore.ops.operations import FakeQuantParam
-from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
 from mindformers.modules.kvcache_mgr import KVCacheMgr
 
 from mindspore_gs.common.gs_enum import BackendTarget
+from mindspore_gs.common import logger
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs

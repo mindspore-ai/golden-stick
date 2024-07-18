@@ -17,12 +17,12 @@ import time
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
-from mindspore import log as logger
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
 
 from mindspore_gs.common.gs_enum import BackendTarget
+from mindspore_gs.common import logger
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs

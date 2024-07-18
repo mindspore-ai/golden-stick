@@ -25,15 +25,16 @@ from mindspore import ops
 from mindspore.train.metrics import Perplexity
 from mindspore.communication import get_rank
 from mindspore_gs.datasets import create_wikitext_dataset
-from networks import NetworkRegister, BaseNetwork
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from llama2 import Llama2Network
 
 
-def evaluate(net, dataset_path, config_, net_helper: BaseNetwork):
+def evaluate(net, dataset_path, config_, tokenizer_):
     """evaluate."""
     bs_ = config_.model.model_config.batch_size
     seq_ = config_.model.model_config.seq_length
-    tokenizer = net_helper.create_tokenizer(config_.processor.tokenizer.vocab_file)
-    ds = create_wikitext_dataset(dataset_path, bs_, seq_, 1, tokenizer)
+    net_helper = MFLlama2Helper(config_)
+    ds = create_wikitext_dataset(dataset_path, bs_, seq_, 1, tokenizer_)
     metric = Perplexity()
     data_count = 0
     total_count = ds.get_dataset_size()
@@ -41,7 +42,7 @@ def evaluate(net, dataset_path, config_, net_helper: BaseNetwork):
         data_count += 1
         logger.info(f"Dataset count: {data_count}/{total_count}")
         input_ids = ds_item['input_ids'].asnumpy()
-        net_inputs = net_helper.assemble_inputs(input_ids, config_)
+        net_inputs = net_helper.assemble_inputs(input_ids)
         output = net(*net_inputs)
         output = ops.squeeze(output)[:-1, :]
         label = input_ids[:, 1:]
@@ -64,7 +65,7 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     print('------------------------- Creating network...', flush=True)
-    net_mgr: BaseNetwork = NetworkRegister.instance().from_config(uargs.config_path)
+    net_mgr: Llama2Network = Llama2Network()
     config = net_mgr.create_mfconfig(uargs.config_path)
     network = net_mgr.create_network(config)
     network.set_train(False)
@@ -88,4 +89,5 @@ if __name__ == "__main__":
     logger.info(f'Loading ckpt :{ckpt_path}.')
     ms.load_checkpoint(ckpt_path, network)
     logger.info(f'Load ckpt cost time is {time.time() - start} s.')
-    evaluate(network, uargs.dataset_path, config, net_mgr)
+    tokenizer = net_mgr.create_tokenizer(config.processor.tokenizer.vocab_file)
+    evaluate(network, uargs.dataset_path, config, tokenizer)

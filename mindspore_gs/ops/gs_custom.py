@@ -22,8 +22,8 @@ import enum
 from typing import Union
 
 from mindspore.ops import Custom, DataType, CustomRegOp
-from mindspore import log as logger
 from mindspore import context
+from mindspore_gs.common import logger
 
 
 class AttrValueType(enum.Enum):

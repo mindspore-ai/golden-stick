@@ -24,10 +24,10 @@ from mindspore import log as logger
 from mindspore import Model
 from mindspore.communication import get_rank
 from mindspore_gs.datasets import create_squad_dataset
-from networks import NetworkRegister, BaseNetwork
+from llama2 import Llama2Network
 
 
-def evaluate(net, dataset_path, cfg, net_helper: BaseNetwork):
+def evaluate(net, dataset_path, cfg, net_helper: Llama2Network):
     """evaluate `net` with dataset from `dataset_path`."""
     top_k = cfg.model.model_config.top_k
     top_p = cfg.model.model_config.top_p
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     print('------------------------- Creating network...', flush=True)
-    net_mgr: BaseNetwork = NetworkRegister.instance().from_config(uargs.config_path)
+    net_mgr: Llama2Network = Llama2Network()
     config = net_mgr.create_mfconfig(uargs.config_path)
     network = net_mgr.create_network(config)
     network.set_train(False)

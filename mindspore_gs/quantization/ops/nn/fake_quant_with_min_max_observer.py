@@ -29,7 +29,7 @@ from mindspore.common.tensor import Tensor
 from mindspore.common.dtype import QuantDtype
 from mindspore.nn.cell import Cell
 from mindspore.ops.operations import _quant_ops as Q
-from mindspore_gs.validator import Validator
+from mindspore_gs.common import Validator
 from mindspore_gs.quantization.quant_utils import get_quant_dtype_num_bits
 
 

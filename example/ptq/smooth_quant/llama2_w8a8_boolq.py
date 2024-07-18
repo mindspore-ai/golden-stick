@@ -26,10 +26,10 @@ import mindspore.common.dtype as mstype
 from mindspore.common.tensor import Tensor
 from mindspore_gs.datasets import create_boolq_dataset
 from mindformers.generation.text_generator import GenerationMixin
-from networks import NetworkRegister, BaseNetwork
+from llama2 import Llama2Network
 
 
-def evaluate(net, dataset_path, cfg, net_helper: BaseNetwork):
+def evaluate(net, dataset_path, cfg, net_helper: Llama2Network):
     """evaluate `net` with dataset from `dataset_path`."""
     batch_size = cfg.model.model_config.batch_size
     seq_length = cfg.model.model_config.seq_length
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     print('------------------------- Creating network...', flush=True)
-    net_mgr: BaseNetwork = NetworkRegister.instance().from_config(uargs.config_path)
+    net_mgr: Llama2Network = Llama2Network()
     config = net_mgr.create_mfconfig(uargs.config_path)
     config.model.model_config.use_past = False
     network = net_mgr.create_network(config)
