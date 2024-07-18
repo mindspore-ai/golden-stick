@@ -17,15 +17,14 @@
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
-from mindspore import Parameter, Tensor, dtype
+from mindspore import Parameter, Tensor, dtype, context
 from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
 
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data, quant_bias_data
+from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
-from mindspore_gs.ptq.ptq_config import PTQMode
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.convert_utils import (
     convert_to_dequant_bmm_for_deploy, convert_to_dequant_bmm, convert_to_smooth_quant_for_deploy,
@@ -298,17 +297,9 @@ class SQLinearWrapper(PTQCell):
             self._input_quantizer.float_min.data.name = prex + "_input_float_min"
             self._input_quantizer.float_max.data.name = prex + "_input_float_max"
 
-        mode = self.cfg.mode
-        self._is_deploy = mode == PTQMode.DEPLOY
         self._alpha = self.cfg.algo_args.get('alpha', None)
         if self._alpha is None:
             self._alpha = 0.5
-        if self._is_deploy:
-            self._handler.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8),
-                                             name=linear.weight.name)
-            if linear.has_bias:
-                self._handler.bias = Parameter(initializer("ones", linear.bias.shape, dtype.int32),
-                                               name=linear.bias.name)
         self._expand = P.ExpandDims()
         self._act_mul = P.Mul()
         self._weight_mul = P.Mul()
@@ -349,6 +340,28 @@ class SQLinearWrapper(PTQCell):
         if act_strategy[1] == 1 and weight_strategy_0 == 1:
             return 1
         raise RuntimeError(f"Invalid in_strategy for matmul: {self._handler.matmul.in_strategy}.")
+
+    def _is_gen_bias_need_allreduce(self):
+        """
+         matmul may have four kind of in_strategy: (1,m)(m,1);(m,1)(1,1);(1,1)(1,m);(1,1)(1,1). We can find that
+         (1,m)(m,1) will add allreduce after matmul, (m,1)(1,1) and (1,1)(1,m) will add allgather after matmul.
+         (1,1)(1,1) will not add any operation after matmul.
+        """
+
+        if "in_strategy" not in self._handler.matmul.get_attr_dict():
+            return False
+        if self._handler.matmul.in_strategy is None:
+            return False
+        act_strategy = self._handler.matmul.in_strategy[0]
+        weight_strategy = self._handler.matmul.in_strategy[1]
+        weight_strategy_0 = weight_strategy[1] if self._handler.transpose_b else weight_strategy[0]
+        weight_strategy_1 = weight_strategy[0] if self._handler.transpose_b else weight_strategy[1]
+        # allreduce
+        if act_strategy[0] == 1 and act_strategy[1] != 1 and weight_strategy_0 != 1 and weight_strategy_1 == 1:
+            if act_strategy[1] != weight_strategy_0:
+                raise RuntimeError(f"Invalid in_strategy for matmul: {self._handler.matmul.in_strategy}.")
+            return True
+        return False
 
     def shard(self):
         """
@@ -402,70 +415,65 @@ class SQLinearWrapper(PTQCell):
         return self._weight_quantizer
 
     def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
-        if not self._is_deploy:
-            self._adjust_parameter()
+        parallel_mode_store = context.get_auto_parallel_context('parallel_mode')
+        mode_store = context.get_context('mode')
+        context.set_auto_parallel_context(parallel_mode=context.ParallelMode.AUTO_PARALLEL)
+        context.set_context(mode=context.PYNATIVE_MODE)
+        self._adjust_parameter()
 
         if self.cfg.backend == BackendTarget.ASCEND:
             # quant weight to int8, bias to int32
             self._input_quantizer = self._input_quantizer.convert_to_fakequantparam()
             self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
-            weight_quant = None
-            bias_quant = None
-            bias_name = self._handler.weight.name + "_bias"
-            if not self._is_deploy:
-                weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
-                if hasattr(self._handler, "dtype"):
-                    weight = self._handler.cast(self._handler.weight, self._handler.dtype)
-                else:
-                    weight = self._handler.weight
-                quant_min, quant_max = get_quant_min_max(
-                    num_bits=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
-                    signed=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_signed],
-                    narrow_range=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
-                scale = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale])
-                zp = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point])
-                if not self._handler.transpose_b:
-                    scale = scale.transpose()
-                    zp = zp.transpose()
-                weight_quant = quant_tensor_data(weight, scale, zp, quant_min, quant_max,
-                                                 self._weight_axis)
-                self._handler.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8), name=self._handler.weight.name)
-                input_quantizer = self._input_quantizer.fq
-                act_scale = np.array(input_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale])
-                dequant_scale = scale * act_scale
-                if self._handler.has_bias:
-                    bias_quant = quant_bias_data(self._handler.bias, dequant_scale)
-                    bias_name = self._handler.bias.name
-                    self._handler.bias = Parameter(bias_quant, name=bias_name)
-            param_bias_quant = bias_quant.asnumpy() if bias_quant is not None else None
-            if param_bias_quant is not None:
-                bn = self._get_bias_reduce_num()
-                # refer to docstring of _get_bias_reduce_num for the reason of this divide operation.
-                param_bias_quant = param_bias_quant / bn
+
+            weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
+            if hasattr(self._handler, "dtype"):
+                weight = self._handler.cast(self._handler.weight, self._handler.dtype)
+            else:
+                weight = self._handler.weight
+            quant_min, quant_max = get_quant_min_max(
+                num_bits=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
+                signed=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_signed],
+                narrow_range=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
+            scale = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale])
+            zp = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point])
+            if not self._handler.transpose_b:
+                scale = scale.transpose()
+                zp = zp.transpose()
+            weight_quant = quant_tensor_data(weight, scale, zp, quant_min, quant_max,
+                                             self._weight_axis)
+            self._handler.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8), name=self._handler.weight.name)
+            new_bias_need_allreduce = self._is_gen_bias_need_allreduce()
             self._output_quantizer, bias = convert_to_dequant_bmm(self._input_quantizer,
                                                                   self._weight_quantizer,
                                                                   weight_quant,
-                                                                  param_bias_quant,
                                                                   dst_dtype=self._handler.dtype,
                                                                   transpose_a=False,
                                                                   transpose_b=self._handler.transpose_b,
+                                                                  new_bias_need_allreduce=new_bias_need_allreduce,
                                                                   strategy=self.antiquant_bmm_strategy(
                                                                       act_strategy=self._act_strategy,
                                                                       weight_strategy=self._weight_strategy,
-                                                                      has_bias=True,  # offset correct by bias
+                                                                      has_bias=False,
                                                                       has_offset=False,
                                                                       is_transpose=self._handler.transpose_b))
-            self._handler.has_bias = True
-            if bias is not None:
-                self._handler.bias = Parameter(Tensor(bias, dtype=dtype.int32), name=bias_name)
+            if self._handler.has_bias:
+                bias = Tensor((bias.asnumpy() + self._handler.bias.asnumpy()), self._handler.dtype)
+                bias_name = self._handler.bias.name
             else:
-                bias_shape = [self._handler.weight.shape[0] if self._handler.transpose_b else
-                              self._handler.weight.shape[1]]
-                self._handler.bias = Parameter(initializer('ones', bias_shape, dtype=dtype.int32), name=bias_name)
+                bias_name = self._handler.weight.name + "_bias"
+                self._handler.bias_add = P.Add()
+                if "in_strategy" in self._handler.matmul.get_attr_dict():
+                    weight_out_strategy = self._weight_out_strategy(self._weight_strategy, self._handler.transpose_b)
+                    self._handler.bias_add.shard(((self._act_strategy[0], weight_out_strategy[0]), weight_out_strategy))
+            self._handler.bias = Parameter(bias.astype(self._handler.dtype), name=bias_name)
+            self._handler.has_bias = True
             iq_strategy = (self._act_strategy,) if self._act_strategy else None
             self._input_quantizer = convert_to_smooth_quant(self._input_quantizer,
                                                             self._weight_observer_cell.scale_store,
                                                             strategy=iq_strategy)
+            context.set_context(mode=mode_store)
+            context.set_auto_parallel_context(parallel_mode=parallel_mode_store)
 
     def calibrate(self):
         if hasattr(self._handler, "dtype"):
@@ -495,23 +503,15 @@ class SQLinearWrapper(PTQCell):
                 x = P.Reshape()(x, (self._handler.outer_batch, self._handler.expert_num, -1, self._handler.in_channels))
         ori_dtype = F.dtype(x)
 
-        if self._is_deploy:
-            x = self._input_quantizer(x)
-            # (matmul(x, int8_weight) + int32_bias) * dequant_scale
-            bias = None
-            if self._handler.has_bias:
-                bias = self._handler.bias
-            x = self._output_quantizer(x, self._handler.weight, bias)
-        else:
-            weight = self._handler.cast(self._handler.weight, self._handler.dtype)
-            x = self._handler.cast(x, self._handler.dtype)
-            x = self._act_mul(x, self._div(1.0, self._weight_observer_cell.scale_store))
-            x = self._input_quantizer(x)
-            x = self._act_mul(x, self._weight_observer_cell.scale_store)
-            x = self._handler.cast(x, self._handler.dtype)
-            x = self._handler.matmul(x, weight)
-            if self._handler.has_bias:
-                x = self._handler.bias_add(x, self._handler.cast(self._handler.bias, self._handler.dtype))
+        weight = self._handler.cast(self._handler.weight, self._handler.dtype)
+        x = self._handler.cast(x, self._handler.dtype)
+        x = self._act_mul(x, self._div(1.0, self._weight_observer_cell.scale_store))
+        x = self._input_quantizer(x)
+        x = self._act_mul(x, self._weight_observer_cell.scale_store)
+        x = self._handler.cast(x, self._handler.dtype)
+        x = self._handler.matmul(x, weight)
+        if self._handler.has_bias:
+            x = self._handler.bias_add(x, self._handler.cast(self._handler.bias, self._handler.dtype))
         if self._handler.activation_flag:
             x = self._handler.activation(x)
         x = F.cast(x, ori_dtype)
@@ -542,17 +542,22 @@ class SQLinearDeploy(PTQCell):
 
         self._handler.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
         if linear.has_bias:
-            self._handler.bias = Parameter(initializer("ones", linear.bias.shape, dtype.int32), name=linear.bias.name)
+            self._handler.bias = Parameter(initializer("ones", linear.bias.shape, linear.dtype),
+                                           name=linear.bias.name)
         else:
             linear.has_bias = True
             bias_shape = [linear.weight.shape[0] if linear.transpose_b else linear.weight.shape[1]]
             bias_name = linear.weight.name + "_bias"
-            self._handler.bias = Parameter(initializer('ones', bias_shape, dtype=dtype.int32), name=bias_name)
+            self._handler.bias = Parameter(initializer('ones', bias_shape, linear.dtype), name=bias_name)
+            self._handler.bias_add = P.Add()
+            if "in_strategy" in linear.matmul.get_attr_dict():
+                weight_out_strategy = self._weight_out_strategy(self._weight_strategy, self._handler.transpose_b)
+                self._handler.bias_add.shard(((self._act_strategy[0], weight_out_strategy[0]), weight_out_strategy))
         iq_strategy = (self._act_strategy,) if self._act_strategy else None
         self._input_quantizer = convert_to_smooth_quant_for_deploy(ic, strategy=iq_strategy)
         oq_strategy = self.antiquant_bmm_strategy(act_strategy=self._act_strategy,
                                                   weight_strategy=self._weight_strategy,
-                                                  has_bias=True,  # offset correct by bias
+                                                  has_bias=False,
                                                   has_offset=False, is_transpose=linear.transpose_b)
         self._output_quantizer = convert_to_dequant_bmm_for_deploy(oc, dst_dtype=linear.dtype,
                                                                    transpose_b=linear.transpose_b,
@@ -560,6 +565,12 @@ class SQLinearDeploy(PTQCell):
 
     def weight_quantizer(self):
         raise RuntimeError("Inner error, should not invoke SQLinearDeploy.weight_quantizer().")
+
+    @staticmethod
+    def _weight_out_strategy(strategy, is_transpose):
+        if is_transpose:
+            return (strategy[0],)
+        return (strategy[1],)
 
     def calibrate(self):
         raise RuntimeError("Inner error, should not invoke SQLinearDeploy.calibrate().")
@@ -586,10 +597,9 @@ class SQLinearDeploy(PTQCell):
             else:
                 x = P.Reshape()(x, (self._handler.outer_batch, self._handler.expert_num, -1, self._handler.in_channels))
 
-        bias = None
+        x = self._output_quantizer(x, self._handler.weight, None)
         if self._handler.has_bias:
-            bias = self._handler.bias
-        x = self._output_quantizer(x, self._handler.weight, bias)
+            x = self._handler.bias_add(x, self._handler.bias)
         if self._handler.activation_flag:
             x = self._handler.activation(x)
         x = F.cast(x, ori_dtype)

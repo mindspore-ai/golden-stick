@@ -78,6 +78,7 @@ MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表�
 
 | MindSpore Golden Stick版本 |                             分支                             | MindSpore版本 |
 | :---------------------: | :----------------------------------------------------------: | :-------: |
+|          0.5.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/) |   2.4.0   |
 |          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/) |   2.3.0   |
 |          0.4.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4/) |   2.3.0-rc1   |
 |          0.3.0          | [r0.3](https://gitee.com/mindspore/golden-stick/tree/r0.3/) |   2.0.0-rc1, 2.0.0   |

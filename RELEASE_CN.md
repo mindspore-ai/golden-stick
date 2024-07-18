@@ -2,6 +2,39 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 0.5.1 Release Notes
+
+### 主要特性和增强
+
+### API Change
+
+### 贡献者
+
+感谢以下人员做出的贡献:
+
+ccsszz, yyyyrf, hangangqiang
+
+欢迎以任何形式对项目提供贡献！
+
+## MindSpore Golden Stick 0.5.0 Release Notes
+
+### 主要特性和增强
+
+* 新增W8A8训练后量化算法`SmoothQuant`，主要针对Llama2系列网络做量化。
+
+### API Change
+
+* `CompAlgo`类的`apply`新增`kwargs`参数作为子类的可扩展入参。
+* 新增`SmoothQuant`作为SmoothQuant算法的入口。
+
+### 贡献者
+
+感谢以下人员做出的贡献:
+
+ccsszz, yyyyrf, hangangqiang
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 0.4.1 Release Notes
 
 ### 主要特性和增强
@@ -13,7 +46,7 @@
 
 感谢以下人员做出的贡献:
 
-changshaozhong, yourifan, hangangqiang
+ccsszz, yyyyrf, hangangqiang
 
 欢迎以任何形式对项目提供贡献！
 

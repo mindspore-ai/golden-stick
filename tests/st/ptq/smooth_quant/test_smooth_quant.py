@@ -372,7 +372,7 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
     return absolute_tolerance_acceptable(qoutput[1].asnumpy(), foutput[1].asnumpy(), 11e-5)
 
 
-@pytest.mark.level0
+# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])

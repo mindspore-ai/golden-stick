@@ -22,6 +22,8 @@ from mindspore.ops import operations as msops
 from mindspore.ops.operations import FakeQuantParam
 from mindspore.ops.operations._inner_ops import AntiQuant, Dequant
 from mindspore.ops.operations._infer_ops import QuantV2
+from mindspore.ops.operations.comm_ops import ReduceOp
+from mindspore.communication.management import GlobalComm
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
@@ -330,17 +332,20 @@ class DequantBMMCell(Cell):
         self.dbmm.shard(strategy)
 
 
-def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, bias_quant, offset=None, dst_dtype=dtype.float16,
-                           transpose_a=False, transpose_b=False, strategy=None):
+def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, offset=None, dst_dtype=dtype.float16,
+                           transpose_a=False, transpose_b=False, strategy=None, new_bias_need_allreduce=False):
     """convert_to_dequant_bmm."""
 
-    def _fused_bias(quant_weight, quant_bias, act_offset):
+    def _fused_bias(quant_weight, act_offset):
         if quant_weight is None:
             return None
         new_bias = -np.sum(act_offset.astype(np.int32) * quant_weight.asnumpy().astype(np.int32),
                            axis=1 if transpose_b else 0).astype(np.int32)
-        if quant_bias is not None:
-            new_bias = quant_bias.astype(np.int32) + new_bias
+        if new_bias_need_allreduce:
+            t_new_bias = Tensor(new_bias)
+            reduce_sum = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)
+            t_new_bias = reduce_sum(t_new_bias)
+            new_bias = t_new_bias.asnumpy()
         return new_bias
 
     input_fq: FakeQuantParam = input_fqcell.fq
@@ -359,8 +364,11 @@ def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, bias_quant
     if len(input_scale) != 1:
         raise ValueError("Input only support perlayer quant.")
     dequant_scale = np.array(input_scale[0], dtype=np.float32) * np.array(weight_scale, dtype=np.float32)
-    bias_data = _fused_bias(weight_quant, bias_quant, np.array(input_zp))
-    bias = Tensor(bias_data, dtype=dtype.int32) if bias_data is not None else None
+    bias_data = _fused_bias(weight_quant, np.array(input_zp))
+    bias_dequant_scale = np.squeeze(dequant_scale)
+    bias_data = bias_data.astype(np.float64)
+    bias_data = bias_data * bias_dequant_scale
+    bias = Tensor(bias_data, dtype=dst_dtype) if bias_data is not None else None
     dbmm_cell = DequantBMMCell(dequant_scale, offset, transpose_a, transpose_b, dst_dtype)
     if strategy is not None:
         dbmm_cell.shard(strategy)
