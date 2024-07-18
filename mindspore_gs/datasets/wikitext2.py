@@ -24,7 +24,8 @@ from mindspore.dataset import GeneratorDataset
 
 class WikiText2Dataset(GeneratorDataset):
     """Wikitext-2 dataset."""
-    def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable, need_pad=True):
+    def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable, need_pad=True,
+                 n_samples=-1):
         self.path = os.path.join(path)
         self.seq_len = seq_length
         self.max_new_tokens = max_new_tokens
@@ -36,14 +37,14 @@ class WikiText2Dataset(GeneratorDataset):
         if hasattr(self.tokenizer, 'add_eos_token'):
             self.tokenizer.add_eos_token = True
         self.content = []
-        self._load()
+        self._load(n_samples)
         self.iterator = None
         super().__init__(source=self, column_names=["input_ids"])
 
     def __len__(self):
         return len(self.content)
 
-    def _load(self):
+    def _load(self, n_samples=-1):
         """_load"""
         input_content = []
         with open(self.path, 'r', encoding='utf-8') as f:
@@ -56,6 +57,8 @@ class WikiText2Dataset(GeneratorDataset):
                 if self.need_pad:
                     content = np.pad(content, (0, self.max_new_tokens), 'constant', constant_values=self.pad_token_id)
                 self.content.append(Tensor(content))
+                if 0 < n_samples <= len(self.content):
+                    break
 
     @staticmethod
     def _clean(string):
@@ -106,12 +109,12 @@ class WikiText2Dataset(GeneratorDataset):
 
 
 def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, max_new_tokens: int, tokenizer: callable,
-                            repeat=1, need_pad=True):
+                            repeat=1, need_pad=True, n_samples=-1):
     """ create wikitext dataset"""
     if max_new_tokens >= seq_length:
         raise RuntimeError(f"max_decode_len should less than seq_length, but got max_new_tokens: {max_new_tokens}, "
                            f"seq_length: {seq_length}.")
-    ds = WikiText2Dataset(ds_path, seq_length, max_new_tokens, tokenizer, need_pad)
+    ds = WikiText2Dataset(ds_path, seq_length, max_new_tokens, tokenizer, need_pad, n_samples)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.batch(bs, drop_remainder=True)
