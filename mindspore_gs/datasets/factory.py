@@ -22,11 +22,15 @@ from .boolq import create_boolq_dataset
 
 
 def get_datasets(ds_type: str, ds_path: str, mode, batch_size, seq_length, max_new_tokens, tokenizer,
-                 ignore_token_id, repeat=1, need_pad=True) -> GeneratorDataset:
+                 ignore_token_id, repeat=1, need_pad=True, n_samples=-1) -> GeneratorDataset:
+    """get_datasets."""
     if ds_type.lower() == 'wikitext2':
-        return create_wikitext_dataset(ds_path, batch_size, seq_length, max_new_tokens, tokenizer, repeat, need_pad)
+        return create_wikitext_dataset(ds_path, batch_size, seq_length, max_new_tokens, tokenizer, repeat, need_pad,
+                                       n_samples)
     if ds_type.lower() == 'squad1.1':
-        return create_squad_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat, need_pad)
+        return create_squad_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat,
+                                    need_pad, n_samples)
     if ds_type.lower() == 'boolq':
-        return create_boolq_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat, need_pad)
+        return create_boolq_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat,
+                                    need_pad, n_samples)
     raise ValueError(f"Not supported datasets type: {ds_type}.")

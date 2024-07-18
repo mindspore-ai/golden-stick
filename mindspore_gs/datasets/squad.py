@@ -26,7 +26,8 @@ from mindspore.dataset import GeneratorDataset
 
 class SQuADDataset(GeneratorDataset):
     """SQuAD dataset."""
-    def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100, need_pad=True):
+    def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
+                 need_pad=True, n_samples=-1):
         self.path = os.path.join(path)
         if mode not in ("eval", "train", "test"):
             raise ValueError("Input `mode` should be 'eval', 'test' or 'train', got: ", mode)
@@ -47,7 +48,7 @@ class SQuADDataset(GeneratorDataset):
                 tokenizer.add_eos_token = True
         self.input_ids = []
         self.labels = []
-        self._load()
+        self._load(n_samples)
         self.iter_input_ids = None
         self.iter_labels = None
         super().__init__(source=self, column_names=["input_ids", "labels"])
@@ -55,7 +56,7 @@ class SQuADDataset(GeneratorDataset):
     def __len__(self):
         return len(self.input_ids)
 
-    def _load(self):
+    def _load(self, n_samples=-1):
         """Load and preprocess squad dataset."""
         input_file = pathlib.Path(self.path)
         with input_file.open() as f:
@@ -72,7 +73,10 @@ class SQuADDataset(GeneratorDataset):
                             f"Instruction:\n{passage}\n\n### Input:\n{query}\n\n### Response:"
                 sources.append(input_str)
                 targets.append(answer)
-
+                if 0 < n_samples <= len(sources):
+                    break
+            if 0 < n_samples <= len(sources):
+                break
         total_items = 0
         total_items = self._dataset_based_on_mode(sources, targets, total_items)
         logger.info("Find %d total data items", total_items)
@@ -135,9 +139,9 @@ class SQuADDataset(GeneratorDataset):
 
 
 def create_squad_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
-                         ignore_token_id=-100, repeat=1, need_pad=True):
+                         ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1):
     """create squad dataset"""
-    ds = SQuADDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad)
+    ds = SQuADDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.map(operations=type_cast_op, input_columns="labels")
