@@ -26,7 +26,7 @@ from mindformers import LlamaForCausalLM
 from mindspore_gs.ptq import PTQMode, PTQConfig
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.datasets import get_datasets
-from mindspore_gs.ptq import SmoothQuant as SQ
+from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 from llama2 import Llama2Network
 

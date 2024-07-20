@@ -18,4 +18,3 @@ MindSpore golden stick PTQ Algorithms.
 
 from .ptq_config import PTQConfig, PTQMode
 from .round_to_nearest import RoundToNearest
-from .smooth_quant import SmoothQuant
