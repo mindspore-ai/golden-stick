@@ -75,6 +75,7 @@ class CompAlgo(abc.ABC):
 
         Args:
             network (Cell): Network to be compressed.
+            kwargs (Dict): Extensible parameter for subclasses.
 
         Returns:
             Compressed network.

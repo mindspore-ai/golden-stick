@@ -11,12 +11,16 @@ mindspore_gs.ptq.RoundToNearest
     异常：
         - **TypeError** - `config` 在输入不为 ``None`` 时，元素类型不为 PTQConfig。
 
-    .. py:method:: apply(network: Cell)
+    .. py:method:: apply(network: Cell, network_helper: NetworkHelper = None)
 
         将 `network` 中添加伪量化节点，转换成一个伪量化网络。
 
         参数：
             - **network** (Cell) - 待伪量化的网络。
+            - **network_helper** (NetworkHelper) - 网络量化工具，用于解耦算法层和网络框架层。
+        
+        异常：
+            - **RuntimeError** - 如果当前算法没有有效的初始化。
 
         返回：
             伪量化后的网络。

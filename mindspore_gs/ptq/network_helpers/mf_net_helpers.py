@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""network base class"""
+"""Network helper for network from MindFormers."""
 
 
 import math
@@ -22,12 +22,22 @@ from mindspore import Tensor
 from mindformers.models.modeling_utils import PreTrainedModel
 from mindformers.tools.register.config import MindFormerConfig
 from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
+from mindspore_gs.common.validator import Validator
 from .network_helper import NetworkHelper
 
 
 class MFNetworkHelper(NetworkHelper):
-    """MFNetworkHelper"""
+    """
+    Network helper for network from MindFormers.
+
+    Args:
+        config (MindFormerConfig): MindFormerConfig for network.
+
+    Raises:
+        TypeError: If input `config` is not an instance of `MindFormerConfig`.
+    """
     def __init__(self, config: MindFormerConfig = None):
+        Validator.check_value_type("config", config, [MindFormerConfig], self.__class__.__name__)
         self.mf_config = config
 
     def get_spec(self, name: str):
@@ -56,7 +66,15 @@ class MFNetworkHelper(NetworkHelper):
 
 
 class MFLlama2Helper(MFNetworkHelper):
-    """MFLlama2Helper"""
+    """
+    Derived from 'NetworkHelper', a utility class for the MindFormers framework Llama2 network.
+
+    Args:
+        config (MindFormerConfig): MindFormerConfig for network.
+
+    Raises:
+        TypeError: If input `config` is not an instance of `MindFormerConfig`.
+    """
     @staticmethod
     def _get_slots(bs, block_size, prefill_max_len, is_prefill, block_tables, valid_length_example):
         """get_slots."""

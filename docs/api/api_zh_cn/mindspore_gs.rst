@@ -11,12 +11,13 @@ mindspore_gs
           - **save_mindir** (bool) - 如果为 ``True``，则在训练后自动导出 MindIR，否则不导出。 默认值：``False``。
           - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径或绝对路径，用户需要保证写入权限。默认值：``'./network'``。
 
-    .. py:method:: apply(network: Cell)
+    .. py:method:: apply(network: Cell, **kwargs)
 
         定义如何压缩输入的 `network` 。此方法必须由所有算法子类重写。
 
         参数：
             - **network** (Cell) - 将被压缩的网络。
+            - **kwargs** (Dict) - 用于子类的可扩展入参。
 
         返回：
             压缩后的网络。
