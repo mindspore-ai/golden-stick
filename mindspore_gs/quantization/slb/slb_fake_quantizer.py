@@ -27,7 +27,7 @@ from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
 from mindspore.ops.operations._quant_ops import FakeQuantParam
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs.common import Validator
+from mindspore_gs.common.validator import Validator
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer, LinearFakeQuantizer
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params
 

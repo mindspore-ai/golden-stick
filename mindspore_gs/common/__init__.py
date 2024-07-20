@@ -18,4 +18,3 @@ MindSpore golden stick MinMaxPTQ Algorithm.
 
 from .gs_enum import BackendTarget
 from .logger import logger
-from .validator import Validator, Rel

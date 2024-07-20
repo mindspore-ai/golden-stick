@@ -21,7 +21,8 @@ from mindspore import Tensor
 from mindspore.ops import operations as P
 from mindspore.common.parameter import Parameter
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs.common import BackendTarget, Validator
+from mindspore_gs.common import BackendTarget
+from mindspore_gs.common.validator import Validator
 from mindspore_gs.quantization.simulated_quantization.combined import Conv2dBn
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs

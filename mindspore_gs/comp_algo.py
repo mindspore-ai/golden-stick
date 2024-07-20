@@ -21,7 +21,8 @@ import os.path
 from mindspore.nn.cell import Cell
 from mindspore.train.callback import Callback
 from mindspore import export, context
-from mindspore_gs.common import logger, Validator
+from mindspore_gs.common import logger
+from mindspore_gs.common.validator import Validator
 
 
 class Backend(enum.Enum):

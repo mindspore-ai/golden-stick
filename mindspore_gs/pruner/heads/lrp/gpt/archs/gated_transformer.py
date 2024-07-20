@@ -30,7 +30,6 @@ import mindspore.common.dtype as mstype
 from mindspore.ops import operations as P
 from mindspore.ops import functional as F
 from mindspore.nn.cell import Cell
-from mindspore import _checkparam as Validator
 from mindspore.parallel._utils import _get_parallel_mode
 from mindspore.context import ParallelMode
 from mindspore.log import _LogActionOnce
@@ -40,6 +39,7 @@ from mindspore.parallel._transformer.layers import _LayerNorm, _Linear, \
 from mindspore.parallel._transformer.op_parallel_config import default_dpmp_config, _PipeLineConfig, OpParallelConfig, \
     _Config, _check_config, MoEParallelConfig
 from mindspore.parallel._transformer.moe import default_moe_config, MoE, _check_moe_config
+from mindspore_gs.common.validator import Validator
 
 from mindspore_gs.pruner.heads.lrp.utils import ConcreteGate
 from mindspore_gs.common import logger

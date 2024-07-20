@@ -16,7 +16,7 @@
 from __future__ import absolute_import
 
 from mindspore.nn.cell import Cell
-from mindspore_gs.common import Validator
+from mindspore_gs.common.validator import Validator
 from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.layer_policy import LayerPolicy
 
