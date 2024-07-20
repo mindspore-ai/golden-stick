@@ -19,8 +19,9 @@ import os
 
 from mindspore.ops import DataType
 from mindspore.ops.functional import zeros_like
-from mindspore_gs.common import Validator as validator
-from mindspore_gs.common import logger, Rel
+from mindspore_gs.common.validator import Validator as validator
+from mindspore_gs.common.validator import Rel
+from mindspore_gs.common import logger
 from mindspore_gs.ops import GSCustom, custom_op_attr_register
 
 

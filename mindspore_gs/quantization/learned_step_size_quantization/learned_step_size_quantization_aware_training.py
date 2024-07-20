@@ -17,7 +17,7 @@ from mindspore.nn import Cell
 from mindspore.common.dtype import QuantDtype
 from mindspore_gs.quantization.ops.nn import Conv2dQuant, DenseQuant, Conv2dBnFoldQuantOneConv, \
     Conv2dBnWithoutFoldQuant, Conv2dBnFoldQuant
-from mindspore_gs.common import Validator
+from mindspore_gs.common.validator import Validator
 from mindspore_gs.quantization.simulated_quantization import SimulatedQuantizationAwareTraining as SimQAT
 from mindspore_gs.quantization.quant_cell import QuantCell
 from .learned_step_size_quantization_net_policy import LearnedStepSizeQuantizationNetPolicy as LsqNetPolicy

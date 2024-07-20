@@ -23,7 +23,8 @@ from mindspore import Tensor, load_checkpoint, load_param_into_net
 from mindspore.nn import Cell, Conv2d, Dense
 from mindspore.train.callback import Callback
 
-from mindspore_gs.common import logger, Validator
+from mindspore_gs.common import logger
+from mindspore_gs.common.validator import Validator
 from ...comp_algo import CompAlgo
 from .graph_analyzer import GraphAnalyzer
 from .utils import do_mask, get_channel_importances, get_mask, prune_net, save_model_and_mask

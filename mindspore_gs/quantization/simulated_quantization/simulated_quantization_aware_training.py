@@ -18,7 +18,8 @@ import os
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.common.dtype import QuantDtype
-from mindspore_gs.common import logger, Validator, Rel
+from mindspore_gs.common.validator import Validator, Rel
+from mindspore_gs.common import logger
 from mindspore_gs.quantization.quantization_aware_training import QuantizationAwareTraining
 from .simulated_quantization_net_policy import SimulatedNetPolicy
 from .simulated_quantization_config import SimulatedQuantizationConfig

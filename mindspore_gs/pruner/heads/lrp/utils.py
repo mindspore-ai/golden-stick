@@ -24,7 +24,7 @@ from mindspore.common.tensor import Tensor
 from mindspore.common.parameter import Parameter
 from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
-from mindspore_gs.common import Validator
+from mindspore_gs.common.validator import Validator
 
 
 class ConcreteGate(nn.Cell):
