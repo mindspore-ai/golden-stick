@@ -174,16 +174,7 @@ class KVCacheMgrQuant(PTQCell):
             self._is_deployed = True
 
     def calibrate(self):
-        logger.info(f"----------- Calibrating key buffer of KVCache Cell: {self._kvcache.key_past.name}")
-        key = self.transpose(self._kvcache.key_past, self._perm)
-        key = self.reshape(key, self._pre_reshape)
-        self._key_input_quantizer(key)
-        self._key_output_quantizer(key)
-        logger.info(f"----------- Calibrating value buffer of KVCache Cell: {self._kvcache.value_past.name}")
-        value = self.transpose(self._kvcache.value_past, self._perm)
-        value = self.reshape(value, self._pre_reshape)
-        self._value_input_quantizer(value)
-        self._value_output_quantizer(value)
+        pass
 
     # pylint: disable=W0221
     def construct(self, key, value, kvcache_inputs=None):
