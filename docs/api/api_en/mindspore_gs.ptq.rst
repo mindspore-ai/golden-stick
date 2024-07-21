@@ -7,16 +7,6 @@ Post training quantization algorithms.
 
     import mindspore_gs.ptq as ptq
 
-RoundToNearest Algorithm
---------------------------------
-
-.. autosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.RoundToNearest
-
 PTQ Config
 -------------
 
@@ -36,3 +26,25 @@ PTQMode Enum
     :template: classtemplate.rst
 
     mindspore_gs.ptq.PTQMode
+
+NetworkHelper
+-------------
+
+.. autosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.NetworkHelper
+    mindspore_gs.ptq.MFLlama2Helper
+
+RoundToNearest Algorithm
+--------------------------------
+
+.. autosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.RoundToNearest
+

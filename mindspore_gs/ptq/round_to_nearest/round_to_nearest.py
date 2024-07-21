@@ -131,12 +131,16 @@ class RoundToNearest(CompAlgo):
         network.update_parameters_name()
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, **kwargs) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
         Args:
             network (Cell): Network to be fake quantized.
+            network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
+
+        Raises:
+            RuntimeError: If RoundToNearest is not well inited.
 
         Returns:
             fake quantized network.

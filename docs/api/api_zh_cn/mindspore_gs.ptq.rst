@@ -7,16 +7,6 @@ mindspore_gs.ptq
 
     import mindspore_gs.ptq as ptq
 
-RoundToNearest 算法
---------------------------------
-
-.. mscnautosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.RoundToNearest
-
 PTQ 配置
 -------------
 
@@ -36,3 +26,25 @@ PTQ 模式枚举
     :template: classtemplate.rst
 
     mindspore_gs.ptq.PTQMode
+
+网络适配层
+-------------
+
+.. mscnautosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.NetworkHelper
+    mindspore_gs.ptq.MFLlama2Helper
+
+RoundToNearest 算法
+--------------------------------
+
+.. mscnautosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.RoundToNearest
+
