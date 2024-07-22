@@ -19,7 +19,6 @@ import math
 import numpy as np
 from mindspore import dtype as mstype
 from mindspore import Tensor
-from mindformers.models.modeling_utils import PreTrainedModel
 from mindformers.tools.register.config import MindFormerConfig
 from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
 from mindspore_gs.common.validator import Validator
@@ -53,7 +52,7 @@ class MFNetworkHelper(NetworkHelper):
         return LlamaTokenizer(vocab_file=self.get_spec('vocab_file'))
 
     # pylint: disable=arguments-differ
-    def generate(self, mf_network: PreTrainedModel, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
+    def generate(self, mf_network, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
         do_sample = self.mf_config.model.model_config.do_sample
         seq = self.mf_config.model.model_config.seq_length
         top_p = self.mf_config.model.model_config.top_p
