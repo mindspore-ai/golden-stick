@@ -12,7 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-""" logger for golden-stick """
+""" Logger for golden-stick """
 
-# pylint: disable=unused-import
-from mindspore import log as logger
+import logging
+
+
+class Logger:
+    """Logger for GoldenStick."""
+    def __init__(self):
+        self.logger = logging.getLogger("GoldenStick")
+        self.logger.setLevel(level=logging.INFO)
+        console = logging.StreamHandler()
+        console.setLevel(level=logging.DEBUG)
+        self.logger.addHandler(console)
+
+    def debug(self, *args, **kwargs):
+        """Add debug level log."""
+        self.logger.debug(*args, **kwargs)
+
+    def info(self, *args, **kwargs):
+        """Add info level log."""
+        self.logger.info(*args, **kwargs)
+
+    def warning(self, *args, **kwargs):
+        """Add warning level log."""
+        self.logger.warning(*args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        """Add error level log."""
+        self.logger.error(*args, **kwargs)
+
+
+logger = Logger()
