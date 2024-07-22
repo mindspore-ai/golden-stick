@@ -2,20 +2,6 @@
 
 [查看中文](./RELEASE_CN.md)
 
-## MindSpore Golden Stick 0.5.1 Release Notes
-
-### Major Features and Improvements
-
-### API Change
-
-### Contributors
-
-Thanks goes to these wonderful people:
-
-ccsszz, yyyyrf, hangangqiang
-
-Contributions of any kind are welcome!
-
 ## MindSpore Golden Stick 0.5.0 Release Notes
 
 ### Major Features and Improvements
