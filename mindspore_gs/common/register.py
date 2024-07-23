@@ -36,7 +36,7 @@ class RegisterMachine:
         self._name = name
         self._name_method_dict = dict()
 
-    def __getitem__(self, item: str):
+    def __getitem__(self, item):
         return self._name_method_dict.get(item, None)
 
     def __repr__(self):

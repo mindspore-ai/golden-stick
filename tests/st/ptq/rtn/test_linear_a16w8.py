@@ -21,7 +21,6 @@ import pytest
 import numpy as np
 import mindspore
 from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype
-from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.round_to_nearest.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
@@ -97,8 +96,7 @@ def test_apply_convert():
     quant_cell = cells.get("linear", None)
     assert isinstance(quant_cell, LinearQuant)
     weight_fake_quant = quant_cell.weight_quantizer()
-    assert isinstance(weight_fake_quant, FakeQuantParamCell)
-    assert isinstance(weight_fake_quant.fq, FakeQuantParam)
+    assert isinstance(weight_fake_quant, AntiquantBMMCell)
 
     assert quant_cell.input_quantizer() is None
     assert quant_cell.output_quantizer() is None

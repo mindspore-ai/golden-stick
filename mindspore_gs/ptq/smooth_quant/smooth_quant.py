@@ -23,7 +23,7 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq import PTQMode
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig
+from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, BackendTarget
 from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
 from mindspore_gs.common.register import cell_type_dicts
 from mindspore_gs.common import logger
@@ -43,7 +43,10 @@ class SmoothQuant(CompAlgo):
         else:
             self._config = PTQConfig()
         # convert PTQConfig to InnerConfig to add inner parameters
-        self._config = InnerPTQConfig.inner_config(self._config)
+        self._config = InnerPTQConfig.inner_config(self._config, approach=PTQApproach.SMOOTH_QUANT)
+        if self._config.backend != BackendTarget.ASCEND:
+            raise ValueError("RoundToNearest only support ASCEND as BackendTarget now, "
+                             f"but got {self._config.backend}.")
         self._ptq_policy = SmoothQuant._init_net_policy(self._config)
         self._op_types = tuple({cell_type_dicts[item] for item in self._config.op_types})
         mode = self._config.mode

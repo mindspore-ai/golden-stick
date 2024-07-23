@@ -33,7 +33,7 @@ from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_co
 
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, SmoothQuantConfig, PTQApproach
 from mindspore_gs.ptq.smooth_quant.smooth_quant import SmoothQuant
 from mindspore_gs.ptq.smooth_quant.sq_layer_policy import LinearLayerPolicy
 from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
@@ -58,6 +58,13 @@ def test_constructor():
     """
     sq = SmoothQuant()
     assert isinstance(sq._config, InnerPTQConfig)
+    assert sq._config.algo_args.get("alpha", None) == 0.5
+
+    sq_args = SmoothQuantConfig(alpha=0.8)
+    cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, algo_args=sq_args)
+    sq = SmoothQuant(cfg)
+    assert isinstance(sq._config, InnerPTQConfig)
+    assert sq._config.algo_args.get("alpha", None) == 0.8
 
 
 class SimpleNet(nn.Cell):
@@ -217,7 +224,7 @@ def test_sq_linear_wrapper(mode, transpose_b):
     """
     context.set_context(device_target="Ascend", mode=mode)
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
-    inner_cfg = InnerPTQConfig.inner_config(cfg)
+    inner_cfg = InnerPTQConfig.inner_config(cfg, PTQApproach.SMOOTH_QUANT)
     act_in = 5
     act_out = 6
     linear = Linear(in_channels=act_in, out_channels=act_out, transpose_b=transpose_b, bias_init="normal",

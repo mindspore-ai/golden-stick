@@ -299,7 +299,7 @@ class SQLinearWrapper(PTQCell):
 
         self._alpha = self.cfg.algo_args.get('alpha', None)
         if self._alpha is None:
-            self._alpha = 0.5
+            raise RuntimeError("Inner error: PTQConfig not include alpha")
         self._expand = P.ExpandDims()
         self._act_mul = P.Mul()
         self._weight_mul = P.Mul()
