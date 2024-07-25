@@ -28,7 +28,7 @@ from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.convert_utils import QuantCell
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode, BackendTarget
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from .rtn_net_policy import RTNNetPolicy
 from .quant_cells import LinearQuant
@@ -43,6 +43,7 @@ class RoundToNearest(CompAlgo):
 
     Raises:
         TypeError: If `config` type is not PTQConfig when it's not ``None``.
+        ValueError: If backend in config is not `BackendTarget.ASCEND`.
 
     Examples:
         >>> import mindspore_gs
@@ -67,6 +68,9 @@ class RoundToNearest(CompAlgo):
             self._create_config()
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig.inner_config(self._config)
+        if self._config.backend != BackendTarget.ASCEND:
+            raise ValueError("RoundToNearest only support ASCEND as BackendTarget now, "
+                             f"but got {self._config.backend}.")
         self._ptq_policy = RoundToNearest._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
