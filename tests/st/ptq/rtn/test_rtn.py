@@ -19,7 +19,7 @@ import sys
 import pytest
 from mindspore import nn
 from mindspore_gs.ptq import RoundToNearest as RTN
-from mindspore_gs.ptq.ptq_config import PTQConfig
+from mindspore_gs.ptq.ptq_config import PTQConfig, BackendTarget
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
 
 
@@ -58,6 +58,11 @@ def test_constructor_error():
     config = {"per_channel": (1, 1)}
     with pytest.raises(TypeError):
         RTN(config)
+
+    config = PTQConfig(backend=BackendTarget.NONE)
+    with pytest.raises(ValueError):
+        RTN(config)
+
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu

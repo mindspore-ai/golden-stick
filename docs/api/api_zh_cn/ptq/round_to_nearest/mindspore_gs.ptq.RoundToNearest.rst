@@ -10,6 +10,7 @@ mindspore_gs.ptq.RoundToNearest
 
     异常：
         - **TypeError** - `config` 在输入不为 ``None`` 时，元素类型不为 PTQConfig。
+        - **ValueError** - `config` 中的 `backend` 不是BackendTarget.ASCEND。
 
     .. py:method:: apply(network: Cell, network_helper: NetworkHelper = None)
 

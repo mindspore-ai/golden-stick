@@ -31,9 +31,9 @@ def value_check(name, src, supported_type, value_choices=None):
     if not isinstance(src, list) and not isinstance(src, supported_type):
         raise ValueError("Type of {} should be {} but not {}".format(name, str(supported_type), type(src)))
 
-    if value_choices is not None and not value_choices:
-        if isinstance(src, str) and src not in value_choices:
-            raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
+    if value_choices is not None and value_choices:
         if isinstance(src, list) and all([isinstance(i, str) for i in src])\
                 and any([i not in value_choices for i in src]):
+            raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
+        if src not in value_choices:
             raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
