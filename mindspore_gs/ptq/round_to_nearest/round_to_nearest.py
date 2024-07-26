@@ -179,8 +179,7 @@ class RoundToNearest(CompAlgo):
             return network
         if network_helper:
             bs = network_helper.get_spec("batch_size") if network_helper.get_spec("batch_size") else 1
-            seq = network_helper.get_spec("seq_length") if network_helper.get_spec("seq_length") else 4096
-            network(*(network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))))
+            network_helper.generate(network, input_ids=np.ones([bs, 1], dtype=np.int32))
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:

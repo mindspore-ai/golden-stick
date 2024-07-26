@@ -5,7 +5,7 @@ src_strategy_path_or_dir: ''
 auto_trans_ckpt: False  # If true, auto transform load_checkpoint to load in distributed model
 only_save_strategy: False
 resume_training: False
-run_mode: 'train'
+run_mode: 'predict'
 
 # trainer config
 trainer:
@@ -15,9 +15,10 @@ trainer:
 # runner config
 runner_config:
   epochs: 2
-  batch_size: 6
+  batch_size: 1
   sink_mode: True
   sink_size: 2
+  gradient_accumulation_steps: 8
 
 # optimizer
 optimizer:
@@ -81,18 +82,18 @@ parallel:
   enable_alltoall: False
   full_batch: True
   search_mode: "sharding_propagation"
-  enable_parallel_optimizer: True
+  enable_parallel_optimizer: False
   strategy_ckpt_save_file: "./ckpt_strategy.ckpt"
   parallel_optimizer_config:
     gradient_accumulation_shard: False
     parallel_optimizer_threshold: 64
 # default parallel of device num = 8 for Atlas 800T A2
 parallel_config:
-  data_parallel: 1
+  data_parallel: 8
   model_parallel: 1
   pipeline_stage: 1
   use_seq_parallel: False
-  micro_batch_num: 4
+  micro_batch_num: 1
   vocab_emb_dp: True
   gradient_aggregation_group: 4
 # when model parallel is greater than 1, we can set micro_batch_interleave_num=2, that may accelerate the train process.
@@ -100,7 +101,7 @@ micro_batch_interleave_num: 1
 
 # recompute config
 recompute_config:
-  recompute: True
+  recompute: False
   select_recompute: False
   parallel_optimizer_comm_recompute: False
   mp_comm_recompute: True
@@ -109,7 +110,7 @@ recompute_config:
 # callbacks
 callbacks:
   - type: MFLossMonitor
-  - type: CheckpointMointor
+  - type: CheckpointMonitor
     prefix: "llama2_7b"
     save_checkpoint_steps: 100
     integrated_save: False
@@ -121,9 +122,8 @@ context:
   mode: 0 #0--Graph Mode; 1--Pynative Mode
   device_target: "Ascend"
   enable_graph_kernel: False
-  graph_kernel_flags: "--disable_expand_ops=Softmax,Dropout --enable_parallel_fusion=true --reduce_fuse_depth=8 --enable_auto_tensor_inplace=true"
   max_call_depth: 10000
-  max_device_memory: "20GB"
+  max_device_memory: "28GB"
   save_graphs: False
   save_graphs_path: "./graph"
   device_id: 0
@@ -133,7 +133,7 @@ model:
   model_config:
     type: LlamaConfig
     batch_size: 1 # add for increase predict
-    seq_length: 2048
+    seq_length: 4096
     hidden_size: 4096
     num_layers: 32
     num_heads: 32
@@ -144,25 +144,26 @@ model:
     eos_token_id: 2
     pad_token_id: 0
     ignore_token_id: -100
-    compute_dtype: "bfloat16"
+    compute_dtype: "float16"
     layernorm_compute_type: "float32"
-    softmax_compute_type: "float16"
+    softmax_compute_type: "float32"
     rotary_dtype: "float16"
     param_init_type: "float16"
-    use_past: False
-    pretrain_seqlen: 4096 # seqlen of the pretrain checkpoint: 2048 for llama and 4096 for llama2
+    use_past: True
+    scaling_factor: 1.0 # The scale factor of seq length
     extend_method: "None" # support "None", "PI", "NTK"
-    compute_in_2d: True
     use_flash_attention: True # FA can accelerate training or finetune
+    block_size: 16
+    num_blocks: 1024
+    is_dynamic: True
+    qkv_concat: False
     offset: 0
-    use_past_shard: False
     checkpoint_name_or_path: ""
     repetition_penalty: 1
-    max_decode_length: 700
+    max_decode_length: 512
     top_k: 3
     top_p: 1
     do_sample: False
-    max_new_tokens: 20
   arch:
     type: LlamaForCausalLM
 
@@ -179,7 +180,7 @@ processor:
 
 # metric
 metric:
-  type: PerplexityMetric
+  type: EmF1Metric
 
 # wrapper cell config
 runner_wrapper:
