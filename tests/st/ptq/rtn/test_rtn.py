@@ -19,7 +19,7 @@ import sys
 import pytest
 from mindspore import nn
 from mindspore_gs.ptq import RoundToNearest as RTN
-from mindspore_gs.ptq.ptq_config import PTQConfig
+from mindspore_gs.ptq.ptq_config import PTQConfig, BackendTarget
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
 
 
@@ -33,13 +33,13 @@ def test_constructor():
     Expectation: Config is updated according to argument `config` of constructor.
     """
 
-    config = PTQConfig()
+    config = PTQConfig(backend=BackendTarget.ASCEND)
     ptq = RTN(config)
     # pylint: disable=W0212
     quant_config = ptq._config
     assert config != quant_config
 
-    ptq_default = RTN()
+    ptq_default = RTN(PTQConfig(backend=BackendTarget.ASCEND))
     # pylint: disable=W0212
     quant_defalut_config = ptq_default._config
     assert quant_defalut_config.mode == config.mode
@@ -59,6 +59,11 @@ def test_constructor_error():
     with pytest.raises(TypeError):
         RTN(config)
 
+    config = PTQConfig()
+    with pytest.raises(ValueError):
+        RTN(config)
+
+
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
@@ -69,7 +74,7 @@ def test_convert_error():
     Expectation: Except TypeError.
     """
     network = nn.Conv2d(6, 5, kernel_size=2)
-    ptq = RTN()
+    ptq = RTN(PTQConfig(backend=BackendTarget.ASCEND))
     new_network = ptq.apply(network)
     with pytest.raises(TypeError, match="The parameter `net_opt` must be isinstance of Cell"):
         ptq.convert(100)

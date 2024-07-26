@@ -56,8 +56,13 @@ def test_constructor():
     Description: Call constructor of smooth quant and check config.
     Expectation: smooth_quant related is updated according to argument `config` of constructor.
     """
-    sq = SmoothQuant()
+    cfg = PTQConfig(backend=BackendTarget.ASCEND)
+    sq = SmoothQuant(cfg)
     assert isinstance(sq._config, InnerPTQConfig)
+
+    config = PTQConfig()
+    with pytest.raises(ValueError):
+        SmoothQuant(config)
 
 
 class SimpleNet(nn.Cell):

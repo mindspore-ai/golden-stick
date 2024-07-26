@@ -24,6 +24,7 @@ from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 
+
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
@@ -52,11 +53,16 @@ def test_ptq_config_construct():
     assert cfg.mode == PTQMode.QUANTIZE
     assert cfg.backend == BackendTarget.NONE
 
+    cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+    assert cfg.mode == PTQMode.DEPLOY
+    assert cfg.backend == BackendTarget.ASCEND
+
     with pytest.raises(ValueError):
         _ = PTQConfig(mode='none')
 
     with pytest.raises(ValueError):
         _ = PTQConfig(backend=PTQMode.QUANTIZE)
+
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
@@ -71,6 +77,7 @@ def test_inner_ptq_config():
         _ = InnerPTQConfig(approach='no_such_approach')
 
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
+    assert cfg.approach == PTQApproach.SMOOTH_QUANT
     with pytest.raises(ValueError):
         cfg.weight_only = 1
         cfg.value_check()

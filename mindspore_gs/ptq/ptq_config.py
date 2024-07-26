@@ -91,20 +91,19 @@ class PTQConfig:
             ``DEPLOY`` for deploy mode.
         backend (:class:`mindspore_gs.ptq.BackendTarget`): Flag for backend target, ``NONE`` for no specific backend,
             ``ASCEND`` for ascend backend.
+        opname_blacklist (List[str]): Blacklist of opname. Layers in network with name fuzzy matched with this blacklist
+            will not being quanted.
 
     Raises:
         ValueError: If `mode` is not in PTQMode's members.
         ValueError: If `backend` is not in BackendTarget's members.
+        ValueError: if `opname_blacklist` is not a list of str.
 
     Example:
-        >>> import mindspore_gs
-        >>> from mindspore_gs import ptq
-        >>> from mindspore_gs import common
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
         >>> from mindspore_gs.common import BackendTarget
-        >>> ascend_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
-        >>> print(ascend_config)
-        >>> PTQConfig(mode=<PTQMode.DEPLOY: 'deploy'>, backend=<BackendTarget.ASCEND: 'ascend'>)
+        >>> PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=['layer0'])
+        PTQConfig(mode=<PTQMode.DEPLOY: 'deploy'>, backend=<BackendTarget.ASCEND: 'ascend'>, opname_blacklist=['layer0'], algo_args={})
     """
     mode: PTQMode = field(default=PTQMode.QUANTIZE,
                           metadata={'valid_values': PTQMode.__members__.values()}

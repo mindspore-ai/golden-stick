@@ -39,6 +39,9 @@
 # GHOST
 "golden-stick/mindspore_gs/ghost/ghost.py"                                                               "protected-access"
 
+# PTQ
+"golden-stick/mindspore_gs/ptq/ptq_config.py"                                                            "line-too-long"
+
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
 "golden-stick/tests/st/models/resnet.py"                                                                 "unused-argument"
