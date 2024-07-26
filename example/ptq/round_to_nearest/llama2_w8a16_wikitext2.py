@@ -38,6 +38,7 @@ def evaluate(net, dataset_path, config_, tokenizer_):
     metric = Perplexity()
     data_count = 0
     total_count = ds.get_dataset_size()
+    net.is_first_iteration = False
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         data_count += 1
         logger.info(f"Dataset count: {data_count}/{total_count}")
@@ -67,6 +68,7 @@ if __name__ == "__main__":
     print('------------------------- Creating network...', flush=True)
     net_mgr: Llama2Network = Llama2Network()
     config = net_mgr.create_mfconfig(uargs.config_path)
+    config.model.model_config.use_past = False
     network = net_mgr.create_network(config)
     network.set_train(False)
     network.phase = 'predict'

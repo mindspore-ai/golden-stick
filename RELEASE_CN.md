@@ -2,7 +2,7 @@
 
 [View English](./RELEASE.md)
 
-## MindSpore Golden Stick 0.5.1 Release Notes
+## MindSpore Golden Stick 0.6.0 Release Notes
 
 ### 主要特性和增强
 
@@ -22,12 +22,15 @@ ccsszz, yyyyrf, hangangqiang
 
 ### 主要特性和增强
 
-* 新增W8A8训练后量化算法`SmoothQuant`，主要针对Llama2系列网络做量化。
+* [Demo]新增了主要针对Llama2网络的训练后量化W8A8算法 `SmoothQuant`。
 
 ### API Change
 
 * `CompAlgo`类的`apply`新增`kwargs`参数作为子类的可扩展入参。
-* 新增`SmoothQuant`作为SmoothQuant算法的入口。
+* 添加了 `NetworkHelper` 抽象类作为适配器，用于算法和框架之间的解耦。
+* 添加了 `MFLlama2Helper` 类作为算法和 MindFormers 之间的适配器。
+* [Demo]新增 `SmoothQuant` 类作为SmoothQuant算法的入口。
+* 新增参数检查，确认 `RoundToNearest` 算法仅支持BackendTarget.ASCEND作为后端。
 
 ### 贡献者
 
