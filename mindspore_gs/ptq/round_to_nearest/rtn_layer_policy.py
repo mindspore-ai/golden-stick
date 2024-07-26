@@ -24,7 +24,7 @@ from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq import PTQMode
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
 from ..quant_cells import KVCacheMgrQuant
-from .quant_cells import LinearQuant, LinearDeploy
+from .quant_cells import LinearQuant, LinearDeploy, PagedAttentionDeploy, PagedAttentionQuant
 
 
 class RTNLayerPolicy(LayerPolicy, abc.ABC):
@@ -165,3 +165,62 @@ class KVCacheMgrPolicy(RTNLayerPolicy):
 
     def wrap_cell(self, handler) -> Cell:
         return KVCacheMgrQuant(handler, self)
+
+class PagedAttentionMgrPolicy(RTNLayerPolicy):
+    """
+    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
+    """
+    def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(3)
+        self.is_deploy = config.mode == PTQMode.DEPLOY
+
+    def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
+        return None
+
+    def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
+                             **kwargs) -> FakeQuantizer:
+        strategy = kwargs.get('strategy', None)
+        channel_axis = perchannel_args.channel_axis
+        num_channels = perchannel_args.num_channels
+        rank = perchannel_args.rank
+        if channel_axis == -1 and num_channels == -1 and rank == -1:
+            return None
+        if channel_axis == -1:
+            raise RuntimeError("Please provide channel axis of input for per-channel input quantize.")
+        if num_channels == -1:
+            raise RuntimeError("Please provide channel number of input for per-channel input quantize.")
+        if rank == -1:
+            raise RuntimeError("Please provide rank of weight for per-channel weight quantize.")
+        quantizer = MinMaxPerChannel(symmetric=self._config.weight_symmetric, data_rank=rank,
+                                     quant_dtype=self._config.weight_quant_dtype,
+                                     narrow_range=self._config.weight_narrow_range, axis=channel_axis,
+                                     output_channel=num_channels, strategy=strategy)
+        quantizer.set_attr("position", "input")
+        return quantizer
+
+    def _get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
+        strategy = kwargs.get('strategy', None)
+        channel_axis = perchannel_args.channel_axis
+        num_channels = perchannel_args.num_channels
+        rank = perchannel_args.rank
+        if channel_axis == -1 and num_channels == -1 and rank == -1:
+            return None
+        if channel_axis == -1:
+            raise RuntimeError("Please provide channel axis of output for per-channel output quantize.")
+        if num_channels == -1:
+            raise RuntimeError("Please provide channel number of output for per-channel output quantize.")
+        if rank == -1:
+            raise RuntimeError("Please provide rank of weight for per-channel weight quantize.")
+        quantizer = MinMaxPerChannel(symmetric=self._config.weight_symmetric, data_rank=rank,
+                                     quant_dtype=self._config.weight_quant_dtype,
+                                     narrow_range=self._config.weight_narrow_range, axis=channel_axis,
+                                     output_channel=num_channels, strategy=strategy)
+        quantizer.set_attr("position", "output")
+        return quantizer
+
+    def wrap_cell(self, handler) -> Cell:
+        if self.is_deploy:
+            return PagedAttentionDeploy(handler, self)
+        return PagedAttentionQuant(handler, self)

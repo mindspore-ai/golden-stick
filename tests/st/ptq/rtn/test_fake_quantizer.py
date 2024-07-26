@@ -52,3 +52,33 @@ def test_minmaxperchannel(mode):
     for max_ in maxs:
         assert max_ == 1
     os.environ.pop('GRAPH_OP_RUN')
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_minmaxperchannel_3d(mode):
+    """
+    Feature: MinMaxPerChannel.
+    Description: Call forward function of MinMaxPerChannel.
+    Expectation: Forward successful.
+    """
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
+    shape = (5, 6, 7)
+    rank = 3
+    axis = 1
+    channels = 6
+    weight = Parameter(initializer('ones', shape, mstype.float32), name="weight")
+    fq = MinMaxPerChannel(symmetric=True, data_rank=rank, quant_dtype=QuantDtype.INT8, narrow_range=False, axis=axis,
+                          output_channel=channels)
+    fq(weight)
+    assert fq.float_min.shape == (6,)
+    assert fq.float_max.shape == (6,)
+    mins = fq.float_min.value().asnumpy()
+    for min_ in mins:
+        assert min_ == 1
+    maxs = fq.float_max.value().asnumpy()
+    for max_ in maxs:
+        assert max_ == 1
+    os.environ.pop('GRAPH_OP_RUN')

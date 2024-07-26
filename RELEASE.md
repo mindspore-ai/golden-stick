@@ -6,6 +6,8 @@
 
 ### Major Features and Improvements
 
+* Added post-training quantization C8 algorithm `RoundToNearest` mainly for Llama2 network.
+
 ### API Change
 
 ### Contributors

@@ -6,6 +6,8 @@
 
 ### 主要特性和增强
 
+* 新增C8训练后量化算法`RoundToNearest`，主要针对Llama2系列网络做量化。
+
 ### API Change
 
 ### 贡献者

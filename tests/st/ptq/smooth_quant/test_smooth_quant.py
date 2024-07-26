@@ -26,10 +26,9 @@ from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model, 
 from mindspore import nn, Parameter, GRAPH_MODE, dtype
 from mindspore.common.dtype import QuantDtype
 from mindspore.communication import get_rank
-from mindspore.dataset import GeneratorDataset
 from mindformers.modules import Linear
 from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
-from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig
+from mindformers import LlamaForCausalLM
 
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -40,11 +39,10 @@ from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLin
 from mindspore_gs.ptq.convert_utils import SmoothAndQuantCell, DequantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
 from tests.st.test_utils import check_network_contain_layer, relative_tolerance_acceptable, \
-    absolute_tolerance_acceptable
+    absolute_tolerance_acceptable, set_config, load_distribut_checkpoint, MFLlama2HelloNetworkHelper, create_hello_ds
 
 
 @pytest.mark.level0
@@ -429,75 +427,6 @@ def test_sq_predict_simplenet_2stage_2p():
     assert return_code == 0
 
 
-def _set_config(config_path):
-    """setup MindFormerConfig"""
-    mfconfig = MindFormerConfig(config_path)
-    mfconfig.model.model_config = LlamaConfig(**mfconfig.model.model_config)
-    init_context(use_parallel=mfconfig.use_parallel, context_config=mfconfig.context, parallel_config=mfconfig.parallel)
-    if mfconfig.use_parallel:
-        parallel_config = TransformerOpParallelConfig(**mfconfig.parallel_config)
-        mfconfig.model.model_config.parallel_config = parallel_config
-    mfconfig.model.model_config.checkpoint_name_or_path = mfconfig.load_checkpoint
-    return mfconfig
-
-
-def load_distribut_checkpoint(config, ckpt_path, network):
-    """load ckpt to multi card"""
-    rank_id = get_rank() or 0
-    bs = config.model.model_config.batch_size
-    seq = config.model.model_config.seq_length
-    if os.path.isdir(ckpt_path):
-        for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):
-            if not file.endswith(".ckpt"):
-                continue
-            ckpt_path = os.path.join(ckpt_path, f"rank_{rank_id}", file)
-            model = Model(network)
-            inputs = network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))
-            model.infer_predict_layout(*inputs)
-            break
-    print(f'Loading ckpt :{ckpt_path}.')
-    load_checkpoint(ckpt_path, network)
-    return network
-
-
-class MFLlama2HelloNetworkHelper(MFLlama2Helper):
-    """SimpleNetworkHelper"""
-
-    def generate(self, mf_network, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
-        do_sample = self.mf_config.model.model_config.do_sample
-        seq = self.mf_config.model.model_config.seq_length
-        top_p = self.mf_config.model.model_config.top_p
-        top_k = self.mf_config.model.model_config.top_k
-        return mf_network.generate(input_ids, do_sample=do_sample, max_length=seq, top_p=top_p, top_k=top_k)
-
-
-def create_hello_ds(tokenizer, repeat=1):
-    """create_hello_ds"""
-    class SimpleIterable:
-        """SimpleIterable"""
-        def __init__(self, tokenizer, repeat=1):
-            self._index = 0
-            self.data = []
-            for _ in range(repeat):
-                input_ids = tokenizer("Hello")['input_ids']
-                self.data.append(input_ids)
-
-        def __next__(self):
-            if self._index >= len(self.data):
-                raise StopIteration
-            item = (self.data[self._index],)
-            self._index += 1
-            return item
-
-        def __iter__(self):
-            self._index = 0
-            return self
-
-        def __len__(self):
-            return len(self.data)
-
-    return GeneratorDataset(source=SimpleIterable(tokenizer, repeat), column_names=["input_ids"])
-
 
 def sq_predict_llama2_2stage(device, mode, model_parallel):
     """test_sq_predict_llama2_2stage"""
@@ -525,7 +454,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     w8a8_ckpt_path = os.path.join(cur_dir, w8a8_ckpt_path)
 
     def quant(ckpt_path, config_path):
-        config = _set_config(config_path)
+        config = set_config(config_path)
         network = LlamaForCausalLM(config.model.model_config)
         tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
         if model_parallel == 1:
@@ -548,7 +477,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
                             choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
 
     def w8a8_infer(input_, ckpt_path, config_path):
-        config = _set_config(config_path)
+        config = set_config(config_path)
         network = LlamaForCausalLM(config.model.model_config)
         cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"])
         ptq = SmoothQuant(config=cfg)
@@ -567,7 +496,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
         return outputs, answer
 
     def fp16_infer(input_, ckpt_path, config_path):
-        config = _set_config(config_path)
+        config = set_config(config_path)
         network = LlamaForCausalLM(config.model.model_config)
         tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
         if model_parallel == 1:
