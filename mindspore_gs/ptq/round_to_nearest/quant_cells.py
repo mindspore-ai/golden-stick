@@ -287,9 +287,13 @@ class PagedAttentionQuant(PTQCell):
             self._key_input_quantizer = convert_to_quant(self._key_input_quantizer, self._key_strategy)
             self._value_input_quantizer = convert_to_quant(self._value_input_quantizer, self._value_strategy)
             self.key_t_scale = copy.deepcopy(self._key_input_quantizer.t_scale)
-            self.key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
+            key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
+            key_t_zp_np = np.array(key_t_zp.asnumpy()*-1).astype(np.float16)
+            self.key_t_zp = Parameter(Tensor(key_t_zp_np, dtype=dtype.float16), name=key_t_zp.name)
             self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
-            self.value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
+            value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
+            value_t_zp_np = np.array(value_t_zp.asnumpy()*-1).astype(np.float16)
+            self.value_t_zp = Parameter(Tensor(value_t_zp_np, dtype=dtype.float16), name=value_t_zp.name)
 
             self._kvcache.key_cache = Parameter(Tensor(np.zeros(self._kvcache.key_cache.shape), dtype=dtype.int8),
                                                 name=self._kvcache.key_cache.name, requires_grad=False)
@@ -351,9 +355,13 @@ class PagedAttentionDeploy(PTQCell):
         self._value_input_quantizer = convert_to_quant_for_deploy(ic, self._value_in_strategy)
         self._weight_quantizer = None
         self.key_t_scale = copy.deepcopy(self._key_input_quantizer.t_scale)
-        self.key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
+        key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
+        self.key_t_zp = Parameter(Tensor(key_t_zp.asnumpy().astype(np.float16), dtype=dtype.float16),
+                                  name=key_t_zp.name)
         self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
-        self.value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
+        value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
+        self.value_t_zp = Parameter(Tensor(value_t_zp.asnumpy().astype(np.float16), dtype=dtype.float16),
+                                    name=value_t_zp.name)
         dst_type = self._kvcache.key_cache.dtype
         self._key_output_quantizer = convert_to_antiquant_for_deploy(n * self._key_in_strategy[2], d,
                                                                      self._key_out_strategy, dst_type)

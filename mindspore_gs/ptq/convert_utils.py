@@ -27,9 +27,6 @@ from mindspore.communication.management import GlobalComm
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
-from mindspore_gs.quantization.quant_utils import get_quant_min_max
-from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
-
 
 class AntiQuantCell(Cell):
     """AntiQuantCell, warp AntiQuant to support per-channel AntiQuant."""
@@ -37,7 +34,9 @@ class AntiQuantCell(Cell):
         super().__init__()
         self.outdtype = dst_dtype
         self.div = msops.Div()
+        self.add = msops.Add()
         self.sub = msops.Sub()
+        self.mul = msops.Mul()
         self.cast = msops.Cast()
         self.reshape = msops.Reshape()
         self._pre_shape = (n, d)
@@ -47,15 +46,15 @@ class AntiQuantCell(Cell):
         scale = self.reshape(scale, self._pre_shape)
         zp = self.reshape(zp, self._pre_shape)
         x = self.cast(x, self.outdtype)
-        x = self.sub(x, zp)
-        x = self.div(x, scale)
+        x = self.add(x, zp)
+        x = self.mul(x, scale)
         x = self.cast(x, self.outdtype)
         return x
 
     def shard(self, strategy):
         """shard strategy for anti quant"""
-        self.sub.shard((strategy, (strategy[-2], strategy[-1],)))
-        self.div.shard((strategy, (strategy[-2], strategy[-1],)))
+        self.add.shard((strategy, (strategy[-2], strategy[-1],)))
+        self.mul.shard((strategy, (strategy[-2], strategy[-1],)))
 
 def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
@@ -113,12 +112,31 @@ class QuantCell(Cell):
         self.round.shard((strategy,))
         self.cast.shard((strategy,))
 
+
+class QuantCellV2(Cell):
+    """QuantCellV2, warp Quant to support serialize and deserialize use QuantV2."""
+    def __init__(self, t_scale: Tensor, t_zp: Tensor):
+        super().__init__()
+        if t_scale.shape != t_zp.shape:
+            raise ValueError(f"Size of scale({t_scale.shape}) should be equal to size of zp({t_zp.shape}).")
+        self._is_perchannel: bool = t_scale.shape != (1,)
+        self.t_scale = Parameter(t_scale)
+        self.t_zp = Parameter(t_zp)
+        self.quant = QuantV2()
+
+    def construct(self, x):
+        """construct network forward"""
+        return self.quant(x, self.t_scale, self.t_zp, False, "ROUND", ms.int8)
+
+    def shard(self, strategy):
+        """shard strategy for quant cell"""
+        self.quant.shard((strategy, (strategy[-1],), (strategy[-1],)))
+
 def convert_to_quant_for_deploy(ic, strategy=None) -> QuantCell:
     """Convert to Quant for deploy."""
     scale = np.ones([ic], dtype=np.float16)
-    zp = np.ones([ic], dtype=np.float16)
-    quant_min, quant_max = get_quant_min_max()
-    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float16), Tensor(zp, dtype=dtype.float16), quant_min, quant_max)
+    zp = np.ones([ic], dtype=np.int8)
+    quant_cell = QuantCellV2(Tensor(scale, dtype=dtype.float16), Tensor(zp, dtype=dtype.int8))
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell
@@ -135,11 +153,7 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    quant_min, quant_max = get_quant_min_max(
-        num_bits=fq.attrs[LinearFakeQuantizer.attr_key_num_bits],
-        signed=fq.attrs[LinearFakeQuantizer.attr_key_signed],
-        narrow_range=fq.attrs[LinearFakeQuantizer.attr_key_narrow_range])
-    quant_cell = QuantCell(Tensor(scale, dtype=dtype.float16), Tensor(zp, dtype=dtype.float16), quant_min, quant_max)
+    quant_cell = QuantCellV2(Tensor(scale, dtype=dtype.float16), Tensor(np.array(zp).astype(np.int8), dtype=dtype.int8))
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell

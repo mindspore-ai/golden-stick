@@ -22,7 +22,7 @@ import numpy as np
 from mindspore import context, GRAPH_MODE, Tensor, nn, QuantDtype, save_checkpoint, load_checkpoint
 from mindspore.communication import get_rank
 from mindspore_gs.ptq import RoundToNearest as RTN
-from mindspore_gs.ptq.convert_utils import QuantCell
+from mindspore_gs.ptq.convert_utils import QuantCellV2
 from mindspore_gs.ptq.round_to_nearest.quant_cells import PagedAttentionQuant
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
@@ -115,10 +115,10 @@ def test_apply_convert(device, mode):
     assert isinstance(quant_cell, PagedAttentionQuant)
 
     key_fake_quant = quant_cell._key_input_quantizer
-    assert isinstance(key_fake_quant, QuantCell)
+    assert isinstance(key_fake_quant, QuantCellV2)
 
     value_fake_quant = quant_cell._value_input_quantizer
-    assert isinstance(value_fake_quant, QuantCell)
+    assert isinstance(value_fake_quant, QuantCellV2)
 
     assert quant_cell.weight_quantizer() is None
 
@@ -211,9 +211,9 @@ def kv_predict_llama2_2stage(device, mode, model_parallel):
     qoutput, _ = w8a16c8_infer(example, w8a16c8_ckpt_path, w8a16c8_config_path)
     npfoutput = np.array(foutput)
     npqoutput = np.array(qoutput)
-    if not np.allclose(npqoutput[:, :329], npfoutput[:, :329], 0, 0):
+    if not np.allclose(npqoutput[:, :398], npfoutput[:, :398], 0, 0):
         return False
-    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
+    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 42.161)
 
 
 @pytest.mark.level0
