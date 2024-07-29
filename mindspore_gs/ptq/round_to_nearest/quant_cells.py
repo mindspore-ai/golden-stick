@@ -15,6 +15,7 @@
 """ptq quant cells."""
 import copy
 import time
+import abc
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
@@ -233,7 +234,7 @@ class LinearDeploy(PTQCell):
         return output
 
 class PagedAttentionQuant(PTQCell):
-    """Linear layer wrapper with min max"""
+    """PagedAttention Quant wrapper with min max"""
 
     def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
         super(PagedAttentionQuant, self).__init__(kvcache, policy)
@@ -250,6 +251,8 @@ class PagedAttentionQuant(PTQCell):
         self.key_t_zp = None
         self.value_t_scale = None
         self.value_t_zp = None
+        self.key_value_t_zp = None
+        self.key_value_t_scale = None
         perchannel_args = PerChannelArgs(n * d, 2, 3)
 
         if "in_strategy" in kvcache.reshape_and_cache.get_attr_dict():
@@ -287,13 +290,27 @@ class PagedAttentionQuant(PTQCell):
             self._key_input_quantizer = convert_to_quant(self._key_input_quantizer, self._key_strategy)
             self._value_input_quantizer = convert_to_quant(self._value_input_quantizer, self._value_strategy)
             self.key_t_scale = copy.deepcopy(self._key_input_quantizer.t_scale)
+            self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
+
+            key_t_scale_np = self.key_t_scale.asnumpy()
+            value_t_scale_np = self.value_t_scale.asnumpy()
+            t_scale_len = key_t_scale_np.shape[0]
+            key_value_t_scale_np = np.concatenate((key_t_scale_np.reshape((1, t_scale_len)),
+                                                   value_t_scale_np.reshape((1, t_scale_len))))
+            self.key_value_t_scale = Parameter(Tensor(key_value_t_scale_np, dtype=dtype.float16),
+                                               name="key_value_t_scale")
+
             key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
             key_t_zp_np = np.array(key_t_zp.asnumpy()*-1).astype(np.float16)
             self.key_t_zp = Parameter(Tensor(key_t_zp_np, dtype=dtype.float16), name=key_t_zp.name)
-            self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
+
             value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
             value_t_zp_np = np.array(value_t_zp.asnumpy()*-1).astype(np.float16)
             self.value_t_zp = Parameter(Tensor(value_t_zp_np, dtype=dtype.float16), name=value_t_zp.name)
+
+            t_zp_len = value_t_zp_np.shape[0]
+            key_value_t_zp = np.concatenate((key_t_zp_np.reshape((1, t_zp_len)), value_t_zp_np.reshape((1, t_zp_len))))
+            self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.float16), name="key_value_t_zp")
 
             self._kvcache.key_cache = Parameter(Tensor(np.zeros(self._kvcache.key_cache.shape), dtype=dtype.int8),
                                                 name=self._kvcache.key_cache.name, requires_grad=False)
@@ -328,13 +345,12 @@ class PagedAttentionQuant(PTQCell):
         return self._kvcache.paged_attention_with_alibi(query, self._kvcache.key_cache, self._kvcache.value_cache,
                                                         block_tables, batch_valid_length, alibi_tensor)
 
-class PagedAttentionDeploy(PTQCell):
-    """Linear layer wrapper with min max"""
+class PagedAttentionDeployBase(PTQCell):
+    """PagedAttention deploy base class"""
 
     def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
-        super(PagedAttentionDeploy, self).__init__(kvcache, policy)
+        super(PagedAttentionDeployBase, self).__init__(kvcache, policy)
         self._kvcache = kvcache
-
         # KVCacheMgr's shape is BSH currently.
         n = kvcache.n_heads
         d = kvcache.head_dim
@@ -343,35 +359,33 @@ class PagedAttentionDeploy(PTQCell):
         self._key_out_strategy = None
         self._value_out_strategy = None
 
-        ic = n * d
         if "in_strategy" in kvcache.reshape_and_cache.get_attr_dict():
             self._key_in_strategy = kvcache.reshape_and_cache.in_strategy[0]
             self._value_in_strategy = kvcache.reshape_and_cache.in_strategy[1]
-            ic = n * d * self._key_in_strategy[2]
+            n = n * self._key_in_strategy[2]
             self._key_out_strategy = kvcache.reshape_and_cache.in_strategy[2]
             self._value_out_strategy = kvcache.reshape_and_cache.in_strategy[3]
-
+        ic = n * d
         self._key_input_quantizer = convert_to_quant_for_deploy(ic, self._key_in_strategy)
         self._value_input_quantizer = convert_to_quant_for_deploy(ic, self._value_in_strategy)
         self._weight_quantizer = None
+
         self.key_t_scale = copy.deepcopy(self._key_input_quantizer.t_scale)
+        self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
         key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
         self.key_t_zp = Parameter(Tensor(key_t_zp.asnumpy().astype(np.float16), dtype=dtype.float16),
                                   name=key_t_zp.name)
-        self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
         value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
         self.value_t_zp = Parameter(Tensor(value_t_zp.asnumpy().astype(np.float16), dtype=dtype.float16),
                                     name=value_t_zp.name)
+
         dst_type = self._kvcache.key_cache.dtype
-        self._key_output_quantizer = convert_to_antiquant_for_deploy(n * self._key_in_strategy[2], d,
-                                                                     self._key_out_strategy, dst_type)
-        self._value_output_quantizer = convert_to_antiquant_for_deploy(n * self._key_in_strategy[2], d,
-                                                                       self._value_out_strategy, dst_type)
+        self._key_output_quantizer = convert_to_antiquant_for_deploy(n, d, self._key_out_strategy, dst_type)
+        self._value_output_quantizer = convert_to_antiquant_for_deploy(n, d, self._value_out_strategy, dst_type)
         self._kvcache.key_cache = Parameter(Tensor(np.zeros(self._kvcache.key_cache.shape), dtype=dtype.int8),
                                             name=self._kvcache.key_cache.name, requires_grad=False)
         self._kvcache.value_cache = Parameter(Tensor(np.zeros(self._kvcache.value_cache.shape), dtype=dtype.int8),
                                               name=self._kvcache.value_cache.name, requires_grad=False)
-
 
     def weight_quantizer(self):
         return self._weight_quantizer
@@ -395,14 +409,44 @@ class PagedAttentionDeploy(PTQCell):
         return self._kvcache.reshape_and_cache(key, value, self._kvcache.key_cache, self._kvcache.value_cache,
                                                slot_mapping)
 
+    @abc.abstractmethod
     def paged_attn(self, query, batch_valid_length, block_tables):
         """The forward compute of Paged Attention."""
-        kcache = self._key_output_quantizer(self._kvcache.key_cache, self.key_t_zp, self.key_t_scale)
-        vcache = self._value_output_quantizer(self._kvcache.value_cache, self.value_t_zp, self.value_t_scale)
-        return self._kvcache.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
+        return NotImplementedError
 
     def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
         """The forward compute of KVCache for Paged Attention with alibi tensor."""
         kcache = self._key_output_quantizer(self._kvcache.key_cache, self.key_t_zp, self.key_t_scale)
         vcache = self._value_output_quantizer(self._kvcache.value_cache, self.value_t_zp, self.value_t_scale)
         return self.paged_attention_with_alibi(query, kcache, vcache, block_tables, batch_valid_length, alibi_tensor)
+
+
+class PagedAttentionDeploy(PagedAttentionDeployBase):
+    """PagedAttention deploy with no fuison"""
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        kcache = self._key_output_quantizer(self._kvcache.key_cache, self.key_t_zp, self.key_t_scale)
+        vcache = self._value_output_quantizer(self._kvcache.value_cache, self.value_t_zp, self.value_t_scale)
+        return self._kvcache.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
+
+class PagedAttentionDeployFusion(PagedAttentionDeployBase):
+    """PagedAttention deploy with fuison ops."""
+
+    def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
+        super(PagedAttentionDeployFusion, self).__init__(kvcache, policy)
+        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.float16),
+                                        name="key_value_t_zp")
+        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.float16),
+                                           name="key_value_t_scale")
+        if "in_strategy" in kvcache.paged_attention.get_attr_dict():
+            pa_strategy = kvcache.paged_attention.in_strategy
+            antiquant_strategy = (1, self._key_in_strategy[2],)
+            self._kvcache.paged_attention.shard((*pa_strategy, antiquant_strategy, antiquant_strategy))
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        kcache = self._kvcache.key_cache
+        vcache = self._kvcache.value_cache
+        return self._kvcache.paged_attention(query, kcache, vcache, block_tables, batch_valid_length,
+                                             self.key_value_t_scale, self.key_value_t_zp)

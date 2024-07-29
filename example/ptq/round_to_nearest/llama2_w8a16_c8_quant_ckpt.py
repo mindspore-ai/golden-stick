@@ -59,6 +59,7 @@ def quant_network(net: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendT
         raise ValueError("Please provide mfconfig for calibrating.")
     network_helper = MFLlama2Helper(mfconfig)
     ds = None
+    tokenizer = None
     if kvcache_int8:
         logger.info('create dataset for kvcache_int8 quant.')
         ptq.config.enable_kvcache_int8 = True
@@ -76,7 +77,7 @@ def quant_network(net: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendT
         tokenizer = network_helper.create_tokenizer()
         ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
                           False, n_samples=200)
-    net = ptq.apply(net, network_helper, ds)
+    net = ptq.apply(net, network_helper, ds, tokenizer)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
     net.phase = "quant_convert"

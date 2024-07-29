@@ -23,7 +23,7 @@ import numpy as np
 from mindspore.nn import Cell
 from mindspore import context
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
-import mindspore.log as logger
+from mindspore_gs.common import logger
 
 from mindspore_gs import CompAlgo
 from mindspore_gs.quantization.net_policy import NetPolicy
@@ -143,7 +143,7 @@ class RoundToNearest(CompAlgo):
         network.update_parameters_name()
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, tokenizer=None, **kwargs) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -211,8 +211,11 @@ class RoundToNearest(CompAlgo):
             for _, ds_item in enumerate(ds.create_dict_iterator()):
                 logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
                 input_ids = ds_item['input_ids'].asnumpy()
-                network_helper.generate(network, input_ids)
+                output = network_helper.generate(network, input_ids)
                 data_count += 1
+                if tokenizer:
+                    logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
+                    logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:

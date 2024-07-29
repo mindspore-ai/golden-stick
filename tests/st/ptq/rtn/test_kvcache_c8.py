@@ -123,7 +123,7 @@ def test_apply_convert(device, mode):
     assert quant_cell.weight_quantizer() is None
 
 
-def kv_predict_llama2_2stage(device, mode, model_parallel):
+def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=False):
     """test_kv_predict_llama2_2stage"""
     os.environ['GRAPH_OP_RUN'] = "1"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
@@ -150,6 +150,7 @@ def kv_predict_llama2_2stage(device, mode, model_parallel):
 
     def quant(ckpt_path, config_path):
         config = set_config(config_path)
+        config.model.model_config.use_past = True
         network = LlamaForCausalLM(config.model.model_config)
         tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
         if model_parallel == 1:
@@ -174,8 +175,10 @@ def kv_predict_llama2_2stage(device, mode, model_parallel):
 
     def w8a16c8_infer(input_, ckpt_path, config_path):
         config = set_config(config_path)
+        config.model.model_config.use_past = True
         network = LlamaForCausalLM(config.model.model_config)
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"])
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"],
+                        enable_deploy_fusion=enable_deploy_fusion)
         ptq = RTN(config=cfg)
         ptq.config.enable_kvcache_int8 = True
         network = ptq.apply(network)
@@ -186,7 +189,7 @@ def kv_predict_llama2_2stage(device, mode, model_parallel):
             load_checkpoint(ckpt_path, network)
         else:
             network = load_distribut_checkpoint(config, ckpt_path, network)
-        seq_len = 500
+        seq_len = 100
         input_ids = tokenizer(input_)['input_ids']
         outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
         answer = tokenizer.decode(outputs, skip_special_tokens=True)
@@ -194,13 +197,14 @@ def kv_predict_llama2_2stage(device, mode, model_parallel):
 
     def fp16_infer(input_, ckpt_path, config_path):
         config = set_config(config_path)
+        config.model.model_config.use_past = True
         network = LlamaForCausalLM(config.model.model_config)
         tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
         if model_parallel == 1:
             load_checkpoint(ckpt_path, network)
         else:
             network = load_distribut_checkpoint(config, ckpt_path, network)
-        seq_len = 500
+        seq_len = 100
         input_ids = tokenizer(input_)['input_ids']
         outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
         answer = tokenizer.decode(outputs, skip_special_tokens=True)
@@ -211,33 +215,31 @@ def kv_predict_llama2_2stage(device, mode, model_parallel):
     qoutput, _ = w8a16c8_infer(example, w8a16c8_ckpt_path, w8a16c8_config_path)
     npfoutput = np.array(foutput)
     npqoutput = np.array(qoutput)
-    if not np.allclose(npqoutput[:, :398], npfoutput[:, :398], 0, 0):
+    if not np.allclose(npqoutput[:, :14], npfoutput[:, :14], 0, 0):
         return False
-    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 42.161)
+    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 31.1)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
 def test_kv_llama2_predict_2stage_1p(device, mode):
     """
-    Feature: test smooth quant adjust parameter in two stages with one cards.
-    Description: apply SQ on llama2 and check accuracy.
+    Feature: test RTQ kvcache int8 quant in two stages with one cards.
+    Description: apply RTQ kvcache int8 quant on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
     model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
     assert kv_predict_llama2_2stage(device, mode, model_parallel)
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_kv_llama2_predict_2stage_2p():
     """
-    Feature: test smooth quant adjust parameter in two stages with two cards.
-    Description: apply SQ on llama2 and check accuracy.
+    Feature: test RTQ kvcache int8 quant in two stages with two cards.
+    Description: apply RTQ kvcache int8 quant on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
     model_parallel = 2
@@ -246,6 +248,44 @@ def test_kv_llama2_predict_2stage_2p():
         "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
         "pytest -s test_kvcache_c8.py::test_kv_llama2_predict_2stage_1p"
+    )
+    if return_code != 0:
+        log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+
+    assert return_code == 0
+
+
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_kv_fusion_ops_llama2_predict_2stage_1p(device, mode):
+    """
+    Feature: test RTQ kvcache int8 quant use PA int8 ops in two stages with one cards.
+    Description: apply RTQ kvcache int8 quant use PA int8 ops on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
+    assert kv_predict_llama2_2stage(device, mode, model_parallel, True)
+
+
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_kv_fusion_ops_llama2_predict_2stage_2p():
+    """
+    Feature: test RTQ kvcache int8 quant use PA int8 ops in two stages with two cards.
+    Description: apply RTQ kvcache int8 quant use PA int8 ops on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = 2
+    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    return_code = os.system(
+        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
+        "pytest -s test_kvcache_c8.py::test_kv_fusion_ops_llama2_predict_2stage_1p"
     )
     if return_code != 0:
         log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")

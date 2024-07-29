@@ -61,7 +61,7 @@ class SmoothQuant(CompAlgo):
         return SQNetPolicy(config)
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: GeneratorDataset = None) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, tokenizer=None, datasets: GeneratorDataset = None) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -146,6 +146,9 @@ class SmoothQuant(CompAlgo):
             input_ids = ds_item['input_ids'].asnumpy()
             network_helper.generate(network, input_ids, max_new_tokens=1)
             data_count += 1
+            if tokenizer:
+                logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
+                logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
         insert_weight_observer_and_quant(network)
         network.update_parameters_name()
         os.environ['NETWORK_PHASE'] = "weightobs"
@@ -162,6 +165,9 @@ class SmoothQuant(CompAlgo):
             input_ids = ds_item['input_ids'].asnumpy()
             network_helper.generate(network, input_ids, max_new_tokens=1)
             data_count += 1
+            if tokenizer:
+                logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
+                logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:

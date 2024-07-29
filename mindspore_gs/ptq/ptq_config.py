@@ -95,6 +95,7 @@ class PTQConfig:
     backend: BackendTarget = BackendTarget.ASCEND
     opname_blacklist: List[str] = field(default_factory=list)
     algo_args: Union[dict, dataclass] = field(default_factory=dict)
+    enable_deploy_fusion: bool = False
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():

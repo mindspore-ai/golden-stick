@@ -153,7 +153,8 @@ def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
         raise ValueError("Can not find scale in FakeQuantParamCell.")
     if zp is None:
         raise ValueError("Can not find zp in FakeQuantParamCell.")
-    quant_cell = QuantCellV2(Tensor(scale, dtype=dtype.float16), Tensor(np.array(zp).astype(np.int8), dtype=dtype.int8))
+    quant_cell = QuantCellV2(Tensor(np.squeeze(scale), dtype=dtype.float16),
+                             Tensor(np.array(np.squeeze(zp)).astype(np.int8), dtype=dtype.int8))
     if strategy is not None:
         quant_cell.shard(strategy)
     return quant_cell

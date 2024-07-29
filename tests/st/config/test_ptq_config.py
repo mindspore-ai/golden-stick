@@ -152,10 +152,12 @@ def test_ptq_yaml_dump_and_load():
     """
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.weight_symmetric = False
+    cfg.enable_deploy_fusion = True
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
     assert new_cfg.weight_symmetric is False
+    assert new_cfg.enable_deploy_fusion is True
 
 
 @pytest.mark.level0
