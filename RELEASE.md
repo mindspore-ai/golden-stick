@@ -6,14 +6,14 @@
 
 ### Major Features and Improvements
 
-* [Demo]Added post-training quantization W8A8 algorithm `SmoothQuant` mainly for Llama2 network.
+* [DEMO] Added post-training quantization W8A8 algorithm `SmoothQuant` mainly for Llama2 network.
 
 ### API Change
 
 * Added `kwargs` to `apply` api of `CompAlgo` class as extensible parameter for subclasses.
 * Added `NetworkHelper` abstract class as adapter for decoupling between algorithm and framework.
 * Added `MFLlama2Helper` class as adapter between algorithm and MindFormers.
-* [Demo]Added `SmoothQuant` class as entry of SmoothQuant algorithm.
+* [DEMO] Added `SmoothQuant` class as entry of SmoothQuant algorithm.
 * Added parameter checking that `RoundToNearest` algorithm only supports BackendTarget.ASCEND as backend.
 
 ### Contributors
