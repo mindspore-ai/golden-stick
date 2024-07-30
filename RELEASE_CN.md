@@ -22,14 +22,14 @@ ccsszz, yyyyrf, hangangqiang
 
 ### 主要特性和增强
 
-* [Demo]新增了主要针对Llama2网络的训练后量化W8A8算法 `SmoothQuant`。
+* [DEMO] 新增了主要针对Llama2网络的训练后量化W8A8算法 `SmoothQuant`。
 
 ### API Change
 
 * `CompAlgo`类的`apply`新增`kwargs`参数作为子类的可扩展入参。
 * 添加了 `NetworkHelper` 抽象类作为适配器，用于算法和框架之间的解耦。
 * 添加了 `MFLlama2Helper` 类作为算法和 MindFormers 之间的适配器。
-* [Demo]新增 `SmoothQuant` 类作为SmoothQuant算法的入口。
+* [DEMO] 新增 `SmoothQuant` 类作为SmoothQuant算法的入口。
 * 新增参数检查，确认 `RoundToNearest` 算法仅支持BackendTarget.ASCEND作为后端。
 
 ### 贡献者
