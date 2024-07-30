@@ -13,4 +13,4 @@ mindspore_gs.ptq.PTQConfig
     异常：
         - **ValueError** - `mode` 输入不在 [PTQMode.QUANTIZE, PTQMode.DEPLOY] 中。
         - **ValueError** - `backend` 输入不在 [BackendTarget.NONE, BackendTarget.ASCEND] 中。
-        - **ValueError** - `opname_blacklist` 不是一个字符串的列表。
+        - **TypeError** - `opname_blacklist` 不是一个字符串的列表。

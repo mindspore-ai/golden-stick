@@ -13,6 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """test Linear W8A16 algorithm."""
+import warnings
+
 import os
 import sys
 from collections import OrderedDict
@@ -20,7 +22,7 @@ from collections import OrderedDict
 import pytest
 import numpy as np
 import mindspore
-from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype
+from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype, ops
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.round_to_nearest.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
@@ -36,17 +38,71 @@ from tests.st.test_utils import check_network_contain_layer, relative_tolerance_
     absolute_tolerance_acceptable
 
 
+class NoQuantNet(nn.Cell):
+    """
+    Network with no linear to be quant
+    """
+    def construct(self, x):
+        return ops.add(x, x)
+
+
 class SimpleNet(nn.Cell):
     """
     Network with single linear to be quant
     """
-
     def __init__(self):
         super(SimpleNet, self).__init__()
         self.linear = Linear(in_channels=5, out_channels=6, weight_init="ones")
 
     def construct(self, x):
         return self.linear(x)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_nothing_to_apply_convert():
+    """
+    Feature: RoundToNearestPTQ algorithm set functions.
+    Description: Apply RoundToNearestPTQ on NoQuantNet.
+    Expectation: warning log.
+    """
+    ptq = RTN(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
+    network = NoQuantNet()
+    with pytest.warns(expected_warning=RuntimeWarning, match="No layer found in network is suitable for quantization"):
+        ptq.apply(network)
+    network = NoQuantNet()
+    with pytest.warns(expected_warning=RuntimeWarning, match="and make sure call apply before convert"):
+        ptq.convert(network)
+    network = SimpleNet()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        network = ptq.apply(network)
+        # pylint: disable=protected-access
+        network.linear._weight_quantizer.foo_init()
+        ptq.convert(network)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_apply_convert_error():
+    """
+    Feature: RoundToNearestPTQ algorithm set functions.
+    Description: Apply RoundToNearestPTQ on SimpleNet with error arguments.
+    Expectation: raise error.
+    """
+    ptq = RTN(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
+    network = NoQuantNet()
+
+    with pytest.raises(TypeError):
+        ptq.apply(1)
+    with pytest.raises(TypeError):
+        ptq.apply(network, 1)
+    with pytest.raises(TypeError):
+        ptq.convert(1)
+    with pytest.raises(TypeError):
+        ptq.convert(network, 1)
 
 
 @pytest.mark.level0

@@ -21,7 +21,7 @@ from typing import List
 from mindspore import QuantDtype
 
 from mindspore_gs.common.config import GSBaseConfig
-from mindspore_gs.common.utils import value_check
+from mindspore_gs.common.utils import value_check, list_value_check
 from mindspore_gs.common.register import RegisterMachine
 from mindspore_gs.common.gs_enum import QuantCellType, BackendTarget
 
@@ -97,7 +97,7 @@ class PTQConfig:
     Raises:
         ValueError: If `mode` is not in PTQMode's members.
         ValueError: If `backend` is not in BackendTarget's members.
-        ValueError: if `opname_blacklist` is not a list of str.
+        TypeError: if `opname_blacklist` is not a list of str.
 
     Example:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -119,7 +119,7 @@ class PTQConfig:
         if self.backend not in BackendTarget.__members__.values():
             raise ValueError(f'backend shall be in '
                              f'{BackendTarget.__members__.values()}')
-        value_check('opname_blacklist', self.opname_blacklist, str)
+        list_value_check('opname_blacklist', self.opname_blacklist, str)
 
 
 @dataclass

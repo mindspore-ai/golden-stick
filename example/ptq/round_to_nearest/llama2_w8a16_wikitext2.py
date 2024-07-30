@@ -21,9 +21,8 @@ import numpy as np
 import mindspore as ms
 from mindspore import log as logger
 from mindspore import Model
-from mindspore import ops
-from mindspore.train.metrics import Perplexity
 from mindspore.communication import get_rank
+from mindformers.core.metric import PerplexityMetric
 from mindspore_gs.datasets import create_wikitext_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 from llama2 import Llama2Network
@@ -35,7 +34,8 @@ def evaluate(net, dataset_path, config_, tokenizer_):
     seq_ = config_.model.model_config.seq_length
     net_helper = MFLlama2Helper(config_)
     ds = create_wikitext_dataset(dataset_path, bs_, seq_, 1, tokenizer_)
-    metric = Perplexity()
+    metric = PerplexityMetric()
+    metric.clear()
     data_count = 0
     total_count = ds.get_dataset_size()
     net.is_first_iteration = False
@@ -44,10 +44,8 @@ def evaluate(net, dataset_path, config_, tokenizer_):
         logger.info(f"Dataset count: {data_count}/{total_count}")
         input_ids = ds_item['input_ids'].asnumpy()
         net_inputs = net_helper.assemble_inputs(input_ids)
-        output = net(*net_inputs)
-        output = ops.squeeze(output)[:-1, :]
-        label = input_ids[:, 1:]
-        metric.update(output, label)
+        outputs = net(*net_inputs)
+        metric.update(*outputs)
     print('...........Evaluate Over!...............', flush=True)
     print(f"PPL: {metric.eval()}", flush=True)
 
@@ -66,6 +64,7 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     print('------------------------- Creating network...', flush=True)
+    os.environ.pop("RUN_MODE")
     net_mgr: Llama2Network = Llama2Network()
     config = net_mgr.create_mfconfig(uargs.config_path)
     config.model.model_config.use_past = False
