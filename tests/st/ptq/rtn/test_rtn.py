@@ -76,10 +76,10 @@ def test_convert_error():
     network = nn.Conv2d(6, 5, kernel_size=2)
     ptq = RTN()
     new_network = ptq.apply(network)
-    with pytest.raises(TypeError, match="The parameter `net_opt` must be isinstance of Cell"):
+    with pytest.raises(TypeError, match="Type of net_opt should be"):
         ptq.convert(100)
 
-    with pytest.raises(TypeError, match="The parameter `ckpt_path` must be isinstance of str"):
+    with pytest.raises(TypeError, match="Type of ckpt_path should be"):
         ptq.convert(new_network, 100)
 
     with pytest.raises(ValueError, match="The parameter `ckpt_path` can only be empty or a valid file"):

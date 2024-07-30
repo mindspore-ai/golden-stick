@@ -13,6 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """test interfaces of smooth quant."""
+import warnings
+
 import os
 import sys
 from collections import OrderedDict
@@ -21,9 +23,10 @@ import numpy as np
 import mindspore.communication.management as D
 from mindspore.context import ParallelMode
 from mindspore.nn import Cell
+from mindspore.dataset import GeneratorDataset
 from mindspore.parallel import set_algo_parameters
 from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model, load_param_into_net
-from mindspore import nn, Parameter, GRAPH_MODE, dtype
+from mindspore import nn, Parameter, GRAPH_MODE, dtype, ops
 from mindspore.common.dtype import QuantDtype
 from mindspore.communication import get_rank
 from mindformers.modules import Linear
@@ -136,6 +139,33 @@ def create_simple_ds(np_paths: [str], repeat=1):
     return GeneratorDataset(source=SimpleIterable(np_paths, repeat), column_names=["input_ids"])
 
 
+def create_foo_ds(repeat=1):
+    """create_hello_ds"""
+    class SimpleIterable:
+        """SimpleIterable"""
+        def __init__(self, repeat=1):
+            self._index = 0
+            self.data = []
+            for _ in range(repeat):
+                self.data.append(np.array([[1, 1, 1]], dtype=np.int32))
+
+        def __next__(self):
+            if self._index >= len(self.data):
+                raise StopIteration
+            item = (self.data[self._index],)
+            self._index += 1
+            return item
+
+        def __iter__(self):
+            self._index = 0
+            return self
+
+        def __len__(self):
+            return len(self.data)
+
+    return GeneratorDataset(source=SimpleIterable(repeat), column_names=["input_ids"])
+
+
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
@@ -148,8 +178,10 @@ def test_apply_convert():
 
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     ptq = SmoothQuant(cfg)
-    network = SimpleNet()
-    network = ptq.apply(network)
+    network = SimpleNet(transpose_b=False)
+    net_helper = SimpleNetworkHelper(batch_size=1, seq_length=5)
+    ds = create_foo_ds(1)
+    network = ptq.apply(network, net_helper, ds)
     cells: OrderedDict = network.name_cells()
     quant_cell = cells.get("linear", None)
     assert isinstance(quant_cell, SQLinearWrapper)
@@ -188,7 +220,7 @@ def test_apply_convert():
     assert isinstance(weight_in_observer.narrow_range(), bool) and not weight_in_observer.narrow_range()
     assert weight_in_observer.signed()
     assert weight_in_observer.num_bits() == 8
-    assert weight_in_observer.axis == 1 if network.linear.handler().transpose_b else 0
+    assert weight_in_observer.axis == (1 if network.linear.handler().transpose_b else 0)
     assert quant_cell.output_quantizer() is None
 
     network = ptq.convert(network)
@@ -207,6 +239,66 @@ def test_apply_convert():
     assert isinstance(network.linear.handler().weight, Parameter)
     assert network.linear.handler().weight.dtype == dtype.int8
     assert network.linear.handler().has_bias
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_apply_convert_error():
+    """
+    Feature: SmoothQuant algorithm set functions.
+    Description: Apply SmoothQuant on SimpleNet with error arguments.
+    Expectation: raise error.
+    """
+    ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
+    network = SimpleNet()
+    net_helper = SimpleNetworkHelper(batch_size=1, seq_length=1)
+    ds = create_foo_ds(1)
+    with pytest.raises(TypeError, match="Type of network should be"):
+        ptq.apply(1, net_helper, ds)
+    with pytest.raises(TypeError, match="Type of network_helper should be"):
+        ptq.apply(network, 1, ds)
+    with pytest.raises(TypeError, match="Type of datasets should be"):
+        ptq.apply(network, net_helper, 1)
+    with pytest.raises(TypeError, match="Type of net_opt should be"):
+        ptq.convert(1)
+    with pytest.raises(TypeError, match="Type of ckpt_path should be"):
+        ptq.convert(network, 1)
+
+
+class NoQuantNet(nn.Cell):
+    """
+    Network with no linear to be quant
+    """
+    def construct(self, x):
+        return ops.add(x, x)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_nothing_to_apply_convert():
+    """
+    Feature: SmoothQuant algorithm set functions.
+    Description: Apply SmoothQuant on NoQuantNet.
+    Expectation: warning log.
+    """
+    ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
+    network = NoQuantNet()
+    net_helper = SimpleNetworkHelper(batch_size=1, seq_length=1)
+    ds = create_foo_ds(1)
+    with pytest.warns(expected_warning=RuntimeWarning, match="No layer found in network is suitable for quantization"):
+        ptq.apply(network, net_helper, ds)
+    network = NoQuantNet()
+    with pytest.warns(expected_warning=RuntimeWarning, match="and make sure call apply before convert"):
+        ptq.convert(network)
+    network = SimpleNet()
+    net_helper = SimpleNetworkHelper(batch_size=1, seq_length=5)
+    ds = create_foo_ds(1)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        network = ptq.apply(network, net_helper, ds)
+        ptq.convert(network)
 
 
 @pytest.mark.level0
@@ -341,7 +433,7 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
         load_checkpoint(fp_ckpt_path, network)
         net_helper = SimpleNetworkHelper(batch_size=act_out, seq_length=act_in)
         ds = create_simple_ds([input_path], 2)
-        network = ptq.apply(network, net_helper, ds=ds)
+        network = ptq.apply(network, net_helper, datasets=ds)
         network = ptq.convert(network)
         save_checkpoint(network.parameters_dict(), ckpt_path, integrated_save=False)
 
@@ -465,7 +557,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
         ptq = SmoothQuant(config=cfg)
         net_helper = MFLlama2HelloNetworkHelper(config)
         ds = create_hello_ds(tokenizer, 1)
-        network = ptq.apply(network, net_helper, ds=ds)
+        network = ptq.apply(network, net_helper, datasets=ds)
         network = ptq.convert(network)
         if model_parallel == 1:
             save_checkpoint(network.parameters_dict(), w8a8_ckpt_path, integrated_save=False)

@@ -13,12 +13,15 @@
 # limitations under the License.
 # ============================================================================
 """SmoothQuant algorithm."""
+import warnings
+
 import os
 from typing import Tuple
 import copy
 import numpy as np
 
 from mindspore.nn import Cell
+from mindspore.dataset import GeneratorDataset
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
@@ -27,6 +30,7 @@ from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, 
 from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
 from mindspore_gs.common.register import cell_type_dicts
 from mindspore_gs.common import logger
+from mindspore_gs.common.utils import value_check
 from mindspore_gs.ptq.smooth_quant.sq_net_policy import SQNetPolicy
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 
@@ -57,8 +61,28 @@ class SmoothQuant(CompAlgo):
         return SQNetPolicy(config)
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
-        """Apply"""
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: GeneratorDataset = None) -> Cell:
+        """
+        Define how to add fake quantizer to `network`.
+
+        Args:
+            network (Cell): Network to be fake quantized.
+            network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
+            datasets (GeneratorDataset): Datasets for calibrating.
+
+        Raises:
+            RuntimeError: If SmoothQuant is not well inited.
+            TypeError: If input `network` is not a Cell.
+            TypeError: If input `network_helper` is not a NetworkHelper if mode is `PTQMode.QUANTIZE`.
+            TypeError: If input `datasets` is not a GeneratorDataset if mode is `PTQMode.QUANTIZE`.
+
+        Returns:
+            fake quantized network.
+        """
+        value_check('network', network, Cell)
+        if not self._is_deploy:
+            value_check('network_helper', network_helper, NetworkHelper)
+            value_check('datasets', datasets, GeneratorDataset)
         if not isinstance(self._ptq_policy, SQNetPolicy):
             raise RuntimeError("Derived class should provide net policy")
 
@@ -68,6 +92,7 @@ class SmoothQuant(CompAlgo):
             def __init__(self, ptq_policy, config):
                 self._ptq_policy = ptq_policy
                 self._config = config
+                self.changed = False
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
@@ -79,6 +104,7 @@ class SmoothQuant(CompAlgo):
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
+                    self.changed = True
                     return new_layer_policy.wrap_cell(cell), True
                 return cell, False
 
@@ -101,50 +127,62 @@ class SmoothQuant(CompAlgo):
                     insert_act_quant(cell)
 
         self._ptq_policy.build()
-        InsertActObserver(self._ptq_policy, self._config).process(network)
+        replacer = InsertActObserver(self._ptq_policy, self._config)
+        replacer.process(network)
+        if not replacer.changed:
+            warn_str = "No layer found in network is suitable for quantization, please check network and " \
+                       "opname_blacklist."
+            warnings.warn(warn_str, RuntimeWarning)
+            return network
         network.update_parameters_name()
         if self._is_deploy:
             return network
-        if ds:
-            if not network_helper:
-                raise ValueError("Please provide network_helper when datasets is given for calibrating.")
-            total_count = ds.get_dataset_size()
-            os.environ['NETWORK_PHASE'] = "actobs"
-            network.phase = "prefill_actobs"
-            data_count = 1
-            for _, ds_item in enumerate(ds.create_dict_iterator()):
-                logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
-                input_ids = ds_item['input_ids'].asnumpy()
-                network_helper.generate(network, input_ids, max_new_tokens=1)
-                data_count += 1
+        total_count = datasets.get_dataset_size()
+        os.environ['NETWORK_PHASE'] = "actobs"
+        network.phase = "prefill_actobs"
+        data_count = 1
+        for _, ds_item in enumerate(datasets.create_dict_iterator()):
+            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+            input_ids = ds_item['input_ids'].asnumpy()
+            network_helper.generate(network, input_ids, max_new_tokens=1)
+            data_count += 1
         insert_weight_observer_and_quant(network)
         network.update_parameters_name()
-        if ds:
-            os.environ['NETWORK_PHASE'] = "weightobs"
-            network.phase = "prefill_weightobs"
-            bs = network_helper.get_spec('batch_size')
-            network_helper.generate(network, np.ones([bs, 1], dtype=np.int32), max_new_tokens=1)
+        os.environ['NETWORK_PHASE'] = "weightobs"
+        network.phase = "prefill_weightobs"
+        bs = network_helper.get_spec('batch_size')
+        network_helper.generate(network, np.ones([bs, 1], dtype=np.int32), max_new_tokens=1)
         insert_act_quant(network)
         network.update_parameters_name()
-        if ds:
-            os.environ['NETWORK_PHASE'] = "quant"
-            network.phase = "prefill_quant"
-            data_count = 1
-            for _, ds_item in enumerate(ds.create_dict_iterator()):
-                logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
-                input_ids = ds_item['input_ids'].asnumpy()
-                network_helper.generate(network, input_ids, max_new_tokens=1)
-                data_count += 1
+        os.environ['NETWORK_PHASE'] = "quant"
+        network.phase = "prefill_quant"
+        data_count = 1
+        for _, ds_item in enumerate(datasets.create_dict_iterator()):
+            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+            input_ids = ds_item['input_ids'].asnumpy()
+            network_helper.generate(network, input_ids, max_new_tokens=1)
+            data_count += 1
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
-        """convert"""
-        if not isinstance(net_opt, Cell):
-            raise TypeError(
-                f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
-        if not isinstance(ckpt_path, str):
-            raise TypeError(
-                f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
+        """
+        Define how to convert a compressed network to a standard network before exporting.
+
+        Args:
+            net_opt (Cell): Network to be converted which is transformed by `RoundToNearest.apply`.
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
+                checkpoint file to `net_opt`.
+
+        Returns:
+            An instance of Cell represents quantized network.
+
+        Raises:
+            TypeError: If `net_opt` is not Cell.
+            TypeError: If `ckpt_path` is not string.
+            ValueError: If `ckpt_path` is not empty and invalid.
+        """
+        value_check('net_opt', net_opt, Cell)
+        value_check('ckpt_path', ckpt_path, str)
         real_path = os.path.realpath(ckpt_path)
         if ckpt_path != "":
             if os.path.isfile(real_path):
@@ -160,11 +198,18 @@ class SmoothQuant(CompAlgo):
             for _, cell in root.name_cells().items():
                 if isinstance(cell, SQLinearWrapper):
                     cell.convert()
+                    nonlocal changed
+                    changed = True
                 else:
                     _convert(cell)
 
+        changed = False
         _convert(net_opt)
         net_opt.update_parameters_name()
+        if not changed:
+            warn_str = "No layer found in network is suitable for quantization, please check network and " \
+                       "opname_blacklist, and make sure call apply before convert."
+            warnings.warn(warn_str, RuntimeWarning)
         return net_opt
 
     def set_deploy(self, is_deploy: bool = False):

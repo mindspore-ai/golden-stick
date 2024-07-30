@@ -13,6 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """RoundToNearestPTQ."""
+import warnings
+
 import copy
 import os
 from typing import Tuple
@@ -30,6 +32,7 @@ from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.convert_utils import QuantCell
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode, PTQApproach, BackendTarget
 from mindspore_gs.ptq.network_helpers import NetworkHelper
+from mindspore_gs.common.utils import value_check
 from .rtn_net_policy import RTNNetPolicy
 from .quant_cells import LinearQuant, PagedAttentionQuant
 
@@ -150,10 +153,15 @@ class RoundToNearest(CompAlgo):
 
         Raises:
             RuntimeError: If RoundToNearest is not well inited.
+            TypeError: If input `network` is not a Cell.
+            TypeError: If input `network_helper` is not None and is not a NetworkHelper.
 
         Returns:
             fake quantized network.
         """
+        value_check('network', network, Cell)
+        if network_helper:
+            value_check('network_helper', network_helper, NetworkHelper)
         if not isinstance(self._ptq_policy, NetPolicy):
             raise RuntimeError("Derived class should provide net policy")
         self._ptq_policy.build()
@@ -164,6 +172,7 @@ class RoundToNearest(CompAlgo):
             def __init__(self, ptq_policy, config):
                 self._ptq_policy = ptq_policy
                 self._config = config
+                self.changed = False
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not isinstance(cell, Cell):
@@ -175,11 +184,18 @@ class RoundToNearest(CompAlgo):
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
+                    self.changed = True
                     return new_layer_policy.wrap_cell(cell), True
                 return cell, False
 
-        ApplyProcessor(self._ptq_policy, self._config).process(network)
+        replacer = ApplyProcessor(self._ptq_policy, self._config)
+        replacer.process(network)
         network.update_parameters_name()
+        if not replacer.changed:
+            warn_str = "No layer found in network is suitable for quantization, please check network and " \
+                       "opname_blacklist."
+            warnings.warn(warn_str, RuntimeWarning)
+            return network
         if self._is_deploy:
             return network
         if network_helper:
@@ -209,19 +225,15 @@ class RoundToNearest(CompAlgo):
                 checkpoint file to `net_opt`.
 
         Returns:
-            An instance of Cell represents converted network.
+            An instance of Cell represents quantized network.
 
         Raises:
             TypeError: If `net_opt` is not Cell.
             TypeError: If `ckpt_path` is not string.
             ValueError: If `ckpt_path` is not empty and invalid.
         """
-        if not isinstance(net_opt, Cell):
-            raise TypeError(
-                f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
-        if not isinstance(ckpt_path, str):
-            raise TypeError(
-                f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
+        value_check('net_opt', net_opt, Cell)
+        value_check('ckpt_path', ckpt_path, str)
         if ckpt_path:
             logger.warning('ckpt_path in convert would be deprecated in next version')
         real_path = os.path.realpath(ckpt_path)
@@ -238,10 +250,17 @@ class RoundToNearest(CompAlgo):
                 return
             for _, cell in root.name_cells().items():
                 if isinstance(cell, (LinearQuant, PagedAttentionQuant)):
+                    nonlocal changed
+                    changed = True
                     cell.convert(self._config.backend, self._is_deploy)
                 else:
                     _convert(cell)
 
+        changed = False
         _convert(net_opt)
         net_opt.update_parameters_name()
+        if not changed:
+            warn_str = "No layer found in network is suitable for quantization, please check network and " \
+                       "opname_blacklist, and make sure call apply before convert."
+            warnings.warn(warn_str, RuntimeWarning)
         return net_opt
