@@ -212,14 +212,15 @@ class LinearDeploy(PTQCell):
         Returns:
             Tensor, returns the computed result.
         """
-        out_shape = P.Shape()(x)[:-1] + (self._linear.out_channels,)
+        out_shape = self.handler().shape(x)[:-1] + (self._linear.out_channels,)
         x = P.Reshape()(x, (-1, self._linear.in_channels))
         if hasattr(self._linear, "expert_flag") and self._linear.expert_flag:
             if self._linear.use_expert_group_size is True:
-                x = P.Reshape()(x, (-1, self._linear.expert_num, self._linear.expert_group_size,
-                                    self._linear.in_channels))
+                x = self.handler().reshape(x, (-1, self._linear.expert_num, self._linear.expert_group_size,
+                                               self._linear.in_channels))
             else:
-                x = P.Reshape()(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
+                x = self.handler().reshape(x, (self._linear.outer_batch, self._linear.expert_num, -1,
+                                               self._linear.in_channels))
         ori_dtype = F.dtype(x)
 
         x = self._linear.cast(x, self._cast_dtype)
@@ -229,7 +230,7 @@ class LinearDeploy(PTQCell):
         if self._linear.activation_flag:
             x = self._linear.activation(x)
         x = F.cast(x, ori_dtype)
-        output = P.Reshape()(x, out_shape)
+        output = self.handler().reshape(x, out_shape)
         return output
 
 class PagedAttentionQuant(PTQCell):
