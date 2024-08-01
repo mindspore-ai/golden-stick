@@ -34,8 +34,11 @@ def test_sq_config():
     Description: Feed invalid param to SmoothQuantConfig to raise type error.
     Expectation: Except error.
     """
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         _ = SmoothQuantConfig(alpha='0.5')
+
+    with pytest.raises(TypeError):
+        _ = SmoothQuantConfig(alpha=0.5, is_deploy=1)
 
 
 @pytest.mark.level0
@@ -61,6 +64,13 @@ def test_ptq_config_construct():
     with pytest.raises(ValueError):
         _ = PTQConfig(backend=PTQMode.QUANTIZE)
 
+    with pytest.raises(TypeError):
+        _ = PTQConfig(opname_blacklist=1)
+    with pytest.raises(TypeError):
+        _ = PTQConfig(opname_blacklist="1")
+    with pytest.raises(TypeError):
+        _ = PTQConfig(opname_blacklist=["1", 1])
+
 
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
@@ -76,7 +86,7 @@ def test_inner_ptq_config():
 
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     assert cfg.approach == PTQApproach.SMOOTH_QUANT
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         cfg.weight_only = 1
         cfg.__post_init__()
 

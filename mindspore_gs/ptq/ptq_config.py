@@ -22,7 +22,7 @@ from mindspore import QuantDtype
 from mindspore import dtype as msdtype
 
 from mindspore_gs.common.config import GSBaseConfig
-from mindspore_gs.common.utils import value_check
+from mindspore_gs.common.utils import value_check, list_value_check
 from mindspore_gs.common.register import RegisterMachine
 from mindspore_gs.common.gs_enum import QuantCellType, BackendTarget
 
@@ -83,7 +83,7 @@ class PTQConfig:
     Raises:
         ValueError: If `mode` is not in PTQMode's members.
         ValueError: If `backend` is not in BackendTarget's members.
-        ValueError: if `opname_blacklist` is not a list of str.
+        TypeError: if `opname_blacklist` is not a list of str.
 
     Example:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -101,8 +101,8 @@ class PTQConfig:
             raise ValueError(f'mode shall be in {PTQMode.__members__.values()}')
         if self.backend not in BackendTarget.__members__.values():
             raise ValueError(f'backend shall be in {BackendTarget.__members__.values()}')
-        value_check('opname_blacklist', self.opname_blacklist, str)
-        if is_dataclass(self.algo_args):
+        list_value_check('opname_blacklist', self.opname_blacklist, str)
+        if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
 
 
