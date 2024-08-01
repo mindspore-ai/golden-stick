@@ -17,22 +17,18 @@
 import os
 import argparse
 import time
-import numpy as np
-import mindspore as ms
-from mindspore import log as logger
-from mindspore import Model
-from mindspore.communication import get_rank
 from mindformers.core.metric import PerplexityMetric
+from mindformers import MindFormerConfig
+from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_wikitext_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
-from llama2 import Llama2Network
 
 
-def evaluate(net, dataset_path, config_, tokenizer_):
+def evaluate(net, dataset_path, net_helper):
     """evaluate."""
-    bs_ = config_.model.model_config.batch_size
-    seq_ = config_.model.model_config.seq_length
-    net_helper = MFLlama2Helper(config_)
+    bs_ = net_helper.get_spec("batch_size")
+    seq_ = net_helper.get_spec("seq_length")
+    tokenizer_ = net_helper.create_tokenizer()
     ds = create_wikitext_dataset(dataset_path, bs_, seq_, 1, tokenizer_)
     metric = PerplexityMetric()
     metric.clear()
@@ -65,30 +61,9 @@ if __name__ == "__main__":
     uargs = get_args()
     print('------------------------- Creating network...', flush=True)
     os.environ.pop("RUN_MODE")
-    net_mgr: Llama2Network = Llama2Network()
-    config = net_mgr.create_mfconfig(uargs.config_path)
+    config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False
-    network = net_mgr.create_network(config)
-    network.set_train(False)
-    network.phase = 'predict'
+    helper = MFLlama2Helper(config)
+    network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
-    start = time.time()
-    rank_id = get_rank() or 0
-    ckpt_path = config.load_checkpoint
-    bs = config.model.model_config.batch_size
-    seq = config.model.model_config.seq_length
-    block_size = config.model.model_config.block_size
-    if os.path.isdir(ckpt_path):
-        for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):
-            if not file.endswith(".ckpt"):
-                continue
-            ckpt_path = os.path.join(ckpt_path, f"rank_{rank_id}", file)
-            model = Model(network)
-            inputs = network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))
-            model.infer_predict_layout(*inputs)
-            break
-    logger.info(f'Loading ckpt :{ckpt_path}.')
-    ms.load_checkpoint(ckpt_path, network)
-    logger.info(f'Load ckpt cost time is {time.time() - start} s.')
-    tokenizer = net_mgr.create_tokenizer(config.processor.tokenizer.vocab_file)
-    evaluate(network, uargs.dataset_path, config, tokenizer)
+    evaluate(network, uargs.dataset_path, helper)

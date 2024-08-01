@@ -14,28 +14,25 @@
 # ============================================================================
 """Eval w8a8 llama2 with squad1.1 datasets."""
 
-import os
 import argparse
 import time
 import numpy as np
-import mindspore as ms
-from mindspore import log as logger
-from mindspore import Model
-from mindspore.communication import get_rank
 import mindspore.common.dtype as mstype
 from mindspore.common.tensor import Tensor
+from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_boolq_dataset
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 from mindformers.generation.text_generator import GenerationMixin
-from llama2 import Llama2Network
+from mindformers import MindFormerConfig
 
 
-def evaluate(net, dataset_path, cfg, net_helper: Llama2Network):
+def evaluate(net, dataset_path, network_helper):
     """evaluate `net` with dataset from `dataset_path`."""
-    batch_size = cfg.model.model_config.batch_size
-    seq_length = cfg.model.model_config.seq_length
-    ignore_token_id = cfg.model.model_config.ignore_token_id
-    pad_token_id = cfg.model.model_config.pad_token_id
-    tokenizer = net_helper.create_tokenizer(cfg.processor.tokenizer.vocab_file)
+    batch_size = network_helper.get_spec("batch_size")
+    seq_length = network_helper.get_spec("seq_length")
+    ignore_token_id = network_helper.get_spec("ignore_token_id")
+    pad_token_id = network_helper.get_spec("pad_token_id")
+    tokenizer = network_helper.create_tokenizer()
     ds = create_boolq_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id)
     choice_tokens = [tokenizer.encode("yes", add_special_tokens=False)[0],
                      tokenizer.encode("no", add_special_tokens=False)[0]]
@@ -57,7 +54,7 @@ def evaluate(net, dataset_path, cfg, net_helper: Llama2Network):
         logits, current_index = net.forward(
             input_ids=input_ids,
             valid_length_each_example=valid_length_each_example,
-            use_past=cfg.model.model_config.use_past)
+            use_past=network_helper.get_spec("use_past"))
         logit_logsoftmax = GenerationMixin.process_logits(
             GenerationMixin, logits[0], Tensor(current_index, dtype=mstype.int32))
 
@@ -89,29 +86,9 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     print('------------------------- Creating network...', flush=True)
-    net_mgr: Llama2Network = Llama2Network()
-    config = net_mgr.create_mfconfig(uargs.config_path)
+    config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False
-    network = net_mgr.create_network(config)
-    network.set_train(False)
-    network.phase = 'predict'
+    helper = MFLlama2Helper(config)
+    network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
-    start = time.time()
-    rank_id = get_rank() or 0
-    ckpt_path = config.load_checkpoint
-    bs = config.model.model_config.batch_size
-    seq = config.model.model_config.seq_length
-    block_size = config.model.model_config.block_size
-    if os.path.isdir(ckpt_path):
-        for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):
-            if not file.endswith(".ckpt"):
-                continue
-            ckpt_path = os.path.join(ckpt_path, f"rank_{rank_id}", file)
-            model = Model(network)
-            inputs = network.prepare_inputs_for_predict_layout(input_ids=np.ones([bs, seq], dtype=np.int32))
-            model.infer_predict_layout(*inputs)
-            break
-    logger.info(f'Loading ckpt :{ckpt_path}.')
-    ms.load_checkpoint(ckpt_path, network)
-    logger.info(f'Load ckpt cost time is {time.time() - start} s.')
-    evaluate(network, uargs.dataset_path, config, net_mgr)
+    evaluate(network, uargs.dataset_path, helper)

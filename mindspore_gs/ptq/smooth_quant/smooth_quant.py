@@ -21,7 +21,7 @@ import copy
 import numpy as np
 
 from mindspore.nn import Cell
-from mindspore.dataset import GeneratorDataset
+from mindspore.dataset import Dataset
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
@@ -61,14 +61,14 @@ class SmoothQuant(CompAlgo):
         return SQNetPolicy(config)
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: GeneratorDataset = None) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: Dataset = None) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
         Args:
             network (Cell): Network to be fake quantized.
             network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
-            datasets (GeneratorDataset): Datasets for calibrating.
+            datasets (Dataset): Datasets for calibrating.
 
         Raises:
             RuntimeError: If SmoothQuant is not well inited.
@@ -82,7 +82,7 @@ class SmoothQuant(CompAlgo):
         value_check('network', network, Cell)
         if not self._is_deploy:
             value_check('network_helper', network_helper, NetworkHelper)
-            value_check('datasets', datasets, GeneratorDataset)
+            value_check('datasets', datasets, Dataset)
         if not isinstance(self._ptq_policy, SQNetPolicy):
             raise RuntimeError("Derived class should provide net policy")
 
@@ -143,13 +143,13 @@ class SmoothQuant(CompAlgo):
         data_count = 1
         tokenizer = network_helper.create_tokenizer()
         for _, ds_item in enumerate(datasets.create_dict_iterator()):
-            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+            logger.info(f"Calibrating, act smooth obs phase: dataset count: {data_count}/{total_count}")
             input_ids = ds_item['input_ids'].asnumpy()
             output = network_helper.generate(network, input_ids, max_new_tokens=1)
             data_count += 1
             if tokenizer is not None:
-                logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
-                logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
+                logger.info(f"Input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
+                logger.info(f"Output: {tokenizer.decode(output, skip_special_tokens=True)}")
         insert_weight_observer_and_quant(network)
         network.update_parameters_name()
         os.environ['NETWORK_PHASE'] = "weightobs"
@@ -162,13 +162,13 @@ class SmoothQuant(CompAlgo):
         network.phase = "prefill_quant"
         data_count = 1
         for _, ds_item in enumerate(datasets.create_dict_iterator()):
-            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+            logger.info(f"Calibrating, act quant obs phase: dataset count: {data_count}/{total_count}")
             input_ids = ds_item['input_ids'].asnumpy()
             output = network_helper.generate(network, input_ids, max_new_tokens=1)
             data_count += 1
             if tokenizer is not None:
-                logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
-                logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
+                logger.info(f"Input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
+                logger.info(f"Output: {tokenizer.decode(output, skip_special_tokens=True)}")
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:

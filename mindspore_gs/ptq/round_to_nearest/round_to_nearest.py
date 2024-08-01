@@ -139,7 +139,7 @@ class RoundToNearest(CompAlgo):
         network.update_parameters_name()
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -205,14 +205,14 @@ class RoundToNearest(CompAlgo):
             network.phase = "prefill_kvcacheobs"
             data_count = 1
             for _, ds_item in enumerate(ds.create_dict_iterator()):
-                logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+                logger.info(f"Calibrating, kvcache obs phase: dataset count: {data_count}/{total_count}")
                 input_ids = ds_item['input_ids'].asnumpy()
                 output = network_helper.generate(network, input_ids)
                 data_count += 1
                 tokenizer = network_helper.create_tokenizer()
                 if tokenizer is not None:
-                    logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
-                    logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
+                    logger.info(f"Input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
+                    logger.info(f"Output: {tokenizer.decode(output, skip_special_tokens=True)}")
         return network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:

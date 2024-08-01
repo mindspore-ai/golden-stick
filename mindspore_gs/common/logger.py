@@ -14,16 +14,69 @@
 # ============================================================================
 """ Logger for golden-stick """
 
+import os
+import sys
+import traceback
+import io
 import logging
+
+
+if hasattr(sys, '_getframe'):
+    # pylint: disable=protected-access
+    currentframe = lambda: sys._getframe(4)
+else: #pragma: no cover
+    def currentframe():
+        """Return the frame object for the caller's stack frame."""
+        try:
+            raise Exception
+        # pylint: disable=broad-except
+        except Exception:
+            return sys.exc_info()[2].tb_frame.f_back
+
+
+# pylint: disable=unused-argument
+def _find_real_caller(stack_info=False, stacklevel=1):
+    """
+    Find the stack frame of the caller so that we can note the source
+    file name, line number and function name.
+    """
+    f = currentframe()
+    log_file = os.path.normcase(f.f_code.co_filename)
+    if f is not None:
+        f = f.f_back
+    rv = "(unknown file)", 0, "(unknown function)", None
+    while hasattr(f, "f_code"):
+        co = f.f_code
+        filename = os.path.normcase(co.co_filename)
+        if filename == log_file:
+            f = f.f_back
+            continue
+        sinfo = None
+        if stack_info:
+            sio = io.StringIO()
+            sio.write('Stack (most recent call last):\n')
+            traceback.print_stack(f, file=sio)
+            sinfo = sio.getvalue()
+            if sinfo[-1] == '\n':
+                sinfo = sinfo[:-1]
+            sio.close()
+        rv = (co.co_filename, f.f_lineno, co.co_name, sinfo)
+        break
+    return rv
 
 
 class Logger:
     """Logger for GoldenStick."""
     def __init__(self):
         self.logger = logging.getLogger("GoldenStick")
+        self.logger.findCaller = _find_real_caller
         self.logger.setLevel(level=logging.INFO)
         console = logging.StreamHandler()
-        console.setLevel(level=logging.DEBUG)
+        console.setLevel(level=logging.INFO)
+        format_str = '[%(levelname)s] %(name)s(%(process)s):%(asctime)s [%(filename)s:%(lineno)s %(funcName)s] - ' \
+                     '%(message)s'
+        formatter = logging.Formatter(format_str)
+        console.setFormatter(formatter)
         self.logger.addHandler(console)
 
     def debug(self, *args, **kwargs):

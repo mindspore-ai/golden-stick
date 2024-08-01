@@ -25,13 +25,10 @@ def value_check(name, src, supported_type, value_choices=None):
         >>> from .utils import value_check
         >>> value_check('my_var', my_var, str, ['my', 'var'])
     """
-    if not isinstance(src, list) and not isinstance(src, supported_type):
+    if not isinstance(src, supported_type):
         raise TypeError("Type of {} should be {} but got {}".format(name, str(supported_type), type(src)))
 
     if value_choices is not None and value_choices:
-        if isinstance(src, list) and all([isinstance(i, str) for i in src])\
-                and any([i not in value_choices for i in src]):
-            raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
         if src not in value_choices:
             raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
 
