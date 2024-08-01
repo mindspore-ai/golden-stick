@@ -61,7 +61,7 @@ class SmoothQuant(CompAlgo):
         return SQNetPolicy(config)
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, tokenizer=None, datasets: GeneratorDataset = None) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: GeneratorDataset = None) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -141,12 +141,13 @@ class SmoothQuant(CompAlgo):
         os.environ['NETWORK_PHASE'] = "actobs"
         network.phase = "prefill_actobs"
         data_count = 1
+        tokenizer = network_helper.create_tokenizer()
         for _, ds_item in enumerate(datasets.create_dict_iterator()):
             logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
             input_ids = ds_item['input_ids'].asnumpy()
-            network_helper.generate(network, input_ids, max_new_tokens=1)
+            output = network_helper.generate(network, input_ids, max_new_tokens=1)
             data_count += 1
-            if tokenizer:
+            if tokenizer is not None:
                 logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
                 logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
         insert_weight_observer_and_quant(network)
@@ -163,9 +164,9 @@ class SmoothQuant(CompAlgo):
         for _, ds_item in enumerate(datasets.create_dict_iterator()):
             logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
             input_ids = ds_item['input_ids'].asnumpy()
-            network_helper.generate(network, input_ids, max_new_tokens=1)
+            output = network_helper.generate(network, input_ids, max_new_tokens=1)
             data_count += 1
-            if tokenizer:
+            if tokenizer is not None:
                 logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
                 logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
         return network

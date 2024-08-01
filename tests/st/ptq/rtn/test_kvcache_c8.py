@@ -19,6 +19,7 @@ from collections import OrderedDict
 
 import pytest
 import numpy as np
+from mindspore import dtype as msdtype
 from mindspore import context, GRAPH_MODE, Tensor, nn, QuantDtype, save_checkpoint, load_checkpoint
 from mindspore.communication import get_rank
 from mindspore_gs.ptq import RoundToNearest as RTN
@@ -68,7 +69,8 @@ def test_apply_convert(device, mode):
     context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
     network = SimpleNet()
     ptq = RTN()
-    ptq.config.enable_kvcache_int8 = True
+    # pylint: disable=W0212
+    ptq._config.kvcache_dtype = msdtype.int8
     # apply & calibrate
     new_network = ptq.apply(network)
     fakekey = np.ones((1, 1, 24), dtype=np.float16)
@@ -157,9 +159,9 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
             load_checkpoint(ckpt_path, network)
         else:
             network = load_distribut_checkpoint(config, ckpt_path, network)
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"])
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"],
+                        kvcache_dtype=msdtype.int8)
         ptq = RTN(config=cfg)
-        ptq.config.enable_kvcache_int8 = True
         net_helper = MFLlama2HelloNetworkHelper(config)
         ds = create_hello_ds(tokenizer, 1)
         network = ptq.apply(network, net_helper, ds=ds)
@@ -178,9 +180,10 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
         config.model.model_config.use_past = True
         network = LlamaForCausalLM(config.model.model_config)
         cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"],
-                        enable_deploy_fusion=enable_deploy_fusion)
+                        kvcache_dtype=msdtype.int8)
         ptq = RTN(config=cfg)
-        ptq.config.enable_kvcache_int8 = True
+        # pylint: disable=W0212
+        ptq._config.enable_deploy_fusion = enable_deploy_fusion
         network = ptq.apply(network)
         network = ptq.convert(network)
 

@@ -58,8 +58,6 @@ class MFNetworkHelper(NetworkHelper):
         seq = self.mf_config.model.model_config.seq_length
         top_p = self.mf_config.model.model_config.top_p
         top_k = self.mf_config.model.model_config.top_k
-        if max_new_tokens is None:
-            return mf_network.generate(input_ids, do_sample=do_sample, max_length=seq, top_p=top_p, top_k=top_k)
         return mf_network.generate(input_ids, do_sample=do_sample, max_length=seq, max_new_tokens=max_new_tokens,
                                    top_p=top_p, top_k=top_k)
 

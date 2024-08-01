@@ -22,6 +22,7 @@ import numpy as np
 
 from mindspore.nn import Cell
 from mindspore import context
+from mindspore import dtype as msdtype
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.common import logger
 
@@ -91,11 +92,6 @@ class RoundToNearest(CompAlgo):
         """Create SimulatedQuantizationConfig."""
         self._config = PTQConfig()
 
-    @property
-    def config(self):
-        """get config."""
-        return self._config
-
     @staticmethod
     def _convert2list(name, value):
         if not isinstance(value, list) and not isinstance(value, tuple):
@@ -143,7 +139,7 @@ class RoundToNearest(CompAlgo):
         network.update_parameters_name()
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, tokenizer=None, **kwargs) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -198,10 +194,10 @@ class RoundToNearest(CompAlgo):
             return network
         if self._is_deploy:
             return network
-        if network_helper:
+        if network_helper and self._config.kvcache_dtype != msdtype.int8:
             bs = network_helper.get_spec("batch_size") if network_helper.get_spec("batch_size") else 1
             network_helper.generate(network, input_ids=np.ones([bs, 1], dtype=np.int32))
-        if ds and self._config.enable_kvcache_int8:
+        if ds and self._config.kvcache_dtype == msdtype.int8:
             if not network_helper:
                 raise ValueError("Please provide network_helper when datasets is given for calibrating.")
             total_count = ds.get_dataset_size()
@@ -213,7 +209,8 @@ class RoundToNearest(CompAlgo):
                 input_ids = ds_item['input_ids'].asnumpy()
                 output = network_helper.generate(network, input_ids)
                 data_count += 1
-                if tokenizer:
+                tokenizer = network_helper.create_tokenizer()
+                if tokenizer is not None:
                     logger.info(f"input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
                     logger.info(f"output: {tokenizer.decode(output, skip_special_tokens=True)}")
         return network

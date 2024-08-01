@@ -71,7 +71,7 @@ def quant_network(net: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendT
     tokenizer = net_helper.create_tokenizer()
     ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1, False,
                       n_samples=200)
-    net = ptq.apply(net, net_helper, ds=ds, tokenizer=tokenizer)
+    net = ptq.apply(net, net_helper, ds=ds)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
     net.phase = "quant_convert"

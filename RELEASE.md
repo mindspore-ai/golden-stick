@@ -6,9 +6,21 @@
 
 ### Major Features and Improvements
 
-* Added post-training quantization C8 algorithm `RoundToNearest` mainly for Llama2 network.
+* The `RoundToNearest` supports Mindformers' KVCache int8 quantization now, i.e. `PagedAttentionMgr` class, mainly for Llama2 networks.
 
 ### API Change
+
+* `PTQConfig` adds the following two parameters:
+    * `weight_dtype`: The data type is mindspore.dtype. The default value is mindspore.dtype.int8. The options and meanings are as follows:
+
+    |  weight_dtype  | mindspore.dtype.int8(default)  | mindspore.dtype.float_  |
+    |  ----  | ----  | ----  |
+    | meanings  | quantize weights to int8 | does not quantize weights |
+    * `kvcache_dtype`: The data type is mindspore.dtype. The default value is mindspore.dtype.float_. The options and meanings are as follows:
+
+    |  kvcache_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_（default）  |
+    |  ----  | ----  | ----  |
+    | meanings  | quantize kvcache to int8 | does not quantize kvcache |
 
 ### Contributors
 

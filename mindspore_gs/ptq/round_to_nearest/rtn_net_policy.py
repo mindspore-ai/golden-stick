@@ -16,6 +16,7 @@
 
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
+from mindspore import dtype as msdtype
 from mindspore.rewrite import PatternEngine
 
 from mindspore_gs.quantization.net_policy import NetPolicy
@@ -42,8 +43,8 @@ class RTNNetPolicy(NetPolicy):
         """Initialize `RTNNetPolicy`. A `RTNNetPolicy` can only be built once."""
         if self._build:
             return
-        if self._config.weight_only:
+        if self._config.weight_dtype == msdtype.int8:
             self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
-        if self._config.enable_kvcache_int8:
+        if self._config.kvcache_dtype == msdtype.int8:
             self._layer_policy_map[PagedAttentionMgr] = PagedAttentionMgrPolicy([], [], self._config)
         self._build = True
