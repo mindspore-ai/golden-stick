@@ -91,7 +91,10 @@ if __name__ == "__main__":
     network.phase = 'predict'
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     start = time.time()
-    rank_id = get_rank() or 0
+    try:
+        rank_id = get_rank()
+    except RuntimeError:
+        rank_id = 0
     ckpt_path = config.load_checkpoint
     if os.path.isdir(ckpt_path):
         for file in os.listdir(os.path.join(ckpt_path, f"rank_{rank_id}")):

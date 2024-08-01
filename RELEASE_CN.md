@@ -8,7 +8,7 @@
 
 * [DEMO] 新增了主要针对Llama2网络的训练后量化W8A8算法 `SmoothQuant`。
 
-### API Change
+### API变更
 
 * `CompAlgo`类的`apply`新增`kwargs`参数作为子类的可扩展入参。
 * 添加了 `NetworkHelper` 抽象类作为适配器，用于算法和框架之间的解耦。

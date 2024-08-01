@@ -22,6 +22,8 @@ mindspore_gs.ptq.RoundToNearest
         
         异常：
             - **RuntimeError** - 如果当前算法没有有效的初始化。
+            - **TypeError** - `network` 不是一个 `Cell` 对象。
+            - **TypeError** - `network_helper` 不为空且不是一个 `NetworkHelper` 对象。
 
         返回：
             伪量化后的网络。
