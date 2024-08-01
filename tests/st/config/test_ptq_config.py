@@ -18,6 +18,7 @@ import sys
 
 import pytest
 from mindspore import QuantDtype
+from mindspore import dtype as msdtype
 
 from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig, PTQApproach, PTQMode
 from mindspore_gs.common.gs_enum import BackendTarget
@@ -152,10 +153,16 @@ def test_ptq_yaml_dump_and_load():
     """
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.weight_symmetric = False
+    cfg.enable_deploy_fusion = True
+    cfg.weight_dtype = msdtype.float_
+    cfg.kvcache_dtype = msdtype.int8
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
     assert new_cfg.weight_symmetric is False
+    assert new_cfg.enable_deploy_fusion is True
+    assert new_cfg.kvcache_dtype is msdtype.int8
+    assert new_cfg.weight_dtype is msdtype.float_
 
 
 @pytest.mark.level0

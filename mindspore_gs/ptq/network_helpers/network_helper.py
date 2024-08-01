@@ -67,7 +67,7 @@ class NetworkHelper:
         """
         raise NotImplementedError
 
-    def generate(self, network: Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
+    def generate(self, network: Cell, input_ids: np.ndarray, max_new_tokens=None, **kwargs):
         """
         Invoke `network` and generate tokens.
 

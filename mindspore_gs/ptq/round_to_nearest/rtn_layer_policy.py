@@ -22,10 +22,10 @@ from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq import PTQMode
+from mindspore_gs.common import logger
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
 from ..quant_cells import KVCacheMgrQuant
-from .quant_cells import LinearQuant, LinearDeploy, PagedAttentionDeploy, PagedAttentionQuant
-
+from .quant_cells import LinearQuant, LinearDeploy, PagedAttentionDeploy, PagedAttentionQuant, PagedAttentionDeployFusion
 
 class RTNLayerPolicy(LayerPolicy, abc.ABC):
     """
@@ -174,6 +174,8 @@ class PagedAttentionMgrPolicy(RTNLayerPolicy):
         super().__init__(weight_names, act_names, config)
         self.set_input_number(3)
         self.is_deploy = config.mode == PTQMode.DEPLOY
+        self.enable_deploy_fusion = config.enable_deploy_fusion
+        logger.info(f"PagedAttentionMgr Quant conifg: {config}.")
 
     def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
                              **kwargs) -> FakeQuantizer:
@@ -222,5 +224,7 @@ class PagedAttentionMgrPolicy(RTNLayerPolicy):
 
     def wrap_cell(self, handler) -> Cell:
         if self.is_deploy:
+            if self.enable_deploy_fusion:
+                return PagedAttentionDeployFusion(handler, self)
             return PagedAttentionDeploy(handler, self)
         return PagedAttentionQuant(handler, self)

@@ -95,12 +95,18 @@ class PTQConfig:
     backend: BackendTarget = BackendTarget.ASCEND
     opname_blacklist: List[str] = field(default_factory=list)
     algo_args: Union[dict, dataclass] = field(default_factory=dict)
+    weight_dtype: msdtype = msdtype.int8
+    kvcache_dtype: msdtype = msdtype.float_
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():
             raise ValueError(f'mode shall be in {PTQMode.__members__.values()}')
         if self.backend not in BackendTarget.__members__.values():
             raise ValueError(f'backend shall be in {BackendTarget.__members__.values()}')
+        if self.weight_dtype != msdtype.int8 and self.weight_dtype != msdtype.float_:
+            raise ValueError(f'self.weight_dtype: {self.weight_dtype} is not msdtype.int8 or msdtype.float_.')
+        if self.kvcache_dtype != msdtype.int8 and self.kvcache_dtype != msdtype.float_:
+            raise ValueError(f'self.kvcache_dtype: {self.kvcache_dtype} is not msdtype.int8 or msdtype.float_.')
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
@@ -159,6 +165,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     weight_symmetric: bool = True
     act_narrow_range: bool = False
     weight_narrow_range: bool = False
+    enable_deploy_fusion: bool = True
     op_types: List[str] = field(default_factory=lambda: [QuantCellType.MF_LINEAR.value],
                                 metadata={'choices': [
                                     item.value for item in QuantCellType.__members__.values()
@@ -175,6 +182,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('act_symmetric', self.weight_symmetric, bool)
         value_check('act_narrow_range', self.act_narrow_range, bool)
         value_check('weight_narrow_range', self.weight_narrow_range, bool)
+        value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
         support_op_types = {
@@ -197,6 +205,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
         parsed_dict['opname_blacklist'] = self.opname_blacklist
+        parsed_dict['kvcache_dtype'] = str(self.kvcache_dtype)
+        parsed_dict['weight_dtype'] = str(self.weight_dtype)
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
@@ -214,7 +224,9 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('weight_quant_dtype', QuantDtype),
             ('mode', PTQMode),
             ('backend', BackendTarget),
-            ('approach', PTQApproach)
+            ('approach', PTQApproach),
+            ('kvcache_dtype', MSDTypeLoader()),
+            ('weight_dtype', MSDTypeLoader())
         ]
         for item in unparse_list:
             update_dict(*item)

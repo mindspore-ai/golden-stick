@@ -100,7 +100,7 @@ class SimpleNetworkHelper(NetworkHelper):
         return self.attrs.get(name, None)
 
     def create_tokenizer(self, **kwargs):
-        raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.create_tokenizer()")
+        return None
 
     def generate(self, network: Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
         input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',

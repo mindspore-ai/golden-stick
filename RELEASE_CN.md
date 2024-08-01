@@ -6,9 +6,21 @@
 
 ### 主要特性和增强
 
-* 新增C8训练后量化算法`RoundToNearest`，主要针对Llama2系列网络做量化。
+* `RoundToNearest`支持将Mindformers的kvcache即`PagedAttentionMgr`类量化成int8，主要针对llama2系列网络。
 
 ### API Change
+
+* `PTQConfig`新增如下两个参数:
+    * `weight_dtype`:mindspore.dtype类型，默认为mindspore.dtype.int8，可选输入及含义如下：
+
+    |  weight_dtype  | mindspore.dtype.int8（默认）  | mindspore.dtype.float_  |
+    |  ----  | ----  | ----  |
+    | 含义  | 将权重量化成int8 | 不进行权重量化 |
+    * `kvcache_dtype`:mindspore.dtype类型，默认为mindspore.dtype.float_，可选输入及含义如下：
+
+    |  kvcache_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_（默认）  |
+    |  ----  | ----  | ----  |
+    | 含义  | 将kvcache量化成int8 | 不进行kvcache量化 |
 
 ### 贡献者
 

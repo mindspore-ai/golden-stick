@@ -23,7 +23,7 @@ import mindspore
 from mindspore import QuantDtype, Tensor, dtype, context, GRAPH_MODE, nn, Parameter, PYNATIVE_MODE
 from mindspore.ops.operations import FakeQuantParam, BatchMatMul, MatMul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
-from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell
+from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell, QuantCellV2
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
 # pylint: disable=wrong-import-position
@@ -126,6 +126,38 @@ def test_quant_cell_perchannel(mode):
     os.environ.pop('GRAPH_OP_RUN')
     assert (expect == output2.asnumpy()).all()
 
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_quant_cell_v2_perchannel(mode):
+    """
+    Feature: QuantCell.
+    Description: test QuantCell can serialize and deserialize successfully.
+    Expectation: Success.
+    """
+
+    os.environ['GRAPH_OP_RUN'] = "1"
+    context.set_context(device_target="Ascend", mode=mode)
+    scale = [2.0, 3.0]
+    zp = [1.0, 2.0]
+    origin = np.ones((3, 2), dtype=np.float32)
+    expect = np.round(origin / scale + zp)
+    expect = expect.astype(np.int8)
+    x = Tensor(origin, dtype=dtype.float32)
+    t_scale = Tensor(1/np.array(scale), dtype=dtype.float32)
+    t_zp = Tensor(zp, dtype=dtype.float32)
+    qcell = QuantCellV2(t_scale, t_zp)
+    output = qcell(x)
+    assert (expect == output.asnumpy()).all()
+    mindspore.save_checkpoint(qcell, "test_quant_cell_perchannel.ckpt")
+
+    qcell2 = QuantCellV2(Tensor([1.0, 1.0], dtype=dtype.float32), Tensor([0.0, 0.0], dtype=dtype.float32))
+    mindspore.load_checkpoint("test_quant_cell_perchannel.ckpt", qcell2)
+    output2 = qcell2(x)
+    os.environ.pop('GRAPH_OP_RUN')
+    assert (expect == output2.asnumpy()).all()
 
 # FIXME @hangangqiang wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training

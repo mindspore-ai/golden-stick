@@ -19,6 +19,7 @@ import time
 
 import numpy as np
 import mindspore as ms
+from mindspore import dtype as msdtype
 from mindspore import Model
 from mindspore.communication import get_rank
 from mindformers import LlamaForCausalLM
@@ -51,7 +52,6 @@ def quant_network(net: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendT
     else:
         logger.info("Use RTN algo to quant network.")
     cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["lm_head"])
-    ptq = RTN(config=cfg)
     logger.info(f'Create PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
     mfconfig = kwargs.get("mfconfig", None)
@@ -61,8 +61,7 @@ def quant_network(net: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendT
     ds = None
     if kvcache_int8:
         logger.info('create dataset for kvcache_int8 quant.')
-        ptq.config.enable_kvcache_int8 = True
-        ptq.config.weight_only = False
+        cfg = PTQConfig(mode=mode, backend=backend, weight_dtype=msdtype.float_, kvcache_dtype=msdtype.int8)
         ds_path = kwargs.get("ds_path", "")
         if not ds_path:
             raise ValueError("Please provide datasets for calibrating.")
@@ -76,6 +75,7 @@ def quant_network(net: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendT
         tokenizer = network_helper.create_tokenizer()
         ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
                           False, n_samples=200)
+    ptq = RTN(config=cfg)
     net = ptq.apply(net, network_helper, ds)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
