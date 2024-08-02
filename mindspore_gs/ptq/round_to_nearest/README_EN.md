@@ -15,7 +15,7 @@ Table 1: RTN algorithm specifications
 | Specifications | Specification Descriptions |
 | --- | --- |
 | Hardware support | The quantization phase runs on the CPU, and quantization model inference is only supported in Ascend |
-| Network support | Llama2 13B/70B. For details, refer to [Llama2 network](https://gitee.com/hangangqiang/mindformers/tree/dev/mindformers/models/llama) |
+| Network support | Llama2 13B/70B. For details, refer to [Llama2 network](https://gitee.com/mindspore/mindformers/tree/dev/mindformers/models/llama) |
 | Running mode support | Graph mode and PyNative mode |
 
 Table 2: Before and after quantization of the network using RTN algorithm
@@ -235,9 +235,7 @@ The running results are as follows:
 
 ### Step 2. Model Quantization
 
-#### 2.1. Instantiating MindFormerConfig
-
-Constructing the Llama2 network for the MindSpore Transformers requires constructing the MindFormerConfig configuration item first. Here, we first implement a tool function that creates MindFormerConfig and defines some constants:
+Construct the Llama2 network for the MindSpore Transformers, then quantize the network using the Golden Stick RoundToNearest algorithm, and finally save the quantized checkpoint file:
 
 ```python
 import os
