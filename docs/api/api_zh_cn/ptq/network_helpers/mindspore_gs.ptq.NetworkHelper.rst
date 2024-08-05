@@ -49,3 +49,29 @@ mindspore_gs.ptq.NetworkHelper
         返回：
             一个对象，表示获取到的网络规格。
 
+    .. py:method:: get_decoder_layers(self, network: Cell)
+
+        获取网络的decoder层。
+
+        参数：
+            - **network** (Cell) - 要获取decoder层的网络。
+
+        返回：
+            一个列表，表示获取到的decoder层。
+
+    .. py:method:: get_linears(self, decoder: Cell)
+
+        获取decoder中的所有linear层。
+
+        参数：
+            - **decoder** (Cell) - 要获取linear层的decoder层。
+
+        返回：
+            一个列表，表示获取到的linears层。
+
+    .. py:method:: offload_embedding(self, network: Cell)
+
+        释放网络中embedding层tensor所占用的显存。
+
+        参数：
+            - **network** (Cell) - 要释放显存的网络。

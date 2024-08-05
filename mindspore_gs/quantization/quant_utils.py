@@ -71,6 +71,45 @@ def cal_quantization_params(input_min,
     return scale, zp
 
 
+def cal_tensor_quantization_params(input_min,
+                                   input_max,
+                                   quant_min,
+                                   quant_max,
+                                   symmetric=False):
+    r"""
+    Calculate quantization params for scale and zero point.
+
+    Args:
+        input_min (tensor): The dimension of channel or 1.
+        input_max (tensor): The dimension of channel or 1.
+        quant_min (int): The minimum quantization integer.
+        quant_max (int): The maximum quantization integer.
+        symmetric (bool): Whether the quantization algorithm is symmetric or not. Default: False.
+
+    Returns:
+        scale (tensor): quantization param.
+        zero point (tensor): quantization param.
+    """
+
+    if input_min.shape != input_max.shape:
+        raise ValueError("input min shape should be equal to input max.")
+    if (input_max == input_min).all():
+        return ms.ops.ones(input_min.shape), ms.ops.zeros(input_min.shape)
+
+    # calculate scale
+    if symmetric:
+        input_max = ms.ops.maximum(ms.ops.abs(input_min), ms.ops.abs(input_max))
+        input_min = -input_max
+    scale = ms.ops.div(ms.ops.sub(input_max, input_min), quant_max - quant_min)
+
+    # calculate zero point
+    zp_double = ms.ops.sub(quant_min, ms.ops.div(input_min, scale))
+    if symmetric:
+        zp = ms.ops.zeros_like(zp_double).astype(np.int32)
+    else:
+        zp = ms.ops.round(zp_double).astype(np.int32)
+    return scale, zp
+
 def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
     """Calculate quantization params for minimum/maximum quantization integer"""
     if signed:

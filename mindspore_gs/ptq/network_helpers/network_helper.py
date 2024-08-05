@@ -123,3 +123,73 @@ class NetworkHelper:
             [[  0,   1,   2 ... 253, 254, 255]]), Tensor(shape=[2], dtype=Int32, value= [0, 1]))
         """
         raise NotImplementedError
+
+    def get_decoder_layers(self, network):
+        """
+        Get decoder layers from network.
+
+        Args:
+            network (Cell): Network to get decoder layers.
+
+        Returns:
+            A list of `Cell` as decoder layers of network.
+
+        Examples:
+            >>> from mindspore import context
+            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindformers import LlamaForCausalLM, LlamaConfig
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+            >>> decoder_layers = helper.get_decoder_layers(network)
+        """
+        raise NotImplementedError
+
+    def offload_embedding(self, network):
+        """
+        Offload embedding tensor to host.
+
+        Args:
+            network (Cell): Network to be offloaded.
+
+        Examples:
+            >>> from mindspore import context
+            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindformers import LlamaForCausalLM, LlamaConfig
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> context.set_context(mode=context.PYNATIVE_MODE, device_target="Ascend")
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+            >>> helper.offload_embedding(network)
+        """
+        raise NotImplementedError
+
+    def get_linears(self, decoder_layer):
+        """
+        Get linears from decoder_layer.
+
+        Args:
+            decoder_layer (Cell): Decoder_layer to get linears.
+
+        Returns:
+            A list of `Cell` as linears of decoder layers.
+
+        Examples:
+            >>> from mindspore import context
+            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindformers import LlamaForCausalLM, LlamaConfig
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+            >>> decoder_layers = helper.get_decoder_layers(network)
+            >>> linears = helper.get_linears(decoder_layers)
+        """
+        raise NotImplementedError

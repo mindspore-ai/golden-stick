@@ -7,10 +7,16 @@
 ### 主要特性和增强
 
 * `RoundToNearest`支持将Mindformers的kvcache即`PagedAttentionMgr`类量化成int8，主要针对llama2系列网络。
+* 新增支持基于动态图的AutoClip和AutoScale训练后量化算法`OmniQuant`，主要针对llama2系列网络。用户可通过配置Clip和Scale的相关超参为list或float类型，来区分是否进行参数搜索或是网络量化。
 
 ### API Change
 
-* `PTQConfig`新增如下两个参数:
+* `PTQConfig`新增如下三个参数:
+    * `act_dtype`:mindspore.dtype类型，默认为mindspore.dtype.float_，可选输入及含义如下：
+
+    |  act_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_（默认）  |
+    |  ----  | ----  | ----  |
+    | 含义  | 将激活量化成int8 | 不进行激活量化 |
     * `weight_dtype`:mindspore.dtype类型，默认为mindspore.dtype.int8，可选输入及含义如下：
 
     |  weight_dtype  | mindspore.dtype.int8（默认）  | mindspore.dtype.float_  |
@@ -21,6 +27,10 @@
     |  kvcache_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_（默认）  |
     |  ----  | ----  | ----  |
     | 含义  | 将kvcache量化成int8 | 不进行kvcache量化 |
+* 新增`OmniQuantConfig`类，用于配置OmniQuant的algo_args。
+* 新增`network_replace`接口，实现对网络中sub-cell的一对一替换。
+* `NetworkHelper`新增`get_decoder_layer`,`get_linears`接口用于获取网络的decoder层及sub-cell的linear层，新增`offload_embedding`接口释放tensor占用的显存。
+* `MFLlama2Helper`新增上述三个接口的实现，适配mindformers中的llama2系列模型。
 
 ### 贡献者
 

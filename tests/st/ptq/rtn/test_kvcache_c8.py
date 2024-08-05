@@ -134,13 +134,13 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
     print(f"---------------- Testing params: {device} {mode} ", flush=True)
     context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
     if model_parallel == 1:
-        fp16_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_1p.yaml"
-        w8a16c8_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_1p.yaml"
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
+        w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
         fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16-1decoder.ckpt"
         w8a16c8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a16c8-1decoder.ckpt"
     else:
-        fp16_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_2p.yaml"
-        w8a16c8_config_path = "../../../data/test_llama2/run_llama2_13b_fp16_910b_2p.yaml"
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
+        w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
         fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
         w8a16c8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a16c8"
     cur_dir, _ = os.path.split(os.path.abspath(__file__))

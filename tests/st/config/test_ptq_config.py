@@ -156,6 +156,7 @@ def test_ptq_yaml_dump_and_load():
     cfg.enable_deploy_fusion = True
     cfg.weight_dtype = msdtype.float_
     cfg.kvcache_dtype = msdtype.int8
+    cfg.act_dtype = msdtype.int8
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
@@ -163,6 +164,7 @@ def test_ptq_yaml_dump_and_load():
     assert new_cfg.enable_deploy_fusion is True
     assert new_cfg.kvcache_dtype is msdtype.int8
     assert new_cfg.weight_dtype is msdtype.float_
+    assert new_cfg.act_dtype is msdtype.int8
 
 
 @pytest.mark.level0

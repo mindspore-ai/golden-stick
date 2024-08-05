@@ -36,6 +36,7 @@ class PTQApproach(Enum):
     SMOOTH_QUANT = 'smooth_quant'
     RTN = 'rtn'
     GPTQ = 'gptq'
+    OMNI_QUANT = 'omni_quant'
 
 
 class PTQMode(Enum):
@@ -47,6 +48,29 @@ class PTQMode(Enum):
     """
     QUANTIZE = 'quantize'
     DEPLOY = 'deploy'
+
+
+@algo_cfg_register.register(PTQApproach.OMNI_QUANT)
+@dataclass
+class OmniQuantConfig:
+    """config for omni quant algorithm"""
+    pre_clip_ratio: Union[list, float] = 1.0
+    post_clip_ratio: Union[list, float] = 1.0
+    smooth_alpha: Union[list, float] = 0.5
+    is_revert_by_loss: bool = False
+
+    def __post_init__(self):
+        value_check('pre_clip_ratio', self.pre_clip_ratio, Union[list, float])
+        value_check('post_clip_ratio', self.post_clip_ratio, Union[list, float])
+        value_check('smooth_alpha', self.smooth_alpha, Union[list, float])
+        value_check('is_revert_by_loss', self.is_revert_by_loss, bool)
+        if (not isinstance(self.pre_clip_ratio, type(self.post_clip_ratio))) or \
+            (not isinstance(self.pre_clip_ratio, type(self.smooth_alpha))) or \
+            (not isinstance(self.post_clip_ratio, type(self.smooth_alpha))):
+            raise ValueError(f"pre_clip_ratio, post_clip_ratio and smooth_alpha should have same type," \
+                             f"but got pre_clip_ratio: {type(self.pre_clip_ratio)}," \
+                             f"post_clip_ratio: {type(self.post_clip_ratio)}," \
+                             f"smooth_alpha: {type(self.smooth_alpha)}.")
 
 
 @algo_cfg_register.register(PTQApproach.SMOOTH_QUANT)
@@ -97,6 +121,7 @@ class PTQConfig:
     algo_args: Union[dict, dataclass] = field(default_factory=dict)
     weight_dtype: msdtype = msdtype.int8
     kvcache_dtype: msdtype = msdtype.float_
+    act_dtype: msdtype = msdtype.float_
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():
@@ -107,6 +132,8 @@ class PTQConfig:
             raise ValueError(f'self.weight_dtype: {self.weight_dtype} is not msdtype.int8 or msdtype.float_.')
         if self.kvcache_dtype != msdtype.int8 and self.kvcache_dtype != msdtype.float_:
             raise ValueError(f'self.kvcache_dtype: {self.kvcache_dtype} is not msdtype.int8 or msdtype.float_.')
+        if self.act_dtype != msdtype.int8 and self.act_dtype != msdtype.float_:
+            raise ValueError(f'self.act_dtype: {self.act_dtype} is not msdtype.int8 or msdtype.float_.')
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
@@ -207,6 +234,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['opname_blacklist'] = self.opname_blacklist
         parsed_dict['kvcache_dtype'] = str(self.kvcache_dtype)
         parsed_dict['weight_dtype'] = str(self.weight_dtype)
+        parsed_dict['act_dtype'] = str(self.act_dtype)
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
@@ -226,7 +254,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('backend', BackendTarget),
             ('approach', PTQApproach),
             ('kvcache_dtype', MSDTypeLoader()),
-            ('weight_dtype', MSDTypeLoader())
+            ('weight_dtype', MSDTypeLoader()),
+            ('act_dtype', MSDTypeLoader())
         ]
         for item in unparse_list:
             update_dict(*item)

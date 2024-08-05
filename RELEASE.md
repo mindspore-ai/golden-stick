@@ -7,10 +7,16 @@
 ### Major Features and Improvements
 
 * The `RoundToNearest` supports Mindformers' KVCache int8 quantization now, i.e. `PagedAttentionMgr` class, mainly for Llama2 networks.
+* Added pynative-based algorithm `OmniQuant`, which supports AutoClip and AutoScale, mainly for llama2 series networks. The user can set the hyperparameters related to Clip and Scale to the list or float type to determine whether to perform parameter search or network quantization.
 
 ### API Change
 
-* `PTQConfig` adds the following two parameters:
+* `PTQConfig` adds the following three parameters:
+    * `act_dtype`: The data type is mindspore.dtype. The default value is mindspore.dtype.float_. The options and meanings are as follows:
+
+    |  act_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_(default)  |
+    |  ----  | ----  | ----  |
+    | meanings  | quantize input to int8 | does not quantize input |
     * `weight_dtype`: The data type is mindspore.dtype. The default value is mindspore.dtype.int8. The options and meanings are as follows:
 
     |  weight_dtype  | mindspore.dtype.int8(default)  | mindspore.dtype.float_  |
@@ -21,6 +27,10 @@
     |  kvcache_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_（default）  |
     |  ----  | ----  | ----  |
     | meanings  | quantize kvcache to int8 | does not quantize kvcache |
+* Added `OmniQuantConfig` class for configuring algo_args of OmniQuant algorithm.
+* Added `network_replace` function for one-by-one sub cell replace.
+* Added `get_decoder_layer`, `get_linears` to'NetworkHelper' to obtain the decoder layer of network and the linear layer of sub-cell. Added `offload_embedding` to release memory.
+* Added implementation of `get_decoder_layer`, `get_linears` and `offload_embedding` of `MFLlama2Helper` to work with the llama2 series models in mindformers.
 
 ### Contributors
 
