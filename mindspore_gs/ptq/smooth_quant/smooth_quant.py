@@ -21,7 +21,7 @@ import copy
 import numpy as np
 
 from mindspore.nn import Cell
-from mindspore.dataset import GeneratorDataset
+from mindspore.dataset import Dataset
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
@@ -61,14 +61,14 @@ class SmoothQuant(CompAlgo):
         return SQNetPolicy(config)
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: GeneratorDataset = None) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: Dataset = None) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
         Args:
             network (Cell): Network to be fake quantized.
             network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
-            datasets (GeneratorDataset): Datasets for calibrating.
+            datasets (Dataset): Datasets for calibrating.
 
         Raises:
             RuntimeError: If SmoothQuant is not well inited.
@@ -82,7 +82,7 @@ class SmoothQuant(CompAlgo):
         value_check('network', network, Cell)
         if not self._is_deploy:
             value_check('network_helper', network_helper, NetworkHelper)
-            value_check('datasets', datasets, GeneratorDataset)
+            value_check('datasets', datasets, Dataset)
         if not isinstance(self._ptq_policy, SQNetPolicy):
             raise RuntimeError("Derived class should provide net policy")
 
