@@ -19,9 +19,12 @@ from functools import partial
 
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
+from research.telechat.telechat_layer import TelechatLinear
 from mindspore_gs.ptq.ptq_policy import PTQNetPolicy
 from mindspore_gs.ptq.round_to_nearest.rtn_net_policy import RTNNetPolicy
-from .layer_policys import LinearLayerPolicy, PagedAttentionMgrPolicy
+from .layer_policys import LinearLayerPolicy, PagedAttentionMgrPolicy, TeleLinearLayerPolicy
 
 PTQNetPolicy.register_policy(RTNNetPolicy, Linear, partial(LinearLayerPolicy, [], []))
 PTQNetPolicy.register_policy(RTNNetPolicy, PagedAttentionMgr, partial(PagedAttentionMgrPolicy, [], []))
+PTQNetPolicy.register_policy(RTNNetPolicy, TelechatLinear, partial(TeleLinearLayerPolicy, [], []))
+

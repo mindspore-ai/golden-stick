@@ -80,7 +80,6 @@ class MFNetworkHelper(NetworkHelper):
         if ckpt_path:
             self._load_ckpt(network)
         ms.ms_memory_recycle()
-        network.phase = 'predict'
         return network
 
     def analysis_decoder_groups(self, network):

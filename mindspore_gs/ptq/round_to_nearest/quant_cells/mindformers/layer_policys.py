@@ -20,7 +20,7 @@ from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.round_to_nearest.rtn_layer_policy import RTNLayerPolicy
 from .quant_cells import LinearQuant, LinearDeploy, PagedAttentionDeploy, PagedAttentionQuant, \
-    PagedAttentionDeployFusion
+    PagedAttentionDeployFusion, TeleLinearDeploy, TeleLinearQuant
 
 
 class LinearLayerPolicy(RTNLayerPolicy):
@@ -62,3 +62,22 @@ class PagedAttentionMgrPolicy(RTNLayerPolicy):
                 return PagedAttentionDeployFusion(handler, self)
             return PagedAttentionDeploy(handler, self)
         return PagedAttentionQuant(handler, self)
+
+class TeleLinearLayerPolicy(RTNLayerPolicy):
+    """
+    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
+    """
+    def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
+        super().__init__(weight_names, act_names, config)
+        self.set_input_number(1)
+        if config.weight_only:
+            self.set_input_not_insert_fq()
+            self.set_output_not_insert_fq()
+        self.is_deploy = config.mode == PTQMode.DEPLOY
+
+    def wrap_cell(self, handler) -> Cell:
+        if self._config.weight_quant_dtype is None:
+            return None
+        if self.is_deploy:
+            return TeleLinearDeploy(handler, self)
+        return TeleLinearQuant(handler, self)
