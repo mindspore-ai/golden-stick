@@ -27,7 +27,6 @@ from mindspore.dataset import GeneratorDataset
 from mindspore.parallel import set_algo_parameters
 from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model, load_param_into_net
 from mindspore import nn, Parameter, GRAPH_MODE, dtype, ops
-from mindspore.common.dtype import QuantDtype
 from mindspore.communication import get_rank
 from mindformers.modules import Linear
 from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
@@ -60,12 +59,18 @@ def test_constructor():
     sq = SmoothQuant()
     assert isinstance(sq._config, InnerPTQConfig)
     assert sq._config.algo_args.get("alpha", None) == 0.5
+    assert sq._config.act_dtype == dtype.int8
+    assert sq._config.weight_dtype == dtype.int8
+    assert sq._config.kvcache_dtype == dtype.float_
 
     sq_args = SmoothQuantConfig(alpha=0.8)
     cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, algo_args=sq_args)
     sq = SmoothQuant(cfg)
     assert isinstance(sq._config, InnerPTQConfig)
     assert sq._config.algo_args.get("alpha", None) == 0.8
+    assert sq._config.act_dtype == dtype.int8
+    assert sq._config.weight_dtype == dtype.int8
+    assert sq._config.kvcache_dtype == dtype.float_
 
 
 class SimpleNet(nn.Cell):
@@ -89,6 +94,7 @@ class SimpleNet(nn.Cell):
 
     def construct(self, x):
         return self.linear(x)
+
 
 #pylint: disable=w0223
 class SimpleNetworkHelper(NetworkHelper):
@@ -189,7 +195,7 @@ def test_apply_convert():
     assert isinstance(weight_fake_quant, MinMaxPerChannel)
     assert weight_fake_quant.symmetric()
     assert weight_fake_quant.signed()
-    assert weight_fake_quant.quant_dtype() == QuantDtype.INT8
+    assert weight_fake_quant.quant_dtype() == dtype.int8
     assert weight_fake_quant.is_per_channel()
     assert not weight_fake_quant.narrow_range()
     assert weight_fake_quant.num_bits() == 8
@@ -197,7 +203,7 @@ def test_apply_convert():
     act_fake_quant = quant_cell.input_quantizer()
     assert isinstance(act_fake_quant, MinMaxPerLayer)
     assert isinstance(act_fake_quant.symmetric(), bool) and not act_fake_quant.symmetric()
-    assert act_fake_quant.quant_dtype() == QuantDtype.INT8
+    assert act_fake_quant.quant_dtype() == dtype.int8
     assert isinstance(act_fake_quant.is_per_channel(), bool) and not act_fake_quant.is_per_channel()
     assert isinstance(act_fake_quant.narrow_range(), bool) and not act_fake_quant.narrow_range()
     assert act_fake_quant.signed()
@@ -206,7 +212,7 @@ def test_apply_convert():
     act_observer = quant_cell.act_observer
     assert isinstance(act_observer, MinMaxPerChannel)
     assert act_observer.symmetric()
-    assert act_observer.quant_dtype() == QuantDtype.INT8
+    assert act_observer.quant_dtype() == dtype.int8
     assert act_observer.is_per_channel()
     assert isinstance(act_observer.narrow_range(), bool) and not act_observer.narrow_range()
     assert act_observer.signed()
@@ -215,7 +221,7 @@ def test_apply_convert():
     weight_in_observer = quant_cell.weight_observer
     assert isinstance(weight_in_observer, MinMaxPerChannel)
     assert weight_in_observer.symmetric()
-    assert weight_in_observer.quant_dtype() == QuantDtype.INT8
+    assert weight_in_observer.quant_dtype() == dtype.int8
     assert weight_in_observer.is_per_channel()
     assert isinstance(weight_in_observer.narrow_range(), bool) and not weight_in_observer.narrow_range()
     assert weight_in_observer.signed()
@@ -313,7 +319,7 @@ def test_sq_linear_wrapper(mode, transpose_b):
     Expectation: Same with numpy.
     """
     context.set_context(device_target="Ascend", mode=mode)
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, act_dtype=dtype.int8)
     inner_cfg = InnerPTQConfig.inner_config(cfg, PTQApproach.SMOOTH_QUANT)
     act_in = 5
     act_out = 6
@@ -517,7 +523,6 @@ def test_sq_predict_simplenet_2stage_2p():
         log_file.close()
 
     assert return_code == 0
-
 
 
 def sq_predict_llama2_2stage(device, mode, model_parallel):

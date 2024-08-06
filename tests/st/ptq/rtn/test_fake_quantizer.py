@@ -19,7 +19,6 @@ import pytest
 from mindspore import Parameter, context, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.common.initializer import initializer
 from mindspore import dtype as mstype
-from mindspore.common.dtype import QuantDtype
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 
 
@@ -40,7 +39,7 @@ def test_minmaxperchannel(mode):
     axis = 1
     channels = 6
     weight = Parameter(initializer('ones', shape, mstype.float32), name="weight")
-    fq = MinMaxPerChannel(symmetric=True, data_rank=rank, quant_dtype=QuantDtype.INT8, narrow_range=False, axis=axis,
+    fq = MinMaxPerChannel(symmetric=True, data_rank=rank, quant_dtype=mstype.int8, narrow_range=False, axis=axis,
                           output_channel=channels)
     fq(weight)
     assert fq.float_min.shape == (6,)
@@ -70,7 +69,7 @@ def test_minmaxperchannel_3d(mode):
     axis = 1
     channels = 6
     weight = Parameter(initializer('ones', shape, mstype.float32), name="weight")
-    fq = MinMaxPerChannel(symmetric=True, data_rank=rank, quant_dtype=QuantDtype.INT8, narrow_range=False, axis=axis,
+    fq = MinMaxPerChannel(symmetric=True, data_rank=rank, quant_dtype=mstype.int8, narrow_range=False, axis=axis,
                           output_channel=channels)
     fq(weight)
     assert fq.float_min.shape == (6,)

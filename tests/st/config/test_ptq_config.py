@@ -17,7 +17,6 @@ import os
 import sys
 
 import pytest
-from mindspore import QuantDtype
 from mindspore import dtype as msdtype
 
 from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig, PTQApproach, PTQMode
@@ -88,7 +87,7 @@ def test_inner_ptq_config():
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     assert cfg.approach == PTQApproach.SMOOTH_QUANT
     with pytest.raises(TypeError):
-        cfg.weight_only = 1
+        cfg.weight_symmetric = 1
         cfg.__post_init__()
 
     cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.NONE)
@@ -111,8 +110,6 @@ def test_ptq_algo_config():
     cfg = InnerPTQConfig(approach=PTQApproach.RTN)
     assert cfg.mode == PTQMode.QUANTIZE
     assert cfg.backend == BackendTarget.ASCEND
-    assert cfg.calibration_sampling_size == 0
-    assert cfg.weight_only is True
     assert cfg.act_per_channel is False
     assert cfg.act_symmetric is False
     assert cfg.weight_symmetric is True
@@ -179,11 +176,11 @@ def test_ptq_yaml_parse_unparse():
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
-    new_cfg.act_quant_dtype = QuantDtype.UINT8
-    new_cfg.weight_quant_dtype = QuantDtype.UINT8
+    new_cfg.act_dtype = msdtype.uint8
+    new_cfg.weight_dtype = msdtype.uint8
     new_cfg.load('my_cfg.yaml')
-    assert new_cfg.act_quant_dtype == QuantDtype.INT8
-    assert new_cfg.weight_quant_dtype == QuantDtype.INT8
+    assert new_cfg.act_dtype == msdtype.float_
+    assert new_cfg.weight_dtype == msdtype.int8
 
 
 @pytest.mark.level0

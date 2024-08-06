@@ -16,7 +16,7 @@
 import numpy as np
 
 import mindspore as ms
-from mindspore import Parameter, Tensor, dtype, QuantDtype
+from mindspore import Parameter, Tensor, dtype
 from mindspore.nn import Cell
 from mindspore import ops as msops
 from mindspore.ops import functional as F
@@ -80,12 +80,12 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         self.weight_quantizer_min_max_axis = 0 if self.weight_quantizer_axis else 1
         weight_observer_axis = 1 if self._handler.matmul.transpose_b else 0
         self.observer_min_max_axis = 0 if weight_observer_axis else 1
-        self._weight_signed = cfg.weight_quant_dtype == QuantDtype.INT8
+        self._weight_signed = cfg.weight_dtype == dtype.int8
         self.weight_quant_min, self.weight_quant_max = get_quant_min_max(num_bits=8,
                                                                          signed=self._weight_signed,
                                                                          narrow_range=cfg.weight_narrow_range)
         if cfg.act_dtype == dtype.int8:
-            self._act_signed = cfg.act_quant_dtype == QuantDtype.INT8
+            self._act_signed = True
             self.act_quant_min, self.act_quant_max = get_quant_min_max(num_bits=8,
                                                                        signed=self._act_signed,
                                                                        narrow_range=cfg.act_narrow_range)

@@ -22,9 +22,9 @@ from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
 
 from mindspore_gs.common.gs_enum import BackendTarget
-from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
+from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.ptq.quant_cells import PTQCell
 from mindspore_gs.ptq.convert_utils import (
     convert_to_dequant_bmm_for_deploy, convert_to_dequant_bmm, convert_to_smooth_quant_for_deploy,
@@ -423,20 +423,19 @@ class SQLinearWrapper(PTQCell):
 
         if self.cfg.backend == BackendTarget.ASCEND:
             # quant weight to int8, bias to int32
-            self._input_quantizer = self._input_quantizer.convert_to_fakequantparam()
-            self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+            input_quant_params = self._input_quantizer.quant_params()
+            weight_quant_params = self._weight_quantizer.quant_params()
 
-            weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
             if hasattr(self._handler, "dtype"):
                 weight = self._handler.cast(self._handler.weight, self._handler.dtype)
             else:
                 weight = self._handler.weight
             quant_min, quant_max = get_quant_min_max(
-                num_bits=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
-                signed=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_signed],
-                narrow_range=weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
-            scale = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale])
-            zp = np.array(weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point])
+                num_bits=weight_quant_params.get(LinearFakeQuantizer.attr_key_num_bits),
+                signed=weight_quant_params.get(LinearFakeQuantizer.attr_key_signed),
+                narrow_range=weight_quant_params.get(LinearFakeQuantizer.attr_key_narrow_range))
+            scale = np.array(weight_quant_params.get(LinearFakeQuantizer.attr_key_quant_scale))
+            zp = np.array(weight_quant_params.get(LinearFakeQuantizer.attr_key_quant_zero_point))
             if not self._handler.transpose_b:
                 scale = scale.transpose()
                 zp = zp.transpose()
@@ -444,8 +443,8 @@ class SQLinearWrapper(PTQCell):
                                              self._weight_axis)
             self._handler.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8), name=self._handler.weight.name)
             new_bias_need_allreduce = self._is_gen_bias_need_allreduce()
-            self._output_quantizer, bias = convert_to_dequant_bmm(self._input_quantizer,
-                                                                  self._weight_quantizer,
+            self._output_quantizer, bias = convert_to_dequant_bmm(input_quant_params,
+                                                                  weight_quant_params,
                                                                   weight_quant,
                                                                   dst_dtype=self._handler.dtype,
                                                                   transpose_a=False,
@@ -469,7 +468,7 @@ class SQLinearWrapper(PTQCell):
             self._handler.bias = Parameter(bias.astype(self._handler.dtype), name=bias_name)
             self._handler.has_bias = True
             iq_strategy = (self._act_strategy,) if self._act_strategy else None
-            self._input_quantizer = convert_to_smooth_quant(self._input_quantizer,
+            self._input_quantizer = convert_to_smooth_quant(input_quant_params,
                                                             self._weight_observer_cell.scale_store,
                                                             strategy=iq_strategy)
             context.set_context(mode=mode_store)
