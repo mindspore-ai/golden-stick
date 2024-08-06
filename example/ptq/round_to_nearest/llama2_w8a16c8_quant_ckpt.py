@@ -36,7 +36,7 @@ def get_args():
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
     args = parser.parse_args()
-    print(f"-------------------------------------------------quant args: {args}", flush=True)
+    logger.info(f"quant args: {args}")
     return args
 
 
@@ -81,17 +81,17 @@ if __name__ == "__main__":
         raise ValueError("uargs.approach = {} is unexpected, Available: w8a16, c8.".format(uargs.approach))
     if uargs.approach == "c8" and (uargs.dataset_path is None or uargs.dataset_type is None):
         raise ValueError("Please provide dataset_path and dataset_type in args when uargs.approach is c8.")
-    print('------------------------- Creating network...', flush=True)
+    logger.info('Creating network...')
     helper = MFLlama2Helper(uargs.config_path)
     network = helper.create_network()
     config = helper.mf_config
     logger.info(f'Create Network cost time is {time.time() - start} s.')
-    print('------------------------- Quantize-ing network...', flush=True)
+    logger.info('Quantize-ing network...')
     start = time.time()
     network = quant_network(network, helper, backend=BackendTarget.ASCEND, approach=uargs.approach,
                             ds_path=uargs.dataset_path, ds_type=uargs.dataset_type)
     logger.info(f'Quant Network cost time is {time.time() - start} s.')
-    print('------------------------- Saving checkpoint...', flush=True)
+    logger.info('Saving checkpoint...')
     start = time.time()
     try:
         rank_id = get_rank()
@@ -103,4 +103,4 @@ if __name__ == "__main__":
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-    print(f'------------------------- Checkpoint saved to {save_path}...', flush=True)
+    logger.info(f'Checkpoint saved to {save_path}...')

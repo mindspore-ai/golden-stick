@@ -25,10 +25,11 @@ from mindspore.dataset import GeneratorDataset
 class WikiText2Dataset(GeneratorDataset):
     """Wikitext-2 dataset."""
     def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable, need_pad=True,
-                 n_samples=-1):
+                 n_samples=-1, add_special_tokens=True):
         self.path = os.path.join(path)
         self.seq_len = seq_length
         self.max_new_tokens = max_new_tokens
+        self.add_special_tokens = add_special_tokens
         self.tokenizer = tokenizer
         self.pad_token_id = tokenizer.pad_token_id
         self.need_pad = need_pad
@@ -50,7 +51,7 @@ class WikiText2Dataset(GeneratorDataset):
         with open(self.path, 'r', encoding='utf-8') as f:
             for para in WikiText2Dataset._clean(f.read()).split("\n\n"):
                 if para and para.strip().startswith('=') is False:
-                    input_content += self.tokenizer(para)['input_ids']
+                    input_content += self.tokenizer(para, add_special_tokens=self.add_special_tokens)['input_ids']
         for chunk in WikiText2Dataset._chunks(input_content, self.seq_len - self.max_new_tokens):
             if len(chunk) == self.seq_len - self.max_new_tokens:
                 content = np.array(chunk, dtype=np.int32)
@@ -109,12 +110,12 @@ class WikiText2Dataset(GeneratorDataset):
 
 
 def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, max_new_tokens: int, tokenizer: callable,
-                            repeat=1, need_pad=True, n_samples=-1):
+                            repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
     """ create wikitext dataset"""
     if max_new_tokens >= seq_length:
         raise RuntimeError(f"max_decode_len should less than seq_length, but got max_new_tokens: {max_new_tokens}, "
                            f"seq_length: {seq_length}.")
-    ds = WikiText2Dataset(ds_path, seq_length, max_new_tokens, tokenizer, need_pad, n_samples)
+    ds = WikiText2Dataset(ds_path, seq_length, max_new_tokens, tokenizer, need_pad, n_samples, add_special_tokens)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.batch(bs, drop_remainder=True)

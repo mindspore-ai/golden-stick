@@ -61,7 +61,7 @@ def evaluate(net, dataset_path, network_helper):
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
         metric.update(pres_str, labels_str)
     metric.eval()
-    print('...........Evaluate Over!...............', flush=True)
+    logger.info('Evaluate Over!')
 
 
 def get_args():
@@ -70,14 +70,14 @@ def get_args():
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     args = parser.parse_args()
-    logger.info(f"-------------------------------------------------evaluate args: {args}")
+    logger.info(f"evaluate args: {args}")
     return args
 
 
 if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
-    print('------------------------- Creating network...', flush=True)
+    logger.info('Creating network...')
     helper = MFLlama2Helper(uargs.config_path)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')

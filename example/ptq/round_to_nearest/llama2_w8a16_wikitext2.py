@@ -42,8 +42,8 @@ def evaluate(net, dataset_path, net_helper):
         net_inputs = net_helper.assemble_inputs(input_ids)
         outputs = net(*net_inputs)
         metric.update(*outputs)
-    print('...........Evaluate Over!...............', flush=True)
-    print(f"PPL: {metric.eval()}", flush=True)
+    logger.info('Evaluate Over!')
+    logger.info(f"PPL: {metric.eval()}")
 
 
 def get_args():
@@ -52,14 +52,14 @@ def get_args():
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     args = parser.parse_args()
-    logger.info(f"-------------------------------------------------evaluate args: {args}")
+    logger.info(f"evaluate args: {args}")
     return args
 
 
 if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
-    print('------------------------- Creating network...', flush=True)
+    logger.info('Creating network...')
     os.environ.pop("RUN_MODE")
     config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False

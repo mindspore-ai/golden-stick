@@ -36,7 +36,7 @@ def get_args():
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     args = parser.parse_args()
     args.dataset_type = args.dataset_type.lower()
-    print(f"-------------------------------------------------quant args: {args}", flush=True)
+    logger.info(f"quant args: {args}")
     return args
 
 
@@ -76,17 +76,17 @@ def quant_network(net: LlamaForCausalLM, net_helper, mode=PTQMode.QUANTIZE, back
 if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
-    print('------------------------- Creating network...', flush=True)
+    logger.info('Creating network...')
     helper = MFLlama2Helper(uargs.config_path)
     network = helper.create_network()
     config = helper.mf_config
     logger.info(f'Create Network cost time is {time.time() - start} s.')
-    print('------------------------- Quantize-ing network...', flush=True)
+    logger.info('Quantize-ing network...')
     start = time.time()
     network = quant_network(network, helper, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
                             ds_path=uargs.dataset_path, ds_type=uargs.dataset_type)
     logger.info(f'Quant Network cost time is {time.time() - start} s.')
-    print('------------------------- Saving checkpoint...', flush=True)
+    logger.info('Saving checkpoint...')
     start = time.time()
     save_ckpt_path = os.path.join(config.output_dir, "w8a8_ckpt")
     try:
@@ -98,4 +98,4 @@ if __name__ == "__main__":
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, "w8a8.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-    print(f'------------------------- Checkpoint saved to {save_path}...', flush=True)
+    logger.info(f'Checkpoint saved to {save_path}...')
