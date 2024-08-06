@@ -28,7 +28,7 @@ from mindformers.modules.layers import Linear
 
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.quantization.quant_utils import (
-    get_quant_min_max, cal_tensor_quantization_params,
+    get_quant_min_max, cal_quantization_params,
     quant_tensor_data, quant_bias_data)
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 
@@ -137,6 +137,7 @@ class SQLinearWrapper(MinMaxLinearWrapper):
             self.quantizer_w_min = msops.mul(self.quantizer_w_min, clip_ratio)
         return weight.clamp(self.quantizer_w_min, self.quantizer_w_max).astype(weight.dtype)
 
+    #pylint: disable=protected-access
     def quant_weight(self):
         """quant weight"""
         self._weight_observer()
@@ -157,20 +158,20 @@ class SQLinearWrapper(MinMaxLinearWrapper):
             observer_x = msops.mul(self.observer_x, msops.div(1.0, smooth_scale))
             self.quantizer_x_max = msops.max(observer_x)[0]
             self.quantizer_x_min = msops.min(observer_x)[0]
-            x_scale, x_zp = cal_tensor_quantization_params(self.quantizer_x_min, self.quantizer_x_max,
-                                                           self.act_quant_min,
-                                                           self.act_quant_max,
-                                                           symmetric=self._act_symmetric)
-        w_scale, w_zp = cal_tensor_quantization_params(self.quantizer_w_min, self.quantizer_w_max,
-                                                       self.weight_quant_min, self.weight_quant_max,
-                                                       symmetric=self._weight_symmetric)
-        weight = quant_tensor_data(weight, w_scale.asnumpy().squeeze(), w_zp.asnumpy().squeeze(),
+            x_scale, x_zp = cal_quantization_params(self.quantizer_x_min.asnumpy(), self.quantizer_x_max.asnumpy(),
+                                                    self.act_quant_min,
+                                                    self.act_quant_max,
+                                                    symmetric=self._act_symmetric)
+        w_scale, w_zp = cal_quantization_params(self.quantizer_w_min.asnumpy(), self.quantizer_w_max.asnumpy(),
+                                                self.weight_quant_min, self.weight_quant_max,
+                                                symmetric=self._weight_symmetric)
+        weight = quant_tensor_data(weight, w_scale.squeeze(), w_zp.squeeze(),
                                    self.weight_quant_min, self.weight_quant_max, self.weight_quantizer_axis)
         if self.cfg.act_quant_dtype == dtype.int8:
             quant_bias = None
             if self._handler.has_bias:
-                quant_bias = quant_bias_data(self._handler.bias, msops.mul(w_scale, x_scale).asnumpy())
-            qmm = AllQuantMatmul(smooth_scale, x_scale, x_zp, w_scale,
+                quant_bias = quant_bias_data(self._handler.bias, w_scale * x_scale)
+            qmm = AllQuantMatmul(smooth_scale.asnumpy(), x_scale, x_zp, w_scale,
                                  weight, quant_bias, transpose_b=self._handler.transpose_b)
         else:
             qmm = WeightQuantMatmul(w_scale, w_zp, bias=self._handler.bias,
@@ -179,6 +180,9 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         self._handler.bias = None
         self._handler.weight = Parameter(weight.astype(dtype.int8), name=self._handler.weight.name)
         self._handler.matmul = qmm
+        self.observer_x = []
+        self._handler.weight._offload()
+        self.float_weight._offload()
 
     def quant_forward(self, inputs):
         float_weight = msops.deepcopy(self._handler.weight)
@@ -247,11 +251,13 @@ class AllQuantMatmul(Cell):
         self.smooth_scale = smooth_scale
         self.transpose_b = transpose_b
         self.offset = offset
-        dequant_scale = np.array(input_scale, dtype=np.float32) * np.array(weight_scale, dtype=np.float32)
-        scale_i64 = NumpyQuantOps.trans_fp32_to_i64(dequant_scale)
-        self.dequant_scale = Parameter(Tensor(np.squeeze(scale_i64), dtype=dtype.int64))
-        self.input_scale = Parameter(msops.mul(input_scale, smooth_scale).astype(dtype.float16))
-        self.input_zp = Parameter(msops.mul(msops.ones_like(self.input_scale), input_zp).astype(dtype.int8))
+        dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
+        scale_i64 = NumpyQuantOps.trans_fp32_to_i64(np.squeeze(dequant_scale))
+        self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64))
+        t_scale = input_scale * smooth_scale
+        self.input_scale = Parameter(Tensor(t_scale, dtype=dtype.float16))
+        t_zp = np.array([input_zp] * len(t_scale)).astype(np.int8)
+        self.input_zp = Parameter(Tensor(t_zp, dtype=dtype.int8))
         self.new_bias = Parameter(self._fused_bias(quant_weight, quant_bias, input_zp))
         self.quant = QuantV2()
         self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
@@ -263,7 +269,7 @@ class AllQuantMatmul(Cell):
     def _fused_bias(self, quant_weight, quant_bias, act_offset):
         if quant_weight is None:
             return None
-        new_bias = -np.sum(act_offset.asnumpy().astype(np.float32) * quant_weight.asnumpy(),
+        new_bias = -np.sum(act_offset.astype(np.float32) * quant_weight.asnumpy(),
                            axis=1 if self.transpose_b else 0).astype(np.int32)
         if quant_bias is not None:
             new_bias = quant_bias.asnumpy().astype(np.int32) + new_bias
@@ -310,11 +316,11 @@ class SQLinearDeploy(Cell):
 
         self._handler.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
 
-        smooth_scale = Tensor([1] * self.ic)
-        x_scale = Tensor(1.0)
-        x_zp = Tensor(1.0)
-        w_scale = [1] * self.oc
-        w_zp = [0] * self.oc
+        smooth_scale = np.array([1] * self.ic)
+        x_scale = np.array(1.0)
+        x_zp = np.array(1.0)
+        w_scale = np.array([1] * self.oc)
+        w_zp = np.array([0] * self.oc)
         weight = msops.ones(linear.weight.shape)
         quant_bias = None
 

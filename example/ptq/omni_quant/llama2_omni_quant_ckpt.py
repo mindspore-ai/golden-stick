@@ -86,7 +86,7 @@ if __name__ == "__main__":
     logger.info('Saving checkpoint...')
     start = time.time()
     os.makedirs(config.output_dir, exist_ok=True)
-    ms.save_checkpoint(network.parameters_dict(), os.path.join(config.output_dir, "llama2_7b_w8a8_refactor.ckpt"),
-                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
+    ms.save_checkpoint(network.parameters_dict(), os.path.join(config.output_dir, "w8a8.ckpt"),
+                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
     logger.info(f'Checkpoint saved to {config.output_dir}...')

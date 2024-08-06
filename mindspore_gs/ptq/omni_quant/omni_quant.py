@@ -36,6 +36,8 @@ class InputCatcher(Cell):
     def __init__(self, handler):
         super().__init__()
         self.handler = handler
+        if hasattr(handler, "attention"):
+            self.attention = handler.attention
         self.args = []
         self.kwargs = []
 
@@ -193,6 +195,8 @@ class OmniQuant(CompAlgo):
             try:
                 network_helper.generate(network, input_ids, max_new_tokens=1)
             except GeneratorExit:
+                if network.block_mgr:
+                    network.block_mgr.clear_cache()
                 if data_count >= total_count:
                     break
                 data_count += 1
