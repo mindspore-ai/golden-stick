@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """ptq quant cells."""
+from typing import Union
 import numpy as np
 
 import mindspore as ms
@@ -24,22 +25,34 @@ from mindspore.ops import operations as P
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore.common.initializer import initializer
+from mindspore.ops.operations.comm_ops import ReduceOp
+from mindspore.communication.management import GlobalComm
 from mindformers.modules.layers import Linear
+from mindformers.experimental.distri_cores.tensor_parallel.layers import (
+    ColumnParallelLinear, RowParallelLinear
+)
+from mindformers.experimental.distri_cores.tensor_parallel.collective_primitives import (
+    MaxFromTensorParallelRegion, MinFromTensorParallelRegion
+)
 
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.quantization.quant_utils import (
     get_quant_min_max, cal_quantization_params,
-    quant_tensor_data, quant_bias_data)
+    quant_tensor_data)
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 
 
 class MinMaxLinearWrapper(Cell):
     """Linear layer wrapper with min max"""
 
-    def __init__(self, linear_name: str, linear: Linear, cfg: InnerPTQConfig = None):
+    def __init__(self,
+                 linear_name: str,
+                 linear: Union[Linear, ColumnParallelLinear, RowParallelLinear],
+                 cfg: InnerPTQConfig = None):
         super().__init__()
-        if not isinstance(linear, Linear):
-            raise ValueError(f'only Linear cell is supported, but {linear_name} type is {type(linear)}.')
+        if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
+            raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
+                             f"but {linear_name} type is {type(linear)}.")
         self.cfg = cfg
         self._handler: Linear = linear
         self.mm = MatMul(linear)
@@ -61,7 +74,7 @@ class MinMaxLinearWrapper(Cell):
         self._handler.matmul = self.qmm
         return self._handler(inputs)
 
-    def construct(self, inputs):
+    def construct(self, inputs, weight=None):
         # for deploy forward
         raise NotImplementedError
 
@@ -69,7 +82,10 @@ class MinMaxLinearWrapper(Cell):
 class SQLinearWrapper(MinMaxLinearWrapper):
     """Linear layer wrapper with min max"""
 
-    def __init__(self, linear_name: str, linear: Linear, cfg: InnerPTQConfig = None):
+    def __init__(self,
+                 linear_name: str,
+                 linear: Union[Linear, ColumnParallelLinear, RowParallelLinear],
+                 cfg: InnerPTQConfig = None):
         super().__init__(linear_name, linear, cfg)
         self.pre_clip_ratio = None
         self.post_clip_ratio = None
@@ -97,6 +113,35 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         self.quantizer_w_max = None
         self.quantizer_w_min = None
 
+        self.x_obs_max = msops.max
+        self.x_obs_min = msops.min
+        if isinstance(self._handler, Linear):
+            self.x_quant_max = msops.max
+            self.x_quant_min = msops.min
+            self.w_obs_max = msops.max
+            self.w_obs_min = msops.min
+            self.w_quant_max = msops.max
+            self.w_quant_min = msops.min
+        elif isinstance(self._handler, ColumnParallelLinear):
+            self.x_quant_max = msops.max
+            self.x_quant_min = msops.min
+            self.w_obs_max = MaxFromTensorParallelRegion()
+            self.w_obs_min = MinFromTensorParallelRegion()
+            self.w_quant_max = msops.max
+            self.w_quant_min = msops.min
+        elif isinstance(self._handler, RowParallelLinear):
+            self.x_quant_max = MaxFromTensorParallelRegion()
+            self.x_quant_min = MinFromTensorParallelRegion()
+            self.w_obs_max = msops.max
+            self.w_obs_min = msops.min
+            self.w_quant_max = MaxFromTensorParallelRegion()
+            self.w_quant_min = MinFromTensorParallelRegion()
+
+        if isinstance(self._handler, Linear):
+            self.compute_type = self._handler.dtype
+        else:
+            self.compute_type = self._handler.compute_dtype
+
     def set_search_args(self, pre_clip_ratio, post_clip_ratio, smooth_alpha, smooth_type="smooth_quant"):
         self.pre_clip_ratio = pre_clip_ratio
         self.post_clip_ratio = post_clip_ratio
@@ -104,16 +149,18 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         self.smooth_type = smooth_type
 
     def _weight_observer(self):
-        self.observer_w_max = msops.max(self._handler.weight, self.observer_min_max_axis)[0]
-        self.observer_w_min = msops.min(self._handler.weight, self.observer_min_max_axis)[0]
-        self.quantizer_w_max = msops.max(self._handler.weight, self.weight_quantizer_min_max_axis, keepdims=True)[0]
-        self.quantizer_w_min = msops.min(self._handler.weight, self.weight_quantizer_min_max_axis, keepdims=True)[0]
+        self.observer_w_max = self.w_obs_max(self._handler.weight, self.observer_min_max_axis)[0]
+        self.observer_w_min = self.w_obs_min(self._handler.weight, self.observer_min_max_axis)[0]
+        self.quantizer_w_max = self.w_quant_max(self._handler.weight,
+                                                self.weight_quantizer_min_max_axis, keepdims=True)[0]
+        self.quantizer_w_min = self.w_quant_min(self._handler.weight,
+                                                self.weight_quantizer_min_max_axis, keepdims=True)[0]
 
     def _calc_smooth_scale(self):
         """calc_smooth_scale"""
         if self.smooth_type == "smooth_quant":
-            act_max = msops.maximum(msops.abs(msops.min(self.observer_x, 0)[0]),
-                                    msops.abs(msops.max(self.observer_x, 0)[0]))
+            act_max = msops.maximum(msops.abs(self.x_obs_max(self.observer_x, 0)[0]),
+                                    msops.abs(self.x_obs_min(self.observer_x, 0)[0]))
             input_max_pow = msops.pow(act_max, self.smooth_alpha)
             weight_max = msops.maximum(msops.abs(self.observer_w_min),
                                        msops.abs(self.observer_w_max))
@@ -137,6 +184,19 @@ class SQLinearWrapper(MinMaxLinearWrapper):
             self.quantizer_w_min = msops.mul(self.quantizer_w_min, clip_ratio)
         return weight.clamp(self.quantizer_w_min, self.quantizer_w_max).astype(weight.dtype)
 
+    def _fused_bias(self, quant_weight, act_offset, new_bias_need_allreduce=False):
+        """compute fused bias"""
+        if quant_weight is None:
+            return None
+        new_bias = -np.sum(act_offset.astype(np.int32) * quant_weight.asnumpy().astype(np.int32),
+                           axis=1 if self._handler.transpose_b else 0).astype(np.int32)
+        if new_bias_need_allreduce:
+            t_new_bias = Tensor(new_bias)
+            reduce_sum = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)
+            t_new_bias = reduce_sum(t_new_bias)
+            new_bias = t_new_bias.asnumpy()
+        return new_bias
+
     #pylint: disable=protected-access
     def quant_weight(self):
         """quant weight"""
@@ -151,13 +211,13 @@ class SQLinearWrapper(MinMaxLinearWrapper):
             else:
                 weight_scale = smooth_scale.expand_dims(1)
                 weight = msops.mul(weight, weight_scale)
-            self.quantizer_w_max = msops.max(weight, self.weight_quantizer_min_max_axis, keepdims=True)[0]
-            self.quantizer_w_min = msops.min(weight, self.weight_quantizer_min_max_axis, keepdims=True)[0]
+            self.quantizer_w_max = self.w_quant_max(weight, self.weight_quantizer_min_max_axis, keepdims=True)[0]
+            self.quantizer_w_min = self.w_quant_min(weight, self.weight_quantizer_min_max_axis, keepdims=True)[0]
             weight = self._clip_weight(weight, self.post_clip_ratio)
 
             observer_x = msops.mul(self.observer_x, msops.div(1.0, smooth_scale))
-            self.quantizer_x_max = msops.max(observer_x)[0]
-            self.quantizer_x_min = msops.min(observer_x)[0]
+            self.quantizer_x_max = self.x_quant_max(observer_x)[0]
+            self.quantizer_x_min = self.x_quant_min(observer_x)[0]
             x_scale, x_zp = cal_quantization_params(self.quantizer_x_min.asnumpy(), self.quantizer_x_max.asnumpy(),
                                                     self.act_quant_min,
                                                     self.act_quant_max,
@@ -167,17 +227,31 @@ class SQLinearWrapper(MinMaxLinearWrapper):
                                                 symmetric=self._weight_symmetric)
         weight = quant_tensor_data(weight, w_scale.squeeze(), w_zp.squeeze(),
                                    self.weight_quant_min, self.weight_quant_max, self.weight_quantizer_axis)
+
         if self.cfg.act_quant_dtype == dtype.int8:
-            quant_bias = None
+            dequant_scale = np.squeeze(w_scale * x_scale).astype(np.float32)
+            bias = None
+            if isinstance(self._handler, RowParallelLinear):
+                bias = self._fused_bias(weight, x_zp, True)
+            else:
+                bias = self._fused_bias(weight, x_zp, False)
+            bias = bias.astype(np.float64) * dequant_scale
+            bias = Tensor(bias, dtype=self.compute_type) if bias is not None else None
             if self._handler.has_bias:
-                quant_bias = quant_bias_data(self._handler.bias, w_scale * x_scale)
+                bias = Tensor((bias.asnumpy() + self._handler.bias.asnumpy()), dtype=self.compute_type)
+                bias_name = self._handler.bias.name
+            else:
+                bias_name = self._handler.weight.name + "_bias"
+                self._handler.bias_add = P.Add()
+            self._handler.has_bias = True
+            self._handler.bias = Parameter(bias.astype(self.compute_type), name=bias_name)
+
             qmm = AllQuantMatmul(smooth_scale.asnumpy(), x_scale, x_zp, w_scale,
-                                 weight, quant_bias, transpose_b=self._handler.transpose_b)
+                                 transpose_b=self._handler.transpose_b)
         else:
             qmm = WeightQuantMatmul(w_scale, w_zp, bias=self._handler.bias,
                                     transpose_b=self._handler.transpose_b)
-        self._handler.has_bias = False
-        self._handler.bias = None
+
         self._handler.weight = Parameter(weight.astype(dtype.int8), name=self._handler.weight.name)
         self._handler.matmul = qmm
         self.observer_x = []
@@ -192,7 +266,7 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         self._handler.matmul = self.mm
         return output
 
-    def act_observer(self, x):
+    def linear_act_observer(self, x):
         """act observer forward"""
         out_shape = P.Shape()(x)[:-1] + (self._handler.out_channels,)
         x = P.Reshape()(x, (-1, self._handler.in_channels))
@@ -215,7 +289,69 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         output = self._handler.reshape(x, out_shape)
         return output
 
-    def construct(self, inputs):
+    def col_parallel_linear_act_observer(self, input_, weight=None):
+        """act observer forward"""
+        if weight is None and self._handler.skip_weight_param_allocation:
+            raise ValueError("For ColumnParallelLinear, when skip_weight_param_allocation=True,"
+                             " weight should be passed to construct(), but got None.")
+
+        if self._handler.sequence_parallel or self._handler.explicit_expert_comm:
+            input_parallel = input_
+        else:
+            input_parallel = self._handler.copy_to_mp_region(input_)
+
+        origin_dtype = F.dtype(input_parallel)
+        if self._handler.skip_weight_param_allocation:
+            weight = self._handler.cast(weight, self._handler.compute_dtype)
+        else:
+            weight = self._handler.cast(self._handler.weight, self._handler.compute_dtype)
+        input_parallel = self._handler.cast(input_parallel, self._handler.compute_dtype)
+
+        if self._handler.sequence_parallel:
+            input_parallel = input_parallel.swapaxes(0, 1).contiguous()
+            input_parallel = self._handler.gather_from_sp_region(input_parallel)
+            input_parallel = input_parallel.swapaxes(0, 1).contiguous()
+        self.observer_x.append(msops.squeeze(input_parallel))
+        output_parallel = self._handler.matmul(input_parallel, weight)
+        if self._handler.has_bias:
+            output_parallel = self._handler.bias_add(
+                output_parallel, self._handler.cast(self._handler.bias, self._handler.compute_dtype)
+            )
+        output_parallel = self._handler.cast(output_parallel, origin_dtype)
+
+        if self._handler.gather_output:
+            output = self._handler.gather_from_mp_region(output_parallel)
+        else:
+            output = output_parallel
+        return output
+
+    def row_parallel_linear_act_observer(self, input_):
+        """act observer forward"""
+        if self._handler.input_is_parallel:
+            input_parallel = input_
+        else:
+            input_parallel = self._handler.scatter_to_mp_region(input_)
+
+        origin_dtype = F.dtype(input_parallel)
+        weight = self._handler.cast(self._handler.weight, self._handler.compute_dtype)
+        input_parallel = self._handler.cast(input_parallel, self._handler.compute_dtype)
+        self.observer_x.append(msops.squeeze(input_parallel))
+        output_parallel = self._handler.matmul(input_parallel, weight)
+        if self._handler.explicit_expert_comm:
+            output = output_parallel
+        elif self._handler.sequence_parallel:
+            output_parallel = output_parallel.swapaxes(0, 1).contiguous()
+            output = self._handler.reduce_scatter_to_sp_region(output_parallel)
+            output = output.swapaxes(0, 1).contiguous()
+        else:
+            output = self._handler.reduce_from_mp_region(output_parallel)
+
+        if self._handler.has_bias:
+            output = self._handler.bias_add(output, self._handler.cast(self._handler.bias, self._handler.compute_dtype))
+        output = self._handler.cast(output, origin_dtype)
+        return output
+
+    def construct(self, inputs, weight=None):
         """
         Defines the computation of LinearWithMinMax to be performed.
 
@@ -223,8 +359,11 @@ class SQLinearWrapper(MinMaxLinearWrapper):
             Tensor, returns the computed result.
         """
         if self._handler.infer_mode == "observer_x":
-            self.observer_x = []
-            return self.act_observer(inputs)
+            if isinstance(self._handler, Linear):
+                return self.linear_act_observer(inputs)
+            if isinstance(self._handler, ColumnParallelLinear):
+                return self.col_parallel_linear_act_observer(inputs, weight)
+            return self.row_parallel_linear_act_observer(inputs)
         if self._handler.infer_mode == "float":
             return self.float_forward(inputs)
         return self.quant_forward(inputs)
@@ -245,7 +384,7 @@ class AllQuantMatmul(Cell):
     """quant act and weight"""
 
     def __init__(self, smooth_scale, input_scale, input_zp, weight_scale,
-                 quant_weight, quant_bias, offset=None, transpose_a=False,
+                 offset=None, transpose_a=False,
                  transpose_b=False, dst_dtype=dtype.float16):
         super().__init__()
         self.smooth_scale = smooth_scale
@@ -254,11 +393,12 @@ class AllQuantMatmul(Cell):
         dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
         scale_i64 = NumpyQuantOps.trans_fp32_to_i64(np.squeeze(dequant_scale))
         self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64))
+
         t_scale = input_scale * smooth_scale
         self.input_scale = Parameter(Tensor(t_scale, dtype=dtype.float16))
         t_zp = np.array([input_zp] * len(t_scale)).astype(np.int8)
         self.input_zp = Parameter(Tensor(t_zp, dtype=dtype.int8))
-        self.new_bias = Parameter(self._fused_bias(quant_weight, quant_bias, input_zp))
+
         self.quant = QuantV2()
         self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
         if offset is None:
@@ -266,21 +406,11 @@ class AllQuantMatmul(Cell):
         else:
             self.offset = Parameter(Tensor(offset, dtype=dtype.float32))
 
-    def _fused_bias(self, quant_weight, quant_bias, act_offset):
-        if quant_weight is None:
-            return None
-        new_bias = -np.sum(act_offset.astype(np.float32) * quant_weight.asnumpy(),
-                           axis=1 if self.transpose_b else 0).astype(np.int32)
-        if quant_bias is not None:
-            new_bias = quant_bias.asnumpy().astype(np.int32) + new_bias
-        new_bias = Tensor(new_bias, dtype=dtype.int32) if new_bias is not None else None
-        return new_bias
-
     def construct(self, x, quant_weight):
         # x: fp16 quant_weight: int8
         quant_weight = quant_weight.astype(dtype.int8)
         qx = self.quant(x, self.input_scale, self.input_zp, False, "ROUND", ms.int8)
-        return self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, self.new_bias)
+        return self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, None)
 
 
 class WeightQuantMatmul(Cell):
@@ -302,10 +432,14 @@ class WeightQuantMatmul(Cell):
 class SQLinearDeploy(Cell):
     """Linear deploy phase"""
 
-    def __init__(self, linear_name: str, linear: Linear, cfg: InnerPTQConfig = None):
+    def __init__(self,
+                 linear_name: str,
+                 linear: Union[Linear, ColumnParallelLinear, RowParallelLinear],
+                 cfg: InnerPTQConfig = None):
         super().__init__()
-        if not isinstance(linear, Linear):
-            raise ValueError(f'only Linear cell is supported, but {linear_name} type is {type(linear)}.')
+        if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
+            raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
+                             f"but {linear_name} type is {type(linear)}.")
         self.cfg = cfg
         self._handler = linear
         rank = len(linear.weight.shape)
@@ -313,26 +447,46 @@ class SQLinearDeploy(Cell):
         self.weight_quantizer_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
         self.ic = linear.weight.shape[ic_axis]
         self.oc = linear.weight.shape[self.weight_quantizer_axis]
+        if isinstance(self._handler, Linear):
+            self.compute_type = self._handler.dtype
+        else:
+            self.compute_type = self._handler.compute_dtype
 
         self._handler.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
+        if linear.has_bias:
+            self._handler.bias = Parameter(initializer("ones", linear.bias.shape, linear.bias.dtype),
+                                           name=linear.bias.name)
+        else:
+            self._handler.has_bias = True
+            bias_shape = [linear.weight.shape[0] if linear.transpose_b else linear.weight.shape[1]]
+            bias_name = linear.weight.name + "_bias"
+            self._handler.bias = Parameter(initializer("ones", bias_shape, self.compute_type), name=bias_name)
+            self._handler.bias_add = P.Add()
 
         smooth_scale = np.array([1] * self.ic)
         x_scale = np.array(1.0)
         x_zp = np.array(1.0)
         w_scale = np.array([1] * self.oc)
         w_zp = np.array([0] * self.oc)
-        weight = msops.ones(linear.weight.shape)
-        quant_bias = None
 
         if self.cfg.act_quant_dtype == dtype.int8:
-            qmm = AllQuantMatmul(smooth_scale, x_scale, x_zp, w_scale,
-                                 weight, quant_bias, transpose_b=self._handler.transpose_b)
-            self._handler.has_bias = False
-            self._handler.bias = None
+            qmm = AllQuantMatmul(smooth_scale, x_scale, x_zp, w_scale, transpose_b=self._handler.transpose_b)
         else:
             qmm = WeightQuantMatmul(w_scale, w_zp, bias=self._handler.bias,
                                     transpose_b=self._handler.transpose_b)
         self._handler.matmul = qmm
+        self.is_colparallel = (isinstance(self._handler, ColumnParallelLinear))
+        self.is_linear = isinstance(self._handler, Linear)
 
-    def construct(self, x):
-        return self._handler(x)
+    def construct(self, x, weight=None):
+        """linear deploy construct"""
+        if self.is_linear:
+            return self._handler(x)
+        out_shape = x.shape[:-1] + (self.oc,)
+        x = msops.reshape(x, (-1, self.ic))
+        if self.is_colparallel:
+            x = self._handler(x, weight)
+        else:
+            x = self._handler(x)
+        x = msops.reshape(x, out_shape)
+        return x

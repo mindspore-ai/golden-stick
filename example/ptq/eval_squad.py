@@ -20,7 +20,7 @@ import numpy as np
 from mindformers.core.metric import EmF1Metric
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_squad_dataset
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
 
 def evaluate(net, dataset_path, network_helper):
@@ -69,6 +69,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
+    parser.add_argument('--network', '-n', type=str, required=True)
     args = parser.parse_args()
     logger.info(f"evaluate args: {args}")
     return args
@@ -78,7 +79,10 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     logger.info('Creating network...')
-    helper = MFLlama2Helper(uargs.config_path)
+    if uargs.network == "LlamaForCasualLM":
+        helper = MFLlama2Helper(uargs.config_path)
+    elif uargs.network == "ParallelLlamaForCasualLM":
+        helper = MFParallelLlama2Helper(uargs.config_path)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     evaluate(network, uargs.dataset_path, helper)
