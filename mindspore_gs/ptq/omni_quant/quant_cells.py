@@ -222,13 +222,14 @@ class SQLinearWrapper(MinMaxLinearWrapper):
                                                     self.act_quant_min,
                                                     self.act_quant_max,
                                                     symmetric=self._act_symmetric)
-        w_scale, w_zp = cal_quantization_params(self.quantizer_w_min.asnumpy(), self.quantizer_w_max.asnumpy(),
-                                                self.weight_quant_min, self.weight_quant_max,
-                                                symmetric=self._weight_symmetric)
-        weight = quant_tensor_data(weight, w_scale.squeeze(), w_zp.squeeze(),
-                                   self.weight_quant_min, self.weight_quant_max, self.weight_quantizer_axis)
+        if self.cfg.weight_quant_dtype == dtype.int8:
+            w_scale, w_zp = cal_quantization_params(self.quantizer_w_min.asnumpy(), self.quantizer_w_max.asnumpy(),
+                                                    self.weight_quant_min, self.weight_quant_max,
+                                                    symmetric=self._weight_symmetric)
+            weight = quant_tensor_data(weight, w_scale.squeeze(), w_zp.squeeze(),
+                                       self.weight_quant_min, self.weight_quant_max, self.weight_quantizer_axis)
 
-        if self.cfg.act_quant_dtype == dtype.int8:
+        if self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
             dequant_scale = np.squeeze(w_scale * x_scale).astype(np.float32)
             bias = None
             if isinstance(self._handler, RowParallelLinear):
@@ -248,9 +249,8 @@ class SQLinearWrapper(MinMaxLinearWrapper):
 
             qmm = AllQuantMatmul(smooth_scale.asnumpy(), x_scale, x_zp, w_scale,
                                  transpose_b=self._handler.transpose_b)
-        else:
-            qmm = WeightQuantMatmul(w_scale, w_zp, bias=self._handler.bias,
-                                    transpose_b=self._handler.transpose_b)
+        elif self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
+            qmm = WeightQuantMatmul(w_scale, w_zp, transpose_b=self._handler.transpose_b)
 
         self._handler.weight = Parameter(weight.astype(dtype.int8), name=self._handler.weight.name)
         self._handler.matmul = qmm
@@ -416,17 +416,17 @@ class AllQuantMatmul(Cell):
 class WeightQuantMatmul(Cell):
     """quant batch matmul"""
 
-    def __init__(self, t_scale, t_zp, bias=None, transpose_a=False, transpose_b=False, dst_type=dtype.float16):
+    def __init__(self, t_scale, t_zp, transpose_a=False, transpose_b=False, dst_type=dtype.float16):
         super().__init__()
-        self.t_scale = t_scale
-        self.t_zp = t_zp
-        self.bias = bias
         self.dst_dtype = dst_type
+        self.t_scale = Parameter(Tensor(np.squeeze(t_scale), dtype=self.dst_dtype))
+        self.t_zp_neg = Parameter(Tensor(np.squeeze(t_zp) * -1, dtype=self.dst_dtype))
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b)
 
     def construct(self, x, weight):
         """forward for antiquant bmm cell"""
-        output = self.weight_qbmm(x, weight, self.t_scale, self.t_zp, None, None, self.bias)
+        weight = weight.astype(dtype.int8)
+        output = self.weight_qbmm(x, weight, self.t_scale, self.t_zp_neg, None, None, None)
         return output.astype(self.dst_dtype)
 
 class SQLinearDeploy(Cell):
@@ -453,26 +453,26 @@ class SQLinearDeploy(Cell):
             self.compute_type = self._handler.compute_dtype
 
         self._handler.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
-        if linear.has_bias:
-            self._handler.bias = Parameter(initializer("ones", linear.bias.shape, linear.bias.dtype),
-                                           name=linear.bias.name)
-        else:
-            self._handler.has_bias = True
-            bias_shape = [linear.weight.shape[0] if linear.transpose_b else linear.weight.shape[1]]
-            bias_name = linear.weight.name + "_bias"
-            self._handler.bias = Parameter(initializer("ones", bias_shape, self.compute_type), name=bias_name)
-            self._handler.bias_add = P.Add()
 
-        smooth_scale = np.array([1] * self.ic)
-        x_scale = np.array(1.0)
-        x_zp = np.array(1.0)
         w_scale = np.array([1] * self.oc)
         w_zp = np.array([0] * self.oc)
 
-        if self.cfg.act_quant_dtype == dtype.int8:
+        if self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
+            if linear.has_bias:
+                self._handler.bias = Parameter(initializer("ones", linear.bias.shape, linear.bias.dtype),
+                                               name=linear.bias.name)
+            else:
+                self._handler.has_bias = True
+                bias_shape = [linear.weight.shape[0] if linear.transpose_b else linear.weight.shape[1]]
+                bias_name = linear.weight.name + "_bias"
+                self._handler.bias = Parameter(initializer("ones", bias_shape, self.compute_type), name=bias_name)
+                self._handler.bias_add = P.Add()
+            smooth_scale = np.array([1] * self.ic)
+            x_scale = np.array(1.0)
+            x_zp = np.array(1.0)
             qmm = AllQuantMatmul(smooth_scale, x_scale, x_zp, w_scale, transpose_b=self._handler.transpose_b)
-        else:
-            qmm = WeightQuantMatmul(w_scale, w_zp, bias=self._handler.bias,
+        elif self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
+            qmm = WeightQuantMatmul(w_scale, w_zp,
                                     transpose_b=self._handler.transpose_b)
         self._handler.matmul = qmm
         self.is_colparallel = (isinstance(self._handler, ColumnParallelLinear))
