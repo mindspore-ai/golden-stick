@@ -21,6 +21,9 @@ from mindspore.nn import Cell
 
 class NetworkHelper:
     """NetworkHelper for decoupling algorithm with network framework."""
+    def create_network(self):
+        raise NotImplementedError
+
     def get_spec(self, name: str):
         """
         Get network specific, such as batch_size, seq_length and so on.

@@ -234,6 +234,7 @@ class LinearDeploy(PTQCell):
         output = self.handler().reshape(x, out_shape)
         return output
 
+
 class PagedAttentionQuant(PTQCell):
     """PagedAttention Quant wrapper with min max"""
 
@@ -346,6 +347,7 @@ class PagedAttentionQuant(PTQCell):
         return self._kvcache.paged_attention_with_alibi(query, self._kvcache.key_cache, self._kvcache.value_cache,
                                                         block_tables, batch_valid_length, alibi_tensor)
 
+
 class PagedAttentionDeployBase(PTQCell):
     """PagedAttention deploy base class"""
 
@@ -430,6 +432,7 @@ class PagedAttentionDeploy(PagedAttentionDeployBase):
         kcache = self._key_output_quantizer(self._kvcache.key_cache, self.key_t_zp, self.key_t_scale)
         vcache = self._value_output_quantizer(self._kvcache.value_cache, self.value_t_zp, self.value_t_scale)
         return self._kvcache.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
+
 
 class PagedAttentionDeployFusion(PagedAttentionDeployBase):
     """PagedAttention deploy with fuison ops."""

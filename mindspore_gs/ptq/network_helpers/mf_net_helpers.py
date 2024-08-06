@@ -13,19 +13,23 @@
 # limitations under the License.
 # ============================================================================
 """Network helper for network from MindFormers."""
+import os.path
 
+from typing import Union, List
 
 import math
 import numpy as np
+import mindspore as ms
 from mindspore import dtype as mstype
-from mindspore import Tensor
-from mindspore_gs.common.validator import Validator
+from mindspore import Tensor, Model
+from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
 from mindformers.models.modeling_utils import PreTrainedModel
-from mindformers.tools.register.config import MindFormerConfig
+from mindformers.models.build_tokenizer import build_tokenizer
+from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.models.llama import LlamaForCausalLM, LlamaModel
-from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
 from mindformers.models.llama.llama_transformer import LLamaDecodeLayer, LLamaAttention
 from mindformers.models.llama.llama_layer import LlamaFeedForward
+from mindspore_gs.common.utils import value_check
 from .network_helper import NetworkHelper
 
 
@@ -34,16 +38,43 @@ class MFNetworkHelper(NetworkHelper):
     Network helper for network from MindFormers.
 
     Args:
-        config (MindFormerConfig): MindFormerConfig for network.
+        config (Union[str, MindFormerConfig]): MindFormerConfig or path of config file for network.
 
     Raises:
-        TypeError: If input `config` is not an instance of `MindFormerConfig`.
+        TypeError: If input `config` is not an instance of `MindFormerConfig` neither a str.
+        ValueError: If input `config` is not a valid file path when input `config` is a str.
     """
-    def __init__(self, config: MindFormerConfig = None):
-        Validator.check_value_type("config", config, [MindFormerConfig], self.__class__.__name__)
-        self.mf_config = config
+    def __init__(self, config: Union[str, MindFormerConfig] = None):
+        value_check("config", config, (MindFormerConfig, str))
+        if isinstance(config, MindFormerConfig):
+            self.mf_config = config
+        else:
+            if not os.path.isfile(config):
+                raise ValueError(f"Input `config`({config}) is not a valid file path.")
+            self.mf_config = MindFormerConfig(config)
+        build_parallel_config(self.mf_config)
+        self.mf_config.model.model_config.parallel_config = self.mf_config.parallel_config
+
+    def create_network(self):
+        build_context(self.mf_config)
+        network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
+        network.set_train(False)
+        network.phase = 'predict'
+        model = Model(network)
+        ckpt_path = self.mf_config.load_checkpoint
+        if ckpt_path:
+            input_ids = np.ones(shape=[self.get_spec('batch_size'), self.get_spec('seq_length')], dtype=np.int32)
+            infer_data = network.prepare_inputs_for_predict_layout(input_ids)
+            if os.path.isdir(ckpt_path):
+                network.phase = 'infer_predict_layout'
+                model.infer_predict_layout(*infer_data)
+            transform_and_load_checkpoint(self.mf_config, model, network, infer_data, do_predict=True)
+        ms.ms_memory_recycle()
+        network.phase = 'predict'
+        return network
 
     def get_spec(self, name: str):
+        value_check('name', name, str)
         if name == 'vocab_file':
             return self.mf_config.processor.tokenizer.vocab_file
         model_config = self.mf_config.model.model_config
@@ -51,16 +82,22 @@ class MFNetworkHelper(NetworkHelper):
             return getattr(model_config, name)
         raise KeyError(f"Can not find network specific: {name}.")
 
-    def create_tokenizer(self, **kwargs):
+    # pylint: disable=arguments-differ
+    def create_tokenizer(self):
         """create_tokenizer."""
-        return LlamaTokenizer(vocab_file=self.get_spec('vocab_file'))
+        return build_tokenizer(self.mf_config.processor.tokenizer)
 
     # pylint: disable=arguments-differ
-    def generate(self, mf_network: PreTrainedModel, input_ids: np.ndarray, max_new_tokens=None, **kwargs):
-        do_sample = self.mf_config.model.model_config.do_sample
-        seq = self.mf_config.model.model_config.seq_length
-        top_p = self.mf_config.model.model_config.top_p
-        top_k = self.mf_config.model.model_config.top_k
+    def generate(self, mf_network: PreTrainedModel, input_ids: Union[np.ndarray, List[int], List[List[int]]],
+                 max_new_tokens=None):
+        value_check('mf_network', mf_network, PreTrainedModel)
+        value_check('input_ids', input_ids, (np.ndarray, List))
+        if max_new_tokens:
+            value_check('max_new_tokens', max_new_tokens, int)
+        do_sample = self.get_spec('do_sample')
+        seq = self.get_spec('seq_length')
+        top_p = self.get_spec('top_p')
+        top_k = self.get_spec('top_k')
         return mf_network.generate(input_ids, do_sample=do_sample, max_length=seq, max_new_tokens=max_new_tokens,
                                    top_p=top_p, top_k=top_k)
 
@@ -112,6 +149,7 @@ class MFLlama2Helper(MFNetworkHelper):
         return block_tables, slot_mapping
 
     def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
+        value_check('input_ids', input_ids, np.ndarray)
         shape = input_ids.shape
         if len(shape) > 2:
             raise ValueError(f"Only support two-dimension(bs, seq_length) input_ids, got: {shape}.")
@@ -132,16 +170,19 @@ class MFLlama2Helper(MFNetworkHelper):
         return t_input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping
 
     def get_decoder_layers(self, network: LlamaForCausalLM):
+        value_check('network', network, LlamaForCausalLM)
         model: LlamaModel = network.model
         return model.layers
 
     # pylint: disable=protected-access
     def offload_embedding(self, network: LlamaForCausalLM):
+        value_check('network', network, LlamaForCausalLM)
         model: LlamaModel = network.model
         model.casual_mask.lower_triangle_mask._offload()
         model.tok_embeddings.embedding_weight._offload()
 
     def get_linears(self, decoder_layer: LLamaDecodeLayer):
+        value_check('decoder_layer', decoder_layer, LLamaDecodeLayer)
         attention: LLamaAttention = decoder_layer.attention
         if not isinstance(attention, LLamaAttention):
             raise RuntimeError(f"Only support LLamaAttention as attention but got {attention}")
