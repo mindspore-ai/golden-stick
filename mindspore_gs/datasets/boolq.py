@@ -29,13 +29,14 @@ from mindspore_gs.common import logger
 class BoolQDataset(GeneratorDataset):
     """boolQ dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
-                 need_pad=True, n_samples=-1):
+                 need_pad=True, n_samples=-1, add_special_tokens=True):
         self.path = os.path.join(path)
         if mode not in ("eval", "train", "test"):
             raise ValueError("Input `mode` should be 'eval', 'test' or 'train', got: ", mode)
         self.mode = mode
         self.seq_len = seq_length
         self.ignore_token_id = ignore_token_id
+        self.add_special_tokens = add_special_tokens
         self.tokenizer = tokenizer
         self.need_pad = need_pad
         if mode in ("eval", "test"):
@@ -89,7 +90,7 @@ class BoolQDataset(GeneratorDataset):
         if self.mode == "eval":
             for prompt, answer in zip(sources, targets):
                 total_items += 1
-                input_ids = self.tokenizer.encode(prompt, add_special_tokens=True)
+                input_ids = self.tokenizer.encode(prompt, add_special_tokens=self.add_special_tokens)
                 label_id = self.tokenizer.encode(answer, add_special_tokens=False)
                 if len(input_ids) >= self.seq_len:
                     input_ids = input_ids[:self.seq_len]
@@ -109,7 +110,7 @@ class BoolQDataset(GeneratorDataset):
             for prompt, answer in zip(sources, targets):
                 total_items += 1
                 concated_qa = prompt + answer
-                input_ids = self.tokenizer.encode(concated_qa, add_special_tokens=True)
+                input_ids = self.tokenizer.encode(concated_qa, add_special_tokens=self.add_special_tokens)
                 input_ids = np.array(input_ids)
 
                 prompt_ids = self.tokenizer.encode(prompt, add_special_tokens=False)
@@ -139,9 +140,9 @@ class BoolQDataset(GeneratorDataset):
 
 
 def create_boolq_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
-                         ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1):
+                         ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
     """create squad dataset"""
-    ds = BoolQDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples)
+    ds = BoolQDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples, add_special_tokens)
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.map(operations=type_cast_op, input_columns="labels")

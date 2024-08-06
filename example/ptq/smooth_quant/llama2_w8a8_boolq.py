@@ -67,9 +67,9 @@ def evaluate(net, dataset_path, network_helper):
         if acc:
             correct += 1
         if data_count % 10 == 0:
-            print("acc: ", correct / data_count)
-    print("total acc: ", correct / data_count)
-    print('...........Evaluate Over!...............', flush=True)
+            logger.info("acc: ", correct / data_count)
+    logger.info("total acc: ", correct / data_count)
+    logger.info('Evaluate Over!')
 
 
 def get_args():
@@ -78,14 +78,14 @@ def get_args():
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     args = parser.parse_args()
-    logger.info(f"-------------------------------------------------evaluate args: {args}")
+    logger.info(f"evaluate args: {args}")
     return args
 
 
 if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
-    print('------------------------- Creating network...', flush=True)
+    logger.info('Creating network...')
     config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False
     helper = MFLlama2Helper(config)

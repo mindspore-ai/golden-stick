@@ -15,22 +15,22 @@
 """get_datasets"""
 
 
-from mindspore.dataset import GeneratorDataset
+from mindspore.dataset import Dataset
 from .wikitext2 import create_wikitext_dataset
 from .squad import create_squad_dataset
 from .boolq import create_boolq_dataset
 
 
 def get_datasets(ds_type: str, ds_path: str, mode, batch_size, seq_length, max_new_tokens, tokenizer,
-                 ignore_token_id, repeat=1, need_pad=True, n_samples=-1) -> GeneratorDataset:
+                 ignore_token_id, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True) -> Dataset:
     """get_datasets."""
     if ds_type.lower() == 'wikitext2':
         return create_wikitext_dataset(ds_path, batch_size, seq_length, max_new_tokens, tokenizer, repeat, need_pad,
-                                       n_samples)
+                                       n_samples, add_special_tokens)
     if ds_type.lower() == 'squad1.1':
         return create_squad_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat,
-                                    need_pad, n_samples)
+                                    need_pad, n_samples, add_special_tokens)
     if ds_type.lower() == 'boolq':
         return create_boolq_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat,
-                                    need_pad, n_samples)
+                                    need_pad, n_samples, add_special_tokens)
     raise ValueError(f"Not supported datasets type: {ds_type}.")
