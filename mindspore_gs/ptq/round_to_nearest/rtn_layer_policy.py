@@ -39,6 +39,8 @@ class RTNLayerPolicy(PTQLayerPolicy, abc.ABC):
         self._config: InnerPTQConfig = config
         if config.weight_dtype in (msdtype.int8, msdtype.uint8):
             self._num_bits = 8
+        elif config.weight_dtype == msdtype.float_:
+            self._num_bits = 16
         else:
             raise TypeError("Only support int8 weight quant now!")
         if config.act_per_channel:

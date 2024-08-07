@@ -227,7 +227,7 @@ class PagedAttentionQuant(PTQCell):
         super(PagedAttentionQuant, self).__init__(kvcache, policy)
         self._kvcache = kvcache
 
-        # KVCacheMgr's shape is BSH currently.
+        # PagedAttentionMgr's shape is BSH currently.
         n = kvcache.n_heads
         d = kvcache.head_dim
         key_fq_args = {}
@@ -299,9 +299,9 @@ class PagedAttentionQuant(PTQCell):
             key_value_t_zp = np.concatenate((key_t_zp_np.reshape((1, t_zp_len)), value_t_zp_np.reshape((1, t_zp_len))))
             self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.float16), name="key_value_t_zp")
 
-            self._kvcache.key_cache = Parameter(Tensor(np.zeros(self._kvcache.key_cache.shape), dtype=dtype.int8),
+            self._kvcache.key_cache = Parameter(initializer('ones', self._kvcache.key_cache.shape, dtype.int8),
                                                 name=self._kvcache.key_cache.name, requires_grad=False)
-            self._kvcache.value_cache = Parameter(Tensor(np.zeros(self._kvcache.value_cache.shape), dtype=dtype.int8),
+            self._kvcache.value_cache = Parameter(initializer('ones', self._kvcache.value_cache.shape, dtype.int8),
                                                   name=self._kvcache.value_cache.name, requires_grad=False)
         else:
             raise ValueError("Only support convert PagedAttentionMgr to MS backend.")
@@ -337,7 +337,7 @@ class PagedAttentionDeployBase(PTQCell):
         super(PagedAttentionDeployBase, self).__init__(kvcache, policy)
         self._converted = True
         self._kvcache = kvcache
-        # KVCacheMgr's shape is BSH currently.
+        # PagedAttentionMgr's shape is BSH currently.
         n = kvcache.n_heads
         d = kvcache.head_dim
         self._key_in_strategy = None
@@ -368,9 +368,9 @@ class PagedAttentionDeployBase(PTQCell):
         dst_type = self._kvcache.key_cache.dtype
         self._key_output_quantizer = convert_to_antiquant_for_deploy(n, d, self._key_out_strategy, dst_type)
         self._value_output_quantizer = convert_to_antiquant_for_deploy(n, d, self._value_out_strategy, dst_type)
-        self._kvcache.key_cache = Parameter(Tensor(np.zeros(self._kvcache.key_cache.shape), dtype=dtype.int8),
+        self._kvcache.key_cache = Parameter(initializer('ones', self._kvcache.key_cache.shape, dtype.int8),
                                             name=self._kvcache.key_cache.name, requires_grad=False)
-        self._kvcache.value_cache = Parameter(Tensor(np.zeros(self._kvcache.value_cache.shape), dtype=dtype.int8),
+        self._kvcache.value_cache = Parameter(initializer('ones', self._kvcache.value_cache.shape, dtype.int8),
                                               name=self._kvcache.value_cache.name, requires_grad=False)
 
     def weight_quantizer(self):
@@ -419,9 +419,9 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
 
     def __init__(self, kvcache: PagedAttentionMgr, policy: PTQLayerPolicy):
         super(PagedAttentionDeployFusion, self).__init__(kvcache, policy)
-        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.float16),
+        self.key_value_t_zp = Parameter(initializer('ones', (2, self.key_t_zp.shape[0]), dtype.float16),
                                         name="key_value_t_zp")
-        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.float16),
+        self.key_value_t_scale = Parameter(initializer('ones', (2, self.key_t_zp.shape[0]), dtype.float16),
                                            name="key_value_t_scale")
         if "in_strategy" in kvcache.paged_attention.get_attr_dict():
             pa_strategy = kvcache.paged_attention.in_strategy

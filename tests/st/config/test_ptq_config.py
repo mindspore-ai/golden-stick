@@ -70,6 +70,18 @@ def test_ptq_config_construct():
         _ = PTQConfig(opname_blacklist="1")
     with pytest.raises(TypeError):
         _ = PTQConfig(opname_blacklist=["1", 1])
+    with pytest.raises(ValueError):
+        _ = PTQConfig(weight_dtype=["1"])
+    with pytest.raises(ValueError):
+        _ = PTQConfig(weight_dtype=msdtype.float16)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(kvcache_dtype=["1"])
+    with pytest.raises(ValueError):
+        _ = PTQConfig(kvcache_dtype=msdtype.float16)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(act_dtype=["1"])
+    with pytest.raises(ValueError):
+        _ = PTQConfig(act_dtype=msdtype.float16)
 
 
 @pytest.mark.level0
@@ -83,6 +95,12 @@ def test_inner_ptq_config():
     """
     with pytest.raises(ValueError):
         _ = InnerPTQConfig(approach='no_such_approach')
+    with pytest.raises(ValueError):
+        _ = InnerPTQConfig(approach=PTQApproach.RTN, act_dtype=msdtype.int8)
+    with pytest.raises(ValueError):
+        _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_dtype=msdtype.float_, kvcache_dtype=msdtype.float_)
+    with pytest.raises(ValueError):
+        _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_dtype=msdtype.int8, kvcache_dtype=msdtype.int8)
 
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     assert cfg.approach == PTQApproach.SMOOTH_QUANT
