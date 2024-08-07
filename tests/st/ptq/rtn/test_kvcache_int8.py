@@ -12,31 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""test KVCache Int8 algorithm."""
+"""test Linear Int8 algorithm."""
 import os
 import sys
 from collections import OrderedDict
 
 import pytest
 import numpy as np
-import mindspore
-from mindspore import context, Parameter, dtype, GRAPH_MODE, Tensor, nn, QuantDtype
-from mindspore.common.initializer import initializer
-
-from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell, FakeQuantParam
+from mindspore import dtype as msdtype
+from mindspore import context, GRAPH_MODE, Tensor, nn, save_checkpoint, load_checkpoint
+from mindspore.communication import get_rank
 from mindspore_gs.ptq import RoundToNearest as RTN
-from mindspore_gs.ptq.quant_cells import KVCacheMgrQuant
-from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell
+from mindspore_gs.ptq.convert_utils import QuantCellV2
+from mindspore_gs.ptq.round_to_nearest.quant_cells import PagedAttentionQuant
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
 from mindspore_gs.common.gs_enum import BackendTarget
-from mindformers.modules import KVCacheMgr
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
-from tests.st.models.llama2 import llama2, create_dummy_inputs
-from tests.st.test_utils import check_network_contain_layer, relative_tolerance_acceptable, \
-    absolute_tolerance_acceptable
+from tests.st.test_utils import relative_tolerance_acceptable, \
+    set_config, load_distribut_checkpoint, MFLlama2HelloNetworkHelper, create_hello_ds
+from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
+from mindformers.modules import PagedAttentionMgr
+from mindformers import LlamaForCausalLM
 
 
 class SimpleNet(nn.Cell):
@@ -46,475 +45,255 @@ class SimpleNet(nn.Cell):
 
     def __init__(self):
         super(SimpleNet, self).__init__()
-        self.kvcache = KVCacheMgr(8, 16, 2, 512)
-        kv_shape = self.kvcache.key_past.shape
-        kv_dtype = self.kvcache.key_past.dtype
-        self.kvcache.key_past = Parameter(initializer('normal', kv_shape, kv_dtype), name=self.kvcache.key_past.name,
-                                          requires_grad=False)
-        self.kvcache.value_past = Parameter(initializer('normal', kv_shape, kv_dtype),
-                                            name=self.kvcache.value_past.name, requires_grad=False)
+        self.kv_cache = PagedAttentionMgr(2, 12, 2, (256, 1, 2, 12))
 
-    def construct(self, key, value, kvcache_inputs):
-        return self.kvcache(key, value, kvcache_inputs)
+    def construct(self, key, value, slot_mapping):
+        return self.kv_cache(key, value, slot_mapping)
 
 
-@pytest.mark.platform_x86_cpu
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_apply_convert():
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_apply_convert(device, mode):
     """
     Feature: RoundToNearestPTQ algorithm set functions.
     Description: Apply RoundToNearestPTQ on SimpleNet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
-
-    mindspore.set_context(device_target="CPU", mode=mindspore.GRAPH_MODE)
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    print(f"---------------- Testing params: {device} {mode} ", flush=True)
+    context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
     network = SimpleNet()
-    kv_shape = network.kvcache.key_past.shape
-    kv_dtype = network.kvcache.key_past.dtype
-    network.kvcache.key_past = Parameter(initializer('ones', kv_shape, kv_dtype), name=network.kvcache.key_past.name,
-                                         requires_grad=False)
-    network.kvcache.value_past = Parameter(initializer('ones', kv_shape, kv_dtype),
-                                           name=network.kvcache.value_past.name, requires_grad=False)
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
-                    backend=BackendTarget.NONE)
-    ptq = RTN(config=cfg)
+    ptq = RTN()
     # pylint: disable=W0212
-    ptq._config.weight_only = False
-    # pylint: disable=W0212
-    ptq._config.enable_kvcache_int8 = True
-    # apply
+    ptq._config.kvcache_dtype = msdtype.int8
+    # apply & calibrate
     new_network = ptq.apply(network)
+    fakekey = np.ones((1, 1, 24), dtype=np.float16)
+    fakevalue = np.ones((1, 1, 24), dtype=np.float16)
+    fakeslot = np.ones((1), dtype=np.int32)
+    new_network(Tensor(fakekey), Tensor(fakevalue), Tensor(fakeslot))
+
     cells: OrderedDict = new_network.name_cells()
-    quant_cell = cells.get("kvcache", None)
-    assert isinstance(quant_cell, KVCacheMgrQuant)
+    quant_cell = cells.get("kv_cache", None)
+    assert isinstance(quant_cell, PagedAttentionQuant)
     assert quant_cell.weight_quantizer() is None
-    assert quant_cell.input_quantizer() is None
-    assert quant_cell.output_quantizer() is None
-
-    key_input_quantizer: MinMaxPerChannel = quant_cell._key_input_quantizer
-    assert isinstance(key_input_quantizer, MinMaxPerChannel)
-    assert key_input_quantizer.symmetric()
-    assert key_input_quantizer.quant_dtype() == QuantDtype.INT8
-    assert key_input_quantizer.is_per_channel()
-    assert not key_input_quantizer.narrow_range()
-    assert key_input_quantizer.num_bits() == 8
-
-    key_output_quantizer: MinMaxPerChannel = quant_cell._key_output_quantizer
-    assert isinstance(key_output_quantizer, MinMaxPerChannel)
-    assert key_output_quantizer.symmetric()
-    assert key_output_quantizer.quant_dtype() == QuantDtype.INT8
-    assert key_output_quantizer.is_per_channel()
-    assert not key_output_quantizer.narrow_range()
-    assert key_output_quantizer.num_bits() == 8
-
-    value_input_quantizer: MinMaxPerChannel = quant_cell._value_input_quantizer
-    assert isinstance(value_input_quantizer, MinMaxPerChannel)
-    assert value_input_quantizer.symmetric()
-    assert value_input_quantizer.quant_dtype() == QuantDtype.INT8
-    assert value_input_quantizer.is_per_channel()
-    assert not value_input_quantizer.narrow_range()
-    assert value_input_quantizer.num_bits() == 8
-
-    value_output_quantizer: MinMaxPerChannel = quant_cell._value_output_quantizer
-    assert isinstance(value_output_quantizer, MinMaxPerChannel)
-    assert value_output_quantizer.symmetric()
-    assert value_output_quantizer.quant_dtype() == QuantDtype.INT8
-    assert value_output_quantizer.is_per_channel()
-    assert not value_output_quantizer.narrow_range()
-    assert value_output_quantizer.num_bits() == 8
-
-    # calibrate
     # pylint: disable=W0212
-    ptq._calibrate(network)
+    key_fake_quant: MinMaxPerChannel = quant_cell._key_input_quantizer
+    assert isinstance(key_fake_quant, MinMaxPerChannel)
+    assert key_fake_quant.symmetric()
+    assert key_fake_quant.quant_dtype() == msdtype.int8
+    assert key_fake_quant.is_per_channel()
+    assert not key_fake_quant.narrow_range()
+    assert key_fake_quant.num_bits() == 8
 
-    quant_params = key_input_quantizer.quant_params()
+    # pylint: disable=W0212
+    value_fake_quant: MinMaxPerChannel = quant_cell._value_input_quantizer
+    assert isinstance(value_fake_quant, MinMaxPerChannel)
+    assert value_fake_quant.symmetric()
+    assert value_fake_quant.quant_dtype() == msdtype.int8
+    assert value_fake_quant.is_per_channel()
+    assert not value_fake_quant.narrow_range()
+    assert value_fake_quant.num_bits() == 8
+
+    quant_params = key_fake_quant.quant_params()
     min_data = np.array(quant_params.get("min"))
     max_data = np.array(quant_params.get("max"))
-    # BNSD: (2, 8, 512, 16) --> BSND: (2, 512, 8, 16) --> BSH: (2, 512, 128)
-    assert min_data.shape == (1, 1, 128)
-    assert max_data.shape == (1, 1, 128)
-    for min_ in min_data.flatten().tolist():
-        assert min_ == 1.
-    for max_ in max_data.flatten().tolist():
-        assert max_ == 1.
+    assert min_data.shape == (1, 1, 24)
+    assert max_data.shape == (1, 1, 24)
+    for idx in range(24):
+        assert min_data[0][0][idx] == 1.
+        assert max_data[0][0][idx] == 1.
 
     # convert
     new_network = ptq.convert(new_network)
     cells: OrderedDict = new_network.name_cells()
 
-    quant_cell = cells.get("kvcache", None)
-    assert isinstance(quant_cell, KVCacheMgrQuant)
-    key_input_quantizer: FakeQuantParamCell = quant_cell._key_input_quantizer
-    assert isinstance(key_input_quantizer, FakeQuantParamCell)
-    assert isinstance(key_input_quantizer.fq, FakeQuantParam)
-    key_output_quantizer: FakeQuantParamCell = quant_cell._key_output_quantizer
-    assert isinstance(key_output_quantizer, FakeQuantParamCell)
-    assert isinstance(key_output_quantizer.fq, FakeQuantParam)
-    value_input_quantizer: FakeQuantParamCell = quant_cell._value_input_quantizer
-    assert isinstance(value_input_quantizer, FakeQuantParamCell)
-    assert isinstance(value_input_quantizer.fq, FakeQuantParam)
-    value_output_quantizer: FakeQuantParamCell = quant_cell._value_output_quantizer
-    assert isinstance(value_output_quantizer, FakeQuantParamCell)
-    assert isinstance(value_output_quantizer.fq, FakeQuantParam)
+    quant_cell = cells.get("kv_cache", None)
+    assert isinstance(quant_cell, PagedAttentionQuant)
+
+    key_fake_quant = quant_cell._key_input_quantizer
+    assert isinstance(key_fake_quant, QuantCellV2)
+
+    value_fake_quant = quant_cell._value_input_quantizer
+    assert isinstance(value_fake_quant, QuantCellV2)
 
     assert quant_cell.weight_quantizer() is None
-    assert quant_cell.input_quantizer() is None
-    assert quant_cell.output_quantizer() is None
+
+
+def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=False):
+    """test_kv_predict_llama2_2stage"""
+    os.environ['GRAPH_OP_RUN'] = "1"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    print(f"---------------- Testing params: {device} {mode} ", flush=True)
+    context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    if model_parallel == 1:
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
+        w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16-1decoder.ckpt"
+        w8a16c8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a16c8-1decoder.ckpt"
+    else:
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
+        w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
+        w8a16c8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a16c8"
+    cur_dir, _ = os.path.split(os.path.abspath(__file__))
+    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    fp16_config_path = os.path.join(cur_dir, fp16_config_path)
+    w8a16c8_config_path = os.path.join(cur_dir, w8a16c8_config_path)
+    fp16_ckpt_path = os.path.join(cur_dir, fp16_ckpt_path)
+    w8a16c8_ckpt_path = os.path.join(cur_dir, w8a16c8_ckpt_path)
+
+    def quant(ckpt_path, config_path):
+        config = set_config(config_path)
+        config.model.model_config.use_past = True
+        network = LlamaForCausalLM(config.model.model_config)
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"],
+                        kvcache_dtype=msdtype.int8)
+        ptq = RTN(config=cfg)
+        net_helper = MFLlama2HelloNetworkHelper(config)
+        ds = create_hello_ds(tokenizer, 1)
+        network = ptq.apply(network, net_helper, ds=ds)
+        network = ptq.convert(network)
+        if model_parallel == 1:
+            save_checkpoint(network.parameters_dict(), w8a16c8_ckpt_path, integrated_save=False)
+        else:
+            rank_id = get_rank() or 0
+            save_path = os.path.join(w8a16c8_ckpt_path, f"rank_{rank_id}")
+            os.makedirs(save_path, exist_ok=True)
+            save_checkpoint(network.parameters_dict(), os.path.join(save_path, "w8a16c8.ckpt"),
+                            choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
+
+    def w8a16c8_infer(input_, ckpt_path, config_path):
+        config = set_config(config_path)
+        config.model.model_config.use_past = True
+        network = LlamaForCausalLM(config.model.model_config)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"],
+                        kvcache_dtype=msdtype.int8)
+        ptq = RTN(config=cfg)
+        # pylint: disable=W0212
+        ptq._config.enable_deploy_fusion = enable_deploy_fusion
+        network = ptq.apply(network)
+        network = ptq.convert(network)
+
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        seq_len = 100
+        input_ids = tokenizer(input_)['input_ids']
+        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+        answer = tokenizer.decode(outputs, skip_special_tokens=True)
+        return outputs, answer
+
+    def fp16_infer(input_, ckpt_path, config_path):
+        config = set_config(config_path)
+        config.model.model_config.use_past = True
+        network = LlamaForCausalLM(config.model.model_config)
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        seq_len = 100
+        input_ids = tokenizer(input_)['input_ids']
+        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+        answer = tokenizer.decode(outputs, skip_special_tokens=True)
+        return outputs, answer
+    example = "Hello"
+    quant(fp16_ckpt_path, fp16_config_path)
+    foutput, _ = fp16_infer(example, fp16_ckpt_path, fp16_config_path)
+    qoutput, _ = w8a16c8_infer(example, w8a16c8_ckpt_path, w8a16c8_config_path)
+    npfoutput = np.array(foutput)
+    npqoutput = np.array(qoutput)
+    if not np.allclose(npqoutput[:, :14], npfoutput[:, :14], 0, 0):
+        return False
+    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 31.1)
 
 
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_kvint8_predict_1stage(device, mode):
+def test_kv_llama2_predict_2stage_1p(device, mode):
     """
-    Feature: RoundToNearestPTQ algorithm set functions.
-    Description: Apply, Convert and Predict RoundToNearestPTQ on SimpleNet.
-    Expectation: Execute success.
+    Feature: test RTQ kvcache int8 quant in two stages with one cards.
+    Description: apply RTQ kvcache int8 quant on llama2 and check accuracy.
+    Expectation: accuracy is good.
     """
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
+    assert kv_predict_llama2_2stage(device, mode, model_parallel)
 
-    context.set_context(device_target=device, mode=mode)
-    network = SimpleNet()
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
-                    backend=BackendTarget.ASCEND)
-    ptq = RTN(config=cfg)
-    # pylint: disable=W0212
-    ptq._config.weight_only = False
-    # pylint: disable=W0212
-    ptq._config.enable_kvcache_int8 = True
-    quant_network = ptq.apply(network)
-    quant_network = ptq._calibrate(quant_network)
-    ascend_network = ptq.convert(quant_network)
-    for _, cell in ascend_network.name_cells().items():
-        if not isinstance(cell, KVCacheMgrQuant):
-            continue
-        kvcache: KVCacheMgrQuant = cell
-        assert not kvcache.input_quantizer()
-        assert not kvcache.output_quantizer()
-        assert not kvcache.weight_quantizer()
-        assert isinstance(kvcache._key_input_quantizer, QuantCell)
-        assert isinstance(kvcache._key_output_quantizer, AntiQuantCell)
-        assert isinstance(kvcache._value_input_quantizer, QuantCell)
-        assert isinstance(kvcache._value_output_quantizer, AntiQuantCell)
-        kcache: Parameter = kvcache.handler().key_past
-        vcache: Parameter = kvcache.handler().value_past
-        assert isinstance(kcache, Parameter)
-        assert isinstance(vcache, Parameter)
-        assert kcache.dtype == dtype.int8
-        assert kcache.value().dtype == dtype.int8
-        assert vcache.dtype == dtype.int8
-        assert vcache.value().dtype == dtype.int8
-    # BNSD: (1, 8, 512, 16)
-    key = Tensor(np.ones((1, 8, 100, 16), dtype=np.float32), dtype=dtype.float32)
-    value = Tensor(np.ones((1, 8, 100, 16), dtype=np.float32), dtype=dtype.float32)
-    batch_valid_length = Tensor([0], dtype=dtype.int64)
-    zactivate_len = Tensor(np.ones((512,)), dtype=dtype.int64)
-    batch_index = Tensor([0], dtype=dtype.int64)
-    seq_length_tensor = Tensor([512], dtype=dtype.int64)
-    kvcache_inputs = (batch_valid_length, zactivate_len, batch_index, seq_length_tensor)
-    ascend_network(key, value, kvcache_inputs)
-    kbuffer = ascend_network.kvcache.handler().key_past.asnumpy()
-    vbuffer = ascend_network.kvcache.handler().value_past.asnumpy()
-    assert kbuffer.shape == (2, 8, 512, 16)
-    for b in range(1):
-        for n in range(8):
-            for s in range(100):
-                for d in range(16):
-                    assert kbuffer[b][n][s][d] == 127
-    assert vbuffer.shape == (2, 8, 512, 16)
-    for b in range(1):
-        for n in range(8):
-            for s in range(100):
-                for d in range(16):
-                    assert vbuffer[b][n][s][d] == 127
+
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_kv_llama2_predict_2stage_2p():
+    """
+    Feature: test RTQ kvcache int8 quant in two stages with two cards.
+    Description: apply RTQ kvcache int8 quant on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = 2
+    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    return_code = os.system(
+        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
+        "pytest -s test_kvcache_c8.py::test_kv_llama2_predict_2stage_1p"
+    )
+    if return_code != 0:
+        log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+
+    assert return_code == 0
 
 
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_kvint8_predict_2stage(device, mode):
+def test_kv_fusion_ops_llama2_predict_2stage_1p(device, mode):
     """
-    Feature: RoundToNearestPTQ algorithm set functions.
-    Description: Apply, Convert and Predict RoundToNearestPTQ on SimpleNet.
-    Expectation: Execute success.
+    Feature: test RTQ kvcache int8 quant use PA int8 ops in two stages with one cards.
+    Description: apply RTQ kvcache int8 quant use PA int8 ops on llama2 and check accuracy.
+    Expectation: accuracy is good.
     """
-
-    context.set_context(device_target=device, mode=mode)
-
-    def quant():
-        network = SimpleNet()
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
-                        backend=BackendTarget.ASCEND)
-        ptq = RTN(config=cfg)
-        # pylint: disable=W0212
-        ptq._config.weight_only = False
-        # pylint: disable=W0212
-        ptq._config.enable_kvcache_int8 = True
-        quant_network = ptq.apply(network)
-        quant_network = ptq._calibrate(quant_network)
-        ascend_network = ptq.convert(quant_network)
-        for _, cell in ascend_network.name_cells().items():
-            if not isinstance(cell, KVCacheMgrQuant):
-                continue
-            kvcache: KVCacheMgrQuant = cell
-            assert not kvcache.input_quantizer()
-            assert not kvcache.output_quantizer()
-            assert not kvcache.weight_quantizer()
-            assert isinstance(kvcache._key_input_quantizer, QuantCell)
-            assert isinstance(kvcache._key_output_quantizer, AntiQuantCell)
-            assert isinstance(kvcache._value_input_quantizer, QuantCell)
-            assert isinstance(kvcache._value_output_quantizer, AntiQuantCell)
-            kcache: Parameter = kvcache.handler().key_past
-            vcache: Parameter = kvcache.handler().value_past
-            assert isinstance(kcache, Parameter)
-            assert isinstance(vcache, Parameter)
-            assert kcache.dtype == dtype.int8
-            assert kcache.value().dtype == dtype.int8
-            assert vcache.dtype == dtype.int8
-            assert vcache.value().dtype == dtype.int8
-        mindspore.save_checkpoint(ascend_network, "test_kvint8_predict_2stage.ckpt")
-
-    def infer():
-        network = SimpleNet()
-        cfg = PTQConfig(mode=PTQMode.DEPLOY,
-                        backend=BackendTarget.ASCEND)
-        ptq = RTN(config=cfg)
-        # pylint: disable=W0212
-        ptq._config.weight_only = False
-        # pylint: disable=W0212
-        ptq._config.enable_kvcache_int8 = True
-        quant_network = ptq.apply(network)
-        ascend_network = ptq.convert(quant_network)
-        mindspore.load_checkpoint("test_kvint8_predict_2stage.ckpt", ascend_network)
-
-        key = Tensor(np.ones((1, 8, 100, 16), dtype=np.float32), dtype=dtype.float32)
-        value = Tensor(np.ones((1, 8, 100, 16), dtype=np.float32), dtype=dtype.float32)
-        batch_valid_length = Tensor([0], dtype=dtype.int64)
-        zactivate_len = Tensor(np.ones((512,)), dtype=dtype.int64)
-        batch_index = Tensor([0], dtype=dtype.int64)
-        seq_length_tensor = Tensor([512], dtype=dtype.int64)
-        kvcache_inputs = (batch_valid_length, zactivate_len, batch_index, seq_length_tensor)
-        ascend_network(key, value, kvcache_inputs)
-        kbuffer = ascend_network.kvcache.handler().key_past.asnumpy()
-        vbuffer = ascend_network.kvcache.handler().value_past.asnumpy()
-        assert kbuffer.shape == (2, 8, 512, 16)
-        for b in range(1):
-            for n in range(8):
-                for s in range(100):
-                    for d in range(16):
-                        assert kbuffer[b][n][s][d] == 127
-        assert vbuffer.shape == (2, 8, 512, 16)
-        for b in range(1):
-            for n in range(8):
-                for s in range(100):
-                    for d in range(16):
-                        assert vbuffer[b][n][s][d] == 127
-
-    quant()
-    infer()
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
+    assert kv_predict_llama2_2stage(device, mode, model_parallel, True)
 
 
 @pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("device", ["Ascend", "CPU"])
-# FIXME @hangangqiang wait for debug on recompute in LLamaRMSNorm: @pytest.mark.parametrize("mode", [PYNATIVE_MODE])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_llama2_kvint8_apply_convert(device, mode):
+@pytest.mark.env_single
+def test_kv_fusion_ops_llama2_predict_2stage_2p():
     """
-    Feature: RoundToNearestPTQ KVInt8 algorithm.
-    Description: Apply KVInt8 quant on LLama2 and convert to ascend backend.
-    Expectation: Execute successfully.
-
-    Disabled because of miss of RMSNorm ops in mindspore2.3.
+    Feature: test RTQ kvcache int8 quant use PA int8 ops in two stages with two cards.
+    Description: apply RTQ kvcache int8 quant use PA int8 ops on llama2 and check accuracy.
+    Expectation: accuracy is good.
     """
+    model_parallel = 2
+    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    return_code = os.system(
+        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
+        "pytest -s test_kvcache_c8.py::test_kv_fusion_ops_llama2_predict_2stage_1p"
+    )
+    if return_code != 0:
+        log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
 
-    context.set_context(device_target=device, mode=mode)
-    network = llama2(8, 512, 1024, 2, use_past=True)
-    assert check_network_contain_layer(network, KVCacheMgr)
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
-                    backend=BackendTarget.ASCEND)
-    ptq = RTN(config=cfg)
-    # pylint: disable=W0212
-    ptq._config.weight_only = False
-    # pylint: disable=W0212
-    ptq._config.enable_kvcache_int8 = True
-    cfg = ptq._config
-    cfg.weight_only = False
-    cfg.enable_kvcache_int8 = True
-
-    quant_network = ptq.apply(network.model)
-    quant_network = ptq._calibrate(quant_network)
-    assert not check_network_contain_layer(quant_network, KVCacheMgr, (KVCacheMgrQuant,))
-    assert check_network_contain_layer(quant_network, KVCacheMgrQuant)
-    ascend_network = ptq.convert(quant_network)
-    for _, cell in ascend_network.name_cells().items():
-        if not isinstance(cell, KVCacheMgrQuant):
-            continue
-        kvcache: KVCacheMgrQuant = cell
-        assert not kvcache.input_quantizer()
-        assert not kvcache.output_quantizer()
-        assert not kvcache.weight_quantizer()
-        assert isinstance(kvcache._key_input_quantizer, QuantCell)
-        assert isinstance(kvcache._key_output_quantizer, AntiQuantCell)
-        assert isinstance(kvcache._value_input_quantizer, QuantCell)
-        assert isinstance(kvcache._value_output_quantizer, AntiQuantCell)
-        kcache: Parameter = kvcache.handler().key_past
-        vcache: Parameter = kvcache.handler().value_past
-        assert isinstance(kcache, Parameter)
-        assert isinstance(vcache, Parameter)
-        assert kcache.dtype == dtype.int8
-        assert kcache.value().dtype == dtype.int8
-        assert vcache.dtype == dtype.int8
-        assert vcache.value().dtype == dtype.int8
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_llama2_kvint8_predict_1stage(device, mode):
-    """
-    Feature: RoundToNearestPTQ A16W8 algorithm.
-    Description: Apply KVInt8 quant on LLama2 and convert to ascend backend.
-    Expectation: Execute successfully.
-
-    Disabled because of miss of RMSNorm ops in mindspore2.3.
-    """
-
-    context.set_context(device_target=device, mode=mode)
-    inputs = create_dummy_inputs(8, 512, 512)
-    network = llama2(8, 512, 2048, 2, use_past=True)
-    fp_outputs = network(*inputs)
-
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
-                    backend=BackendTarget.ASCEND)
-    ptq = RTN(config=cfg)
-    # pylint: disable=W0212
-    ptq._config.weight_only = False
-    # pylint: disable=W0212
-    ptq._config.enable_kvcache_int8 = True
-
-    quant_network = ptq.apply(network.model)
-    # calibrate
-    for _, cell in network.name_cells().items():
-        if not isinstance(cell, KVCacheMgr):
-            continue
-        kvcachemgr: KVCacheMgr = cell
-        kv_shape = kvcachemgr.key_past.shape
-        kv_dtype = kvcachemgr.key_past.dtype
-        kvcachemgr.key_past = Parameter(initializer('normal', kv_shape, kv_dtype), name=kvcachemgr.key_past.name,
-                                        requires_grad=False)
-        kvcachemgr.value_past = Parameter(initializer('normal', kv_shape, kv_dtype), name=kvcachemgr.value_past.name,
-                                          requires_grad=False)
-    quant_network = ptq._calibrate(quant_network)
-
-    ascend_network = ptq.convert(quant_network)
-    network.model = ascend_network
-    quant_outputs = network(*inputs)
-
-    assert len(fp_outputs) == 3
-    assert fp_outputs[0].shape == (8, 32000)
-    assert fp_outputs[0].dtype == dtype.float32
-    assert fp_outputs[1].shape == (8, 512)
-    assert fp_outputs[1].dtype == dtype.int32
-    assert fp_outputs[2].shape == (8, 512)
-    assert fp_outputs[2].dtype == dtype.float32
-
-    assert len(quant_outputs) == 3
-    assert quant_outputs[0].shape == (8, 32000)
-    assert quant_outputs[0].dtype == dtype.float32
-    assert quant_outputs[1].shape == (8, 512)
-    assert quant_outputs[1].dtype == dtype.int32
-    assert quant_outputs[2].shape == (8, 512)
-    assert quant_outputs[2].dtype == dtype.float32
-
-    context.set_context(device_target="CPU", mode=mode)
-    assert relative_tolerance_acceptable(quant_outputs[0].asnumpy(), fp_outputs[0].asnumpy(), 5e-2)
-    assert relative_tolerance_acceptable(quant_outputs[1].asnumpy(), fp_outputs[1].asnumpy(), 5e-2)
-    assert relative_tolerance_acceptable(quant_outputs[2].asnumpy(), fp_outputs[2].asnumpy(), 5e-2)
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
-def test_llama2_kvint8_predict_2stage(device, mode):
-    """
-    Feature: RoundToNearestPTQ A16W8 algorithm.
-    Description: Apply KVInt8 quant on LLama2 and convert to ascend backend.
-    Expectation: Execute successfully.
-
-    Disabled because of miss of RMSNorm ops in mindspore2.3.
-    """
-
-    context.set_context(device_target=device, mode=mode)
-
-    def quant(inputs):
-        network = llama2(8, 512, 2048, 2, use_past=True)
-        fp_outputs = network(*inputs)
-
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
-                        backend=BackendTarget.ASCEND)
-        ptq = RTN(config=cfg)
-        # pylint: disable=W0212
-        ptq._config.weight_only = False
-        # pylint: disable=W0212
-        ptq._config.enable_kvcache_int8 = True
-        quant_network = ptq.apply(network.model)
-        # calibrate
-        for _, cell in network.name_cells().items():
-            if not isinstance(cell, KVCacheMgr):
-                continue
-            kvcachemgr: KVCacheMgr = cell
-            kv_shape = kvcachemgr.key_past.shape
-            kv_dtype = kvcachemgr.key_past.dtype
-            kvcachemgr.key_past = Parameter(initializer('normal', kv_shape, kv_dtype), name=kvcachemgr.key_past.name,
-                                            requires_grad=False)
-            kvcachemgr.value_past = Parameter(initializer('normal', kv_shape, kv_dtype),
-                                              name=kvcachemgr.value_past.name,
-                                              requires_grad=False)
-        quant_network = ptq._calibrate(quant_network)
-        ascend_network = ptq.convert(quant_network)
-        network.model = ascend_network
-        mindspore.save_checkpoint(network, "test_llama2_kvint8_predict_2stage.ckpt")
-        return fp_outputs
-
-    def infer(inputs):
-        network = llama2(8, 512, 2048, 2, use_past=True)
-        cfg = PTQConfig(mode=PTQMode.DEPLOY,
-                        backend=BackendTarget.ASCEND)
-        ptq = RTN(config=cfg)
-        # pylint: disable=W0212
-        ptq._config.weight_only = False
-        # pylint: disable=W0212
-        ptq._config.enable_kvcache_int8 = True
-        quant_network = ptq.apply(network.model)
-        ascend_network = ptq.convert(quant_network)
-        network.model = ascend_network
-        mindspore.load_checkpoint("test_llama2_kvint8_predict_2stage.ckpt", network)
-        return network(*inputs)
-
-    inputs = create_dummy_inputs(8, 512, 512)
-    fp_outputs = quant(inputs)
-    quant_outputs = infer(inputs)
-    assert len(fp_outputs) == 3
-    assert fp_outputs[0].shape == (8, 32000)
-    assert fp_outputs[0].dtype == dtype.float32
-    assert fp_outputs[1].shape == (8, 512)
-    assert fp_outputs[1].dtype == dtype.int32
-    assert fp_outputs[2].shape == (8, 512)
-    assert fp_outputs[2].dtype == dtype.float32
-
-    assert len(quant_outputs) == 3
-    assert quant_outputs[0].shape == (8, 32000)
-    assert quant_outputs[0].dtype == dtype.float32
-    assert quant_outputs[1].shape == (8, 512)
-    assert quant_outputs[1].dtype == dtype.int32
-    assert quant_outputs[2].shape == (8, 512)
-    assert quant_outputs[2].dtype == dtype.float32
-
-    context.set_context(device_target="CPU", mode=mode)
-    assert absolute_tolerance_acceptable(quant_outputs[0].asnumpy(), fp_outputs[0].asnumpy(), 1e-2)
-    assert relative_tolerance_acceptable(quant_outputs[1].asnumpy(), fp_outputs[1].asnumpy(), 5e-2)
-    assert relative_tolerance_acceptable(quant_outputs[2].asnumpy(), fp_outputs[2].asnumpy(), 5e-2)
+    assert return_code == 0

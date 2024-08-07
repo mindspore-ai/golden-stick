@@ -19,14 +19,14 @@ import mindspore as ms
 from mindspore import Parameter, Tensor, dtype, context, JitConfig
 from mindspore.nn import Cell
 from mindspore.ops import operations as msops
-from mindspore.ops.operations import FakeQuantParam
 from mindspore.ops.operations._inner_ops import Dequant
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
-from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
+from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
+
 
 class AntiQuantCell(Cell):
     """AntiQuantCell, warp AntiQuant to support per-channel AntiQuant."""
@@ -56,21 +56,20 @@ class AntiQuantCell(Cell):
         self.add.shard((strategy, (strategy[-2], strategy[-1],)))
         self.mul.shard((strategy, (strategy[-2], strategy[-1],)))
 
-def convert_to_antiquant(fqcell: FakeQuantParamCell, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
+
+def convert_to_antiquant(antiquant_params, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
-    fq: FakeQuantParam = fqcell.fq
-    if not isinstance(fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to AntiQuant.")
-    scale = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
-    zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
+    scale = antiquant_params.get(LinearFakeQuantizer.attr_key_quant_scale, None)
+    zp = antiquant_params.get(LinearFakeQuantizer.attr_key_quant_zero_point, None)
     if scale is None:
-        raise ValueError("Can not find scale in FakeQuantParamCell.")
+        raise ValueError("Can not find scale in quant params.")
     if zp is None:
-        raise ValueError("Can not find zp in FakeQuantParamCell.")
+        raise ValueError("Can not find zp in quant params.")
     anti_quant = AntiQuantCell(scale, zp, dst_dtype=dst_dtype)
     if strategy is not None:
         anti_quant.shard(strategy)
     return anti_quant
+
 
 def convert_to_antiquant_for_deploy(n, d, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
     """Convert to AntiQuantCell For deploy."""
@@ -78,6 +77,7 @@ def convert_to_antiquant_for_deploy(n, d, strategy=None, dst_dtype=dtype.float16
     if strategy is not None:
         anti_quant.shard(strategy)
     return anti_quant
+
 
 class QuantCell(Cell):
     """QuantCell, warp Quant to support serialize and deserialize."""
@@ -132,6 +132,7 @@ class QuantCellV2(Cell):
         """shard strategy for quant cell"""
         self.quant.shard((strategy, (strategy[-1],), (strategy[-1],)))
 
+
 def convert_to_quant_for_deploy(ic, strategy=None) -> QuantCell:
     """Convert to Quant for deploy."""
     scale = np.ones([ic], dtype=np.float16)
@@ -142,17 +143,14 @@ def convert_to_quant_for_deploy(ic, strategy=None) -> QuantCell:
     return quant_cell
 
 
-def convert_to_quant(fqcell: FakeQuantParamCell, strategy=None) -> QuantCell:
+def convert_to_quant(input_qparams, strategy=None) -> QuantCell:
     """Convert FakeQuantParamCell to Quant."""
-    fq: FakeQuantParam = fqcell.fq
-    if not isinstance(fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to Quant.")
-    scale = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
-    zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
+    scale = input_qparams.get(LinearFakeQuantizer.attr_key_quant_scale, None)
+    zp = input_qparams.get(LinearFakeQuantizer.attr_key_quant_zero_point, None)
     if scale is None:
-        raise ValueError("Can not find scale in FakeQuantParamCell.")
+        raise ValueError("Can not find scale in quant params.")
     if zp is None:
-        raise ValueError("Can not find zp in FakeQuantParamCell.")
+        raise ValueError("Can not find zp in quant params.")
     quant_cell = QuantCellV2(Tensor(np.squeeze(scale), dtype=dtype.float16),
                              Tensor(np.array(np.squeeze(zp)).astype(np.int8), dtype=dtype.int8))
     if strategy is not None:
@@ -190,17 +188,14 @@ class SmoothAndQuantCell(Cell):
         self.quant.shard(((1, *strategy[0]), (strategy[0][-1],), (strategy[0][-1],)))
 
 
-def convert_to_smooth_quant(fqcell: FakeQuantParamCell, smooth_scale: Parameter, strategy=None) -> QuantCell:
+def convert_to_smooth_quant(input_qparams, smooth_scale: Parameter, strategy=None) -> QuantCell:
     """Convert FakeQuantParamCell to Quant."""
-    fq: FakeQuantParam = fqcell.fq
-    if not isinstance(fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to Quant.")
-    scale = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
-    zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
+    scale = input_qparams.get(LinearFakeQuantizer.attr_key_quant_scale, None)
+    zp = input_qparams.get(LinearFakeQuantizer.attr_key_quant_zero_point, None)
     if scale is None:
-        raise ValueError("Can not find scale in FakeQuantParamCell.")
+        raise ValueError("Can not find scale in quant params.")
     if zp is None:
-        raise ValueError("Can not find zp in FakeQuantParamCell.")
+        raise ValueError("Can not find zp in quant params.")
     quant_cell = SmoothAndQuantCell(smooth_scale.asnumpy(), scale, zp)
     quant_cell.set_jit_config(JitConfig(jit_level="O0", infer_boost="on"))
     if strategy is not None:
@@ -235,21 +230,15 @@ class DequantCell(Cell):
         self.dequant.shard(strategy)
 
 
-def convert_to_dequant(input_fqcell: FakeQuantParamCell, weight_fqcell: FakeQuantParamCell, is_transpose=False,
+def convert_to_dequant(input_qparams, weight_qparams, is_transpose=False,
                        strategy=None) -> DequantCell:
     """Convert FakeQuantParamCell to DequantCell."""
-    input_fq: FakeQuantParam = input_fqcell.fq
-    if not isinstance(input_fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to DeQuant.")
-    weight_fq: FakeQuantParam = weight_fqcell.fq
-    if not isinstance(weight_fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to DeQuant.")
-    input_scale = input_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
-    weight_scale = weight_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
+    input_scale = input_qparams.get(LinearFakeQuantizer.attr_key_quant_scale, None)
+    weight_scale = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_scale, None)
     if input_scale is None:
-        raise ValueError("Can not find scale in input FakeQuantParamCell.")
+        raise ValueError("Can not find scale in input quant params.")
     if weight_scale is None:
-        raise ValueError("Can not find scale in weight FakeQuantParamCell.")
+        raise ValueError("Can not find scale in weight quant params.")
     if len(input_scale) != 1:
         raise ValueError("Input only support perlayer quant.")
     dequant_scale = np.array(input_scale[0]) * np.array(weight_scale)
@@ -282,18 +271,15 @@ class AntiquantBMMCell(Cell):
         self.weight_qbmm.shard(strategy)
 
 
-def convert_to_fusion_antiquant(fqcell: FakeQuantParamCell, transpose_weight=False, transpose_x=False, strategy=None,
+def convert_to_fusion_antiquant(weight_qparams, transpose_weight=False, transpose_x=False, strategy=None,
                                 dst_dtype=None) -> AntiquantBMMCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
-    fq: FakeQuantParam = fqcell.fq
-    if not isinstance(fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to AntiQuant.")
-    scale = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
-    zp = fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
+    scale = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_scale, None)
+    zp = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_zero_point, None)
     if scale is None:
-        raise ValueError("Can not find scale in FakeQuantParamCell.")
+        raise ValueError("Can not find scale in quant params.")
     if zp is None:
-        raise ValueError("Can not find zp in FakeQuantParamCell.")
+        raise ValueError("Can not find zp in quant params.")
     if not dst_dtype:
         if context.get_context("device_target") == "Ascend":
             dst_dtype = dtype.float16
@@ -356,7 +342,7 @@ class DequantBMMCell(Cell):
         self.dbmm.shard(strategy)
 
 
-def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, offset=None, dst_dtype=dtype.float16,
+def convert_to_dequant_bmm(input_qparams, weight_qparams, weight_quant, offset=None, dst_dtype=dtype.float16,
                            transpose_a=False, transpose_b=False, strategy=None, new_bias_need_allreduce=False):
     """convert_to_dequant_bmm."""
 
@@ -372,19 +358,13 @@ def convert_to_dequant_bmm(input_fqcell, weight_fqcell, weight_quant, offset=Non
             new_bias = t_new_bias.asnumpy()
         return new_bias
 
-    input_fq: FakeQuantParam = input_fqcell.fq
-    if not isinstance(input_fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to DeQuant.")
-    weight_fq: FakeQuantParam = weight_fqcell.fq
-    if not isinstance(weight_fq, FakeQuantParam):
-        raise ValueError("Only support convert FakeQuantParam to DeQuant.")
-    input_scale = input_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
-    input_zp = input_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_zero_point, None)
-    weight_scale = weight_fq.attrs.get(FakeQuantParam.attr_key_linear_quant_scale, None)
+    input_scale = input_qparams.get(LinearFakeQuantizer.attr_key_quant_scale, None)
+    input_zp = input_qparams.get(LinearFakeQuantizer.attr_key_quant_zero_point, None)
+    weight_scale = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_scale, None)
     if input_scale is None:
-        raise ValueError("Can not find scale in input FakeQuantParamCell.")
+        raise ValueError("Can not find scale in input quant params.")
     if weight_scale is None:
-        raise ValueError("Can not find scale in weight FakeQuantParamCell.")
+        raise ValueError("Can not find scale in weight quant params.")
     if len(input_scale) != 1:
         raise ValueError("Input only support perlayer quant.")
     dequant_scale = np.array(input_scale[0], dtype=np.float32) * np.array(weight_scale, dtype=np.float32)

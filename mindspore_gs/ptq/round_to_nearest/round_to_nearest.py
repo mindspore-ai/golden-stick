@@ -259,7 +259,7 @@ class RoundToNearest(CompAlgo):
         changed = False
         _convert(net_opt)
         net_opt.update_parameters_name()
-        if not changed:
+        if not changed and self._config.mode == PTQMode.QUANTIZE:
             warn_str = "No layer found in network is suitable for quantization, please check network and " \
                        "opname_blacklist, and make sure call apply before convert."
             warnings.warn(warn_str, RuntimeWarning)

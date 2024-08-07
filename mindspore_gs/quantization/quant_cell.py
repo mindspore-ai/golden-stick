@@ -20,7 +20,7 @@ import abc
 from mindspore.nn.cell import Cell
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.layer_policy import LayerPolicy
-from mindspore_gs.quantization.fake_quantizer import FakeQuantizer, FakeQuantParamCell
+from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
 
 
 class QuantCell(Cell):
@@ -41,8 +41,8 @@ class QuantCell(Cell):
         self._output_quantizer = None
         self._inputs_insert_fq = None
         if self._policy:
-            self._input_quantizer: FakeQuantizer = self._policy.get_input_quantizer()
-            self._output_quantizer: FakeQuantizer = self._policy.get_output_quantizer()
+            self._input_quantizer = self._policy.get_input_quantizer()
+            self._output_quantizer = self._policy.get_output_quantizer()
             self._inputs_insert_fq = self._policy.get_input_need_insert_fq()
         self._converted = False
 

@@ -22,7 +22,7 @@ from collections import OrderedDict
 import pytest
 import numpy as np
 import mindspore
-from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, QuantDtype, ops
+from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, ops
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.round_to_nearest.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
@@ -127,7 +127,7 @@ def test_apply_convert():
     weight_fake_quant: MinMaxPerChannel = quant_cell.weight_quantizer()
     assert isinstance(weight_fake_quant, MinMaxPerChannel)
     assert weight_fake_quant.symmetric()
-    assert weight_fake_quant.quant_dtype() == QuantDtype.INT8
+    assert weight_fake_quant.quant_dtype() == dtype.int8
     assert weight_fake_quant.is_per_channel()
     assert not weight_fake_quant.narrow_range()
     assert weight_fake_quant.num_bits() == 8

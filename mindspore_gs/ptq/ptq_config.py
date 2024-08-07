@@ -18,7 +18,6 @@ from dataclasses import dataclass, field, is_dataclass, asdict
 from enum import Enum
 from typing import List, Union
 
-from mindspore import QuantDtype
 from mindspore import dtype as msdtype
 
 from mindspore_gs.common.config import GSBaseConfig
@@ -67,9 +66,9 @@ class OmniQuantConfig:
         if (not isinstance(self.pre_clip_ratio, type(self.post_clip_ratio))) or \
             (not isinstance(self.pre_clip_ratio, type(self.smooth_alpha))) or \
             (not isinstance(self.post_clip_ratio, type(self.smooth_alpha))):
-            raise ValueError(f"pre_clip_ratio, post_clip_ratio and smooth_alpha should have same type," \
-                             f"but got pre_clip_ratio: {type(self.pre_clip_ratio)}," \
-                             f"post_clip_ratio: {type(self.post_clip_ratio)}," \
+            raise ValueError(f"pre_clip_ratio, post_clip_ratio and smooth_alpha should have same type,"
+                             f"but got pre_clip_ratio: {type(self.pre_clip_ratio)},"
+                             f"post_clip_ratio: {type(self.post_clip_ratio)},"
                              f"smooth_alpha: {type(self.smooth_alpha)}.")
 
 
@@ -181,11 +180,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     config for post-trainning-quantizer
     """
     approach: PTQApproach = field(default=PTQApproach.RTN)
-    calibration_sampling_size: int = 0
-    act_quant_dtype: QuantDtype = QuantDtype.INT8
-    weight_quant_dtype: QuantDtype = QuantDtype.INT8
-    weight_only: bool = True
-    enable_kvcache_int8: bool = False
     act_per_channel: bool = False
     weight_per_channel: bool = True
     act_symmetric: bool = False
@@ -199,11 +193,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
                                 ]})
 
     def __post_init__(self):
-        value_check('calibration_sampling_size', self.calibration_sampling_size, int)
-        value_check('act_quant_dtype', self.act_quant_dtype, QuantDtype)
-        value_check('weight_quant_dtype', self.weight_quant_dtype, QuantDtype)
-        value_check('weight_only', self.weight_only, bool)
-        value_check('enable_kvcache_int8', self.enable_kvcache_int8, bool)
         value_check('act_per_channel', self.act_per_channel, bool)
         value_check('weight_per_channel', self.weight_per_channel, bool)
         value_check('act_symmetric', self.weight_symmetric, bool)
@@ -226,8 +215,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     def _parse_dict(self):
         """ parse data class to readable dicts"""
         parsed_dict = self.__dict__
-        parsed_dict['act_quant_dtype'] = str(self.act_quant_dtype)
-        parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
         parsed_dict['backend'] = self.backend.name
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
@@ -248,8 +235,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             else:
                 data_dict[key] = decode_fn[data_dict[key]]
         unparse_list = [
-            ('act_quant_dtype', QuantDtype),
-            ('weight_quant_dtype', QuantDtype),
             ('mode', PTQMode),
             ('backend', BackendTarget),
             ('approach', PTQApproach),

@@ -14,14 +14,116 @@
 # ============================================================================
 """ptq fake quantizer."""
 from typing import Union
-
+import abc
 import numpy as np
-from mindspore import Parameter, Tensor, QuantDtype, nn
+from mindspore import Parameter, Tensor, nn, ops
 from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
-from mindspore import ops
+from mindspore.nn import Cell
 from mindspore import dtype as mstype
-from mindspore_gs.quantization.fake_quantizer import LinearFakeQuantizer
+from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params
+
+
+class FakeQuantizer(Cell):
+    """
+    Abstract class for cell which statistic distribute of input x and return quant param.
+    """
+    def __init__(self):
+        super().__init__()
+        self._attrs = {}
+
+    @abc.abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def quant_dtype(self) -> mstype:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def is_per_channel(self) -> bool:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def quant_params(self) -> dict:
+        raise NotImplementedError
+
+    def set_attr(self, key, value):
+        self._attrs[key] = value
+
+    def get_attr(self, key, default=None):
+        return self._attrs.get(key, default)
+
+
+class LinearFakeQuantizer(FakeQuantizer):
+    """
+    Abstract class derived from FakeQuantizer, suit for linear quantization.
+    """
+
+    attr_key_min = "min"
+    attr_key_max = "max"
+    attr_key_num_bits = "num_bits"
+    attr_key_narrow_range = "narrow_range"
+    attr_key_symmetric = "symmetric"
+    attr_key_signed = "signed"
+    attr_key_channel_axis = "channel_axis"
+    attr_key_quant_scale = "quant_scale"
+    attr_key_quant_zero_point = "quant_zero_point"
+    attr_value_quant_algo_name = "linear_quant_algo"
+
+    def name(self) -> str:
+        return LinearFakeQuantizer.attr_value_quant_algo_name
+
+    def foo_init(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def mins(self) -> Union[list, tuple]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def maxs(self) -> Union[list, tuple]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def num_bits(self) -> int:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def narrow_range(self) -> bool:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def symmetric(self) -> bool:
+        raise NotImplementedError
+
+    def signed(self) -> bool:
+        return self.symmetric()
+
+    def channel_axis(self) -> int:
+        return -1
+
+    def get_scale_zp(self):
+        quant_min, quant_max = get_quant_min_max(self.num_bits(), self.signed(), self.narrow_range())
+        input_mins = np.array(self.mins(), dtype=np.float32)
+        input_maxs = np.array(self.maxs(), dtype=np.float32)
+        scale, zp = cal_quantization_params(input_mins, input_maxs, quant_min, quant_max, symmetric=self.symmetric())
+        scale = scale.tolist()
+        zp = zp.tolist()
+        return scale, zp
+
+    def quant_params(self) -> dict:
+        scale, zp = self.get_scale_zp()
+        params = {LinearFakeQuantizer.attr_key_min: self.mins(), LinearFakeQuantizer.attr_key_max: self.maxs(),
+                  LinearFakeQuantizer.attr_key_num_bits: self.num_bits(),
+                  LinearFakeQuantizer.attr_key_narrow_range: self.narrow_range(),
+                  LinearFakeQuantizer.attr_key_symmetric: self.symmetric(),
+                  LinearFakeQuantizer.attr_key_signed: self.signed(),
+                  LinearFakeQuantizer.attr_key_quant_scale: scale,
+                  LinearFakeQuantizer.attr_key_quant_zero_point: zp}
+        if self.is_per_channel():
+            params[LinearFakeQuantizer.attr_key_channel_axis] = self.channel_axis()
+        return params
 
 
 class MinMaxHolder(nn.Cell):
@@ -43,16 +145,16 @@ class MinMaxHolder(nn.Cell):
 class MinMaxPerLayer(LinearFakeQuantizer):
     """Static minmax by layer"""
 
-    def __init__(self, symmetric=True, narrow_range=False, quant_dtype=QuantDtype.INT8, strategy=None):
+    def __init__(self, symmetric=True, narrow_range=False, quant_dtype=mstype.int8, strategy=None):
         super(MinMaxPerLayer, self).__init__()
         self._symmetric = symmetric
         self._narrow_range = narrow_range
         self._quant_dtype = quant_dtype
         if self._narrow_range:
             raise ValueError("Not support narrow_range now.")
-        if self._quant_dtype != QuantDtype.INT8:
-            raise ValueError("Only support quant to int8 now.")
-        self._signed = quant_dtype == QuantDtype.INT8
+        if self._quant_dtype != mstype.int8:
+            raise ValueError(f"Only support quant to int8 now, but got {self._quant_dtype}.")
+        self._signed = quant_dtype == mstype.int8
         self.float_min = Parameter(Tensor(np.array([float("inf")]), mstype.float32), name="float_min")
         self.float_max = Parameter(Tensor(np.array([-float("inf")]), mstype.float32), name="float_max")
         self._in_strategy = strategy
@@ -105,7 +207,7 @@ class MinMaxPerLayer(LinearFakeQuantizer):
         # for ascend backend, only support int8
         return self._signed
 
-    def quant_dtype(self) -> QuantDtype:
+    def quant_dtype(self) -> mstype:
         """quant dtype"""
         return self._quant_dtype
 
@@ -127,7 +229,7 @@ class MinMaxPerLayer(LinearFakeQuantizer):
 class MinMaxPerChannel(LinearFakeQuantizer):
     """Static minmax by channel"""
 
-    def __init__(self, axis, output_channel, data_rank, symmetric=True, narrow_range=False, quant_dtype=QuantDtype.INT8,
+    def __init__(self, axis, output_channel, data_rank, symmetric=True, narrow_range=False, quant_dtype=mstype.int8,
                  strategy=None):
         super(MinMaxPerChannel, self).__init__()
         self._symmetric = symmetric
@@ -136,9 +238,9 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         self._data_rank = data_rank
         if self._narrow_range:
             raise ValueError("Not support narrow_range now.")
-        if self._quant_dtype != QuantDtype.INT8:
-            raise ValueError("Only support quant to int8 now.")
-        self._signed = quant_dtype == QuantDtype.INT8
+        if self._quant_dtype != mstype.int8:
+            raise ValueError(f"Only support quant to int8 now, but got {self._quant_dtype}.")
+        self._signed = quant_dtype == mstype.int8
         self.float_min = Parameter(Tensor(np.array([float("inf")] * output_channel), mstype.float32),
                                    name="float_min")
         self.float_max = Parameter(Tensor(np.array([-float("inf")] * output_channel), mstype.float32),
@@ -209,7 +311,7 @@ class MinMaxPerChannel(LinearFakeQuantizer):
     def symmetric(self) -> bool:
         return self._symmetric
 
-    def quant_dtype(self) -> QuantDtype:
+    def quant_dtype(self) -> mstype:
         return self._quant_dtype
 
     def is_per_channel(self) -> bool:

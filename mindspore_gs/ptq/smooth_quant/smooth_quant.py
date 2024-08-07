@@ -20,6 +20,7 @@ from typing import Tuple
 import copy
 import numpy as np
 
+from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 from mindspore.dataset import Dataset
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
@@ -48,8 +49,13 @@ class SmoothQuant(CompAlgo):
             self._config = PTQConfig()
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig.inner_config(self._config, approach=PTQApproach.SMOOTH_QUANT)
+        print("----------------------------------1 self._config", self._config, flush=True)
+        self._config.act_dtype = msdtype.int8
+        print("----------------------------------2 self._config", self._config, flush=True)
+        self._config.weight_dtype = msdtype.int8
+        self._config.kvcache_dtype = msdtype.float_
         if self._config.backend != BackendTarget.ASCEND:
-            raise ValueError("RoundToNearest only support ASCEND as BackendTarget now, "
+            raise ValueError("SmoothQuant only support ASCEND as BackendTarget now, "
                              f"but got {self._config.backend}.")
         self._ptq_policy = SmoothQuant._init_net_policy(self._config)
         self._op_types = tuple({cell_type_dicts[item] for item in self._config.op_types})
@@ -213,7 +219,7 @@ class SmoothQuant(CompAlgo):
         changed = False
         _convert(net_opt)
         net_opt.update_parameters_name()
-        if not changed:
+        if not changed and self._config.mode == PTQMode.QUANTIZE:
             warn_str = "No layer found in network is suitable for quantization, please check network and " \
                        "opname_blacklist, and make sure call apply before convert."
             warnings.warn(warn_str, RuntimeWarning)

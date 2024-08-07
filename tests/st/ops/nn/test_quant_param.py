@@ -159,6 +159,7 @@ def test_quant_cell_v2_perchannel(mode):
     os.environ.pop('GRAPH_OP_RUN')
     assert (expect == output2.asnumpy()).all()
 
+
 # FIXME @hangangqiang wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
