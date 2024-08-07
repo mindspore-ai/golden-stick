@@ -14,7 +14,6 @@
 # ============================================================================
 """ptq quant cells."""
 import copy
-import time
 import abc
 import numpy as np
 from mindspore.ops import functional as F
@@ -27,8 +26,9 @@ from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.common import logger
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
-from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
-from mindspore_gs.ptq.quant_cells import PTQCell
+from mindspore_gs.quantization.layer_policy import PerChannelArgs
+from mindspore_gs.ptq.quant_cell import PTQCell
+from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
 from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.ptq.convert_utils import (
     convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
@@ -40,7 +40,7 @@ from mindspore_gs.ptq.convert_utils import (
 class LinearQuant(PTQCell):
     """Linear layer wrapper with min max"""
 
-    def __init__(self, linear: Linear, policy: LayerPolicy):
+    def __init__(self, linear: Linear, policy: PTQLayerPolicy):
         super(LinearQuant, self).__init__(linear, policy)
         self._linear = linear
         rank = len(linear.weight.shape)
@@ -79,7 +79,7 @@ class LinearQuant(PTQCell):
     def core_construct(self, *args):
         pass
 
-    def convert(self, backend: str = BackendTarget.NONE, is_deploy=False):
+    def convert(self, backend=BackendTarget.NONE, is_deploy=False):
         weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
                     self._weight_quantizer.get_attr("weight_only_quant", False)
         all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
@@ -121,13 +121,6 @@ class LinearQuant(PTQCell):
             self._quant_deployed = True
             raise RuntimeError(f'current version not support all quantization, only for weight quantization')
 
-    def calibrate(self):
-        """calibrate for weight quant"""
-        start = time.time()
-        self._weight_quantizer(self._linear.weight)
-        logger.info(
-            f"Calibrated weight of Linear Cell: {self._linear.weight.name}, time cost: {time.time() - start} s.")
-
     # pylint: disable=W0221
     def construct(self, x):
         """
@@ -163,8 +156,9 @@ class LinearQuant(PTQCell):
 class LinearDeploy(PTQCell):
     """Linear layer wrapper with min max"""
 
-    def __init__(self, linear: Linear, policy: LayerPolicy):
+    def __init__(self, linear: Linear, policy: PTQLayerPolicy):
         super(LinearDeploy, self).__init__(linear, policy)
+        self._converted = True
         if not isinstance(linear, Linear):
             raise ValueError(f'only Linear cell is supported, but got {type(linear)}')
         self._linear = linear
@@ -195,9 +189,6 @@ class LinearDeploy(PTQCell):
 
     def core_construct(self, *args):
         pass
-
-    def calibrate(self):
-        raise ValueError("Inner error, should not invoke LinearDeploy.calibrate().")
 
     # pylint: disable=W0221
     def construct(self, x):
@@ -232,7 +223,7 @@ class LinearDeploy(PTQCell):
 class PagedAttentionQuant(PTQCell):
     """PagedAttention Quant wrapper with min max"""
 
-    def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
+    def __init__(self, kvcache: PagedAttentionMgr, policy: PTQLayerPolicy):
         super(PagedAttentionQuant, self).__init__(kvcache, policy)
         self._kvcache = kvcache
 
@@ -258,10 +249,10 @@ class PagedAttentionQuant(PTQCell):
             key_fq_args["strategy"] = (kvcache.reshape_and_cache.in_strategy[0],)
             value_fq_args["strategy"] = (kvcache.reshape_and_cache.in_strategy[1],)
 
-        self._key_input_quantizer = self._policy.get_input_quantizer(input_index=0, perchannel_args=perchannel_args,
-                                                                     **key_fq_args)
-        self._value_input_quantizer = self._policy.get_input_quantizer(input_index=1, perchannel_args=perchannel_args,
-                                                                       **value_fq_args)
+        self._key_input_quantizer = self._policy.get_kvcache_quantizer(input_index=0, perchannel_args=perchannel_args,
+                                                                       **key_fq_args)
+        self._value_input_quantizer = self._policy.get_kvcache_quantizer(input_index=1, perchannel_args=perchannel_args,
+                                                                         **value_fq_args)
         self._weight_quantizer = None
         prex = ""
         for _, param in kvcache.parameters_and_names():
@@ -315,9 +306,6 @@ class PagedAttentionQuant(PTQCell):
         else:
             raise ValueError("Only support convert PagedAttentionMgr to MS backend.")
 
-    def calibrate(self):
-        raise ValueError("Inner error, should not invoke PagedAttentionQuant.calibrate().")
-
     # pylint: disable=W0221
     def construct(self, key, value, slot_mapping):
         """
@@ -345,8 +333,9 @@ class PagedAttentionQuant(PTQCell):
 class PagedAttentionDeployBase(PTQCell):
     """PagedAttention deploy base class"""
 
-    def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
+    def __init__(self, kvcache: PagedAttentionMgr, policy: PTQLayerPolicy):
         super(PagedAttentionDeployBase, self).__init__(kvcache, policy)
+        self._converted = True
         self._kvcache = kvcache
         # KVCacheMgr's shape is BSH currently.
         n = kvcache.n_heads
@@ -390,9 +379,6 @@ class PagedAttentionDeployBase(PTQCell):
     def core_construct(self, *args):
         pass
 
-    def calibrate(self):
-        raise ValueError("Inner error, should not invoke PagedAttentionDeploy.calibrate().")
-
     # pylint: disable=W0221
     def construct(self, key, value, slot_mapping):
         """
@@ -431,7 +417,7 @@ class PagedAttentionDeploy(PagedAttentionDeployBase):
 class PagedAttentionDeployFusion(PagedAttentionDeployBase):
     """PagedAttention deploy with fuison ops."""
 
-    def __init__(self, kvcache: PagedAttentionMgr, policy: LayerPolicy):
+    def __init__(self, kvcache: PagedAttentionMgr, policy: PTQLayerPolicy):
         super(PagedAttentionDeployFusion, self).__init__(kvcache, policy)
         self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.float16),
                                         name="key_value_t_zp")

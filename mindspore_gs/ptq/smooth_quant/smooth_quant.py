@@ -28,8 +28,8 @@ from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, BackendTarget
-from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
-from mindspore_gs.common.register import cell_type_dicts
+from mindspore_gs.ptq.quant_cell import PTQCell
+from mindspore_gs.ptq.smooth_quant.sq_cell import SQCell
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.ptq.smooth_quant.sq_net_policy import SQNetPolicy
@@ -49,18 +49,20 @@ class SmoothQuant(CompAlgo):
             self._config = PTQConfig()
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig.inner_config(self._config, approach=PTQApproach.SMOOTH_QUANT)
-        print("----------------------------------1 self._config", self._config, flush=True)
         self._config.act_dtype = msdtype.int8
-        print("----------------------------------2 self._config", self._config, flush=True)
         self._config.weight_dtype = msdtype.int8
         self._config.kvcache_dtype = msdtype.float_
         if self._config.backend != BackendTarget.ASCEND:
             raise ValueError("SmoothQuant only support ASCEND as BackendTarget now, "
                              f"but got {self._config.backend}.")
         self._ptq_policy = SmoothQuant._init_net_policy(self._config)
-        self._op_types = tuple({cell_type_dicts[item] for item in self._config.op_types})
         mode = self._config.mode
         self._is_deploy = mode == PTQMode.DEPLOY
+
+    @staticmethod
+    def load_mindformers_plugin():
+        # pylint: disable=unused-import
+        import mindspore_gs.ptq.smooth_quant.quant_cells.mindformers
 
     @staticmethod
     def _init_net_policy(config):
@@ -92,7 +94,7 @@ class SmoothQuant(CompAlgo):
         if not isinstance(self._ptq_policy, SQNetPolicy):
             raise RuntimeError("Derived class should provide net policy")
 
-        class InsertActObserver(Processor):
+        class InsertFQCell(Processor):
             """A network iterator for applying algorithm on network."""
 
             def __init__(self, ptq_policy, config):
@@ -110,30 +112,25 @@ class SmoothQuant(CompAlgo):
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
-                    self.changed = True
-                    return new_layer_policy.wrap_cell(cell), True
+                    fq_cell = new_layer_policy.wrap_cell(cell)
+                    if fq_cell:
+                        self.changed = True
+                        logger.info(f"replace {cell_name} with fake-quant cell {type(fq_cell)}.")
+                        return fq_cell, True
                 return cell, False
 
-        def insert_weight_observer_and_quant(root: Cell):
-            if root is None:
-                return
-            for name, cell in root.name_cells().items():
-                if isinstance(cell, SQLinearActObserver):
-                    root.insert_child_to_cell(name, SQLinearWeightObserver(cell))
-                else:
-                    insert_weight_observer_and_quant(cell)
-
-        def insert_act_quant(root: Cell):
-            if root is None:
-                return
-            for name, cell in root.name_cells().items():
-                if isinstance(cell, SQLinearWeightObserver):
-                    root.insert_child_to_cell(name, SQLinearWrapper(cell))
-                else:
-                    insert_act_quant(cell)
+        class ToNextPhase(Processor):
+            """A network iterator for applying algorithm on network."""
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, SQCell):
+                    return cell, False
+                next_phase_cell = cell.to_next_phase()
+                logger.info(f"replace {cell_name} with fake-quant cell {type(next_phase_cell)}.")
+                return next_phase_cell, True
 
         self._ptq_policy.build()
-        replacer = InsertActObserver(self._ptq_policy, self._config)
+        # act smooth observer
+        replacer = InsertFQCell(self._ptq_policy, self._config)
         replacer.process(network)
         if not replacer.changed:
             warn_str = "No layer found in network is suitable for quantization, please check network and " \
@@ -156,13 +153,16 @@ class SmoothQuant(CompAlgo):
             if tokenizer is not None:
                 logger.info(f"Input: {tokenizer.decode(input_ids, skip_special_tokens=True)}")
                 logger.info(f"Output: {tokenizer.decode(output, skip_special_tokens=True)}")
-        insert_weight_observer_and_quant(network)
+        # weight smooth observer; smooth; weight quant observer
+        network_to_next_phase = ToNextPhase()
+        network_to_next_phase.process(network)
         network.update_parameters_name()
         os.environ['NETWORK_PHASE'] = "weightobs"
         network.phase = "prefill_weightobs"
         bs = network_helper.get_spec('batch_size')
         network_helper.generate(network, np.ones([bs, 1], dtype=np.int32), max_new_tokens=1)
-        insert_act_quant(network)
+        # act quant observer
+        network_to_next_phase.process(network)
         network.update_parameters_name()
         os.environ['NETWORK_PHASE'] = "quant"
         network.phase = "prefill_quant"
@@ -208,8 +208,9 @@ class SmoothQuant(CompAlgo):
         def _convert(root: Cell):
             if root is None:
                 return
-            for _, cell in root.name_cells().items():
-                if isinstance(cell, SQLinearWrapper):
+            for name, cell in root.name_cells().items():
+                if isinstance(cell, PTQCell):
+                    logger.info(f"convert {name} to real-quant cell.")
                     cell.convert()
                     nonlocal changed
                     changed = True

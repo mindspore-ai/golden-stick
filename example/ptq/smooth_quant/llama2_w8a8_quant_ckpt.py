@@ -19,6 +19,7 @@ import argparse
 import time
 
 import mindspore as ms
+from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
 from mindformers import LlamaForCausalLM
 from mindspore_gs.ptq import PTQMode, PTQConfig
@@ -43,11 +44,9 @@ def get_args():
 def quant_network(net: LlamaForCausalLM, net_helper, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, **kwargs):
     """Quant llama2 model to w8a16 with RTN algorithm."""
     start_time = time.time()
-    if mode == PTQMode.QUANTIZE:
-        logger.info("Use RTN algo to quant network and weight.")
-    else:
-        logger.info("Use RTN algo to quant network.")
-    cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2", "lm_head"])
+    logger.info("Use SmoothQuant algo to quant network and weight.")
+    cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2", "lm_head"], act_dtype=msdtype.int8)
+    SQ.load_mindformers_plugin()
     ptq = SQ(config=cfg)
     logger.info(f'Create PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()

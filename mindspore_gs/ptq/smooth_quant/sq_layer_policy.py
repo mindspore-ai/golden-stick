@@ -18,14 +18,14 @@ import abc
 
 from mindspore.nn import Cell
 from mindspore import dtype as msdtype
-from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
+from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.fake_quantizer import FakeQuantizer
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
-from .quant_cells import SQLinearActObserver, SQLinearDeploy
 
 
-class SQLayerPolicy(LayerPolicy, abc.ABC):
+class SQLayerPolicy(PTQLayerPolicy, abc.ABC):
     """
     Derived class of LayerPolicy. Sim-QAT layer policy.
     Use linear perchannel fake quantizer as weight fake quantizer, linear perlayer fake quantizer as act fake quantizer.
@@ -83,36 +83,13 @@ class SQLayerPolicy(LayerPolicy, abc.ABC):
         return MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_dtype,
                               narrow_range=self._config.act_narrow_range, strategy=kwargs.get('strategy', None))
 
+    def get_kvcache_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
+                              **kwargs) -> FakeQuantizer:
+        return None
+
     def get_config(self) -> InnerPTQConfig:
         return self._config
 
     @abc.abstractmethod
     def wrap_cell(self, handler: Cell) -> Cell:
         raise NotImplementedError
-
-
-class LinearLayerPolicy(SQLayerPolicy):
-    """
-    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
-    """
-    def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
-        super().__init__(weight_names, act_names, config)
-        self.set_input_number(1)
-        self._is_deploy = config.mode == PTQMode.DEPLOY
-
-    def create_observer_perchannel(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
-        """create_observer_perchannel."""
-        strategy = kwargs.get('strategy', None)
-        channel_axis = perchannel_args.channel_axis
-        num_channels = perchannel_args.num_channels
-        rank = perchannel_args.rank
-        if num_channels == -1:
-            raise RuntimeError("Please provide channel number for observer.")
-        perchannel_observer = MinMaxPerChannel(symmetric=True, narrow_range=False, axis=channel_axis, data_rank=rank,
-                                               output_channel=num_channels, strategy=strategy)
-        return perchannel_observer
-
-    def wrap_cell(self, handler) -> Cell:
-        if self._is_deploy:
-            return SQLinearDeploy(handler, self, self._config)
-        return SQLinearActObserver(handler, self, self._config)

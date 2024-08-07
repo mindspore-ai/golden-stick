@@ -12,8 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick SmoothQuant Algorithm.
-"""
-
-from .smooth_quant import SmoothQuant
+"""Quant_cells from different network framework."""

@@ -13,7 +13,13 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick SmoothQuant Algorithm.
+LayerPolicy for Mindformers.
 """
+from functools import partial
 
-from .smooth_quant import SmoothQuant
+from mindformers.modules.layers import Linear
+from mindspore_gs.ptq.ptq_policy import PTQNetPolicy
+from mindspore_gs.ptq.smooth_quant.sq_net_policy import SQNetPolicy
+from .layer_policys import LinearLayerPolicy
+
+PTQNetPolicy.register_policy(SQNetPolicy, Linear, partial(LinearLayerPolicy, [], []))

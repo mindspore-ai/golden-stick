@@ -17,7 +17,7 @@
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
-from mindspore import Parameter, Tensor, dtype, context
+from mindspore import Parameter, Tensor, dtype, context, nn
 from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
 
@@ -25,14 +25,15 @@ from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
-from mindspore_gs.ptq.quant_cells import PTQCell
+from mindspore_gs.ptq.quant_cell import PTQCell
+from mindspore_gs.ptq.smooth_quant.sq_cell import SQCell
 from mindspore_gs.ptq.convert_utils import (
     convert_to_dequant_bmm_for_deploy, convert_to_dequant_bmm, convert_to_smooth_quant_for_deploy,
     convert_to_smooth_quant
 )
 
 
-class SQLinearActObserver(PTQCell):
+class SQLinearActObserver(SQCell):
     """Linear layer wrapper with min max"""
 
     def __init__(self, linear: Linear, policy=None, cfg=None):
@@ -58,11 +59,12 @@ class SQLinearActObserver(PTQCell):
     def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
         raise NotImplementedError("Inner Error: should not call SQLinearActObserver.convert().")
 
-    def calibrate(self):
-        pass
-
     def core_construct(self, *args):
         pass
+
+    def to_next_phase(self) -> nn.Cell:
+        """to_next_phase"""
+        return SQLinearWeightObserver(self)
 
     # pylint: disable=W0221
     def construct(self, x):
@@ -94,7 +96,7 @@ class SQLinearActObserver(PTQCell):
         return output
 
 
-class SQLinearWeightObserver(PTQCell):
+class SQLinearWeightObserver(SQCell):
     """Linear layer wrapper with min max"""
 
     def __init__(self, act_observer: SQLinearActObserver):
@@ -215,12 +217,12 @@ class SQLinearWeightObserver(PTQCell):
     def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
         raise NotImplementedError("Inner Error: should not call SQLinearWeightObserver.convert().")
 
-    def calibrate(self):
-        weight = self._handler.cast(self._handler.weight, self._handler.dtype)
-        self.weight_quantizer_(weight)
-
     def core_construct(self, *args):
         pass
+
+    def to_next_phase(self) -> nn.Cell:
+        """to_next_phase"""
+        return SQLinearWrapper(self)
 
     # pylint: disable=W0221
     def construct(self, x):
@@ -474,13 +476,6 @@ class SQLinearWrapper(PTQCell):
             context.set_context(mode=mode_store)
             context.set_auto_parallel_context(parallel_mode=parallel_mode_store)
 
-    def calibrate(self):
-        if hasattr(self._handler, "dtype"):
-            weight = self._handler.cast(self._handler.weight, self._handler.dtype)
-        else:
-            weight = self._handler.weight
-        self._weight_quantizer(weight)
-
     def core_construct(self, *args):
         pass
 
@@ -523,6 +518,7 @@ class SQLinearDeploy(PTQCell):
 
     def __init__(self, linear: Linear, policy=None, cfg=None):
         super().__init__(linear, policy)
+        self._converted = True
         if not isinstance(linear, Linear):
             raise ValueError(f'only Linear cell is supported, but got {type(linear)}')
         self.cfg = cfg
@@ -570,9 +566,6 @@ class SQLinearDeploy(PTQCell):
         if is_transpose:
             return (strategy[0],)
         return (strategy[1],)
-
-    def calibrate(self):
-        raise RuntimeError("Inner error, should not invoke SQLinearDeploy.calibrate().")
 
     def core_construct(self, *args):
         raise RuntimeError("Inner error, should not invoke SQLinearDeploy.core_construct().")

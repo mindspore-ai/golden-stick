@@ -36,8 +36,9 @@ from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, SmoothQuantConfig, PTQApproach
 from mindspore_gs.ptq.smooth_quant.smooth_quant import SmoothQuant
-from mindspore_gs.ptq.smooth_quant.sq_layer_policy import LinearLayerPolicy
-from mindspore_gs.ptq.smooth_quant.quant_cells import SQLinearActObserver, SQLinearWeightObserver, SQLinearWrapper
+from mindspore_gs.ptq.smooth_quant.quant_cells.mindformers.layer_policys import LinearLayerPolicy
+from mindspore_gs.ptq.smooth_quant.quant_cells.mindformers.quant_cells import SQLinearActObserver, \
+    SQLinearWeightObserver, SQLinearWrapper
 from mindspore_gs.ptq.convert_utils import SmoothAndQuantCell, DequantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel
 from mindspore_gs.ptq.network_helpers import NetworkHelper

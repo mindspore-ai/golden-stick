@@ -23,7 +23,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.common.config import GSBaseConfig
 from mindspore_gs.common.utils import value_check, list_value_check
 from mindspore_gs.common.register import RegisterMachine
-from mindspore_gs.common.gs_enum import QuantCellType, BackendTarget
+from mindspore_gs.common.gs_enum import BackendTarget
 
 algo_cfg_register = RegisterMachine()
 
@@ -182,31 +182,27 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     approach: PTQApproach = field(default=PTQApproach.RTN)
     act_per_channel: bool = False
     weight_per_channel: bool = True
+    kvcache_per_head: bool = True
     act_symmetric: bool = False
     weight_symmetric: bool = True
+    kvcache_symmetric: bool = True
     act_narrow_range: bool = False
     weight_narrow_range: bool = False
+    kvcache_narrow_range: bool = False
     enable_deploy_fusion: bool = True
-    op_types: List[str] = field(default_factory=lambda: [QuantCellType.MF_LINEAR.value],
-                                metadata={'choices': [
-                                    item.value for item in QuantCellType.__members__.values()
-                                ]})
 
     def __post_init__(self):
         value_check('act_per_channel', self.act_per_channel, bool)
         value_check('weight_per_channel', self.weight_per_channel, bool)
-        value_check('act_symmetric', self.weight_symmetric, bool)
+        value_check('kvcache_per_head', self.kvcache_per_head, bool)
+        value_check('act_symmetric', self.act_symmetric, bool)
+        value_check('weight_symmetric', self.weight_symmetric, bool)
+        value_check('kvcache_symmetric', self.kvcache_symmetric, bool)
         value_check('act_narrow_range', self.act_narrow_range, bool)
         value_check('weight_narrow_range', self.weight_narrow_range, bool)
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
-        support_op_types = {
-            item.value for item in QuantCellType.__members__.values()
-        }
-        for op_type in self.op_types:
-            if op_type not in support_op_types:
-                raise ValueError(f'{op_type} is not supported, all support type is {support_op_types}')
         if not self.algo_args:
             args_config = algo_cfg_register[self.approach]
             if args_config is not None and is_dataclass(args_config):
