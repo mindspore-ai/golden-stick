@@ -61,11 +61,16 @@ class SmoothQuant(CompAlgo):
 
     @staticmethod
     def load_mindformers_plugin():
+        """
+        Load quant cells, layer policy for MindFormers as plugin so that `SmoothQuant` can support network from
+        MindFormers. Invoking this static method before creating `SmoothQuant`.
+        """
         # pylint: disable=unused-import
         import mindspore_gs.ptq.smooth_quant.quant_cells.mindformers
 
     @staticmethod
     def _init_net_policy(config):
+        SmoothQuant.load_mindformers_plugin()
         return SQNetPolicy(config)
 
     # pylint: disable=arguments-differ

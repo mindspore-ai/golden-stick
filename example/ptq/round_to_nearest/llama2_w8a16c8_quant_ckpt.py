@@ -62,7 +62,6 @@ def quant_network(net: LlamaForCausalLM, network_helper, backend=BackendTarget.A
     else:
         logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["lm_head"])
-    RTN.load_mindformers_plugin()
     ptq = RTN(config=cfg)
     logger.info(f'Create RoundToNearest and datasets cost time is {time.time() - start_time} s.')
     start_time = time.time()
