@@ -17,17 +17,7 @@ registers for ptq
 """
 from typing import Dict
 
-from mindformers.modules.layers import Linear
-import mindspore.log as logger
-import mindspore.nn as nn
-from mindspore_gs.common.gs_enum import QuantCellType
-
-
-cell_type_dicts = {
-    QuantCellType.LINEAR.value: nn.Dense,
-    QuantCellType.CONV2D.value: nn.Conv2d,
-    QuantCellType.MF_LINEAR.value: Linear
-}
+from mindspore_gs.common import logger
 
 
 class RegisterMachine:

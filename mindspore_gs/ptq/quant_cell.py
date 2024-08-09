@@ -22,7 +22,11 @@ class PTQCell(QuantCell):
     """Wrapper Cell to PTQCell with FakeQuantizer"""
 
     @abc.abstractmethod
-    def calibrate(self):
+    def weight_quantizer(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def core_construct(self, *args):
         raise NotImplementedError
 
     @staticmethod

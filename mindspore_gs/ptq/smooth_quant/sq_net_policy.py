@@ -14,15 +14,13 @@
 # ============================================================================
 """SQNetPolicy."""
 
-from mindformers.modules.layers import Linear
 from mindspore.rewrite import PatternEngine
-
-from mindspore_gs.quantization.net_policy import NetPolicy
+from mindspore_gs.common import logger
+from mindspore_gs.ptq.ptq_policy import PTQNetPolicy
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
-from .sq_layer_policy import LinearLayerPolicy
 
 
-class SQNetPolicy(NetPolicy):
+class SQNetPolicy(PTQNetPolicy):
     """
     Derived class of NetworkQConfig. SmoothQuant config.
 
@@ -42,5 +40,11 @@ class SQNetPolicy(NetPolicy):
         """Initialize `RTNNetPolicy`. A `RTNNetPolicy` can only be built once."""
         if self._build:
             return
-        self._layer_policy_map[Linear] = LinearLayerPolicy([], [], self._config)
+        for key, value in PTQNetPolicy.register_policy_map.items():
+            if key[0] is not SQNetPolicy:
+                continue
+            policy = value(self._config)
+            layer_type = key[1]
+            logger.info(f"Map layer_policy for {layer_type} to {type(policy)}")
+            self._layer_policy_map[layer_type] = policy
         self._build = True

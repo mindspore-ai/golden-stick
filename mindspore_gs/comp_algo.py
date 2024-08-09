@@ -67,6 +67,8 @@ class CompAlgo(abc.ABC):
 
     def _update_config_from_dict(self, config: dict):
         """Update config for specific algo. If derived class has extra attributes, Should be over-writed."""
+        # pylint: disable=unnecessary-pass
+        pass
 
     @abc.abstractmethod
     def apply(self, network: Cell, **kwargs) -> Cell:

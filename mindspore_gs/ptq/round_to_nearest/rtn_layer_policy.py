@@ -18,17 +18,14 @@ import abc
 
 from mindspore.nn import Cell
 from mindspore import dtype as msdtype
-from mindspore_gs.quantization.layer_policy import LayerPolicy, PerChannelArgs
+from mindspore_gs.quantization.layer_policy import PerChannelArgs
+from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
 from mindspore_gs.ptq.fake_quantizer import FakeQuantizer
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
-from mindspore_gs.ptq import PTQMode
-from mindspore_gs.common import logger
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
-from .quant_cells import LinearQuant, LinearDeploy, PagedAttentionDeploy, PagedAttentionQuant, \
-    PagedAttentionDeployFusion
 
 
-class RTNLayerPolicy(LayerPolicy, abc.ABC):
+class RTNLayerPolicy(PTQLayerPolicy, abc.ABC):
     """
     Derived class of LayerPolicy. Sim-QAT layer policy.
     Use linear perchannel fake quantizer as weight fake quantizer, linear perlayer fake quantizer as act fake quantizer.
@@ -78,6 +75,30 @@ class RTNLayerPolicy(LayerPolicy, abc.ABC):
         weight_quantizer.set_attr("weight_only_quant", weight_only)
         return weight_quantizer
 
+    def get_kvcache_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
+                              **kwargs) -> FakeQuantizer:
+        """get_kvcache_quantizer"""
+        if self._config.kvcache_dtype == msdtype.float_:
+            return None
+        strategy = kwargs.get('strategy', None)
+        channel_axis = perchannel_args.channel_axis
+        num_channels = perchannel_args.num_channels
+        rank = perchannel_args.rank
+        if channel_axis == -1 and num_channels == -1 and rank == -1:
+            return None
+        if channel_axis == -1:
+            raise RuntimeError("Please provide channel axis of input for per-channel input quantize.")
+        if num_channels == -1:
+            raise RuntimeError("Please provide channel number of input for per-channel input quantize.")
+        if rank == -1:
+            raise RuntimeError("Please provide rank of kvcache for per-channel weight quantize.")
+        quantizer = MinMaxPerChannel(symmetric=self._config.kvcache_symmetric, data_rank=rank,
+                                     quant_dtype=self._config.kvcache_dtype,
+                                     narrow_range=self._config.kvcache_narrow_range, axis=channel_axis,
+                                     output_channel=num_channels, strategy=strategy)
+        quantizer.set_attr("position", "input")
+        return quantizer
+
     def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
                              **kwargs) -> FakeQuantizer:
         if self._config.act_dtype == msdtype.float_:
@@ -102,89 +123,3 @@ class RTNLayerPolicy(LayerPolicy, abc.ABC):
     @abc.abstractmethod
     def wrap_cell(self, handler: Cell) -> Cell:
         raise NotImplementedError
-
-
-class LinearLayerPolicy(RTNLayerPolicy):
-    """
-    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
-    """
-    def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
-        super().__init__(weight_names, act_names, config)
-        self.set_input_number(1)
-        if config.act_dtype == msdtype.float_:
-            self.set_input_not_insert_fq()
-            self.set_output_not_insert_fq()
-        self.is_deploy = config.mode == PTQMode.DEPLOY
-
-    def wrap_cell(self, handler) -> Cell:
-        if self.is_deploy:
-            return LinearDeploy(handler, self)
-        return LinearQuant(handler, self)
-
-
-class PagedAttentionMgrPolicy(RTNLayerPolicy):
-    """
-    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
-    """
-    def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
-        super().__init__(weight_names, act_names, config)
-        self.set_input_number(3)
-        self.is_deploy = config.mode == PTQMode.DEPLOY
-        self.enable_deploy_fusion = config.enable_deploy_fusion
-        logger.info(f"PagedAttentionMgr Quant conifg: {config}.")
-
-    def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
-                             **kwargs) -> FakeQuantizer:
-        return None
-
-    def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
-                             **kwargs) -> FakeQuantizer:
-        if self._config.kvcache_dtype == msdtype.float_:
-            return None
-        strategy = kwargs.get('strategy', None)
-        channel_axis = perchannel_args.channel_axis
-        num_channels = perchannel_args.num_channels
-        rank = perchannel_args.rank
-        if channel_axis == -1 and num_channels == -1 and rank == -1:
-            return None
-        if channel_axis == -1:
-            raise RuntimeError("Please provide channel axis of input for per-channel input quantize.")
-        if num_channels == -1:
-            raise RuntimeError("Please provide channel number of input for per-channel input quantize.")
-        if rank == -1:
-            raise RuntimeError("Please provide rank of kvcache for per-channel weight quantize.")
-        quantizer = MinMaxPerChannel(symmetric=self._config.weight_symmetric, data_rank=rank,
-                                     quant_dtype=self._config.weight_dtype,
-                                     narrow_range=self._config.weight_narrow_range, axis=channel_axis,
-                                     output_channel=num_channels, strategy=strategy)
-        quantizer.set_attr("position", "input")
-        return quantizer
-
-    def _get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
-        if self._config.kvcache_dtype == msdtype.float_:
-            return None
-        strategy = kwargs.get('strategy', None)
-        channel_axis = perchannel_args.channel_axis
-        num_channels = perchannel_args.num_channels
-        rank = perchannel_args.rank
-        if channel_axis == -1 and num_channels == -1 and rank == -1:
-            return None
-        if channel_axis == -1:
-            raise RuntimeError("Please provide channel axis of output for per-channel output quantize.")
-        if num_channels == -1:
-            raise RuntimeError("Please provide channel number of output for per-channel output quantize.")
-        if rank == -1:
-            raise RuntimeError("Please provide rank of kvcache for per-channel weight quantize.")
-        quantizer = MinMaxPerChannel(symmetric=self._config.weight_symmetric, data_rank=rank,
-                                     quant_dtype=self._config.weight_dtype,
-                                     narrow_range=self._config.weight_narrow_range, axis=channel_axis,
-                                     output_channel=num_channels, strategy=strategy)
-        quantizer.set_attr("position", "output")
-        return quantizer
-
-    def wrap_cell(self, handler) -> Cell:
-        if self.is_deploy:
-            if self.enable_deploy_fusion:
-                return PagedAttentionDeployFusion(handler, self)
-            return PagedAttentionDeploy(handler, self)
-        return PagedAttentionQuant(handler, self)

@@ -24,7 +24,7 @@ from mindspore import context, GRAPH_MODE, Tensor, nn, save_checkpoint, load_che
 from mindspore.communication import get_rank
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.convert_utils import QuantCellV2
-from mindspore_gs.ptq.round_to_nearest.quant_cells import PagedAttentionQuant
+from mindspore_gs.ptq.round_to_nearest.quant_cells.mindformers.quant_cells import PagedAttentionQuant
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
 from mindspore_gs.common.gs_enum import BackendTarget

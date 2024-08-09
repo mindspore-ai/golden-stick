@@ -12,8 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""
-MindSpore golden stick SmoothQuant Algorithm.
-"""
+"""sq quant cell."""
 
-from .smooth_quant import SmoothQuant
+
+from mindspore import nn
+from mindspore_gs.ptq.quant_cell import PTQCell
+
+
+class SQCell(PTQCell):
+    """SQCell"""
+    def to_next_phase(self) -> nn.Cell:
+        """to_next_phase"""
+        raise NotImplementedError

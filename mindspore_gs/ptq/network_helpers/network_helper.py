@@ -35,7 +35,7 @@ class NetworkHelper:
             Object as network specific.
 
         Examples:
-            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
             >>> from mindformers.tools.register.config import MindFormerConfig
             >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
             >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
@@ -56,7 +56,7 @@ class NetworkHelper:
             Object as network tokenizer.
 
         Examples:
-            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
             >>> from mindformers.tools.register.config import MindFormerConfig
             >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
             >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
@@ -86,7 +86,7 @@ class NetworkHelper:
         Examples:
             >>> import numpy as np
             >>> from mindspore import context
-            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
             >>> from mindformers import LlamaForCausalLM, LlamaConfig
             >>> from mindformers.tools.register.config import MindFormerConfig
             >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")

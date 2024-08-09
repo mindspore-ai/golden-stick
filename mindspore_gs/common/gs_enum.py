@@ -27,27 +27,6 @@ class QATApproach(Enum):
     SLB = 'slb'
 
 
-class QuantCellType(Enum):
-    """
-    supported quant cell type enums
-    """
-    LINEAR = 'linear'
-    CONV2D = 'conv2d'
-    MF_LINEAR = 'mf_linear'
-
-
-class GSQuantDtype(Enum):
-    """
-    supported quant dtype
-    """
-    int4 = 'INT4'
-    uint4 = 'UINT4'
-    int8 = 'INT8'
-    uint8 = 'UINT8'
-    int16 = 'INT16'
-    UINT16 = 'UINT16'
-
-
 class BackendTarget(Enum):
     """
     Mindspore backend target for cell convert.

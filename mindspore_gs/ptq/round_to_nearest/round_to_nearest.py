@@ -21,21 +21,18 @@ from typing import Tuple
 import numpy as np
 
 from mindspore.nn import Cell
-from mindspore import context
 from mindspore import dtype as msdtype
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.common import logger
 
 from mindspore_gs import CompAlgo
 from mindspore_gs.quantization.net_policy import NetPolicy
-from mindspore_gs.ptq.quant_cells import PTQCell
+from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.ptq.convert_utils import QuantCell
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode, PTQApproach, BackendTarget
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.common.utils import value_check
 from .rtn_net_policy import RTNNetPolicy
-from .quant_cells import LinearQuant, PagedAttentionQuant
 
 
 class RoundToNearest(CompAlgo):
@@ -79,10 +76,11 @@ class RoundToNearest(CompAlgo):
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
         self._is_deploy: bool = self._config.mode == PTQMode.DEPLOY
-        if hasattr(config, 'custom_transforms'):
-            self._custom_transforms = config.custom_transforms
-        if hasattr(config, 'custom_policies'):
-            self._custom_layer_policy_map = config.custom_policies
+
+    @staticmethod
+    def load_mindformers_plugin():
+        # pylint: disable=unused-import
+        import mindspore_gs.ptq.round_to_nearest.quant_cells.mindformers
 
     @staticmethod
     def _init_net_policy(config):
@@ -99,44 +97,6 @@ class RoundToNearest(CompAlgo):
         elif len(value) > 2:
             raise ValueError("input `{}` len should be less than 3".format(name))
         return value
-
-    def _update_config_from_dict(self, config: dict):
-        """Create RoundToNearestPTQ `config` from a dict"""
-
-    def _calibrate(self, network):
-        """
-        Start calibrating network and statistic quant parameters.
-        """
-        def _process(root: Cell):
-            if root is None:
-                return
-            for _, cell in root.name_cells().items():
-                if not isinstance(cell, PTQCell):
-                    _process(cell)
-                    continue
-                cell.calibrate()
-
-        restore_device_target = context.get_context("device_target")
-        context.set_context(device_target="CPU")
-        _process(network)
-        context.set_context(device_target=restore_device_target)
-        return network
-
-    @staticmethod
-    def _fix_param_after_load_ckpt(network):
-        """
-        Fix quant param after loaded checkpoint for some quant parameter is store in attribute of primitive. QuantCell
-        is an example who's quant parameter is an attribute.
-        """
-        class FixProcessor(Processor):
-            """A network iterator for fix parameter after load ckpt."""
-            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                if not isinstance(cell, QuantCell):
-                    return cell, True
-                return cell, False
-
-        FixProcessor().process(network)
-        network.update_parameters_name()
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None) -> Cell:
@@ -180,8 +140,11 @@ class RoundToNearest(CompAlgo):
                 layer_policy = self._ptq_policy.get_layer_policy(type(cell))
                 if layer_policy:
                     new_layer_policy = copy.deepcopy(layer_policy)
-                    self.changed = True
-                    return new_layer_policy.wrap_cell(cell), True
+                    fq_cell = new_layer_policy.wrap_cell(cell)
+                    if fq_cell:
+                        logger.info(f"replace {cell_name} with fake-quant cell {type(fq_cell)}.")
+                        self.changed = True
+                        return fq_cell, True
                 return cell, False
 
         replacer = ApplyProcessor(self._ptq_policy, self._config)
@@ -248,10 +211,11 @@ class RoundToNearest(CompAlgo):
         def _convert(root: Cell):
             if root is None:
                 return
-            for _, cell in root.name_cells().items():
-                if isinstance(cell, (LinearQuant, PagedAttentionQuant)):
+            for name, cell in root.name_cells().items():
+                if isinstance(cell, PTQCell):
                     nonlocal changed
                     changed = True
+                    logger.info(f"convert {name} to real-quant cell.")
                     cell.convert(self._config.backend, self._is_deploy)
                 else:
                     _convert(cell)
