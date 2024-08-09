@@ -65,19 +65,47 @@ def _find_real_caller(stack_info=False, stacklevel=1):
     return rv
 
 
+class GSLogFormatter(logging.Formatter):
+    """_GSLogFormatter"""
+    def format(self, record):
+        """format"""
+        # handle pathname
+        ms_install_home_path = 'mindspore_gs'
+        idx = record.pathname.rfind(ms_install_home_path)
+        if idx >= 0:
+            # Get the relative path of the file
+            record.filepath = record.pathname[idx:]
+        else:
+            record.filepath = record.pathname
+
+        # handle funcName
+        if record.funcName == "<module>":
+            record.funcname = ""
+        else:
+            record.funcname = record.funcName
+
+        return super().format(record)
+
+
 class Logger:
     """Logger for GoldenStick."""
     def __init__(self):
         self.logger = logging.getLogger("GoldenStick")
         self.logger.findCaller = _find_real_caller
-        self.logger.setLevel(level=logging.INFO)
-        console = logging.StreamHandler()
-        console.setLevel(level=logging.INFO)
-        format_str = '[%(levelname)s] %(name)s(%(process)s):%(asctime)s [%(filename)s:%(lineno)s %(funcName)s] - ' \
-                     '%(message)s'
-        formatter = logging.Formatter(format_str)
-        console.setFormatter(formatter)
-        self.logger.addHandler(console)
+        if not self.logger.hasHandlers():
+            console = logging.StreamHandler(sys.stdout)
+            console.setLevel(level=logging.INFO)
+            format_str = '[%(levelname)s] %(name)s(%(process)s):%(asctime)s [%(filepath)s:%(lineno)d %(funcname)s] - ' \
+                         '%(message)s'
+            console.setFormatter(GSLogFormatter(format_str))
+            self.logger.addHandler(console)
+        self.logger.setLevel(logging.INFO)
+        self.logger.propagate = False
+
+    def set_level(self, level):
+        self.logger.setLevel(level)
+        for handler in self.logger.handlers:
+            handler.setLevel(level)
 
     def debug(self, *args, **kwargs):
         """Add debug level log."""
