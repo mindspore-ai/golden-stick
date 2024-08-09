@@ -419,9 +419,9 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
 
     def __init__(self, kvcache: PagedAttentionMgr, policy: PTQLayerPolicy):
         super(PagedAttentionDeployFusion, self).__init__(kvcache, policy)
-        self.key_value_t_zp = Parameter(initializer('ones', (2, self.key_t_zp.shape[0]), dtype.float16),
+        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.float16),
                                         name="key_value_t_zp")
-        self.key_value_t_scale = Parameter(initializer('ones', (2, self.key_t_zp.shape[0]), dtype.float16),
+        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.float16),
                                            name="key_value_t_scale")
         if "in_strategy" in kvcache.paged_attention.get_attr_dict():
             pa_strategy = kvcache.paged_attention.in_strategy
