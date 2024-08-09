@@ -106,6 +106,9 @@ class PTQConfig:
     Raises:
         ValueError: If `mode` is not in PTQMode's members.
         ValueError: If `backend` is not in BackendTarget's members.
+        ValueError: If `weight_dtype` is not mindspore.dtype.int8 or mindspore.dtype.float_.
+        ValueError: If `kvcache_dtype` is not mindspore.dtype.int8 or mindspore.dtype.float_.
+        ValueError: If `act_dtype` is not mindspore.dtype.int8 or mindspore.dtype.float_.
         TypeError: if `opname_blacklist` is not a list of str.
 
     Example:
@@ -128,11 +131,11 @@ class PTQConfig:
         if self.backend not in BackendTarget.__members__.values():
             raise ValueError(f'backend shall be in {BackendTarget.__members__.values()}')
         if self.weight_dtype != msdtype.int8 and self.weight_dtype != msdtype.float_:
-            raise ValueError(f'self.weight_dtype: {self.weight_dtype} is not msdtype.int8 or msdtype.float_.')
+            raise ValueError(f'self.weight_dtype: {self.weight_dtype} is not mindspore.dtype.int8 or mindspore.dtype.float_.')
         if self.kvcache_dtype != msdtype.int8 and self.kvcache_dtype != msdtype.float_:
-            raise ValueError(f'self.kvcache_dtype: {self.kvcache_dtype} is not msdtype.int8 or msdtype.float_.')
+            raise ValueError(f'self.kvcache_dtype: {self.kvcache_dtype} is not mindspore.dtype.int8 or mindspore.dtype.float_.')
         if self.act_dtype != msdtype.int8 and self.act_dtype != msdtype.float_:
-            raise ValueError(f'self.act_dtype: {self.act_dtype} is not msdtype.int8 or msdtype.float_.')
+            raise ValueError(f'self.act_dtype: {self.act_dtype} is not mindspore.dtype.int8 or mindspore.dtype.float_.')
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
@@ -203,6 +206,12 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
+        if self.approach is PTQApproach.RTN and self.act_dtype == msdtype.int8:
+            raise ValueError(f"{self.approach} is not support act_dtype == mindspore.dtype.int8.")
+        if self.approach is PTQApproach.RTN and self.weight_dtype == msdtype.int8 and self.kvcache_dtype == msdtype.int8:
+            raise ValueError(f"weight_dtype and kvcache_dtype are mindspore.dtype.int8, {self.approach} isn't supported.")
+        if self.approach is PTQApproach.RTN and self.weight_dtype == msdtype.float_ and self.kvcache_dtype == msdtype.float_:
+            raise ValueError(f"weight_dtype and kvcache_dtype are mindspore.dtype.float_, {self.approach} can't take effect.")
         if not self.algo_args:
             args_config = algo_cfg_register[self.approach]
             if args_config is not None and is_dataclass(args_config):
