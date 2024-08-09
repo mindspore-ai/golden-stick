@@ -46,7 +46,6 @@ def quant_network(net: LlamaForCausalLM, net_helper, mode=PTQMode.QUANTIZE, back
     start_time = time.time()
     logger.info("Use SmoothQuant algo to quant network and weight.")
     cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2", "lm_head"], act_dtype=msdtype.int8)
-    SQ.load_mindformers_plugin()
     ptq = SQ(config=cfg)
     logger.info(f'Create PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()

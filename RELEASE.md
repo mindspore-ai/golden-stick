@@ -7,7 +7,9 @@
 ### Major Features and Improvements
 
 * The `RoundToNearest` supports Mindformers' KVCache int8 quantization now, i.e. `PagedAttentionMgr` class, mainly for Llama2 networks.
+* Added `SmoothQuant` A8W8 PTQ algorithm aimed to quant Linear of MindFormers, mainly for Llama2 networks.
 * Added pynative-based algorithm `OmniQuant`, which supports AutoClip and AutoScale, mainly for llama2 series networks. The user can set the hyperparameters related to Clip and Scale to the list or float type to determine whether to perform parameter search or network quantization.
+* Added `load_mindformers_plugin` static method in `RoundToNearest` for decoupling `RoundToNearest` with MindFormers. If user want to quantize network from MindFormers, please invoke this method before `RoundToNearest` being created.
 
 ### API Change
 
@@ -28,9 +30,8 @@
     |  ----  | ----  | ----  |
     | meanings  | quantize kvcache to int8 | does not quantize kvcache |
 * Added `OmniQuantConfig` class for configuring algo_args of OmniQuant algorithm.
-* Added `network_replace` function for one-by-one sub cell replace.
-* Added `get_decoder_layer`, `get_linears` to'NetworkHelper' to obtain the decoder layer of network and the linear layer of sub-cell. Added `offload_embedding` to release memory.
-* Added implementation of `get_decoder_layer`, `get_linears` and `offload_embedding` of `MFLlama2Helper` to work with the llama2 series models in mindformers.
+* Added `get_decoder_layer`, `get_linears` method to `NetworkHelper` class to obtain the decoder layer of network and the linear layer of sub-cell. Added `offload_embedding` method to release memory.
+* Added implementation of `get_decoder_layer` , `get_linears` and `offload_embedding` of `MFLlama2Helper` to work with the Llama2 series models in MindFormers.
 
 ### Contributors
 
