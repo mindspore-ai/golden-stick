@@ -210,20 +210,19 @@ class SmoothQuant(CompAlgo):
                 raise ValueError(
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
 
-        def _convert(root: Cell):
-            if root is None:
-                return
-            for name, cell in root.name_cells().items():
-                if isinstance(cell, PTQCell):
-                    logger.info(f"convert {name} to real-quant cell.")
-                    cell.convert()
-                    nonlocal changed
-                    changed = True
-                else:
-                    _convert(cell)
+        class Converter(Processor):
+            """A network iterator for applying algorithm on network."""
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, PTQCell):
+                    return cell, False
+                logger.info(f"convert {cell_name} to real-quant cell.")
+                cell.convert()
+                nonlocal changed
+                changed = True
+                return cell, True
 
         changed = False
-        _convert(net_opt)
+        Converter().process(net_opt)
         net_opt.update_parameters_name()
         if not changed and self._config.mode == PTQMode.QUANTIZE:
             warn_str = "No layer found in network is suitable for quantization, please check network and " \

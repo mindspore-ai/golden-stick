@@ -45,5 +45,6 @@ mindspore_gs.ptq.RoundToNearest
             转换后的网络。
 
     .. py:method:: load_mindformers_plugin()
+        ::staticmethod        
 
         将针对MindFormers的quant-cells、layer-policy作为插件加载进来，从而使算法支持量化来自MindFormers的网络。需要在算法创建之前调用该静态方法。
