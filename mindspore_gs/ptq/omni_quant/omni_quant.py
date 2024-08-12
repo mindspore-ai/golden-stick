@@ -36,7 +36,6 @@ class InputCatcher(Cell):
     def __init__(self, handler):
         super().__init__()
         self.handler = handler
-        self.attention = handler.attention
         self.args = []
         self.kwargs = []
 
@@ -169,6 +168,7 @@ class OmniQuant(CompAlgo):
         """get first layer input"""
         layers = network_helper.get_decoder_layers(network)
         catcher = InputCatcher(layers[0])
+
         def replace_first_decoder(root: Cell, src: Cell, dst: Cell):
             if root is None:
                 return
