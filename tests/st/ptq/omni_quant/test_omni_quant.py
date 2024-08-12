@@ -17,7 +17,7 @@ import os
 import pytest
 import numpy as np
 
-from mindspore import Tensor, context, save_checkpoint, load_checkpoint
+from mindspore import Tensor, context, save_checkpoint, load_checkpoint, nn
 from mindspore import GRAPH_MODE, PYNATIVE_MODE, dtype
 from mindspore import ops as msops
 from mindspore.dataset import GeneratorDataset
@@ -33,6 +33,7 @@ from mindspore_gs.quantization.quant_utils import (cal_tensor_quantization_param
                                                    quant_tensor_data, quant_bias_data)
 from mindspore_gs.ptq.omni_quant import OmniQuant
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -462,3 +463,55 @@ def test_oq_llama2_predict_2stage_1p(device):
     npfoutput = np.array(foutput)
     npqoutput = np.array(qoutput)
     assert np.allclose(npqoutput[:, :24], npfoutput[:, :24], 0, 0)
+
+
+class SimpleNet(nn.Cell):
+    """
+    Network with single linear to be quant
+    """
+    def __init__(self):
+        super(SimpleNet, self).__init__()
+        self.linear = Linear(in_channels=5, out_channels=6, weight_init="ones")
+
+    def construct(self, x):
+        return self.linear(x)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend", "CPU"])
+def test_input_catcher(device):
+    """
+    Feature: InputCatcher.
+    Description: Apply InputCatcher on SimpleNet and check if inputs being caught correctly.
+    Expectation: Inputs being caught correctly.
+    """
+    from mindspore_gs.ptq.omni_quant.omni_quant import InputCatcher
+    context.set_context(mode=context.PYNATIVE_MODE, device_target=device)
+
+    net = SimpleNet()
+    foo_input = Tensor(np.ones((1, 3), dtype=np.float16))
+    catcher = InputCatcher(net.linear)
+    net.linear = catcher
+
+    try:
+        net(foo_input)
+    except GeneratorExit:
+        pass
+    try:
+        net(foo_input)
+    except GeneratorExit:
+        pass
+    assert len(catcher.args) == 2
+    assert len(catcher.kwargs) == 2
+
+    for i in range(2):
+        assert isinstance(catcher.args[i], tuple)
+        assert len(catcher.args[i]) == 1
+        assert isinstance(catcher.args[i][0], Tensor)
+        assert catcher.args[i][0].shape == (1, 3)
+        assert catcher.args[i][0].dtype == dtype.float16
+
+        assert isinstance(catcher.kwargs[i], dict)
+        assert not catcher.kwargs[i]
