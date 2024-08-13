@@ -43,7 +43,8 @@ def quant_network(net: LlamaForCausalLM, net_helper, backend=BackendTarget.ASCEN
     """Quant llama2 model to w8a8 with omni quant algorithm."""
     start_time = time.time()
     logger.info("Use omni quant algo to quant network and weight.")
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"], act_dtype=msdtype.int8)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
+                    act_quant_dtype=msdtype.int8)
     ptq = OQ(config=cfg)
     logger.info(f'Create PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()

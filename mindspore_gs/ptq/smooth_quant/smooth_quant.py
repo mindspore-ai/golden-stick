@@ -49,9 +49,9 @@ class SmoothQuant(CompAlgo):
             self._config = PTQConfig()
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig.inner_config(self._config, approach=PTQApproach.SMOOTH_QUANT)
-        self._config.act_dtype = msdtype.int8
-        self._config.weight_dtype = msdtype.int8
-        self._config.kvcache_dtype = msdtype.float_
+        self._config.act_quant_dtype = msdtype.int8
+        self._config.weight_quant_dtype = msdtype.int8
+        self._config.kvcache_quant_dtype = None
         if self._config.backend != BackendTarget.ASCEND:
             raise ValueError("SmoothQuant only support ASCEND as BackendTarget now, "
                              f"but got {self._config.backend}.")

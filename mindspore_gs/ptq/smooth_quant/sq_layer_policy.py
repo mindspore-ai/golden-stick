@@ -37,7 +37,7 @@ class SQLayerPolicy(PTQLayerPolicy, abc.ABC):
     def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
         super(SQLayerPolicy, self).__init__()
         self._config: InnerPTQConfig = config
-        if config.weight_dtype in (msdtype.int8, msdtype.uint8):
+        if config.weight_quant_dtype in (msdtype.int8, msdtype.uint8):
             self._num_bits = 8
         else:
             raise TypeError("Only support int8 weight quant now!")
@@ -48,7 +48,7 @@ class SQLayerPolicy(PTQLayerPolicy, abc.ABC):
 
     def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
                              **kwargs) -> FakeQuantizer:
-        if self._config.weight_dtype == msdtype.float_:
+        if self._config.weight_quant_dtype is None:
             return None
         strategy = kwargs.get('strategy', None)
         if self._config.weight_per_channel:
@@ -61,26 +61,26 @@ class SQLayerPolicy(PTQLayerPolicy, abc.ABC):
                 raise RuntimeError("Please provide channel number of weight for per-channel weight quantize.")
             weight_quantizer = MinMaxPerChannel(data_rank=rank,
                                                 symmetric=self._config.weight_symmetric,
-                                                quant_dtype=self._config.weight_dtype,
+                                                quant_dtype=self._config.weight_quant_dtype,
                                                 narrow_range=self._config.weight_narrow_range,
                                                 axis=channel_axis, output_channel=num_channels, strategy=strategy)
         else:
             weight_quantizer = MinMaxPerLayer(symmetric=self._config.weight_symmetric,
-                                              quant_dtype=self._config.weight_dtype,
+                                              quant_dtype=self._config.weight_quant_dtype,
                                               narrow_range=self._config.weight_narrow_range, strategy=strategy)
         return weight_quantizer
 
     def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
                              **kwargs) -> FakeQuantizer:
-        if self._config.act_dtype == msdtype.float_:
+        if self._config.act_quant_dtype is None:
             return None
-        return MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_dtype,
+        return MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_quant_dtype,
                               narrow_range=self._config.act_narrow_range, strategy=kwargs.get('strategy', None))
 
     def _get_output_quantizer(self, perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
-        if self._config.act_dtype == msdtype.float_:
+        if self._config.act_quant_dtype is None:
             return None
-        return MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_dtype,
+        return MinMaxPerLayer(symmetric=self._config.act_symmetric, quant_dtype=self._config.act_quant_dtype,
                               narrow_range=self._config.act_narrow_range, strategy=kwargs.get('strategy', None))
 
     def get_kvcache_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),

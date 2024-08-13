@@ -60,18 +60,18 @@ def test_constructor():
     sq = SmoothQuant()
     assert isinstance(sq._config, InnerPTQConfig)
     assert sq._config.algo_args.get("alpha", None) == 0.5
-    assert sq._config.act_dtype == dtype.int8
-    assert sq._config.weight_dtype == dtype.int8
-    assert sq._config.kvcache_dtype == dtype.float_
+    assert sq._config.act_quant_dtype == dtype.int8
+    assert sq._config.weight_quant_dtype == dtype.int8
+    assert sq._config.kvcache_quant_dtype is None
 
     sq_args = SmoothQuantConfig(alpha=0.8)
     cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, algo_args=sq_args)
     sq = SmoothQuant(cfg)
     assert isinstance(sq._config, InnerPTQConfig)
     assert sq._config.algo_args.get("alpha", None) == 0.8
-    assert sq._config.act_dtype == dtype.int8
-    assert sq._config.weight_dtype == dtype.int8
-    assert sq._config.kvcache_dtype == dtype.float_
+    assert sq._config.act_quant_dtype == dtype.int8
+    assert sq._config.weight_quant_dtype == dtype.int8
+    assert sq._config.kvcache_quant_dtype is None
 
 
 class SimpleNet(nn.Cell):
@@ -320,7 +320,7 @@ def test_sq_linear_wrapper(mode, transpose_b):
     Expectation: Same with numpy.
     """
     context.set_context(device_target="Ascend", mode=mode)
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, act_dtype=dtype.int8)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, act_quant_dtype=dtype.int8)
     inner_cfg = InnerPTQConfig.inner_config(cfg, PTQApproach.SMOOTH_QUANT)
     act_in = 5
     act_out = 6

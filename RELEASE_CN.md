@@ -14,19 +14,19 @@
 ### API Change
 
 * `PTQConfig`新增如下三个参数:
-    * `act_dtype`:mindspore.dtype类型，默认为mindspore.dtype.float_，可选输入及含义如下：
+    * `act_quant_dtype`:mindspore.dtype类型，默认为None，可选输入及含义如下：
 
-    |  act_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_（默认）  |
+    |  act_quant_dtype  | mindspore.dtype.int8  | None（默认）  |
     |  ----  | ----  | ----  |
     | 含义  | 将激活量化成int8 | 不进行激活量化 |
-    * `weight_dtype`:mindspore.dtype类型，默认为mindspore.dtype.int8，可选输入及含义如下：
+    * `weight_quant_dtype`:mindspore.dtype类型，默认为mindspore.dtype.int8，可选输入及含义如下：
 
-    |  weight_dtype  | mindspore.dtype.int8（默认）  | mindspore.dtype.float_  |
+    |  weight_quant_dtype  | mindspore.dtype.int8（默认）  | None  |
     |  ----  | ----  | ----  |
     | 含义  | 将权重量化成int8 | 不进行权重量化 |
-    * `kvcache_dtype`:mindspore.dtype类型，默认为mindspore.dtype.float_，可选输入及含义如下：
+    * `kvcache_quant_dtype`:mindspore.dtype类型，默认为None，可选输入及含义如下：
 
-    |  kvcache_dtype  | mindspore.dtype.int8  | mindspore.dtype.float_（默认）  |
+    |  kvcache_quant_dtype  | mindspore.dtype.int8  | None（默认）  |
     |  ----  | ----  | ----  |
     | 含义  | 将kvcache量化成int8 | 不进行kvcache量化 |
 * 新增 `OmniQuantConfig` 类，用于配置OmniQuant的algo_args。

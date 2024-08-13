@@ -81,7 +81,8 @@ class LinearQuant(PTQCell):
 
     def convert(self, backend=BackendTarget.NONE, is_deploy=False):
         weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
-                    self._weight_quantizer.get_attr("weight_only_quant", False)
+                      self._policy.get_config().weight_quant_dtype == dtype.int8 and \
+                      self._policy.get_config().act_quant_dtype is None
         all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
                     isinstance(self._input_quantizer, LinearFakeQuantizer)
         if not all_quant and not weight_only:

@@ -45,7 +45,7 @@ def quant_network(net: LlamaForCausalLM, net_helper, mode=PTQMode.QUANTIZE, back
     """Quant llama2 model to w8a16 with RTN algorithm."""
     start_time = time.time()
     logger.info("Use SmoothQuant algo to quant network and weight.")
-    cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2", "lm_head"], act_dtype=msdtype.int8)
+    cfg = PTQConfig(mode=mode, backend=backend, opname_blacklist=["w2", "lm_head"], act_quant_dtype=msdtype.int8)
     ptq = SQ(config=cfg)
     logger.info(f'Create PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
