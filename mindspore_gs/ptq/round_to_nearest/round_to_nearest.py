@@ -175,7 +175,8 @@ class RoundToNearest(CompAlgo):
             for _, ds_item in enumerate(ds.create_dict_iterator()):
                 logger.info(f"Calibrating, kvcache obs phase: dataset count: {data_count}/{total_count}")
                 input_ids = ds_item['input_ids'].asnumpy()
-                output = network_helper.generate(network, input_ids)
+                output = network_helper.generate(network, input_ids,
+                                                 max_new_tokens=self._config.kvcache_calibrate_max_new_tokens)
                 data_count += 1
                 tokenizer = network_helper.create_tokenizer()
                 if tokenizer is not None:
