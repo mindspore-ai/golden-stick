@@ -80,11 +80,11 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         self.weight_quantizer_min_max_axis = 0 if self.weight_quantizer_axis else 1
         weight_observer_axis = 1 if self._handler.matmul.transpose_b else 0
         self.observer_min_max_axis = 0 if weight_observer_axis else 1
-        self._weight_signed = cfg.weight_dtype == dtype.int8
+        self._weight_signed = cfg.weight_quant_dtype == dtype.int8
         self.weight_quant_min, self.weight_quant_max = get_quant_min_max(num_bits=8,
                                                                          signed=self._weight_signed,
                                                                          narrow_range=cfg.weight_narrow_range)
-        if cfg.act_dtype == dtype.int8:
+        if cfg.act_quant_dtype == dtype.int8:
             self._act_signed = True
             self.act_quant_min, self.act_quant_max = get_quant_min_max(num_bits=8,
                                                                        signed=self._act_signed,
@@ -141,7 +141,7 @@ class SQLinearWrapper(MinMaxLinearWrapper):
         """quant weight"""
         self._weight_observer()
         weight = self._clip_weight(self._handler.weight, self.pre_clip_ratio)
-        if self.cfg.act_dtype == dtype.int8:
+        if self.cfg.act_quant_dtype == dtype.int8:
             if isinstance(self.observer_x, list):
                 self.observer_x = msops.cat(tuple(self.observer_x))
             smooth_scale = self._calc_smooth_scale()
@@ -166,7 +166,7 @@ class SQLinearWrapper(MinMaxLinearWrapper):
                                                        symmetric=self._weight_symmetric)
         weight = quant_tensor_data(weight, w_scale.asnumpy().squeeze(), w_zp.asnumpy().squeeze(),
                                    self.weight_quant_min, self.weight_quant_max, self.weight_quantizer_axis)
-        if self.cfg.act_dtype == dtype.int8:
+        if self.cfg.act_quant_dtype == dtype.int8:
             quant_bias = None
             if self._handler.has_bias:
                 quant_bias = quant_bias_data(self._handler.bias, msops.mul(w_scale, x_scale).asnumpy())
@@ -318,7 +318,7 @@ class SQLinearDeploy(Cell):
         weight = msops.ones(linear.weight.shape)
         quant_bias = None
 
-        if self.cfg.act_dtype == dtype.int8:
+        if self.cfg.act_quant_dtype == dtype.int8:
             qmm = AllQuantMatmul(smooth_scale, x_scale, x_zp, w_scale,
                                  weight, quant_bias, transpose_b=self._handler.transpose_b)
             self._handler.has_bias = False

@@ -106,9 +106,9 @@ class PTQConfig:
     Raises:
         ValueError: If `mode` is not in PTQMode's members.
         ValueError: If `backend` is not in BackendTarget's members.
-        ValueError: If `weight_dtype` is not mindspore.dtype.int8 or mindspore.dtype.float_.
-        ValueError: If `kvcache_dtype` is not mindspore.dtype.int8 or mindspore.dtype.float_.
-        ValueError: If `act_dtype` is not mindspore.dtype.int8 or mindspore.dtype.float_.
+        ValueError: If `weight_quant_dtype` is not mindspore.dtype.int8 or None.
+        ValueError: If `kvcache_quant_dtype` is not mindspore.dtype.int8 or None.
+        ValueError: If `act_quant_dtype` is not mindspore.dtype.int8 or None.
         TypeError: if `opname_blacklist` is not a list of str.
 
     Example:
@@ -121,21 +121,21 @@ class PTQConfig:
     backend: BackendTarget = BackendTarget.ASCEND
     opname_blacklist: List[str] = field(default_factory=list)
     algo_args: Union[dict, dataclass] = field(default_factory=dict)
-    weight_dtype: msdtype = msdtype.int8
-    kvcache_dtype: msdtype = msdtype.float_
-    act_dtype: msdtype = msdtype.float_
+    weight_quant_dtype: msdtype = msdtype.int8
+    kvcache_quant_dtype: msdtype = None
+    act_quant_dtype: msdtype = None
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():
             raise ValueError(f'mode shall be in {PTQMode.__members__.values()}')
         if self.backend not in BackendTarget.__members__.values():
             raise ValueError(f'backend shall be in {BackendTarget.__members__.values()}')
-        if self.weight_dtype != msdtype.int8 and self.weight_dtype != msdtype.float_:
-            raise ValueError(f'self.weight_dtype: {self.weight_dtype} is not mindspore.dtype.int8 or mindspore.dtype.float_.')
-        if self.kvcache_dtype != msdtype.int8 and self.kvcache_dtype != msdtype.float_:
-            raise ValueError(f'self.kvcache_dtype: {self.kvcache_dtype} is not mindspore.dtype.int8 or mindspore.dtype.float_.')
-        if self.act_dtype != msdtype.int8 and self.act_dtype != msdtype.float_:
-            raise ValueError(f'self.act_dtype: {self.act_dtype} is not mindspore.dtype.int8 or mindspore.dtype.float_.')
+        if self.weight_quant_dtype != msdtype.int8 and self.weight_quant_dtype is not None:
+            raise ValueError(f'self.weight_quant_dtype: {self.weight_quant_dtype} is not mindspore.dtype.int8 or None.')
+        if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_dtype is not None:
+            raise ValueError(f'self.kvcache_quant_dtype: {self.kvcache_quant_dtype} is not mindspore.dtype.int8 or None.')
+        if self.act_quant_dtype != msdtype.int8 and self.act_quant_dtype is not None:
+            raise ValueError(f'self.act_quant_dtype: {self.act_quant_dtype} is not mindspore.dtype.int8 or None.')
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
@@ -171,6 +171,8 @@ class MSDTypeLoader(YamlLoader):
         }
 
     def __call__(self, src: str):
+        if src == "None":
+            return None
         ms_dtype = self.dtype_dict.get(src, None)
         if not ms_dtype:
             raise ValueError(f"Unrecognized dtype: {src}")
@@ -206,12 +208,12 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
-        if self.approach is PTQApproach.RTN and self.act_dtype == msdtype.int8:
-            raise ValueError(f"{self.approach} is not support act_dtype == mindspore.dtype.int8.")
-        if self.approach is PTQApproach.RTN and self.weight_dtype == msdtype.int8 and self.kvcache_dtype == msdtype.int8:
-            raise ValueError(f"weight_dtype and kvcache_dtype are mindspore.dtype.int8, {self.approach} isn't supported.")
-        if self.approach is PTQApproach.RTN and self.weight_dtype == msdtype.float_ and self.kvcache_dtype == msdtype.float_:
-            raise ValueError(f"weight_dtype and kvcache_dtype are mindspore.dtype.float_, {self.approach} can't take effect.")
+        if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8:
+            raise ValueError(f"{self.approach} is not support act_quant_dtype == mindspore.dtype.int8.")
+        if self.approach is PTQApproach.RTN and self.weight_quant_dtype == msdtype.int8 and self.kvcache_quant_dtype == msdtype.int8:
+            raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, {self.approach} isn't supported.")
+        if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
+            raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
         if not self.algo_args:
             args_config = algo_cfg_register[self.approach]
             if args_config is not None and is_dataclass(args_config):
@@ -224,9 +226,9 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
         parsed_dict['opname_blacklist'] = self.opname_blacklist
-        parsed_dict['kvcache_dtype'] = str(self.kvcache_dtype)
-        parsed_dict['weight_dtype'] = str(self.weight_dtype)
-        parsed_dict['act_dtype'] = str(self.act_dtype)
+        parsed_dict['kvcache_quant_dtype'] = str(self.kvcache_quant_dtype)
+        parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
+        parsed_dict['act_quant_dtype'] = str(self.act_quant_dtype)
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
@@ -243,9 +245,9 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('mode', PTQMode),
             ('backend', BackendTarget),
             ('approach', PTQApproach),
-            ('kvcache_dtype', MSDTypeLoader()),
-            ('weight_dtype', MSDTypeLoader()),
-            ('act_dtype', MSDTypeLoader())
+            ('kvcache_quant_dtype', MSDTypeLoader()),
+            ('weight_quant_dtype', MSDTypeLoader()),
+            ('act_quant_dtype', MSDTypeLoader())
         ]
         for item in unparse_list:
             update_dict(*item)

@@ -15,7 +15,6 @@
 """RTNLayerPolicy for mindformers layers."""
 
 from mindspore.nn import Cell
-from mindspore import dtype as msdtype
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import logger
@@ -31,13 +30,13 @@ class LinearLayerPolicy(RTNLayerPolicy):
     def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
         super().__init__(weight_names, act_names, config)
         self.set_input_number(1)
-        if config.act_dtype == msdtype.float_:
+        if config.act_quant_dtype is None:
             self.set_input_not_insert_fq()
             self.set_output_not_insert_fq()
         self.is_deploy = config.mode == PTQMode.DEPLOY
 
     def wrap_cell(self, handler) -> Cell:
-        if self._config.weight_dtype == msdtype.float_:
+        if self._config.weight_quant_dtype is None:
             return None
         if self.is_deploy:
             return LinearDeploy(handler, self)
@@ -56,7 +55,7 @@ class PagedAttentionMgrPolicy(RTNLayerPolicy):
         logger.info(f"PagedAttentionMgr Quant conifg: {config}.")
 
     def wrap_cell(self, handler) -> Cell:
-        if self._config.kvcache_dtype == msdtype.float_:
+        if self._config.kvcache_quant_dtype is None:
             return None
         if self.is_deploy:
             if self.enable_deploy_fusion:

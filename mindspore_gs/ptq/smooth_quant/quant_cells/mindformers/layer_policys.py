@@ -47,7 +47,7 @@ class LinearLayerPolicy(SQLayerPolicy):
         return perchannel_observer
 
     def wrap_cell(self, handler) -> Cell:
-        if self._config.weight_dtype != msdtype.int8 or self._config.act_dtype != msdtype.int8:
+        if self._config.weight_quant_dtype != msdtype.int8 or self._config.act_quant_dtype != msdtype.int8:
             return None
         if self._is_deploy:
             return SQLinearDeploy(handler, self, self._config)

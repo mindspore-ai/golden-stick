@@ -71,17 +71,17 @@ def test_ptq_config_construct():
     with pytest.raises(TypeError):
         _ = PTQConfig(opname_blacklist=["1", 1])
     with pytest.raises(ValueError):
-        _ = PTQConfig(weight_dtype=["1"])
+        _ = PTQConfig(weight_quant_dtype=["1"])
     with pytest.raises(ValueError):
-        _ = PTQConfig(weight_dtype=msdtype.float16)
+        _ = PTQConfig(weight_quant_dtype=msdtype.float16)
     with pytest.raises(ValueError):
-        _ = PTQConfig(kvcache_dtype=["1"])
+        _ = PTQConfig(kvcache_quant_dtype=["1"])
     with pytest.raises(ValueError):
-        _ = PTQConfig(kvcache_dtype=msdtype.float16)
+        _ = PTQConfig(kvcache_quant_dtype=msdtype.float16)
     with pytest.raises(ValueError):
-        _ = PTQConfig(act_dtype=["1"])
+        _ = PTQConfig(act_quant_dtype=["1"])
     with pytest.raises(ValueError):
-        _ = PTQConfig(act_dtype=msdtype.float16)
+        _ = PTQConfig(act_quant_dtype=msdtype.float16)
 
 
 @pytest.mark.level0
@@ -96,11 +96,11 @@ def test_inner_ptq_config():
     with pytest.raises(ValueError):
         _ = InnerPTQConfig(approach='no_such_approach')
     with pytest.raises(ValueError):
-        _ = InnerPTQConfig(approach=PTQApproach.RTN, act_dtype=msdtype.int8)
+        _ = InnerPTQConfig(approach=PTQApproach.RTN, act_quant_dtype=msdtype.int8)
     with pytest.raises(ValueError):
-        _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_dtype=msdtype.float_, kvcache_dtype=msdtype.float_)
+        _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_quant_dtype=None, kvcache_quant_dtype=None)
     with pytest.raises(ValueError):
-        _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_dtype=msdtype.int8, kvcache_dtype=msdtype.int8)
+        _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8)
 
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     assert cfg.approach == PTQApproach.SMOOTH_QUANT
@@ -169,17 +169,17 @@ def test_ptq_yaml_dump_and_load():
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.weight_symmetric = False
     cfg.enable_deploy_fusion = True
-    cfg.weight_dtype = msdtype.float_
-    cfg.kvcache_dtype = msdtype.int8
-    cfg.act_dtype = msdtype.int8
+    cfg.weight_quant_dtype = None
+    cfg.kvcache_quant_dtype = msdtype.int8
+    cfg.act_quant_dtype = msdtype.int8
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
     assert new_cfg.weight_symmetric is False
     assert new_cfg.enable_deploy_fusion is True
-    assert new_cfg.kvcache_dtype is msdtype.int8
-    assert new_cfg.weight_dtype is msdtype.float_
-    assert new_cfg.act_dtype is msdtype.int8
+    assert new_cfg.kvcache_quant_dtype is msdtype.int8
+    assert new_cfg.weight_quant_dtype is None
+    assert new_cfg.act_quant_dtype is msdtype.int8
 
 
 @pytest.mark.level0
@@ -194,11 +194,11 @@ def test_ptq_yaml_parse_unparse():
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
-    new_cfg.act_dtype = msdtype.uint8
-    new_cfg.weight_dtype = msdtype.uint8
+    new_cfg.act_quant_dtype = msdtype.uint8
+    new_cfg.weight_quant_dtype = msdtype.uint8
     new_cfg.load('my_cfg.yaml')
-    assert new_cfg.act_dtype == msdtype.float_
-    assert new_cfg.weight_dtype == msdtype.int8
+    assert new_cfg.act_quant_dtype is None
+    assert new_cfg.weight_quant_dtype == msdtype.int8
 
 
 @pytest.mark.level0

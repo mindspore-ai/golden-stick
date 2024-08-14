@@ -118,7 +118,7 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
     context.set_context(device_target="Ascend", mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     inner_cfg = InnerPTQConfig.inner_config(cfg)
-    inner_cfg.act_dtype = dtype.int8
+    inner_cfg.act_quant_dtype = dtype.int8
 
     pre_clip_ratio = 1.0
     post_clip_ratio = 1.0
@@ -185,7 +185,7 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
     pre_clip_weight_np = np.clip(fp_weight, quantizer_w_min_np, quantizer_w_max_np)
     assert np.allclose(pre_clip_weight.asnumpy(), pre_clip_weight_np, 0, 0)
 
-    if inner_cfg.act_dtype == dtype.int8:
+    if inner_cfg.act_quant_dtype == dtype.int8:
         # 4. calc smooth scale
         ## sq linear
         sq_linear_wrapper.observer_x = msops.cat(tuple(sq_linear_wrapper.observer_x))
@@ -275,7 +275,7 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
     assert np.isclose(w_zp.asnumpy(), w_zp_np, 0, 1e-7).all()
 
     # 13. weight quant
-    if inner_cfg.act_dtype == dtype.int8:
+    if inner_cfg.act_quant_dtype == dtype.int8:
         ## sq linear
         weight_quant = quant_tensor_data(post_clip_weight, w_scale.asnumpy().squeeze(),
                                          w_zp.asnumpy().squeeze(), -128, 127, weight_axis)
@@ -293,7 +293,7 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
     assert np.isclose(weight_quant.asnumpy(), weight_quant_np, 0, 1).all()
 
     # 14. quant matmul
-    if inner_cfg.act_dtype == dtype.int8:
+    if inner_cfg.act_quant_dtype == dtype.int8:
         #pylint: disable=protected-access
         if sq_linear_wrapper._handler.has_bias:
             ## sq linear

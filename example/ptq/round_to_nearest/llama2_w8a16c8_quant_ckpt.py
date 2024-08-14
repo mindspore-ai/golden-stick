@@ -51,7 +51,8 @@ def quant_network(net: LlamaForCausalLM, network_helper, backend=BackendTarget.A
             raise ValueError("Please provide `ds_path` for calibrating.")
         if not ds_type:
             raise ValueError("Please provide `ds_type` for calibrating.")
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_dtype=msdtype.float_, kvcache_dtype=msdtype.int8)
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=None,
+                        kvcache_quant_dtype=msdtype.int8)
         bs_ = network_helper.get_spec('batch_size')
         seq_ = network_helper.get_spec('seq_length')
         max_decode_length = network_helper.get_spec('max_decode_length')
