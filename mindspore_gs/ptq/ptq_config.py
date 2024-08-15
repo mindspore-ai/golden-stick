@@ -102,14 +102,22 @@ class PTQConfig:
             ``ASCEND`` for ascend backend.
         opname_blacklist (List[str]): Blacklist of opname. Layers in network with name fuzzy matched with this blacklist
             will not being quanted.
+        algo_args (Union[dict, dataclass]): Used to configure hyperparameters of algorithms such as RTN, SmoothQuant,
+            and OmniQuant.
+        act_quant_dtype (mindspore.dtype): Used to configure the quantization type of activation. mindspore.dtype.int8
+            indicates that the activation is quantized by 8 bits, and None indicates that it is not quantized.
+        weight_quant_dtype (mindspore.dtype): Used to configure the quantization type of weight. mindspore.dtype.int8
+            indicates that the weight is quantized by 8 bits, and None indicates that it is not quantized.
+        kvcache_quant_dtype (mindspore.dtype): Used to configure the quantization type of kvcache. mindspore.dtype.int8
+            indicates that the kvcache is quantized by 8 bits, and None indicates that it is not quantized.
 
     Raises:
-        ValueError: If `mode` is not in PTQMode's members.
-        ValueError: If `backend` is not in BackendTarget's members.
+        ValueError: If `mode` is not PTQMode.QUANTIZE or PTQMode.DEPLOY.
+        ValueError: If `backend` is not BackendTarget.NONE or BackendTarget.ASCEND.
+        TypeError: if `opname_blacklist` is not a list of str.
         ValueError: If `weight_quant_dtype` is not mindspore.dtype.int8 or None.
         ValueError: If `kvcache_quant_dtype` is not mindspore.dtype.int8 or None.
         ValueError: If `act_quant_dtype` is not mindspore.dtype.int8 or None.
-        TypeError: if `opname_blacklist` is not a list of str.
 
     Example:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
