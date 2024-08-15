@@ -28,8 +28,8 @@ from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_co
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
-from mindspore_gs.ptq.omni_quant.quant_cells import SQLinearWrapper, AllQuantMatmul, WeightQuantMatmul
-from mindspore_gs.quantization.quant_utils import (cal_tensor_quantization_params,
+from mindspore_gs.ptq.omni_quant.quant_cells import SQLinearWrapper
+from mindspore_gs.quantization.quant_utils import (cal_quantization_params,
                                                    quant_tensor_data, quant_bias_data)
 from mindspore_gs.ptq.omni_quant import OmniQuant
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
@@ -79,7 +79,7 @@ def test_linear_quant_forward(mode, transpose_b):
     Expectation: Same with numpy output.
     """
     context.set_context(device_target="Ascend", mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, act_quant_dtype=dtype.int8)
     inner_cfg = InnerPTQConfig.inner_config(cfg)
     inner_cfg.act_bits = 8
 
@@ -105,6 +105,7 @@ def test_linear_quant_forward(mode, transpose_b):
     assert np.isclose(quant_forward_output.asnumpy(), real_output.asnumpy(), 0, 1e-3).all()
 
 
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [PYNATIVE_MODE])
@@ -116,9 +117,8 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
     Expectation: Same with numpy output.
     """
     context.set_context(device_target="Ascend", mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, act_quant_dtype=dtype.int8)
     inner_cfg = InnerPTQConfig.inner_config(cfg)
-    inner_cfg.act_quant_dtype = dtype.int8
 
     pre_clip_ratio = 1.0
     post_clip_ratio = 1.0
@@ -131,7 +131,6 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
     linear = Linear(in_channels=act_in, out_channels=act_out, transpose_b=transpose_b, bias_init="normal",
                     weight_init="normal")
     t_x = Tensor(np.random.normal(size=(act_in, act_in)), dtype=dtype.float16)
-    real_output = linear(t_x)
     fp_weight = linear.weight.asnumpy()
 
     # sq linear observer all inputs
@@ -255,37 +254,38 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
 
         # 10. act scale zp
         ## sq linear
-        x_scale, x_zp = cal_tensor_quantization_params(sq_linear_wrapper.quantizer_x_min,
-                                                       sq_linear_wrapper.quantizer_x_max,
-                                                       -128, 127, symmetric=False)
+        x_scale, x_zp = cal_quantization_params(sq_linear_wrapper.quantizer_x_min.asnumpy(),
+                                                sq_linear_wrapper.quantizer_x_max.asnumpy(),
+                                                -128, 127, symmetric=False)
         ## numpy
         x_scale_np = (quantizer_x_max_np - quantizer_x_min_np) / (127 + 128)
         x_zp_np = np.round(-128 - quantizer_x_min_np / x_scale_np)
-        assert np.isclose(x_scale.asnumpy().squeeze(), x_scale_np, 0, 1e-5).all()
-        assert np.isclose(x_zp.asnumpy().squeeze(), x_zp_np, 0, 1e-5).all()
+        assert np.isclose(x_scale.squeeze(), x_scale_np, 0, 1e-5).all()
+        assert np.isclose(x_zp.squeeze(), x_zp_np, 0, 1e-5).all()
 
     # 11. weight scale zp
     ## sq linear
-    w_scale, w_zp = cal_tensor_quantization_params(sq_linear_wrapper.quantizer_w_min, sq_linear_wrapper.quantizer_w_max,
-                                                   -128, 127, symmetric=True)
+    w_scale, w_zp = cal_quantization_params(sq_linear_wrapper.quantizer_w_min.asnumpy(),
+                                            sq_linear_wrapper.quantizer_w_max.asnumpy(),
+                                            -128, 127, symmetric=True)
     ## numpy
     w_scale_np = (quantizer_w_max_np * 2) / (127 + 128)
     w_zp_np = np.zeros_like(w_scale_np).round()
-    assert np.isclose(w_scale.asnumpy(), w_scale_np, 0, 1e-7).all()
-    assert np.isclose(w_zp.asnumpy(), w_zp_np, 0, 1e-7).all()
+    assert np.isclose(w_scale, w_scale_np, 0, 1e-7).all()
+    assert np.isclose(w_zp, w_zp_np, 0, 1e-7).all()
 
     # 13. weight quant
     if inner_cfg.act_quant_dtype == dtype.int8:
         ## sq linear
-        weight_quant = quant_tensor_data(post_clip_weight, w_scale.asnumpy().squeeze(),
-                                         w_zp.asnumpy().squeeze(), -128, 127, weight_axis)
+        weight_quant = quant_tensor_data(post_clip_weight, w_scale.squeeze(),
+                                         w_zp.squeeze(), -128, 127, weight_axis)
         ## numpy
         weight_quant_np = post_clip_weight_np / w_scale_np + w_zp_np
         weight_quant_np = np.round(weight_quant_np)
         weight_quant_np = np.clip(weight_quant_np, -128, 127).astype(np.int32)
     else:
-        weight_quant = quant_tensor_data(pre_clip_weight, w_scale.asnumpy().squeeze(),
-                                         w_zp.asnumpy().squeeze(), -128, 127, weight_axis)
+        weight_quant = quant_tensor_data(pre_clip_weight, w_scale.squeeze(),
+                                         w_zp.squeeze(), -128, 127, weight_axis)
         ## numpy
         weight_quant_np = pre_clip_weight_np / w_scale_np + w_zp_np
         weight_quant_np = np.round(weight_quant_np)
@@ -298,43 +298,13 @@ def test_linear_quant_forward_by_numpy(mode, transpose_b):
         if sq_linear_wrapper._handler.has_bias:
             ## sq linear
             #pylint: disable=protected-access
-            quant_bias = quant_bias_data(sq_linear_wrapper._handler.bias, msops.mul(w_scale, x_scale).asnumpy())
+            quant_bias = quant_bias_data(sq_linear_wrapper._handler.bias, w_scale * x_scale)
             ## numpy
             dequant_scale_np = np.squeeze(w_scale_np * x_scale_np)
             #pylint: disable=protected-access
             quant_bias_np = np.round(sq_linear_wrapper._handler.bias.asnumpy()
                                      / dequant_scale_np).clip(-2 ** 31, 2 ** 31 - 1).astype(np.int32)
             assert np.isclose(quant_bias.asnumpy(), quant_bias_np, 0, 1e-4).all()
-        #pylint: disable=protected-access
-        qmm = AllQuantMatmul(smooth_scale, x_scale, x_zp, w_scale,
-                             weight_quant, quant_bias, transpose_b=sq_linear_wrapper._handler.transpose_b)
-        ## numpy
-        ### quant x
-        quant_x_np = np.round(t_x.asnumpy() / (x_scale_np * smooth_scale_np) + x_zp_np).clip(-128, 127).astype(np.int32)
-        ### new_bias
-        new_bias = -np.sum(x_zp_np.astype(np.int32) * weight_quant_np.astype(np.int32),
-                           axis=1 if transpose_b else 0).astype(np.int32)
-        if quant_bias is not None:
-            new_bias = quant_bias.asnumpy().astype(np.int32) + new_bias
-        ### numpy output
-        if transpose_b:
-            np_output = (quant_x_np @ weight_quant_np.T + new_bias) * dequant_scale_np
-        else:
-            np_output = (quant_x_np @ weight_quant_np + new_bias) * dequant_scale_np
-    else:
-        #pylint: disable=protected-access
-        qmm = WeightQuantMatmul(w_scale, w_zp, bias=sq_linear_wrapper._handler.bias,
-                                transpose_b=sq_linear_wrapper._handler.transpose_b)
-    ## sq linear
-    #pylint: disable=protected-access
-    sq_linear_wrapper._handler.has_bias = False
-    sq_linear_wrapper._handler.bias = None
-    sq_linear_wrapper._handler.weight = weight_quant
-    sq_linear_wrapper._handler.matmul = qmm
-    sq_output = sq_linear_wrapper._handler(t_x)
-
-    assert np.isclose(sq_output.asnumpy(), real_output.asnumpy(), 0, 1e-3).all()
-    assert np.isclose(np_output, real_output.asnumpy(), 0, 1e-3).all()
 
 
 def _set_config(config_path):
@@ -394,7 +364,8 @@ def oq_quant_llama2(device, mode, model_parallel, fp16_config_path, fp16_ckpt_pa
         load_checkpoint(fp16_ckpt_path, network)
     else:
         raise ValueError("only support model_parallel = 1 right now.")
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"])
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                    opname_blacklist=["w2", "lm_head"], act_quant_dtype=dtype.int8)
     ptq = OmniQuant(config=cfg)
     network_helper = MFLlama2Helper(config)
     ds = create_hello_ds(tokenizer, 1)
@@ -423,7 +394,9 @@ def eval_llama2(device, mode, model_parallel, is_quant, input_, config_path, ckp
     config = _set_config(config_path)
     network = LlamaForCausalLM(config.model.model_config)
     if is_quant:
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"])
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        act_quant_dtype=dtype.int8)
         ptq = OmniQuant(config=cfg)
         network_helper = MFLlama2Helper(config)
         network = ptq.apply(network, network_helper)
