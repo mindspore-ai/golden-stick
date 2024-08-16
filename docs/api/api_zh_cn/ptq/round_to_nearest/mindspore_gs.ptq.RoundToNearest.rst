@@ -12,18 +12,20 @@ mindspore_gs.ptq.RoundToNearest
         - **TypeError** - `config` 在输入不为 ``None`` 时，元素类型不为 PTQConfig。
         - **ValueError** - `config` 中的 `backend` 不是BackendTarget.ASCEND。
 
-    .. py:method:: apply(network: Cell, network_helper: NetworkHelper = None)
+    .. py:method:: apply(network: Cell, network_helper: NetworkHelper = None, datasets: Dataset = None)
 
         将 `network` 中添加伪量化节点，转换成一个伪量化网络。
 
         参数：
             - **network** (Cell) - 待伪量化的网络。
             - **network_helper** (NetworkHelper) - 网络量化工具，用于解耦算法层和网络框架层。
+            - **datasets** (Dataset) - 校准用的数据集。
         
         异常：
             - **RuntimeError** - 如果当前算法没有有效的初始化。
             - **TypeError** - `network` 不是一个 `Cell` 对象。
             - **TypeError** - `network_helper` 不为空且不是一个 `NetworkHelper` 对象。
+            - **ValueError** - 当kvcache_quant_dtype `mindspore.int8` 时 `network_helper` 为空。
 
         返回：
             伪量化后的网络。

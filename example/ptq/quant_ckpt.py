@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Quant llama2 7b to w8a16."""
+"""Quant network."""
 import os
 import argparse
 import time
@@ -24,6 +24,9 @@ from mindformers import LlamaForCausalLM
 from mindspore_gs.ptq import PTQMode, PTQConfig
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
+from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
+from mindspore_gs.ptq.ptq import PTQ
+from mindspore_gs.ptq.omni_quant import OmniQuant as OQ
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 
@@ -32,7 +35,7 @@ def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
-    parser.add_argument('--approach', '-a', type=str, required=True, help="Available: w8a16, c8")
+    parser.add_argument('--approach', '-a', type=str, required=True, help="Available: w8a16, w8a8, c8, ptq, omni_quant")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
     args = parser.parse_args()
@@ -40,19 +43,48 @@ def get_args():
     return args
 
 
-def quant_network(net: LlamaForCausalLM, network_helper, backend=BackendTarget.ASCEND, approach='w8a16', ds_path='',
-                  ds_type=''):
-    """Quant llama2 model to w8a16 with RTN algorithm."""
+def create_ptq(approach, backend=BackendTarget.ASCEND):
+    """Create ptq algorithm."""
     start_time = time.time()
-    ds = None
     if approach == 'c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
-        if not ds_path:
-            raise ValueError("Please provide `ds_path` for calibrating.")
-        if not ds_type:
-            raise ValueError("Please provide `ds_type` for calibrating.")
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=None,
                         kvcache_quant_dtype=msdtype.int8)
+        ptq = RTN(config=cfg)
+    elif approach == 'w8a8':
+        logger.info("Use SmoothQuant(W8A8) algo to quant network and weight.")
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
+                        act_quant_dtype=msdtype.int8)
+        ptq = SQ(config=cfg)
+    elif approach == 'w8a16':
+        logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["lm_head"])
+        ptq = RTN(config=cfg)
+    elif approach == 'ptq':
+        logger.info("Use ptq algo to quant network and weight.")
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
+                        algo_args={'enable_smooth': True})
+        ptq = PTQ(config=cfg)
+    elif approach == 'omni_quant':
+        logger.info("Use omni quant algo to quant network and weight.")
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
+                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8)
+        ptq = OQ(config=cfg)
+    else:
+        raise ValueError(f"uargs.approach = {uargs.approach} is unexpected, "
+                         "Available: w8a16, w8a8, c8, ptq, omni_quant.")
+    logger.info(f'Create quantizer cost time is {time.time() - start_time} s.')
+    return ptq
+
+
+def create_ds(network_helper, ds_path, ds_type, approach):
+    """Create datasets."""
+    if approach in ['w8a8', 'c8', 'ptq', 'omni_quant']:
+        start_time = time.time()
+        if not ds_path:
+            raise ValueError(f"Please provide dataset_path when approach is {approach}.")
+        if not ds_type:
+            raise ValueError(f"Please provide dataset_type when approach is {approach}.")
         bs_ = network_helper.get_spec('batch_size')
         seq_ = network_helper.get_spec('seq_length')
         max_decode_length = network_helper.get_spec('max_decode_length')
@@ -60,45 +92,43 @@ def quant_network(net: LlamaForCausalLM, network_helper, backend=BackendTarget.A
         tokenizer = network_helper.create_tokenizer()
         ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
                           False, n_samples=200)
-    else:
-        logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["lm_head"])
-    ptq = RTN(config=cfg)
-    logger.info(f'Create RoundToNearest and datasets cost time is {time.time() - start_time} s.')
+        logger.info(f'Create datasets cost time is {time.time() - start_time} s.')
+        return ds
+    return None
+
+
+def quant_net(net: LlamaForCausalLM, network_helper, ptq, ds):
+    """Quant network with algorithm."""
+    quant_start = time.time()
+    logger.info('Quantize-ing network...')
     start_time = time.time()
-    net = ptq.apply(net, network_helper, ds)
+    ptq.apply(net, network_helper, ds)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
     net.phase = "quant_convert"
-    net = ptq.convert(net)
+    ptq.convert(net)
     logger.info(f'Convert to real quantize cost time is {time.time() - start_time} s.')
+    logger.info(f'Quant Network cost total time is {time.time() - quant_start} s.')
     return net
 
 
 if __name__ == "__main__":
-    start = time.time()
     uargs = get_args()
-    if uargs.approach not in ['w8a16', 'c8']:
-        raise ValueError("uargs.approach = {} is unexpected, Available: w8a16, c8.".format(uargs.approach))
-    if uargs.approach == "c8" and (uargs.dataset_path is None or uargs.dataset_type is None):
-        raise ValueError("Please provide dataset_path and dataset_type in args when uargs.approach is c8.")
-    logger.info('Creating network...')
+    algo = create_ptq(approach=uargs.approach)
     helper = MFLlama2Helper(uargs.config_path)
-    network = helper.create_network()
-    config = helper.mf_config
-    logger.info(f'Create Network cost time is {time.time() - start} s.')
-    logger.info('Quantize-ing network...')
+    datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     start = time.time()
-    network = quant_network(network, helper, backend=BackendTarget.ASCEND, approach=uargs.approach,
-                            ds_path=uargs.dataset_path, ds_type=uargs.dataset_type)
-    logger.info(f'Quant Network cost time is {time.time() - start} s.')
+    logger.info('Creating network...')
+    network = helper.create_network()
+    logger.info(f'Create Network cost time is {time.time() - start} s.')
+    network = quant_net(network, helper, algo, datasets)
     logger.info('Saving checkpoint...')
     start = time.time()
     try:
         rank_id = get_rank()
     except RuntimeError:
         rank_id = 0
-    save_ckpt_path = os.path.join(config.output_dir, f"{uargs.approach}_ckpt")
+    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{uargs.approach}_ckpt")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),

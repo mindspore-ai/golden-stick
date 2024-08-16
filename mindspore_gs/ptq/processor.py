@@ -41,17 +41,20 @@ class Processor(abc.ABC):
         return root
 
 
-def network_replace(network: Cell, src_layer: type, dst_layer_fn: callable, opname_blacklist: list):
+def network_replace(network: Cell, src_layer: type, dst_layer: type, dst_layer_fn: callable, opname_blacklist: list,
+                    network_root_name="root"):
     """network replace"""
     class Replacer(Processor):
         """A network iterator for one-to-one sub-cell replace."""
         def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
             if not isinstance(cell, src_layer):
                 return cell, False
+            if dst_layer and isinstance(cell, dst_layer):
+                return cell, True
             for opname in opname_blacklist:
                 if opname in cell_name:
                     return cell, True
-            dst_layer = dst_layer_fn(cell_name, cell)
-            return dst_layer, True
+            new_dst_layer = dst_layer_fn(cell_name, cell)
+            return new_dst_layer, True
 
-    Replacer().process(network)
+    Replacer().process(network, network_root_name)

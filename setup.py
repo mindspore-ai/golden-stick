@@ -104,6 +104,7 @@ setup(
     install_requires=[
         'numpy >= 1.17.0',
         'scipy >= 1.5.2',
+        'pyyaml>=6.0',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

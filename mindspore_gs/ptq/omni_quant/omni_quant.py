@@ -23,6 +23,7 @@ from mindspore import ops as msops
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
+from mindspore_gs.common.utils import offload_network
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.ptq.processor import network_replace
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach
@@ -74,10 +75,11 @@ class OmniQuant(CompAlgo):
         if self._is_deploy:
             layers = network_helper.get_decoder_layers(network)
             for i in range(len(layers)):
-                layer = layers[i]
+                _, layer = layers[i]
                 _, _, linears = network_helper.get_linears(layer)
                 sq_linear_deploy_creator = partial(SQLinearDeploy, cfg=self._config)
-                network_replace(layer, type(linears[0]), sq_linear_deploy_creator, self._config.opname_blacklist)
+                network_replace(layer, type(linears[0]), SQLinearDeploy, sq_linear_deploy_creator,
+                                self._config.opname_blacklist)
             network.update_parameters_name()
             return network
 
@@ -88,11 +90,12 @@ class OmniQuant(CompAlgo):
         all_kwargs = catcher.kwargs
         layers = network_helper.get_decoder_layers(network)
         for i in tqdm.tqdm(range(len(layers)), desc="Running OmniQuant..."):
-            layer = layers[i]
+            _, layer = layers[i]
             _, _, linears = network_helper.get_linears(layer)
             linear_type = type(linears[0])
             sq_linear_wrapper_creator = partial(SQLinearWrapper, cfg=self._config)
-            network_replace(layer, linear_type, sq_linear_wrapper_creator, self._config.opname_blacklist)
+            network_replace(layer, linear_type, SQLinearWrapper, sq_linear_wrapper_creator,
+                            self._config.opname_blacklist)
             _, _, linears = network_helper.get_linears(layer)
 
             layer.add_flags_recursive(infer_mode="observer_x")
@@ -169,7 +172,7 @@ class OmniQuant(CompAlgo):
     def _get_first_layer_input(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs):
         """get first layer input"""
         layers = network_helper.get_decoder_layers(network)
-        catcher = InputCatcher(layers[0])
+        catcher = InputCatcher(layers[0][1])
 
         def replace_first_decoder(root: Cell, src: Cell, dst: Cell):
             if root is None:
@@ -180,7 +183,7 @@ class OmniQuant(CompAlgo):
                     return
                 replace_first_decoder(cell, src, dst)
 
-        replace_first_decoder(network, layers[0], catcher)
+        replace_first_decoder(network, layers[0][1], catcher)
         if not ds:
             raise ValueError("OmniQuant need dataset to calibrate, please provide dataset.")
         ds_count = kwargs.get("ds_count", None)
@@ -202,7 +205,7 @@ class OmniQuant(CompAlgo):
                 data_count += 1
                 continue
         replace_first_decoder(network, catcher, catcher.handler)
-        network_helper.offload_embedding(network)
+        offload_network(network)
         return catcher, network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:

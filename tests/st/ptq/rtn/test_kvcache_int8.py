@@ -164,7 +164,7 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
         ptq = RTN(config=cfg)
         net_helper = MFLlama2HelloNetworkHelper(config)
         ds = create_hello_ds(tokenizer, 1)
-        network = ptq.apply(network, net_helper, ds=ds)
+        network = ptq.apply(network, net_helper, datasets=ds)
         network = ptq.convert(network)
         if model_parallel == 1:
             save_checkpoint(network.parameters_dict(), w8a16c8_ckpt_path, integrated_save=False)

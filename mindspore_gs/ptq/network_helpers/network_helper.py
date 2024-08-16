@@ -12,11 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+
 """Network helper base class."""
 
-
+import enum
+from dataclasses import dataclass
 import numpy as np
 from mindspore.nn import Cell
+
+
+class LayerType(enum.Enum):
+    UNKNOWN = 0
+    NORM_LAYER = 1
+    LINEAR_LAYER = 2
+    CONCAT_LINEAR_LAYER = 3
+
+
+@dataclass
+class LayerInfo:
+    name: str = ""
+    layer: Cell = None
+    type_: LayerType = LayerType.UNKNOWN
+
+
+class DecoderGroupInfo:
+    """DecoderGroupInfo."""
+    def __init__(self, name, decoder, **kwargs):
+        self.decoder: LayerInfo = LayerInfo(name, decoder)
+        self.qkv_concat: bool = kwargs.get("qkv_concat", False)
+        self.ffn_concat: bool = kwargs.get("ffn_concat", False)
+        self.attention_norm: LayerInfo = kwargs.get("attention_norm", None)
+        self.attention: LayerInfo = kwargs.get("attention", None)
+        self.qkv_mm: LayerInfo = kwargs.get("qkv_mm", None)
+        self.q_mm: LayerInfo = kwargs.get("q_mm", None)
+        self.k_mm: LayerInfo = kwargs.get("k_mm", None)
+        self.v_mm: LayerInfo = kwargs.get("v_mm", None)
+        self.o_mm: LayerInfo = kwargs.get("o_mm", None)
+        self.ffn_norm: LayerInfo = kwargs.get("ffn_norm", None)
+        self.ffn: LayerInfo = kwargs.get("ffn", None)
+        self.gate_hidden_mm: LayerInfo = kwargs.get("gate_hidden_mm", None)
+        self.gate_mm: LayerInfo = kwargs.get("gate_mm", None)
+        self.hidden_mm: LayerInfo = kwargs.get("hidden_mm", None)
+        self.w2_mm: LayerInfo = kwargs.get("w2_mm", None)
 
 
 class NetworkHelper:
@@ -113,7 +150,7 @@ class NetworkHelper:
 
         Examples:
             >>> import numpy as np
-            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
             >>> from mindformers.tools.register.config import MindFormerConfig
             >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
             >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
@@ -135,11 +172,11 @@ class NetworkHelper:
             network (Cell): Network to get decoder layers.
 
         Returns:
-            A list of `Cell` as decoder layers of network.
+            A list of tuple of (cell_name, `Cell`) as decoder layers of network.
 
         Examples:
             >>> from mindspore import context
-            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
             >>> from mindformers import LlamaForCausalLM, LlamaConfig
             >>> from mindformers.tools.register.config import MindFormerConfig
             >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
@@ -148,27 +185,6 @@ class NetworkHelper:
             >>> helper = MFLlama2Helper(mfconfig)
             >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
             >>> decoder_layers = helper.get_decoder_layers(network)
-        """
-        raise NotImplementedError
-
-    def offload_embedding(self, network):
-        """
-        Offload embedding tensor to host.
-
-        Args:
-            network (Cell): Network to be offloaded.
-
-        Examples:
-            >>> from mindspore import context
-            >>> from mindspore_gs.ptq import MFLlama2Helper
-            >>> from mindformers import LlamaForCausalLM, LlamaConfig
-            >>> from mindformers.tools.register.config import MindFormerConfig
-            >>> context.set_context(mode=context.PYNATIVE_MODE, device_target="Ascend")
-            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
-            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
-            >>> helper = MFLlama2Helper(mfconfig)
-            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
-            >>> helper.offload_embedding(network)
         """
         raise NotImplementedError
 
@@ -184,7 +200,7 @@ class NetworkHelper:
 
         Examples:
             >>> from mindspore import context
-            >>> from mindspore_gs.ptq import MFLlama2Helper
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
             >>> from mindformers import LlamaForCausalLM, LlamaConfig
             >>> from mindformers.tools.register.config import MindFormerConfig
             >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
