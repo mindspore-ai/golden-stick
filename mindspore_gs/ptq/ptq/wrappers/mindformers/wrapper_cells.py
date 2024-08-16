@@ -17,17 +17,12 @@
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperLinearCell
-from mindspore_gs.ptq.network_helpers import NetworkHelper, LayerType
+from mindspore_gs.ptq.network_helpers import LayerType
 
 
 class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
-    def __init__(self, linear_name: str, linear: Linear, cfg: InnerPTQConfig, net_helper: NetworkHelper):
-        super().__init__(linear_name, linear, cfg)
-        self.net_helper = net_helper
-
     def _calc_smooth_scale(self, alpha):
         """_calc_smooth_scale"""
         act_max = msops.maximum(msops.abs(msops.min(self.cat_samples, 0)[0]),
@@ -114,9 +109,16 @@ class SmoothLinearCell(WrapperLinearCell):
         super(SmoothLinearCell, self).process()
         self.smooth(self.cfg.algo_args.get('alpha', 0.5))
 
+    def deploy(self):
+        logger.info("Take back Linear from SmoothQuantLinearCell.")
+        return self._linear
+
 
 class QuantLinearCell(WrapperLinearCell):
     """QuantLinearCell"""
-    def __init__(self, linear_name: str, linear: Linear, cfg: InnerPTQConfig, net_helper: NetworkHelper):
-        super().__init__(linear_name, linear, cfg)
-        self.net_helper = net_helper
+
+    def process(self):
+        raise NotImplementedError
+
+    def deploy(self):
+        raise NotImplementedError

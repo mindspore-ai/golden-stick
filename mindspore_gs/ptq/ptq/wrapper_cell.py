@@ -14,27 +14,35 @@
 # ============================================================================
 """ptq wrapper cell base class."""
 
+import abc
 from mindspore.nn import Cell
 from mindspore import ops as msops
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 
-class WrapperCell(Cell):
+class WrapperCell(abc.ABC, Cell):
     """WrapperCell"""
     def __init__(self, cfg: InnerPTQConfig):
         super().__init__()
         self.cfg = cfg
 
+    @abc.abstractmethod
     def process(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def deploy(self):
         raise NotImplementedError
 
 
 class WrapperLinearCell(WrapperCell):
     """WrapperLinearCell"""
-    def __init__(self, linear_name: str, linear, cfg: InnerPTQConfig):
+    def __init__(self, linear_name: str, linear, cfg: InnerPTQConfig, network_helper: NetworkHelper):
         super().__init__(cfg)
         self._linear_name = linear_name
         self._linear = linear
+        self.net_helper = network_helper
         self.samples = []
         self.cat_samples = None
 
@@ -51,6 +59,10 @@ class WrapperLinearCell(WrapperCell):
             raise RuntimeError(f"Please catch matmul inputs before quantization.")
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)
         self.samples.clear()
+
+    @abc.abstractmethod
+    def deploy(self):
+        raise NotImplementedError
 
     def construct(self, x, **kwargs):
         """construct"""
