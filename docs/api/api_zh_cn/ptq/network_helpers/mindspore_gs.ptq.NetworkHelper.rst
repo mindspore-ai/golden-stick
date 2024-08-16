@@ -57,7 +57,7 @@ mindspore_gs.ptq.NetworkHelper
             - **network** (Cell) - 要获取decoder层的网络。
 
         返回：
-            一个列表，表示获取到的decoder层。
+            一个元组的列表，表示获取到的decoder层及其名称。
 
     .. py:method:: get_linears(self, decoder: Cell)
 

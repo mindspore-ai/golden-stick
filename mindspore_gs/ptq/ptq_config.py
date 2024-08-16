@@ -36,6 +36,7 @@ class PTQApproach(Enum):
     RTN = 'rtn'
     GPTQ = 'gptq'
     OMNI_QUANT = 'omni_quant'
+    PTQ = 'ptq'
 
 
 class PTQMode(Enum):
@@ -70,6 +71,16 @@ class OmniQuantConfig:
                              f"but got pre_clip_ratio: {type(self.pre_clip_ratio)},"
                              f"post_clip_ratio: {type(self.post_clip_ratio)},"
                              f"smooth_alpha: {type(self.smooth_alpha)}.")
+
+
+@algo_cfg_register.register(PTQApproach.PTQ)
+@dataclass
+class PTQQuantConfig:
+    """config for omni quant algorithm"""
+    enable_smooth: bool = False
+
+    def __post_init__(self):
+        value_check('enable_smooth', self.enable_smooth, bool)
 
 
 @algo_cfg_register.register(PTQApproach.SMOOTH_QUANT)

@@ -191,7 +191,7 @@ def load_distribut_checkpoint(config, ckpt_path, network):
 class MFLlama2HelloNetworkHelper(MFLlama2Helper):
     """SimpleNetworkHelper"""
 
-    def generate(self, mf_network, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
+    def generate(self, mf_network, input_ids, max_new_tokens=1):
         do_sample = self.mf_config.model.model_config.do_sample
         seq = self.mf_config.model.model_config.seq_length
         top_p = self.mf_config.model.model_config.top_p
@@ -445,8 +445,10 @@ def relative_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, toleranc
     """Calculate relative tolerance and check."""
     diff = relative_tolerance(data, ground)
     max_diff = np.max(diff)
-    logger.error(f"relative_tolerance: \r\n{diff}, \r\nmax: {max_diff}")
-    return max_diff < tolerance
+    ret = max_diff < tolerance
+    if not ret:
+        logger.error(f"relative_tolerance: \r\n{diff}, \r\nmax: {max_diff}")
+    return ret
 
 
 def absolute_tolerance(data: np.ndarray, ground: np.ndarray):
@@ -458,5 +460,7 @@ def absolute_tolerance_acceptable(data: np.ndarray, ground: np.ndarray, toleranc
     """Calculate relative tolerance and check."""
     diff = absolute_tolerance(data, ground)
     max_diff = np.max(diff)
-    logger.error(f"absolute_tolerance: \r\n{diff}, \r\nmax: {max_diff}")
-    return max_diff < tolerance
+    ret = max_diff < tolerance
+    if not ret:
+        logger.error(f"absolute_tolerance: \r\n{diff}, \r\nmax: {max_diff}")
+    return ret

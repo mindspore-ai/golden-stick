@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Network helpers."""
+"""algorithms"""
 
-from .network_helper import NetworkHelper, DecoderGroupInfo, LayerInfo, LayerType
+from .anti_outliers import LinearSmoother

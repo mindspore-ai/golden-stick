@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-
 """
 util functions for golden-stick
 """
+
+from mindspore import nn
 
 
 def value_check(name, src, supported_type, value_choices=None):
@@ -47,3 +48,9 @@ def list_value_check(name, src, item_supported_type, value_choices=None):
         if isinstance(src, list) and all([isinstance(i, str) for i in src])\
                 and any([i not in value_choices for i in src]):
             raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
+
+
+def offload_network(network: nn.Cell):
+    for _, param in network.parameters_dict().items():
+        # pylint: disable=protected-access
+        param._offload()

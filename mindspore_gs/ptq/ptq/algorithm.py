@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Network helpers."""
+"""Algorithm base class."""
 
-from .network_helper import NetworkHelper, DecoderGroupInfo, LayerInfo, LayerType
+from mindspore_gs.ptq.network_helpers import NetworkHelper
+
+
+class Algorithm:
+    """Algorithm"""
+    def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
+        """process"""
+        raise NotImplementedError

@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Network helpers."""
+"""Wrapper cells for PTQ for MindFormers."""
 
-from .network_helper import NetworkHelper, DecoderGroupInfo, LayerInfo, LayerType
+from mindformers import Linear
+from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother
+from .wrapper_cells import SmoothLinearCell
+
+LinearSmoother.reg_linear_map(Linear, SmoothLinearCell)

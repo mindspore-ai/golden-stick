@@ -21,6 +21,7 @@ from typing import Tuple
 import numpy as np
 
 from mindspore.nn import Cell
+from mindspore.dataset import Dataset
 from mindspore import dtype as msdtype
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.common import logger
@@ -104,18 +105,20 @@ class RoundToNearest(CompAlgo):
         return value
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: Dataset = None) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
         Args:
             network (Cell): Network to be fake quantized.
             network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
+            datasets (Dataset): Datasets for calibrating.
 
         Raises:
             RuntimeError: If RoundToNearest is not well inited.
             TypeError: If input `network` is not a Cell.
             TypeError: If input `network_helper` is not None and is not a NetworkHelper.
+            ValueError: if `network_helper` is None when kvcache_quant_dtype is `mindspore.int8`.
 
         Returns:
             fake quantized network.
@@ -165,14 +168,14 @@ class RoundToNearest(CompAlgo):
         if network_helper and self._config.kvcache_quant_dtype != msdtype.int8:
             bs = network_helper.get_spec("batch_size") if network_helper.get_spec("batch_size") else 1
             network_helper.generate(network, input_ids=np.ones([bs, 1], dtype=np.int32))
-        if ds and self._config.kvcache_quant_dtype == msdtype.int8:
+        if datasets and self._config.kvcache_quant_dtype == msdtype.int8:
             if not network_helper:
                 raise ValueError("Please provide network_helper when datasets is given for calibrating.")
-            total_count = ds.get_dataset_size()
+            total_count = datasets.get_dataset_size()
             os.environ['NETWORK_PHASE'] = "kvcacheobs"
             network.phase = "prefill_kvcacheobs"
             data_count = 1
-            for _, ds_item in enumerate(ds.create_dict_iterator()):
+            for _, ds_item in enumerate(datasets.create_dict_iterator()):
                 logger.info(f"Calibrating, kvcache obs phase: dataset count: {data_count}/{total_count}")
                 input_ids = ds_item['input_ids'].asnumpy()
                 output = network_helper.generate(network, input_ids,
