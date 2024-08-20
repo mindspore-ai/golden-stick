@@ -13,8 +13,15 @@
 # limitations under the License.
 # ============================================================================
 """Algorithm base class."""
+import warnings
 
+from typing import Tuple
+
+from mindspore.nn import Cell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
+from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.common import logger
+from .wrapper_cell import WrapperCell
 
 
 class Algorithm:
@@ -22,3 +29,23 @@ class Algorithm:
     def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
         """process"""
         raise NotImplementedError
+
+    def deploy(self, decoder_layer_name, decoder_layer):
+        """deploy"""
+        class Deployer(Processor):
+            """A network iterator for transform fq-network to quant-network."""
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, WrapperCell):
+                    return cell, False
+                deploy_cell = cell.deploy()
+                logger.info(f"convert {cell_name} to real-quant cell({id(deploy_cell)}).")
+                nonlocal changed
+                changed = True
+                return deploy_cell, True
+
+        changed = False
+        Deployer().process(decoder_layer, decoder_layer_name)
+        if not changed:
+            warn_str = "No layer found in network is suitable for quantization, please check network and " \
+                       "opname_blacklist, and make sure call apply before convert."
+            warnings.warn(warn_str, RuntimeWarning)

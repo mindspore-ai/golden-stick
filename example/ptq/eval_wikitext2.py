@@ -61,7 +61,8 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     logger.info('Creating network...')
-    os.environ.pop("RUN_MODE")
+    if "RUN_MODE" in os.environ:
+        os.environ.pop("RUN_MODE")
     config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False
     if uargs.network == "LlamaForCasualLM":

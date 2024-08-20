@@ -14,7 +14,7 @@
 # ============================================================================
 """PTQ algorithm."""
 from typing import List
-
+import time
 import os
 import tqdm
 from mindspore.nn import Cell
@@ -76,24 +76,35 @@ class PTQ(CompAlgo):
             raise ValueError("Please provide network_helper when omni quant in apply phase.")
         if not ds:
             raise ValueError("please provide dataset when use omni quant to quantize network.")
-
+        start_time = time.time()
         logger.info("Analysis network structure.")
         network_helper.analysis_decoder_groups(network)
-
+        logger.info(f"analysis_decoder_groups time cost {time.time() - start_time}")
+        start_time = time.time()
         logger.info(f"Catching inputs for first decoder layer with {ds.get_dataset_size()} samples from datasets.")
         catcher, network = PTQ._get_first_layer_input(network, network_helper, ds)
         all_args = catcher.args
         all_kwargs = catcher.kwargs
+        logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
+        start_time = time.time()
         layers = network_helper.get_decoder_layers(network)
+        logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
         for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ..."):
             logger.info(f"Quantize {i}th decoder layer.")
             layer_name, layer = layers[i]
             for processor in self.pipeline:
+                start_time = time.time()
                 processor.process(layer_name, layer, all_args, all_kwargs, network_helper)
+                processor.deploy(layer_name, layer)
+                network.update_parameters_name()
+                logger.info(f"{i}th layer smooth time cost {time.time() - start_time}")
+            start_time = time.time()
             for args, kwargs in zip(all_args, all_kwargs):
                 args[0] = layer(*args, **kwargs)
-            network.update_parameters_name()
-            offload_network(network)
+            logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
+            start_time = time.time()
+            offload_network(layer)
+            logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
     @staticmethod
