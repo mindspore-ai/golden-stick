@@ -77,9 +77,10 @@ class OmniQuant(CompAlgo):
             for i in range(len(layers)):
                 _, layer = layers[i]
                 _, _, linears = network_helper.get_linears(layer)
+                linear_type = [type(linears[k]) for k in range(len(linears))]
                 sq_linear_deploy_creator = partial(SQLinearDeploy, cfg=self._config)
-                network_replace(layer, type(linears[0]), SQLinearDeploy, sq_linear_deploy_creator,
-                                self._config.opname_blacklist)
+                network_replace(layer, tuple(linear_type), SQLinearDeploy,
+                                sq_linear_deploy_creator, self._config.opname_blacklist)
             network.update_parameters_name()
             return network
 
@@ -92,10 +93,10 @@ class OmniQuant(CompAlgo):
         for i in tqdm.tqdm(range(len(layers)), desc="Running OmniQuant..."):
             _, layer = layers[i]
             _, _, linears = network_helper.get_linears(layer)
-            linear_type = type(linears[0])
+            linear_type = [type(linears[k]) for k in range(len(linears))]
             sq_linear_wrapper_creator = partial(SQLinearWrapper, cfg=self._config)
-            network_replace(layer, linear_type, SQLinearWrapper, sq_linear_wrapper_creator,
-                            self._config.opname_blacklist)
+            network_replace(layer, tuple(linear_type), SQLinearWrapper,
+                            sq_linear_wrapper_creator, self._config.opname_blacklist)
             _, _, linears = network_helper.get_linears(layer)
 
             layer.add_flags_recursive(infer_mode="observer_x")

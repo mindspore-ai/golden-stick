@@ -28,7 +28,7 @@ from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.omni_quant import OmniQuant as OQ
 from mindspore_gs.datasets import get_datasets
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
 
 def get_args():
@@ -38,6 +38,7 @@ def get_args():
     parser.add_argument('--approach', '-a', type=str, required=True, help="Available: w8a16, w8a8, c8, ptq, omni_quant")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
+    parser.add_argument('--network', '-n', type=str, required=True)
     args = parser.parse_args()
     logger.info(f"quant args: {args}")
     return args
@@ -115,7 +116,10 @@ def quant_net(net: LlamaForCausalLM, network_helper, ptq, ds):
 if __name__ == "__main__":
     uargs = get_args()
     algo = create_ptq(approach=uargs.approach)
-    helper = MFLlama2Helper(uargs.config_path)
+    if uargs.network == "LlamaForCasualLM":
+        helper = MFLlama2Helper(uargs.config_path)
+    elif uargs.network == "ParallelLlamaForCasualLM":
+        helper = MFParallelLlama2Helper(uargs.config_path)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     start = time.time()
     logger.info('Creating network...')
@@ -132,6 +136,6 @@ if __name__ == "__main__":
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),
-                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
+                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
     logger.info(f'Checkpoint saved to {save_path}...')

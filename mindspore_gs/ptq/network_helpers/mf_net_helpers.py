@@ -22,7 +22,8 @@ from collections import OrderedDict
 import numpy as np
 import mindspore as ms
 from mindspore import dtype as mstype
-from mindspore import Tensor, Model, nn
+from mindspore import Tensor, Model, set_context, nn
+from mindspore.communication.management import init
 from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
 from mindformers.models.modeling_utils import PreTrainedModel
 from mindformers.models.build_tokenizer import build_tokenizer
@@ -31,6 +32,10 @@ from mindformers.modules import Linear
 from mindformers.models.llama import LlamaForCausalLM, LlamaModel
 from mindformers.models.llama.llama_transformer import LLamaDecodeLayer, LLamaAttention
 from mindformers.models.llama.llama_layer import LlamaFeedForward, LlamaRMSNorm
+from mindformers.experimental.llama_demo import (ParallelLlamaForCausalLM, ParallelLlamaModel,
+                                                 ParallelLlamaTransformerLayer, ParallelLlamaAttention,
+                                                 ParallelLlamaMLPWithGate)
+from mindformers.experimental.distri_cores.create_comm import initialize_model_parallel
 from mindspore_gs.common.utils import value_check
 from .network_helper import NetworkHelper, DecoderGroupInfo, LayerInfo, LayerType
 from ..processor import Processor
@@ -351,3 +356,86 @@ class MFLlama2Helper(MFNetworkHelper):
         if pre_layer:
             return pre_layer
         return MFLlama2Helper._get_pre_layer_for_ffn(linear_name, decoder_info)
+
+class MFParallelLlama2Helper(MFLlama2Helper):
+    """
+    Derived from 'NetworkHelper', a utility class for the MindFormers framework ParrallelLlamaForCasualLM network.
+
+    Args:
+        config (MindFormerConfig): A MindFormerConfig object indicates the network configuration.
+
+    Raises:
+        TypeError: If input `config` is not an instance of `MindFormerConfig`.
+
+    Examples:
+        >>> from mindspore_gs.ptq import MFParallelLlama2Helper
+        >>> from mindformers.tools.register.config import MindFormerConfig
+        >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+        >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+        >>> helper = MFParallelLlama2Helper(mfconfig)
+        >>> network = helper.create_network()
+        >>> decoder_layers = helper.get_decoder_layers(network)
+        >>> linears = helper.get_linears(decoder_layers[0][1])
+    """
+    def create_network(self):
+        """
+        Create network of type ParallelLlamaForCasualLM.
+
+        Returns:
+            Network of type ParallelLlamaForCasualLM.
+        """
+        init()
+        initialize_model_parallel(tp_size=self.mf_config.parallel_config.model_parallel, order='tp')
+        set_context(mode=self.mf_config.context.mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
+        network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
+        network.set_train(False)
+        network.phase = 'predict'
+        transform_and_load_checkpoint(self.mf_config, None, network, None)
+        return network
+
+    def get_decoder_layers(self, network: ParallelLlamaForCausalLM):
+        """
+        Get decoder layers from network.
+
+        Args:
+            network (ParallelLlamaForCausalLM): Network to get decoder layers.
+
+        Returns:
+            A list of tuple of (cell_name, `Cell`) as decoder layers and names.
+        """
+        value_check('network', network, ParallelLlamaForCausalLM)
+        model: ParallelLlamaModel = network.model
+        layers = []
+        for i, layer in enumerate(model.layers):
+            layers.append((f"root.model.layers.{i}", layer))
+        return layers
+
+    def get_linears(self, decoder_layer: ParallelLlamaTransformerLayer):
+        """
+        Get linear layers from decoder layer.
+
+        Args:
+            decoder_layer (ParallelLlamaTransformerLayer): Decoder layer to get linear layers.
+
+        Returns:
+            A list of `Cell` as linear layers of decoder layer.
+        """
+        attention: ParallelLlamaAttention = decoder_layer.attention
+        if not isinstance(attention, ParallelLlamaAttention):
+            raise RuntimeError(f"Only support ParallelLlamaAttention as attention but got {attention}")
+        qkv_concat = (attention.attn_type == "self_attn")
+        ffn: ParallelLlamaMLPWithGate = decoder_layer.feed_forward
+        if not isinstance(ffn, ParallelLlamaMLPWithGate):
+            raise RuntimeError(f"Only support ParallelLlamaMLPWithGate as FFN but got {ffn}")
+        ffn_concat = True
+        linears = []
+        if qkv_concat:
+            linears.extend([attention.w_qkv, attention.wo])
+        else:
+            linears.extend([attention.wq, attention.wk, attention.wv, attention.wo])
+
+        if ffn_concat:
+            linears.extend([ffn.w_gate_hidden, ffn.w2])
+        else:
+            linears.extend([ffn.w1, ffn.w3, ffn.w2])
+        return qkv_concat, ffn_concat, linears

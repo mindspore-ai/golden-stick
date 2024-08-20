@@ -27,8 +27,9 @@
     |  ----  | ----  | ----  |
     | meanings  | quantize kvcache to int8 | does not quantize kvcache |
 * Added `OmniQuantConfig` class for configuring algo_args of OmniQuant algorithm.
-* Added `get_decoder_layer`, `get_linears` method to `NetworkHelper` class to obtain the decoder layer of network and the linear layer of sub-cell. Added `offload_embedding` method to release memory.
+* Added `get_decoder_layer`, `get_linears` method to `NetworkHelper` class to obtain the decoder layer of network and the linear layer of sub-cell.
 * Added implementation of `get_decoder_layer` , `get_linears` and `offload_embedding` of `MFLlama2Helper` to work with the Llama2 series models in MindFormers.
+* Added `MFParallelLlama2Helper` class to work with the ParallelLlamaForCasualLM model in Mindformers. Added implementation of `create_network` to create ParallelLlamaForCasualLM model. Added implementation of `get_decoder_layer` and `get_linears` to obtain the decoder layer of network and linear layer of decoder.
 
 ### Contributors
 

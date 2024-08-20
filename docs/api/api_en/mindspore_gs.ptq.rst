@@ -37,6 +37,7 @@ NetworkHelper
 
     mindspore_gs.ptq.NetworkHelper
     mindspore_gs.ptq.MFLlama2Helper
+    mindspore_gs.ptq.MFParallelLlama2Helper
 
 RoundToNearest Algorithm
 --------------------------------

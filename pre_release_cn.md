@@ -27,8 +27,9 @@
     |  ----  | ----  | ----  |
     | 含义  | 将kvcache量化成int8 | 不进行kvcache量化 |
 * 新增 `OmniQuantConfig` 类，用于配置OmniQuant的algo_args。
-* `NetworkHelper` 类新增 `get_decoder_layer` 、 `get_linears` 方法用于获取网络的decoder层及sub-cell的linear层；新增 `offload_embedding` 接口释放tensor占用的显存。
+* `NetworkHelper` 类新增 `get_decoder_layer` 、 `get_linears` 方法用于获取网络的decoder层及sub-cell的linear层。
 * `MFLlama2Helper`新增上述三个接口的实现，适配MindFormers中的llama2系列模型。
+* 新增`MFParallelLlama2Helper`类，适配MindFormers中的ParallelLlamaForCasualLM模型。该类中实现`create_network`接口来创建网络，实现`get_decoder_layer`和`get_linears`接口来获取网络的decoder层和linear层。
 
 ### 贡献者
 

@@ -21,7 +21,7 @@ from mindformers.core.metric import PerplexityMetric
 from mindformers import MindFormerConfig
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_wikitext_dataset
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
 
 def evaluate(net, dataset_path, net_helper):
@@ -51,6 +51,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
+    parser.add_argument('--network', '-n', type=str, required=True)
     args = parser.parse_args()
     logger.info(f"evaluate args: {args}")
     return args
@@ -63,7 +64,10 @@ if __name__ == "__main__":
     os.environ.pop("RUN_MODE")
     config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False
-    helper = MFLlama2Helper(config)
+    if uargs.network == "LlamaForCasualLM":
+        helper = MFLlama2Helper(uargs.config_path)
+    elif uargs.network == "ParallelLlamaForCasualLM":
+        helper = MFParallelLlama2Helper(uargs.config_path)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     evaluate(network, uargs.dataset_path, helper)
