@@ -16,7 +16,9 @@
 from typing import List
 import time
 import os
+import copy
 import tqdm
+from mindspore import dtype
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
@@ -25,7 +27,7 @@ from mindspore_gs.common.utils import offload_network
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, PTQMode
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from .algorithm import Algorithm
-from .algorithms import LinearSmoother
+from .algorithms import LinearSmoother, Quantizer, Deployer
 
 
 class InputCatcher(Cell):
@@ -62,15 +64,33 @@ class PTQ(CompAlgo):
         self.build_pipeline()
 
     def build_pipeline(self):
-        if self._config.algo_args.get('enable_smooth'):
-            logger.info("Adding LinearSmoother to pipeline.")
-            LinearSmoother.load_mindformers_plugin()
-            self.pipeline.append(LinearSmoother(self._config))
+        """build pipline"""
+        if self._config.mode == PTQMode.QUANTIZE:
+            if self._config.outliers_suppression == 'smooth':
+                logger.info("Adding LinearSmoother to pipeline.")
+                LinearSmoother.load_mindformers_plugin()
+                self.pipeline.append(LinearSmoother(self._config))
+            if self._config.act_quant_dtype == dtype.int8 or \
+                self._config.weight_quant_dtype == dtype.int8 or \
+                    self._config.kvcache_quant_dtype == dtype.int8:
+                logger.info("Adding Quantizer to pipeline.")
+                Quantizer.load_mindformers_plugin()
+                self.pipeline.append(Quantizer(self._config))
+        elif self._config.mode == PTQMode.DEPLOY:
+            logger.info("Adding Deploy to pipeline.")
+            Deployer.load_mindformers_plugin()
+            self.pipeline.append(Deployer(self._config))
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
         """Apply"""
         if self._config.mode == PTQMode.DEPLOY:
+            layers = network_helper.get_decoder_layers(network)
+            for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ Deploy..."):
+                layer_name, layer = layers[i]
+                for processor in self.pipeline:
+                    processor.process(layer_name, layer, None, None, network_helper)
+                    network.update_parameters_name()
             return network
         if not network_helper:
             raise ValueError("Please provide network_helper when omni quant in apply phase.")
@@ -92,16 +112,17 @@ class PTQ(CompAlgo):
         for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ..."):
             logger.info(f"Quantize {i}th decoder layer.")
             layer_name, layer = layers[i]
-            for processor in self.pipeline:
-                start_time = time.time()
-                processor.process(layer_name, layer, all_args, all_kwargs, network_helper)
-                processor.deploy(layer_name, layer)
-                network.update_parameters_name()
-                logger.info(f"{i}th layer smooth time cost {time.time() - start_time}")
             start_time = time.time()
+            cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             for args, kwargs in zip(all_args, all_kwargs):
                 args[0] = layer(*args, **kwargs)
-            logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
+            logger.info(f"{i}th layer get net next layer input time cost {time.time() - start_time}")
+            for processor in self.pipeline:
+                start_time = time.time()
+                processor.process(layer_name, layer, cur_args, cur_kwargs, network_helper)
+                processor.deploy(layer_name, layer)
+                network.update_parameters_name()
+                logger.info(f"{i}th layer do {type(processor)} time cost {time.time() - start_time}")
             start_time = time.time()
             offload_network(layer)
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")

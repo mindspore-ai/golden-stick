@@ -23,36 +23,22 @@ from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 class WrapperCell(abc.ABC, Cell):
     """WrapperCell"""
-    def __init__(self, cfg: InnerPTQConfig):
+    def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
         super().__init__()
         self.cfg = cfg
-
-    @abc.abstractmethod
-    def process(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def deploy(self):
-        raise NotImplementedError
-
-
-class WrapperLinearCell(WrapperCell):
-    """WrapperLinearCell"""
-    def __init__(self, linear_name: str, linear, cfg: InnerPTQConfig, network_helper: NetworkHelper):
-        super().__init__(cfg)
-        self._linear_name = linear_name
-        self._linear = linear
+        self._layer_name = layer_name
+        self._layer = layer
         self.net_helper = network_helper
         self.samples = []
         self.cat_samples = None
 
     @property
-    def linear(self):
-        return self._linear
+    def layer(self):
+        return self._layer
 
     @property
-    def linear_name(self):
-        return self._linear_name
+    def layer_name(self):
+        return self._layer_name
 
     def process(self):
         if not self.samples:
@@ -73,7 +59,7 @@ class WrapperLinearCell(WrapperCell):
                 self.samples = samples
 
             def construct(self, x, weight):
-                self.samples.append(x)
+                self.samples.append(msops.squeeze(x))
                 return self.mm(x, weight)
 
         class MatmulCell(Cell):
@@ -84,7 +70,7 @@ class WrapperLinearCell(WrapperCell):
             def construct(self, *args, **kwargs):
                 return self.mm(*args, **kwargs)
 
-        self._linear.matmul = CatchInputMatmul(self._linear.matmul, self.samples)
-        output = self._linear(x, **kwargs)
-        self._linear.matmul = MatmulCell(self._linear.matmul.mm)
+        self._layer.matmul = CatchInputMatmul(self._layer.matmul, self.samples)
+        output = self._layer(x, **kwargs)
+        self._layer.matmul = MatmulCell(self._layer.matmul.mm)
         return output

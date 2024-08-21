@@ -20,26 +20,26 @@ from mindspore_gs.ptq.processor import network_replace
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
-from mindspore_gs.ptq.ptq.wrapper_cell import WrapperLinearCell
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 
 
-class LinearQuantizer(Algorithm):
-    """quanter for linear"""
+class Quantizer(Algorithm):
+    """quanter for linear and PageAttentionMgr"""
 
-    _linear_map = {}
+    _layer_map = {}
 
     def __init__(self, config=None):
         super().__init__()
         if not isinstance(config, InnerPTQConfig):
-            raise TypeError(f'Shall init LinearSmoother with InnerPTQConfig, bug got {type(config)}')
+            raise TypeError(f'Shall init Quantizer with InnerPTQConfig, bug got {type(config)}')
         self._config = config
 
     @staticmethod
-    def reg_linear_map(linear_type, quant_linear_type):
-        if not issubclass(quant_linear_type, WrapperLinearCell):
-            raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperLinearCell)}, "
-                               f"but got {quant_linear_type}.")
-        LinearQuantizer._linear_map[linear_type] = quant_linear_type
+    def reg_layer_map(layer_type, quant_layer_type):
+        if not issubclass(quant_layer_type, WrapperCell):
+            raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
+                               f"but got {quant_layer_type}.")
+        Quantizer._layer_map[layer_type] = quant_layer_type
 
     @staticmethod
     def load_mindformers_plugin():
@@ -49,15 +49,26 @@ class LinearQuantizer(Algorithm):
     def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
         """process"""
         _, _, linears = network_helper.get_linears(decoder_layer)
-        linear_type = type(linears[0])
-        logger.info("Replacing Linear with Smooth linear.")
-        quant_linear_type = LinearQuantizer._linear_map.get(linear_type)
-        if not issubclass(quant_linear_type, WrapperLinearCell):
-            raise RuntimeError(f"Not support linear type: {linear_type}.")
-        smooth_linear_creator = partial(quant_linear_type, cfg=self._config, net_helper=network_helper)
-        network_replace(decoder_layer, linear_type, quant_linear_type, smooth_linear_creator,
+        linear_type = [type(linears[k]) for k in range(len(linears))]
+        logger.info("Replacing Linear with Quant linear.")
+        quant_linear_type = Quantizer._layer_map.get(linear_type[0])
+        if not issubclass(quant_linear_type, WrapperCell):
+            raise RuntimeError(f"Not support linear type: {linear_type[0]}.")
+        quant_linear_creator = partial(quant_linear_type, cfg=self._config, network_helper=network_helper)
+        network_replace(decoder_layer, tuple(linear_type), quant_linear_type, quant_linear_creator,
                         self._config.opname_blacklist, decoder_layer_name)
         _, _, linears = network_helper.get_linears(decoder_layer)
+
+        page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
+        page_attention_mgr_type = type(page_attention_mgr)
+        quant_page_attention_mgr_type = Quantizer._layer_map.get(page_attention_mgr_type)
+        if not issubclass(quant_page_attention_mgr_type, WrapperCell):
+            raise RuntimeError(f"Not support PageAttentionMgr type: {page_attention_mgr_type}")
+        quant_page_attention_mgr_creator = partial(quant_page_attention_mgr_type,
+                                                   cfg=self._config, network_helper=network_helper)
+        network_replace(decoder_layer, page_attention_mgr_type, quant_page_attention_mgr_type,
+                        quant_page_attention_mgr_creator, self._config.opname_blacklist, decoder_layer_name)
+        page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
 
         logger.info("Catching inputs of all Linear in current decoder layer.")
         for j in range(len(args_list)):
@@ -65,10 +76,11 @@ class LinearQuantizer(Algorithm):
             cur_kwargs = kwargs_list[j]
             decoder_layer(*cur_args, **cur_kwargs)
 
+        logger.info("Start quantizer Linear...")
         for linear in linears:
             if isinstance(linear, quant_linear_type):
-                logger.info(f"Quantize Linear {linear.linear_name}")
+                logger.info(f"Quantize Linear {linear.layer_name}")
                 linear.process()
-        logger.info("Take back Linear from SmoothQuantLinearCell.")
-        get_out = lambda cell_name, cell: cell.linear
-        network_replace(decoder_layer, quant_linear_type, None, get_out, [])
+
+        logger.info("Start quantizer KV Cache...")
+        page_attention_mgr.process()
