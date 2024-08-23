@@ -93,10 +93,11 @@ class PTQ(CompAlgo):
                 layer_name, layer = layers[i]
                 for processor in self.pipeline:
                     processor.process(layer_name, layer, None, None, network_helper)
+                    processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
         if not ds:
-            raise ValueError("please provide dataset when use omni quant to quantize network.")
+            raise ValueError("please provide dataset when use PTQ quant to quantize network.")
         start_time = time.time()
         logger.info("Analysis network structure.")
         network_helper.analysis_decoder_groups(network)

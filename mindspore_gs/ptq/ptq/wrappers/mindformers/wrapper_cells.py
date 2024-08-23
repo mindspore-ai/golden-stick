@@ -14,18 +14,18 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 import abc
-
 import numpy as np
 
 from mindspore import Parameter, Tensor, dtype
 from mindspore import ops as msops
+from mindspore.common.initializer import initializer
 from mindspore.nn import Cell
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
-from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
+from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.distri_cores.tensor_parallel.layers import (
     ColumnParallelLinear, RowParallelLinear
 )
@@ -34,10 +34,15 @@ from mindformers.experimental.distri_cores.tensor_parallel.collective_primitives
 )
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import LayerType, NetworkHelper
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params, quant_tensor_data
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
+from mindspore_gs.ptq.convert_utils import (
+    convert_to_quant_for_deploy,
+    convert_to_antiquant_for_deploy
+)
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
@@ -392,16 +397,16 @@ class DeployLinearCell(WrapperLinearCell):
         self.is_linear = isinstance(self.layer, Linear)
 
     def deploy(self):
-        return self.layer
+        return self
 
-    def construct(self, x, **kwargs):
+    def construct(self, x, *args, **kwargs):
         """linear deploy construct"""
         if self.is_linear:
             return self.layer(x)
         out_shape = x.shape[:-1] + (self.oc,)
         x = msops.reshape(x, (-1, self.ic))
         if self.is_colparallel:
-            x = self.layer(x, **kwargs)
+            x = self.layer(x, *args, **kwargs)
         if self.is_rowparallel:
             x = self.layer(x)
         x = msops.reshape(x, out_shape)
@@ -463,8 +468,251 @@ class WeightQuantMatmul(Cell):
 class QuantPageAttentionMgrCell(WrapperCell):
     """QuantPageAttentionMgrCell"""
 
+    def __init__(self, linear_name, linear, cfg, network_helper):
+        super().__init__(linear_name, linear, cfg, network_helper)
+        self.key_samples = []
+        self.value_samples = []
+        self.quantizer_key_max = None
+        self.quantizer_key_min = None
+        self.quantizer_value_max = None
+        self.quantizer_value_min = None
+        self.kvcache_symmetric = cfg.kvcache_symmetric
+        self.enable_deploy_fusion = cfg.enable_deploy_fusion
+        self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
+                                                                           signed=True,
+                                                                           narrow_range=cfg.kvcache_narrow_range)
     def process(self):
-        raise NotImplementedError
+        if not self.key_samples or not self.value_samples:
+            raise RuntimeError("Please catch ReshapeAndCache inputs before quantization.")
+        key_cat_samples = msops.cat(tuple(self.key_samples), axis=0)
+        self.quantizer_key_max = msops.max(key_cat_samples, 0)[0]
+        self.quantizer_key_min = msops.min(key_cat_samples, 0)[0]
+        key_scale, key_zp = cal_quantization_params(self.quantizer_key_min.asnumpy(), self.quantizer_key_max.asnumpy(),
+                                                    self.kvcache_quant_min,
+                                                    self.kvcache_quant_max,
+                                                    symmetric=self.kvcache_symmetric)
+        value_cat_samples = msops.cat(tuple(self.value_samples), axis=0)
+        self.quantizer_value_max = msops.max(value_cat_samples, 0)[0]
+        self.quantizer_value_min = msops.min(value_cat_samples, 0)[0]
+        value_scale, value_zp = cal_quantization_params(self.quantizer_value_min.asnumpy(),
+                                                        self.quantizer_value_max.asnumpy(),
+                                                        self.kvcache_quant_min,
+                                                        self.kvcache_quant_max,
+                                                        symmetric=self.kvcache_symmetric)
+        self.layer.key_cache = Parameter(initializer('ones', self.layer.key_cache.shape, dtype.int8),
+                                         name=self.layer.key_cache.name, requires_grad=False)
+        self.layer.value_cache = Parameter(initializer('ones', self.layer.value_cache.shape, dtype.int8),
+                                           name=self.layer.value_cache.name, requires_grad=False)
+        self._layer = QuantPageAttentionMgrDeployCell(self.layer, value_scale, value_zp, key_scale, key_zp,
+                                                      self.enable_deploy_fusion)
+        self.key_samples.clear()
+        self.value_samples.clear()
 
     def deploy(self):
-        raise NotImplementedError
+        logger.info("Take back Linear from SmoothQuantLinearCell.")
+        return self.layer
+
+    def add_hook(self):
+        pass
+
+    def remove_hook(self):
+        pass
+
+    def construct(self, x, *args, **kwargs):
+        value = args[0]
+        self.key_samples.append(msops.squeeze(x))
+        self.value_samples.append(msops.squeeze(value))
+        slot_mapping = args[1]
+        self.layer.reshape_and_cache(x, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        return self.layer.paged_attention(query, self.layer.key_cache, self.layer.value_cache, block_tables,
+                                          batch_valid_length)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
+                                                     block_tables, batch_valid_length, alibi_tensor)
+
+class QuantPageAttentionMgrDeployCell(Cell):
+    """QuantPageAttentionMgrDeployCell"""
+
+    def __init__(self, kvcache: PagedAttentionMgr, value_t_scale, value_t_zp, key_t_scale, key_t_zp,
+                 enable_deploy_fusion):
+        super().__init__()
+        self.layer = kvcache
+        self.enable_deploy_fusion = enable_deploy_fusion
+        key_t_scale = np.squeeze(key_t_scale).astype(np.float16)
+        key_t_zp = np.squeeze(key_t_zp).astype(np.float16)
+        value_t_scale = np.squeeze(value_t_scale).astype(np.float16)
+        value_t_zp = np.squeeze(value_t_zp).astype(np.float16)
+        self._key_input_quantizer = QuantCellV2(Tensor(key_t_scale, dtype=dtype.float16),
+                                                Tensor(np.array(key_t_zp).astype(np.int8), dtype=dtype.int8))
+        self._value_input_quantizer = QuantCellV2(Tensor(value_t_scale, dtype=dtype.float16),
+                                                  Tensor(np.array(value_t_zp).astype(np.int8), dtype=dtype.int8))
+        dst_type = self.layer.key_cache.dtype
+        n = kvcache.n_heads
+        d = kvcache.head_dim
+        self._key_output_quantizer = AntiQuantCell(n, d, dst_type)
+        self._value_output_quantizer = AntiQuantCell(n, d, dst_type)
+        key_t_zp = np.array(key_t_zp*-1).astype(np.float16)
+        value_t_zp = np.array(value_t_zp*-1).astype(np.float16)
+        self.key_t_zp = Parameter(Tensor(key_t_zp, dtype=dtype.float16), name="key_t_zp")
+        self.value_t_zp = Parameter(Tensor(value_t_zp, dtype=dtype.float16), name="value_t_zp")
+        self.key_t_scale = Parameter(Tensor(key_t_scale, dtype=dtype.float16), name="key_t_scale")
+        self.value_t_scale = Parameter(Tensor(value_t_scale, dtype=dtype.float16), name="value_t_scale")
+
+        t_scale_len = key_t_scale.shape[0]
+        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
+                                            value_t_scale.reshape((1, t_scale_len))))
+        self.key_value_t_scale = Parameter(Tensor(key_value_t_scale, dtype=dtype.float16), name="key_value_t_scale")
+
+        t_zp_len = value_t_zp.shape[0]
+        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
+        self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.float16), name="key_value_t_zp")
+
+    def construct(self, key, value, slot_mapping):
+        """The forward compute of KVCache for Paged Attention."""
+        key = self._key_input_quantizer(key)
+        value = self._value_input_quantizer(value)
+        self.layer.reshape_and_cache(key, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        if not self.enable_deploy_fusion:
+            kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
+            vcache = self._value_output_quantizer(self.layer.value_cache, self.value_t_zp, self.value_t_scale)
+            return self.layer.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
+        return self.layer.paged_attention(query, self.layer.key_cache, self.layer.value_cache, block_tables,
+                                          batch_valid_length, self.key_value_t_scale, self.key_value_t_zp)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of Paged Attention."""
+        if not self.enable_deploy_fusion:
+            kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
+            vcache = self._value_output_quantizer(self.layer.value_cache, self.value_t_zp, self.value_t_scale)
+            return self.layer.paged_attention_with_alibi(query, kcache, vcache, block_tables, batch_valid_length,
+                                                         alibi_tensor)
+        return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
+                                                     block_tables, batch_valid_length, self.key_value_t_scale,
+                                                     self.key_value_t_zp, alibi_tensor)
+
+class DeployPageAttentionMgrCell(WrapperCell):
+    """DeployPageAttentionMgrCell"""
+
+    def __init__(self, linear_name, linear, cfg, network_helper=None):
+        super().__init__(linear_name, linear, cfg, network_helper)
+        if not isinstance(linear, PagedAttentionMgr):
+            raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
+                             f"but {linear_name} type is {type(linear)}.")
+        self.cfg = cfg
+        self.enable_deploy_fusion = cfg.enable_deploy_fusion
+
+    def add_hook(self):
+        pass
+
+    def remove_hook(self):
+        pass
+
+    def deploy(self):
+        if self.enable_deploy_fusion:
+            return PagedAttentionDeployFusion(self.layer)
+        return PagedAttentionDeploy(self.layer)
+
+class PagedAttentionDeployBase(Cell):
+    """PagedAttention deploy base class"""
+
+    def __init__(self, kvcache: PagedAttentionMgr):
+        super().__init__()
+        self._converted = True
+        self.layer = kvcache
+        # PagedAttentionMgr's shape is BSH currently.
+        n = kvcache.n_heads
+        d = kvcache.head_dim
+        ic = n * d
+        self._key_input_quantizer = convert_to_quant_for_deploy(ic)
+        self._value_input_quantizer = convert_to_quant_for_deploy(ic)
+        self._weight_quantizer = None
+
+        self.key_t_scale = Parameter(initializer('ones', [ic], dtype.float16), name="key_t_scale", requires_grad=False)
+        self.value_t_scale = Parameter(initializer('ones', [ic], dtype.float16), name="value_t_scale",
+                                       requires_grad=False)
+        self.key_t_zp = Parameter(initializer('ones', [ic], dtype.float16), name="key_t_zp", requires_grad=False)
+        self.value_t_zp = Parameter(initializer('ones', [ic], dtype.float16), name="value_t_zp", requires_grad=False)
+
+        dst_type = self.layer.key_cache.dtype
+        self._key_output_quantizer = convert_to_antiquant_for_deploy(n, d, None, dst_type)
+        self._value_output_quantizer = convert_to_antiquant_for_deploy(n, d, None, dst_type)
+        self.layer.key_cache = Parameter(initializer('ones', self.layer.key_cache.shape, dtype.int8),
+                                         name=self.layer.key_cache.name, requires_grad=False)
+        self.layer.value_cache = Parameter(initializer('ones', self.layer.value_cache.shape, dtype.int8),
+                                           name=self.layer.value_cache.name, requires_grad=False)
+
+    def weight_quantizer(self):
+        return self._weight_quantizer
+
+    def core_construct(self, *args):
+        pass
+
+    # pylint: disable=W0221
+    def construct(self, key, value, slot_mapping):
+        """
+        Defines the computation of PagedAttentionQuant to be performed.
+
+        Returns:
+            Tensor, returns the computed result.
+        """
+        key = self._key_input_quantizer(key)
+        value = self._value_input_quantizer(value)
+        return self.layer.reshape_and_cache(key, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
+
+    @abc.abstractmethod
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        return NotImplementedError
+
+    @abc.abstractmethod
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        return NotImplementedError
+
+class PagedAttentionDeploy(PagedAttentionDeployBase):
+    """PagedAttention deploy with no fuison"""
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
+        vcache = self._value_output_quantizer(self.layer.value_cache, self.value_t_zp, self.value_t_scale)
+        return self.layer.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
+        vcache = self._value_output_quantizer(self.layer.value_cache, self.value_t_zp, self.value_t_scale)
+        return self.layer.paged_attention_with_alibi(query, kcache, vcache, block_tables, batch_valid_length,
+                                                     alibi_tensor)
+
+
+class PagedAttentionDeployFusion(PagedAttentionDeployBase):
+    """PagedAttention deploy with fuison ops."""
+
+    def __init__(self, kvcache: PagedAttentionMgr):
+        super(PagedAttentionDeployFusion, self).__init__(kvcache)
+        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.float16),
+                                        name="key_value_t_zp")
+        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.float16),
+                                           name="key_value_t_scale")
+
+    def paged_attn(self, query, batch_valid_length, block_tables):
+        """The forward compute of Paged Attention."""
+        kcache = self.layer.key_cache
+        vcache = self.layer.value_cache
+        return self.layer.paged_attention(query, kcache, vcache, block_tables, batch_valid_length,
+                                          self.key_value_t_scale, self.key_value_t_zp)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
+                                                     block_tables, batch_valid_length, self.key_value_t_scale,
+                                                     self.key_value_t_zp, alibi_tensor)

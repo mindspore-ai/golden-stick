@@ -57,6 +57,6 @@ class WrapperCell(abc.ABC, Cell):
     def deploy(self):
         raise NotImplementedError
 
-    def construct(self, x, **kwargs):
+    def construct(self, x, *args, **kwargs):
         """construct"""
-        return self._layer(x, **kwargs)
+        return self._layer(x, *args, **kwargs)

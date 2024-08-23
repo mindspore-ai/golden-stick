@@ -211,6 +211,31 @@ class NetworkHelper:
             >>> helper = MFLlama2Helper(mfconfig)
             >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
             >>> decoder_layers = helper.get_decoder_layers(network)
-            >>> linears = helper.get_linears(decoder_layers)
+            >>> linears = helper.get_linears(decoder_layers[0])
+        """
+        raise NotImplementedError
+
+    def get_page_attention_mgr(self, decoder_layer):
+        """
+        Get PageAttentionMgr layer from decoder layer.
+
+        Args:
+            decoder_layer (Cell): Decoder layer to get PageAttentionMgr layer.
+
+        Returns:
+            the PageAttentionMgr of decoder layer.
+
+        Examples:
+            >>> from mindspore import context
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+            >>> from mindformers import LlamaForCausalLM, LlamaConfig
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+            >>> decoder_layers = helper.get_decoder_layers(network)
+            >>> page_attention_mgr = helper.get_page_attention_mgr(decoder_layers[0])
         """
         raise NotImplementedError
