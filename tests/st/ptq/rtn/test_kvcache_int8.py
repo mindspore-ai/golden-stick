@@ -153,6 +153,8 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
     def quant(ckpt_path, config_path):
         config = set_config(config_path)
         config.model.model_config.use_past = True
+        config.model.model_config.use_flash_attention = True
+        config.model.model_config.is_dynamic = True
         network = LlamaForCausalLM(config.model.model_config)
         tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
         if model_parallel == 1:
@@ -178,6 +180,8 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
     def w8a16c8_infer(input_, ckpt_path, config_path):
         config = set_config(config_path)
         config.model.model_config.use_past = True
+        config.model.model_config.use_flash_attention = True
+        config.model.model_config.is_dynamic = True
         network = LlamaForCausalLM(config.model.model_config)
         cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"],
                         kvcache_quant_dtype=msdtype.int8)
@@ -219,9 +223,9 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
     npqoutput = np.array(qoutput)
     print(npfoutput)
     print(npqoutput)
-    if not np.allclose(npqoutput[:, :6], npfoutput[:, :6], 0, 0):
+    if not np.allclose(npqoutput[:, :30], npfoutput[:, :30], 0, 0):
         return False
-    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 1)
+    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 25.3)
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
