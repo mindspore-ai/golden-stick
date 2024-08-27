@@ -33,10 +33,9 @@ from mindformers.experimental.distri_cores.tensor_parallel.collective_primitives
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import LayerType
-from mindspore_gs.quantization.quant_utils import (
-    get_quant_min_max, cal_quantization_params,
-    quant_tensor_data)
+from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params, quant_tensor_data
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
+from mindspore_gs.ptq.ptq_config import PTQMode
 
 
 class SmoothLinearCell(WrapperCell):
@@ -70,9 +69,20 @@ class SmoothLinearCell(WrapperCell):
         smooth_scale[weight_max_pow == 0] = 1.0
         return smooth_scale
 
-    def _apply_smooth(self, smooth_scale):
-        """_apply_smooth"""
-        pre_layer = self.net_helper.get_pre_layer(self.layer_name)
+    def _apply_weight_smooth(self, smooth_scale: Tensor):
+        """_apply_weight_smooth"""
+        # weight * scale
+        weight_scale = msops.expand_dims(smooth_scale, 0)
+        if not self._layer.transpose_b:
+            weight_scale = weight_scale.transpose()
+        orin_dtype = self._layer.weight.dtype
+        weight = msops.mul(self._layer.weight, weight_scale)
+        weight = self._layer.cast(weight, orin_dtype)
+        msops.assign(self._layer.weight, weight)
+
+    def _apply_act_smooth_to_pre_layer(self, smooth_scale: Tensor):
+        """_apply_act_smooth_to_pre_layer"""
+        pre_layer = self.net_helper.get_pre_layer(self._layer_name)
         # pre-weight / scale
         if not pre_layer:
             raise ValueError("Not support inserting mul in x for smooth now, please enable qkv_concat and "
@@ -122,14 +132,42 @@ class SmoothLinearCell(WrapperCell):
             weight = msops.div(linear.weight, pre_scale)
             weight = msops.cast(weight, orin_dtype)
             msops.assign(linear.weight, weight)
-        # weight * scale
-        weight_scale = msops.expand_dims(smooth_scale, 0)
-        if not self.layer.transpose_b:
-            weight_scale = weight_scale.transpose()
-        orin_dtype = self.layer.weight.dtype
-        weight = msops.mul(self.layer.weight, weight_scale)
-        weight = self.layer.cast(weight, orin_dtype)
-        msops.assign(self.layer.weight, weight)
+
+    def _apply_act_smooth_by_insert_op(self, smooth_scale: Tensor):
+        """_apply_act_smooth_by_insert_op"""
+        class SmoothMatmul(Cell):
+            def __init__(self, mm, smooth_scale_):
+                super().__init__()
+                self.mm = mm
+                self.mul_scale = Parameter(msops.div(1, smooth_scale_), name="mul_scale")
+
+            def construct(self, x, weight):
+                x = msops.mul(x, self.mul_scale)
+                return self.mm(x, weight)
+
+        self._layer.matmul = SmoothMatmul(self._layer.matmul, smooth_scale)
+
+    def _apply_act_smooth_by_insert_op_for_deploy(self, ic, compute_dtype):
+        """_apply_act_smooth_by_insert_op_for_deploy"""
+        class SmoothMatmul(Cell):
+            def __init__(self, mm, ic_, compute_dtype_):
+                super().__init__()
+                self.mm = mm
+                self.mul_scale = Parameter(initializer('ones', (ic_,), dtype=compute_dtype_), name="mul_scale")
+
+            def construct(self, x, weight):
+                x = msops.mul(x, self.mul_scale)
+                return self.mm(x, weight)
+
+        self._layer.matmul = SmoothMatmul(self._layer.matmul, ic, compute_dtype)
+
+    def _apply_smooth(self, smooth_scale):
+        """_apply_smooth"""
+        if self.cfg.smooth_to_pre_layer:
+            self._apply_act_smooth_to_pre_layer(smooth_scale)
+        else:
+            self._apply_act_smooth_by_insert_op(smooth_scale)
+        self._apply_weight_smooth(smooth_scale)
 
     def smooth(self, alpha=0.5):
         """smooth"""
@@ -137,8 +175,14 @@ class SmoothLinearCell(WrapperCell):
         self._apply_smooth(smooth_scale)
 
     def process(self):
-        super(SmoothLinearCell, self).process()
-        self.smooth(self.cfg.algo_args.get('alpha', 0.5))
+        if self.cfg.mode == PTQMode.QUANTIZE:
+            super(SmoothLinearCell, self).process()
+            self.smooth(self.cfg.algo_args.get('alpha', 0.5))
+            return
+        if not self.cfg.smooth_to_pre_layer:
+            ic = self._layer.weight.shape[1] if self._layer.transpose_b else self._layer.weight.shape[1]
+            self._apply_act_smooth_by_insert_op_for_deploy(ic, self._layer.dtype)
+
 
     def deploy(self):
         logger.info("Take back Linear from SmoothQuantLinearCell.")
@@ -209,14 +253,14 @@ class QuantLinearCell(WrapperCell):
     #pylint: disable=protected-access
     def quant_weight(self):
         """quant weight"""
-        if self.cfg.act_quant_dtype == dtype.int8:
+        if self.a8w8:
             self.quantizer_x_max = self.x_quant_max(self.cat_samples)[0]
             self.quantizer_x_min = self.x_quant_min(self.cat_samples)[0]
             x_scale, x_zp = cal_quantization_params(self.quantizer_x_min.asnumpy(), self.quantizer_x_max.asnumpy(),
                                                     self.act_quant_min,
                                                     self.act_quant_max,
                                                     symmetric=self._act_symmetric)
-        if self.cfg.weight_quant_dtype == dtype.int8:
+        if self.a16w8 or self.a8w8:
             self.quantizer_w_max = self.w_quant_max(self.layer.weight, self.weight_quantizer_min_max_axis,
                                                     keepdims=True)[0]
             self.quantizer_w_min = self.w_quant_min(self.layer.weight, self.weight_quantizer_min_max_axis,
@@ -243,11 +287,18 @@ class QuantLinearCell(WrapperCell):
                 self.layer.bias_add = msops.Add()
             self.layer.has_bias = True
             self.layer.bias = Parameter(bias.astype(self.compute_type), name=bias_name)
-            qmm = AllQuantMatmul(x_scale, x_zp, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b)
-        elif self.a16w8:
+            # FIXME hangangqiang, decouple with smooth
+            if self.cfg.outliers_suppression == "smooth" and not self.cfg.smooth_to_pre_layer:
+                smooth_scale = self.layer.matmul.mm.mul_scale.asnumpy()
+            else:
+                smooth_scale = None
+            qmm = AllQuantMatmul(x_scale, x_zp, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b,
+                                 smooth_scale=smooth_scale)
+        if self.a16w8:
             qmm = WeightQuantMatmul(w_scale, w_zp, transpose_b=self.layer.transpose_b)
-        self.layer.weight = Parameter(weight.astype(dtype.int8), name=self.layer.weight.name)
-        self.layer.matmul = qmm
+        if self.a8w8 or self.a16w8:
+            self.layer.weight = Parameter(weight.astype(dtype.int8), name=self.layer.weight.name)
+            self.layer.matmul = qmm
 
     def process(self):
         super(QuantLinearCell, self).process()
@@ -256,7 +307,6 @@ class QuantLinearCell(WrapperCell):
         self.cat_samples = None
 
     def deploy(self):
-        logger.info("Take back Linear from QuantLinearCell.")
         return self
 
 
@@ -316,12 +366,12 @@ class DeployLinearCell(WrapperCell):
         x = msops.reshape(x, out_shape)
         return x
 
+
 class AllQuantMatmul(Cell):
     """quant act and weight"""
 
-    def __init__(self, input_scale, input_zp, weight_scale,
-                 in_channels=None, out_channels=None, offset=None,
-                 transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
+    def __init__(self, input_scale, input_zp, weight_scale, in_channels=None, out_channels=None, offset=None,
+                 transpose_a=False, transpose_b=False, dst_dtype=dtype.float16, smooth_scale=None):
         super().__init__()
         self.transpose_b = transpose_b
         self.offset = offset
@@ -330,7 +380,10 @@ class AllQuantMatmul(Cell):
         dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
         scale_i64 = NumpyQuantOps.trans_fp32_to_i64(np.squeeze(dequant_scale))
         self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64))
-        input_scale = np.array([input_scale] * in_channels).astype(np.float16)
+        if smooth_scale is not None:
+            input_scale = (input_scale * smooth_scale).astype(np.float16)
+        else:
+            input_scale = np.array([input_scale] * in_channels).astype(np.float16)
         self.input_scale = Parameter(Tensor(input_scale, dtype=dtype.float16))
         input_zp = np.array([input_zp] * len(input_scale)).astype(np.int8)
         self.input_zp = Parameter(Tensor(input_zp, dtype=dtype.int8))

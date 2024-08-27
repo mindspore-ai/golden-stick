@@ -17,12 +17,21 @@
 import abc
 from mindspore.nn import Cell
 from mindspore import ops as msops
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 
 class WrapperCell(abc.ABC, Cell):
     """WrapperCell"""
+
+    class MatmulCell(Cell):
+        def __init__(self, matmul):
+            super().__init__()
+            self.mm = matmul
+
+        def construct(self, *args, **kwargs):
+            return self.mm(*args, **kwargs)
+
     def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
         super().__init__()
         self.cfg = cfg
@@ -31,6 +40,8 @@ class WrapperCell(abc.ABC, Cell):
         self.net_helper = network_helper
         self.samples = []
         self.cat_samples = None
+        if self.cfg.mode == PTQMode.QUANTIZE:
+            self._layer.matmul = WrapperCell.MatmulCell(self._layer.matmul)
 
     @property
     def layer(self):
@@ -46,31 +57,19 @@ class WrapperCell(abc.ABC, Cell):
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)
         self.samples.clear()
 
+    def add_hook(self):
+        def hook_fn(_, inps):
+            x = inps[0]
+            self.samples.append(msops.squeeze(x))
+        self._layer.matmul.register_forward_pre_hook(hook_fn)
+
+    def remove_hook(self):
+        self._layer.matmul = WrapperCell.MatmulCell(self._layer.matmul.mm)
+
     @abc.abstractmethod
     def deploy(self):
         raise NotImplementedError
 
     def construct(self, x, **kwargs):
         """construct"""
-        class CatchInputMatmul(Cell):
-            def __init__(self, matmul, samples):
-                super().__init__()
-                self.mm = matmul
-                self.samples = samples
-
-            def construct(self, x, weight):
-                self.samples.append(msops.squeeze(x))
-                return self.mm(x, weight)
-
-        class MatmulCell(Cell):
-            def __init__(self, matmul):
-                super().__init__()
-                self.mm = matmul
-
-            def construct(self, *args, **kwargs):
-                return self.mm(*args, **kwargs)
-
-        self._layer.matmul = CatchInputMatmul(self._layer.matmul, self.samples)
-        output = self._layer(x, **kwargs)
-        self._layer.matmul = MatmulCell(self._layer.matmul.mm)
-        return output
+        return self._layer(x, **kwargs)

@@ -28,7 +28,8 @@ from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.omni_quant import OmniQuant as OQ
 from mindspore_gs.datasets import get_datasets
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper import MFParallelLlama2Helper
 
 
 def get_args():
@@ -64,7 +65,7 @@ def create_ptq(approach, backend=BackendTarget.ASCEND):
     elif approach == 'ptq':
         logger.info("Use ptq algo to quant network and weight.")
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
-                        algo_args={'enable_smooth': True})
+                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, outliers_suppression="smooth")
         ptq = PTQ(config=cfg)
     elif approach == 'omni_quant':
         logger.info("Use omni quant algo to quant network and weight.")

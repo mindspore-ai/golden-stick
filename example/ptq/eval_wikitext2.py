@@ -21,7 +21,8 @@ from mindformers.core.metric import PerplexityMetric
 from mindformers import MindFormerConfig
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_wikitext_dataset
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper import MFParallelLlama2Helper
 
 
 def evaluate(net, dataset_path, net_helper):

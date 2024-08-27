@@ -55,9 +55,10 @@ def network_replace(network: Cell, src_layer: type, dst_layer: type, dst_layer_f
                 return cell, True
             for opname in opname_blacklist:
                 if opname in cell_name:
+                    logger.info(f"{cell_name} is in blacklist, keep not being replaced.")
                     return cell, True
             new_dst_layer = dst_layer_fn(cell_name, cell)
-            logger.info(f"replacing {cell_name} with layer({id(dst_layer)}).")
+            logger.info(f"replacing {cell_name} with layer({dst_layer}).")
             nonlocal changed
             changed = True
             return new_dst_layer, True

@@ -21,7 +21,8 @@ import mindspore.common.dtype as mstype
 from mindspore.common.tensor import Tensor
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_boolq_dataset
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper import MFParallelLlama2Helper
 from mindformers.generation.text_generator import GenerationMixin
 from mindformers import MindFormerConfig
 
@@ -67,8 +68,8 @@ def evaluate(net, dataset_path, network_helper):
         if acc:
             correct += 1
         if data_count % 10 == 0:
-            logger.info("acc: ", correct / data_count)
-    logger.info("total acc: ", correct / data_count)
+            logger.info(f"acc: {correct / data_count}")
+    logger.info(f"total acc: {correct / data_count}")
     logger.info('Evaluate Over!')
 
 
@@ -90,9 +91,9 @@ if __name__ == "__main__":
     config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False
     if uargs.network == "LlamaForCasualLM":
-        helper = MFLlama2Helper(uargs.config_path)
+        helper = MFLlama2Helper(config)
     elif uargs.network == "ParallelLlamaForCasualLM":
-        helper = MFParallelLlama2Helper(uargs.config_path)
+        helper = MFParallelLlama2Helper(config)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     evaluate(network, uargs.dataset_path, helper)

@@ -218,6 +218,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     kvcache_narrow_range: bool = False
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
+    smooth_to_pre_layer: bool = True
 
     def __post_init__(self):
         value_check('act_per_channel', self.act_per_channel, bool)
@@ -230,6 +231,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('weight_narrow_range', self.weight_narrow_range, bool)
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         value_check('kvcache_calibrate_max_new_tokens', self.kvcache_calibrate_max_new_tokens, int)
+        value_check('smooth_to_pre_layer', self.smooth_to_pre_layer, bool)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
         if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8:
