@@ -21,7 +21,7 @@ import mindspore as ms
 from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
 from mindformers import LlamaForCausalLM
-from mindspore_gs.ptq import PTQMode, PTQConfig
+from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
@@ -65,7 +65,8 @@ def create_ptq(approach, backend=BackendTarget.ASCEND):
     elif approach == 'ptq':
         logger.info("Use ptq algo to quant network and weight.")
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
-                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, outliers_suppression="smooth")
+                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = PTQ(config=cfg)
     elif approach == 'omni_quant':
         logger.info("Use omni quant algo to quant network and weight.")

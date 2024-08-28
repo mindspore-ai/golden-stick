@@ -13,18 +13,18 @@
 # limitations under the License.
 # ============================================================================
 """PTQ algorithm."""
-from typing import List
+from typing import List, Union
 import time
 import os
 import copy
 import tqdm
-from mindspore import dtype
+from mindspore import dtype, get_context, PYNATIVE_MODE
 from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import offload_network
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, PTQMode
+from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from .algorithm import Algorithm
@@ -50,7 +50,7 @@ class InputCatcher(Cell):
 class PTQ(CompAlgo):
     """ptq"""
 
-    def __init__(self, config=None):
+    def __init__(self, config: Union[dict, PTQConfig] = None):
         super().__init__()
         if config is not None:
             if not isinstance(config, PTQConfig):
@@ -63,11 +63,12 @@ class PTQ(CompAlgo):
         logger.info(f"Config for PTQ: {self._config}")
         self.pipeline: List[Algorithm] = []
         self.build_pipeline()
+        self.context_mode = get_context("mode")
 
     def build_pipeline(self):
         """build pipline"""
         if self._config.mode == PTQMode.QUANTIZE:
-            if self._config.outliers_suppression == 'smooth':
+            if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
                 logger.info("Adding LinearSmoother to pipeline.")
                 LinearSmoother.load_mindformers_plugin()
                 self.pipeline.append(LinearSmoother(self._config))
@@ -82,6 +83,16 @@ class PTQ(CompAlgo):
             Deployer.load_mindformers_plugin()
             self.pipeline.append(Deployer(self._config))
 
+    @staticmethod
+    def _ptq_config_check(config):
+        if config.outliers_suppression is None and \
+            config.weight_quant_dtype == dtype.int8 and \
+                config.act_quant_dtype == dtype.int8:
+            logger.warning("When outliers_suppression is None, A8W8 algorithm accuracy is expected to decline.")
+        if config.weight_quant_dtype is None and \
+                config.act_quant_dtype == dtype.int8:
+            raise ValueError("PTQ algorithm not support only quant activation.")
+
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper, ds=None, **kwargs) -> Cell:
         """Apply"""
@@ -92,12 +103,15 @@ class PTQ(CompAlgo):
             for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = layers[i]
                 for processor in self.pipeline:
-                    processor.process(layer_name, layer, None, None, network_helper)
+                    processor.process(layer_name, layer, network_helper)
                     processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
+        self._ptq_config_check(self._config)
         if not ds:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
+        if self.context_mode != PYNATIVE_MODE:
+            raise ValueError("Quantization phase only support PYNATIVE MODE.")
         start_time = time.time()
         logger.info("Analysis network structure.")
         network_helper.analysis_decoder_groups(network)
@@ -114,12 +128,7 @@ class PTQ(CompAlgo):
         for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ..."):
             logger.info(f"Quantize {i}th decoder layer.")
             layer_name, layer = layers[i]
-            start_time = time.time()
-            # FIXME yourifan, move to the place after pipeline after pyboost support kernel-select
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
-            for args, kwargs in zip(all_args, all_kwargs):
-                args[0] = layer(*args, **kwargs)
-            logger.info(f"{i}th layer get net next layer input time cost {time.time() - start_time}")
             for processor in self.pipeline:
                 processor.replace(layer_name, layer, network_helper)
 
@@ -129,15 +138,17 @@ class PTQ(CompAlgo):
                 for linear in linears:
                     if isinstance(linear, WrapperCell):
                         linear.add_hook()
-                for args, kwargs in zip(all_args, all_kwargs):
-                    args[0] = layer(*args, **kwargs)
+                index = 0
+                for args, kwargs in zip(cur_args, cur_kwargs):
+                    all_args[index][0] = layer(*args, **kwargs)
+                    index += 1
                 for linear in linears:
                     if isinstance(linear, WrapperCell):
                         linear.remove_hook()
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
                 start_time = time.time()
-                processor.process(layer_name, layer, cur_args, cur_kwargs, network_helper)
+                processor.process(layer_name, layer, network_helper)
                 processor.deploy(layer_name, layer)
                 network.update_parameters_name()
                 logger.info(f"{i}th layer do {type(processor)} time cost {time.time() - start_time}")

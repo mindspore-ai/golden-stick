@@ -49,7 +49,7 @@ class Deployer(Algorithm):
     def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
         pass
 
-    def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
+    def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
         if self._config.weight_quant_dtype == msdtype.int8 or self._config.act_quant_dtype == msdtype.int8:
             _, _, linears = network_helper.get_linears(decoder_layer)
             linear_type = [type(linears[k]) for k in range(len(linears))]
