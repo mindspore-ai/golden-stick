@@ -15,9 +15,11 @@
 """A network iterator for transforming network."""
 
 import abc
+import warnings
 from typing import Tuple
 
 from mindspore.nn import Cell
+from mindspore_gs.common import logger
 
 
 class Processor(abc.ABC):
@@ -55,6 +57,14 @@ def network_replace(network: Cell, src_layer: type, dst_layer: type, dst_layer_f
                 if opname in cell_name:
                     return cell, True
             new_dst_layer = dst_layer_fn(cell_name, cell)
+            logger.info(f"replacing {cell_name} with layer({id(dst_layer)}).")
+            nonlocal changed
+            changed = True
             return new_dst_layer, True
 
+    changed = False
     Replacer().process(network, network_root_name)
+    if not changed:
+        warn_str = f"Not found {src_layer} of layer to quant, please check network and opname_blacklist" \
+                    f"({opname_blacklist})."
+        warnings.warn(warn_str, RuntimeWarning)

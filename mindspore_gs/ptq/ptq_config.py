@@ -143,6 +143,7 @@ class PTQConfig:
     weight_quant_dtype: msdtype = msdtype.int8
     kvcache_quant_dtype: msdtype = None
     act_quant_dtype: msdtype = None
+    outliers_suppression: str = None
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():
@@ -155,6 +156,8 @@ class PTQConfig:
             raise ValueError(f'self.kvcache_quant_dtype: {self.kvcache_quant_dtype} is not mindspore.dtype.int8 or None.')
         if self.act_quant_dtype != msdtype.int8 and self.act_quant_dtype is not None:
             raise ValueError(f'self.act_quant_dtype: {self.act_quant_dtype} is not mindspore.dtype.int8 or None.')
+        if self.outliers_suppression is not None and self.outliers_suppression != 'smooth':
+            raise ValueError(f"outliers_suppression only support 'smooth' or 'None' currently.")
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)

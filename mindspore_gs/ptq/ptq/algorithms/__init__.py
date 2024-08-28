@@ -15,3 +15,5 @@
 """algorithms"""
 
 from .anti_outliers import LinearSmoother
+from .quantizer import Quantizer
+from .deployer import Deployer

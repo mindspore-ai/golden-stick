@@ -23,7 +23,7 @@ from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
-from mindspore_gs.ptq.ptq.wrapper_cell import WrapperLinearCell
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 
 
 class LinearSmoother(Algorithm):
@@ -39,8 +39,8 @@ class LinearSmoother(Algorithm):
 
     @staticmethod
     def reg_linear_map(linear_type, smooth_linear_type):
-        if not issubclass(smooth_linear_type, WrapperLinearCell):
-            raise RuntimeError(f"Smooth linear type should be a subclass of {id(WrapperLinearCell)}, "
+        if not issubclass(smooth_linear_type, WrapperCell):
+            raise RuntimeError(f"Smooth linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {smooth_linear_type}.")
         LinearSmoother._linear_map[linear_type] = smooth_linear_type
 
@@ -54,7 +54,7 @@ class LinearSmoother(Algorithm):
         class Replacer(Processor):
             """A network iterator for transform fq-network to quant-network."""
             def __init__(self, config):
-                if not smooth_linear_type or not issubclass(smooth_linear_type, WrapperLinearCell):
+                if not smooth_linear_type or not issubclass(smooth_linear_type, WrapperCell):
                     raise RuntimeError(f"Not support linear type: {linear_type} with wrapper type "
                                        f"{smooth_linear_type}.")
                 self._inner_config = config
@@ -64,6 +64,9 @@ class LinearSmoother(Algorithm):
                     return cell, False
                 if isinstance(cell, smooth_linear_type):
                     return cell, True
+                for opname in self._inner_config.opname_blacklist:
+                    if opname in cell_name:
+                        return cell, True
                 smooth_linear = smooth_linear_type(cell_name, cell, self._inner_config, network_helper)
                 logger.info(f"replacing {cell_name} with smooth cell({id(smooth_linear)}).")
                 nonlocal changed
@@ -80,10 +83,10 @@ class LinearSmoother(Algorithm):
     def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
         """process"""
         _, _, linears = network_helper.get_linears(decoder_layer)
-        linear_type = type(linears[0])
+        linear_type = [type(linears[k]) for k in range(len(linears))]
         logger.info("Replacing Linear with Smooth linear.")
-        smooth_linear_type = LinearSmoother._linear_map.get(linear_type)
-        self._replace(decoder_layer_name, decoder_layer, linear_type, smooth_linear_type, network_helper)
+        smooth_linear_type = LinearSmoother._linear_map.get(linear_type[0])
+        self._replace(decoder_layer_name, decoder_layer, tuple(linear_type), smooth_linear_type, network_helper)
         _, _, linears = network_helper.get_linears(decoder_layer)
 
         logger.info("Catching inputs of all Linear in current decoder layer.")
@@ -94,5 +97,5 @@ class LinearSmoother(Algorithm):
 
         for linear in linears:
             if isinstance(linear, smooth_linear_type):
-                logger.info(f"Smooth Linear {linear.linear_name}")
+                logger.info(f"Smooth Linear {linear.layer_name}")
                 linear.process()

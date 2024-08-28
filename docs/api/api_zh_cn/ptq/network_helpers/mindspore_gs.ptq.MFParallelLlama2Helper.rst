@@ -37,3 +37,20 @@ mindspore_gs.ptq.MFParallelLlama2Helper
 
         返回：
             一个'Cell'列表，表示decoder层的linear层。
+
+    .. py:method:: get_page_attention_mgr(self, decoder_layer: ParallelLlamaTransformerLayer)
+
+        获取decoder中的PageAttentionMgr层。
+
+        参数：
+            - **decoder_layer** (ParallelLlamaTransformerLayer) - 要获取PageAttentionMgr层的decoder层。
+
+        返回：
+            一个'Cell'列表，表示decoder层的PageAttentionMgr层。
+
+    .. py:method:: analysis_decoder_groups(self, network: ParallelLlamaForCausalLM)
+
+        分析网络中decoder组的信息。
+
+        参数：
+            - **network** (ParallelLlamaForCausalLM) - 要分析decoder组信息的网络。
