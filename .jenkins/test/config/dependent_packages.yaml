@@ -1,4 +1,4 @@
 mindspore:
-  '/mindspore/mindspore/version/202408/20240813/br_infer_iter_20240813030019_18388b2533d15a7fa3f1c6e02c64c2ce6e79d54d/'
+  '/mindspore/mindspore/version/202408/20240827/master_20240827160020_8f96eb361369362bf89913c427004c7f553d1cbc_newest/'
 mindformers:
   '/mindspore/mindformers/version/202408/20240815/r1.2.0-infer_20240815120015_3fdcb7d5ad5b66a8bc344762caa05c2f79d6d27a_newest/'

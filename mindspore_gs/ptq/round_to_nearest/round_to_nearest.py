@@ -167,7 +167,7 @@ class RoundToNearest(CompAlgo):
             return network
         if network_helper and self._config.kvcache_quant_dtype != msdtype.int8:
             bs = network_helper.get_spec("batch_size") if network_helper.get_spec("batch_size") else 1
-            network_helper.generate(network, input_ids=np.ones([bs, 1], dtype=np.int32))
+            network_helper.generate(network, input_ids=np.ones([bs, 1], dtype=np.int32), max_new_tokens=1)
         if datasets and self._config.kvcache_quant_dtype == msdtype.int8:
             if not network_helper:
                 raise ValueError("Please provide network_helper when datasets is given for calibrating.")
