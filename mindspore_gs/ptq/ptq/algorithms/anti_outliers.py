@@ -20,7 +20,7 @@ from typing import Tuple
 from mindspore.nn import Cell
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
@@ -81,29 +81,18 @@ class LinearSmoother(Algorithm):
                        f"({self._config.opname_blacklist})."
             warnings.warn(warn_str, RuntimeWarning)
 
-    def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
-        """process"""
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
+        """infer_and_cache"""
         _, _, linears = network_helper.get_linears(decoder_layer)
         linear_type = [type(linears[k]) for k in range(len(linears))]
         logger.info("Replacing Linear with Smooth linear.")
         smooth_linear_type = LinearSmoother._linear_map.get(linear_type[0])
         self._replace(decoder_layer_name, decoder_layer, tuple(linear_type), smooth_linear_type, network_helper)
+
+    def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
+        """process"""
         _, _, linears = network_helper.get_linears(decoder_layer)
-
-        if self._config.mode == PTQMode.QUANTIZE:
-            logger.info("Catching inputs of all Linear in current decoder layer.")
-            for linear in linears:
-                if isinstance(linear, WrapperCell):
-                    linear.add_hook()
-            for j in range(len(args_list)):
-                cur_args = args_list[j]
-                cur_kwargs = kwargs_list[j]
-                decoder_layer(*cur_args, **cur_kwargs)
-            for linear in linears:
-                if isinstance(linear, WrapperCell):
-                    linear.remove_hook()
-
         for linear in linears:
-            if isinstance(linear, smooth_linear_type):
+            if isinstance(linear, WrapperCell):
                 logger.info(f"Smooth Linear {linear.layer_name}")
                 linear.process()
