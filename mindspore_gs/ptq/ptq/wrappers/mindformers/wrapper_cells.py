@@ -139,10 +139,10 @@ class SmoothLinearCell(WrapperCell):
             def __init__(self, mm, smooth_scale_):
                 super().__init__()
                 self.mm = mm
-                self.mul_scale = Parameter(msops.div(1, smooth_scale_), name="mul_scale")
+                self.mul_scale = Parameter(smooth_scale_, name="mul_scale")
 
             def construct(self, x, weight):
-                x = msops.mul(x, self.mul_scale)
+                x = msops.div(x, self.mul_scale)
                 return self.mm(x, weight)
 
         self._layer.matmul = SmoothMatmul(self._layer.matmul, smooth_scale)
@@ -308,6 +308,15 @@ class QuantLinearCell(WrapperCell):
 
     def deploy(self):
         return self
+
+    def add_hook(self):
+        def hook_fn(_, inps):
+            x = inps[0]
+            self.samples.append(msops.squeeze(x))
+        if self.cfg.outliers_suppression == "smooth" and not self.cfg.smooth_to_pre_layer:
+            self._layer.matmul.mm.mm.register_forward_pre_hook(hook_fn)
+        else:
+            self._layer.matmul.register_forward_pre_hook(hook_fn)
 
 
 class DeployLinearCell(WrapperCell):

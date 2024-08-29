@@ -117,9 +117,9 @@ def quant_net(net: LlamaForCausalLM, network_helper, ptq, ds):
 if __name__ == "__main__":
     uargs = get_args()
     algo = create_ptq(approach=uargs.approach)
-    if uargs.network == "LlamaForCasualLM":
+    if uargs.network == "LlamaForCausalLM":
         helper = MFLlama2Helper(uargs.config_path)
-    elif uargs.network == "ParallelLlamaForCasualLM":
+    elif uargs.network == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(uargs.config_path)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     start = time.time()

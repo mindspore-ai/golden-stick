@@ -90,9 +90,9 @@ if __name__ == "__main__":
     logger.info('Creating network...')
     config = MindFormerConfig(uargs.config_path)
     config.model.model_config.use_past = False
-    if uargs.network == "LlamaForCasualLM":
+    if uargs.network == "LlamaForCausalLM":
         helper = MFLlama2Helper(config)
-    elif uargs.network == "ParallelLlamaForCasualLM":
+    elif uargs.network == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(config)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
