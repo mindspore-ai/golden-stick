@@ -20,7 +20,7 @@ from typing import Tuple
 from mindspore.nn import Cell
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
@@ -64,11 +64,12 @@ class LinearSmoother(Algorithm):
                     return cell, False
                 if isinstance(cell, smooth_linear_type):
                     return cell, True
-                for opname in self._inner_config.opname_blacklist:
-                    if opname in cell_name:
+                for exclude_name in self._inner_config.opname_blacklist:
+                    if exclude_name in cell_name:
+                        logger.info(f"Setting {cell_name} being no-smooth.")
                         return cell, True
                 smooth_linear = smooth_linear_type(cell_name, cell, self._inner_config, network_helper)
-                logger.info(f"replacing {cell_name} with smooth cell({id(smooth_linear)}).")
+                logger.info(f"replacing {cell_name} with smooth cell({type(smooth_linear)}).")
                 nonlocal changed
                 changed = True
                 return smooth_linear, True
@@ -89,11 +90,18 @@ class LinearSmoother(Algorithm):
         self._replace(decoder_layer_name, decoder_layer, tuple(linear_type), smooth_linear_type, network_helper)
         _, _, linears = network_helper.get_linears(decoder_layer)
 
-        logger.info("Catching inputs of all Linear in current decoder layer.")
-        for j in range(len(args_list)):
-            cur_args = args_list[j]
-            cur_kwargs = kwargs_list[j]
-            decoder_layer(*cur_args, **cur_kwargs)
+        if self._config.mode == PTQMode.QUANTIZE:
+            logger.info("Catching inputs of all Linear in current decoder layer.")
+            for linear in linears:
+                if isinstance(linear, WrapperCell):
+                    linear.add_hook()
+            for j in range(len(args_list)):
+                cur_args = args_list[j]
+                cur_kwargs = kwargs_list[j]
+                decoder_layer(*cur_args, **cur_kwargs)
+            for linear in linears:
+                if isinstance(linear, WrapperCell):
+                    linear.remove_hook()
 
         for linear in linears:
             if isinstance(linear, smooth_linear_type):

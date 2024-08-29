@@ -82,8 +82,10 @@ class PTQ(CompAlgo):
             self.pipeline.append(Deployer(self._config))
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, ds=None, **kwargs) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper, ds=None, **kwargs) -> Cell:
         """Apply"""
+        if not network_helper:
+            raise ValueError("Please provide network_helper when omni quant in apply phase.")
         if self._config.mode == PTQMode.DEPLOY:
             layers = network_helper.get_decoder_layers(network)
             for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ Deploy..."):
@@ -92,8 +94,6 @@ class PTQ(CompAlgo):
                     processor.process(layer_name, layer, None, None, network_helper)
                     network.update_parameters_name()
             return network
-        if not network_helper:
-            raise ValueError("Please provide network_helper when omni quant in apply phase.")
         if not ds:
             raise ValueError("please provide dataset when use omni quant to quantize network.")
         start_time = time.time()

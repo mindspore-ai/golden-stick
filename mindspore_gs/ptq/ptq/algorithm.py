@@ -38,7 +38,7 @@ class Algorithm:
                 if not isinstance(cell, WrapperCell):
                     return cell, False
                 deploy_cell = cell.deploy()
-                logger.info(f"convert {cell_name} to real-quant cell({id(deploy_cell)}).")
+                logger.info(f"convert {cell_name} to real-quant cell({type(deploy_cell)}).")
                 nonlocal changed
                 changed = True
                 return deploy_cell, True

@@ -71,10 +71,16 @@ class Quantizer(Algorithm):
         page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
 
         logger.info("Catching inputs of all Linear in current decoder layer.")
+        for linear in linears:
+            if isinstance(linear, WrapperCell):
+                linear.add_hook()
         for j in range(len(args_list)):
             cur_args = args_list[j]
             cur_kwargs = kwargs_list[j]
             decoder_layer(*cur_args, **cur_kwargs)
+        for linear in linears:
+            if isinstance(linear, WrapperCell):
+                linear.remove_hook()
 
         logger.info("Start quantizer Linear...")
         for linear in linears:
