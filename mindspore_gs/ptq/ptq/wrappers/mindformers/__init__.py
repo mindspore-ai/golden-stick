@@ -24,7 +24,7 @@ from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.algorithms.deployer import Deployer
 from .wrapper_cells import (
     SmoothLinearCell, QuantLinearCell, QuantPageAttentionMgrCell,
-    DeployLinearCell
+    DeployLinearCell, DeployPageAttentionMgrCell
 )
 
 LinearSmoother.reg_linear_map(Linear, SmoothLinearCell)
@@ -37,3 +37,4 @@ Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell)
 Deployer.reg_layer_map(Linear, DeployLinearCell)
 Deployer.reg_layer_map(ColumnParallelLinear, DeployLinearCell)
 Deployer.reg_layer_map(RowParallelLinear, DeployLinearCell)
+Deployer.reg_layer_map(PagedAttentionMgr, DeployPageAttentionMgrCell)

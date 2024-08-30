@@ -216,6 +216,7 @@ class MFLlama2Helper(MFNetworkHelper):
         Returns:
             A list of `Cell` as PageAttentionMgr layers of decoder layer.
         """
+        value_check('decoder_layer', decoder_layer, LLamaDecodeLayer)
         if not self.mf_config.model.model_config.use_past:
             raise ValueError("use_path need be True when doing kv cache quantizer.")
         attention: LLamaAttention = decoder_layer.attention
