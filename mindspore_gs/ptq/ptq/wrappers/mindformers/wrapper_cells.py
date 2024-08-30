@@ -13,6 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """ptq wrapper cells for mindformers."""
+import abc
+
 import numpy as np
 
 from mindspore import Parameter, Tensor, dtype
@@ -31,14 +33,44 @@ from mindformers.experimental.distri_cores.tensor_parallel.collective_primitives
     MaxFromTensorParallelRegion, MinFromTensorParallelRegion
 )
 from mindspore_gs.common import logger
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
-from mindspore_gs.ptq.network_helpers import LayerType
+from mindspore_gs.ptq.network_helpers import LayerType, NetworkHelper
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params, quant_tensor_data
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
-from mindspore_gs.ptq.ptq_config import PTQMode
 
 
-class SmoothLinearCell(WrapperCell):
+class WrapperLinearCell(WrapperCell, abc.ABC):
+    """WrapperCell"""
+
+    class MatmulCell(Cell):
+        def __init__(self, matmul):
+            super().__init__()
+            self.mm = matmul
+
+        def construct(self, *args, **kwargs):
+            return self.mm(*args, **kwargs)
+
+    def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
+        super().__init__(layer_name, layer, cfg, network_helper)
+        if self.cfg.mode == PTQMode.QUANTIZE:
+            self._layer.matmul = WrapperLinearCell.MatmulCell(self._layer.matmul)
+
+    def add_hook(self):
+        def hook_fn(_, inps):
+            x = inps[0]
+            self.samples.append(msops.squeeze(x))
+        self._layer.matmul.register_forward_pre_hook(hook_fn)
+
+    def remove_hook(self):
+        self._layer.matmul = WrapperLinearCell.MatmulCell(self._layer.matmul.mm)
+
+    @abc.abstractmethod
+    def deploy(self):
+        raise NotImplementedError
+
+
+class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
@@ -189,7 +221,7 @@ class SmoothLinearCell(WrapperCell):
         return self.layer
 
 
-class QuantLinearCell(WrapperCell):
+class QuantLinearCell(WrapperLinearCell):
     """QuantLinearCell"""
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
@@ -319,7 +351,7 @@ class QuantLinearCell(WrapperCell):
             self._layer.matmul.register_forward_pre_hook(hook_fn)
 
 
-class DeployLinearCell(WrapperCell):
+class DeployLinearCell(WrapperLinearCell):
     """DeployLinearCell"""
     def __init__(self, linear_name, linear, cfg, network_helper=None):
         super().__init__(linear_name, linear, cfg, network_helper)

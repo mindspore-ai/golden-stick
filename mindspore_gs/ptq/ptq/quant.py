@@ -26,6 +26,7 @@ from mindspore_gs.common import logger
 from mindspore_gs.common.utils import offload_network
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, PTQMode
 from mindspore_gs.ptq.network_helpers import NetworkHelper
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from .algorithm import Algorithm
 from .algorithms import LinearSmoother, Quantizer, Deployer
 
@@ -113,16 +114,33 @@ class PTQ(CompAlgo):
             logger.info(f"Quantize {i}th decoder layer.")
             layer_name, layer = layers[i]
             start_time = time.time()
+            # FIXME yourifan, move to the place after pipeline after pyboost support kernel-select
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             for args, kwargs in zip(all_args, all_kwargs):
                 args[0] = layer(*args, **kwargs)
             logger.info(f"{i}th layer get net next layer input time cost {time.time() - start_time}")
             for processor in self.pipeline:
+                processor.replace(layer_name, layer, network_helper)
+
+                logger.info("Catching inputs of all Linear in decoder layer.")
+                start_time = time.time()
+                _, _, linears = network_helper.get_linears(layer)
+                for linear in linears:
+                    if isinstance(linear, WrapperCell):
+                        linear.add_hook()
+                for args, kwargs in zip(all_args, all_kwargs):
+                    args[0] = layer(*args, **kwargs)
+                for linear in linears:
+                    if isinstance(linear, WrapperCell):
+                        linear.remove_hook()
+                logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
+
                 start_time = time.time()
                 processor.process(layer_name, layer, cur_args, cur_kwargs, network_helper)
                 processor.deploy(layer_name, layer)
                 network.update_parameters_name()
                 logger.info(f"{i}th layer do {type(processor)} time cost {time.time() - start_time}")
+
             start_time = time.time()
             offload_network(layer)
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")

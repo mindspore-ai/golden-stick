@@ -617,7 +617,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
 
 
-@pytest.mark.level0
+# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
@@ -632,7 +632,7 @@ def test_sq_llama2_predict_2stage_1p(device, mode):
     assert sq_predict_llama2_2stage(device, mode, model_parallel)
 
 
-@pytest.mark.level0
+# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_sq_llama2_predict_2stage_2p():

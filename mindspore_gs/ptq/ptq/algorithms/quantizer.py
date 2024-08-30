@@ -15,6 +15,7 @@
 """anti-outliers algorithm."""
 
 from functools import partial
+from mindspore import dtype as msdtype
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.processor import network_replace
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
@@ -46,47 +47,40 @@ class Quantizer(Algorithm):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
+        if self._config.weight_quant_dtype == msdtype.int8 or self._config.act_quant_dtype == msdtype.int8:
+            _, _, linears = network_helper.get_linears(decoder_layer)
+            linear_type = [type(linears[k]) for k in range(len(linears))]
+            logger.info("Replacing Linear with Quant linear.")
+            quant_linear_type = Quantizer._layer_map.get(linear_type[0])
+            if not issubclass(quant_linear_type, WrapperCell):
+                raise RuntimeError(f"Not support linear type: {linear_type[0]}.")
+            quant_linear_creator = partial(quant_linear_type, cfg=self._config, network_helper=network_helper)
+            network_replace(decoder_layer, tuple(linear_type), quant_linear_type, quant_linear_creator,
+                            self._config.opname_blacklist, decoder_layer_name)
+
+        if self._config.kvcache_quant_dtype == msdtype.int8:
+            page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
+            page_attention_mgr_type = type(page_attention_mgr)
+            quant_page_attention_mgr_type = Quantizer._layer_map.get(page_attention_mgr_type)
+            if not issubclass(quant_page_attention_mgr_type, WrapperCell):
+                raise RuntimeError(f"Not support PageAttentionMgr type: {page_attention_mgr_type}")
+            quant_page_attention_mgr_creator = partial(quant_page_attention_mgr_type,
+                                                       cfg=self._config, network_helper=network_helper)
+            network_replace(decoder_layer, page_attention_mgr_type, quant_page_attention_mgr_type,
+                            quant_page_attention_mgr_creator, self._config.opname_blacklist, decoder_layer_name)
+
     def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
         """process"""
-        _, _, linears = network_helper.get_linears(decoder_layer)
-        linear_type = [type(linears[k]) for k in range(len(linears))]
-        logger.info("Replacing Linear with Quant linear.")
-        quant_linear_type = Quantizer._layer_map.get(linear_type[0])
-        if not issubclass(quant_linear_type, WrapperCell):
-            raise RuntimeError(f"Not support linear type: {linear_type[0]}.")
-        quant_linear_creator = partial(quant_linear_type, cfg=self._config, network_helper=network_helper)
-        network_replace(decoder_layer, tuple(linear_type), quant_linear_type, quant_linear_creator,
-                        self._config.opname_blacklist, decoder_layer_name)
-        _, _, linears = network_helper.get_linears(decoder_layer)
+        if self._config.weight_quant_dtype == msdtype.int8 or self._config.act_quant_dtype == msdtype.int8:
+            _, _, linears = network_helper.get_linears(decoder_layer)
+            logger.info("Start quantizer Linear...")
+            for linear in linears:
+                if isinstance(linear, WrapperCell):
+                    logger.info(f"Quantize Linear {linear.layer_name}")
+                    linear.process()
 
-        page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
-        page_attention_mgr_type = type(page_attention_mgr)
-        quant_page_attention_mgr_type = Quantizer._layer_map.get(page_attention_mgr_type)
-        if not issubclass(quant_page_attention_mgr_type, WrapperCell):
-            raise RuntimeError(f"Not support PageAttentionMgr type: {page_attention_mgr_type}")
-        quant_page_attention_mgr_creator = partial(quant_page_attention_mgr_type,
-                                                   cfg=self._config, network_helper=network_helper)
-        network_replace(decoder_layer, page_attention_mgr_type, quant_page_attention_mgr_type,
-                        quant_page_attention_mgr_creator, self._config.opname_blacklist, decoder_layer_name)
-        page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
-
-        logger.info("Catching inputs of all Linear in current decoder layer.")
-        for linear in linears:
-            if isinstance(linear, WrapperCell):
-                linear.add_hook()
-        for j in range(len(args_list)):
-            cur_args = args_list[j]
-            cur_kwargs = kwargs_list[j]
-            decoder_layer(*cur_args, **cur_kwargs)
-        for linear in linears:
-            if isinstance(linear, WrapperCell):
-                linear.remove_hook()
-
-        logger.info("Start quantizer Linear...")
-        for linear in linears:
-            if isinstance(linear, quant_linear_type):
-                logger.info(f"Quantize Linear {linear.layer_name}")
-                linear.process()
-
-        logger.info("Start quantizer KV Cache...")
-        page_attention_mgr.process()
+        if self._config.kvcache_quant_dtype == msdtype.int8:
+            logger.info("Start quantizer KV Cache...")
+            page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
+            page_attention_mgr.process()

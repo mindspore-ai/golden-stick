@@ -26,6 +26,9 @@ from .wrapper_cell import WrapperCell
 
 class Algorithm:
     """Algorithm"""
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
+        raise NotImplementedError
+
     def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
         """process"""
         raise NotImplementedError

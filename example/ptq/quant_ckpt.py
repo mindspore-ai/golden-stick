@@ -121,6 +121,8 @@ if __name__ == "__main__":
         helper = MFLlama2Helper(uargs.config_path)
     elif uargs.network == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(uargs.config_path)
+    else:
+        raise ValueError(f"Unsupported network: {uargs.network}")
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     start = time.time()
     logger.info('Creating network...')
