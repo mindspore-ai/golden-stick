@@ -32,13 +32,13 @@ from mindformers.modules import Linear
 from mindformers.models.llama import LlamaForCausalLM, LlamaModel
 from mindformers.models.llama.llama_transformer import LLamaDecodeLayer, LLamaAttention
 from mindformers.models.llama.llama_layer import LlamaFeedForward, LlamaRMSNorm
-from mindformers.experimental.llama_demo import (ParallelLlamaForCausalLM, ParallelLlamaModel,
-                                                 ParallelLlamaTransformerLayer, ParallelLlamaAttention,
-                                                 ParallelLlamaMLPWithGate)
-from mindformers.experimental.llama_demo.llama import LlamaRMSNorm as ParallelLlamaRMSNorm
-from mindformers.experimental.distri_cores.tensor_parallel.layers import (
-    ColumnParallelLinear, RowParallelLinear
-)
+from mindformers.experimental.infer.models.llama.llama import ParallelLlamaForCausalLM
+from mindformers.experimental.infer.core.transformer import (ParallelTransformer,
+                                                             ParallelTransformerLayer,
+                                                             ParallelAttention,
+                                                             ParallelMLP)
+from mindformers.experimental.infer.core.norm import RMSNorm
+from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindformers.experimental.distri_cores.create_comm import initialize_model_parallel
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.ptq.processor import Processor
@@ -486,7 +486,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         ms.set_context(mode=self.mf_config.context.mode, device_target=self.mf_config.context.device_target,
                        jit_config={"jit_level": "O0", "infer_boost": "on"})
         init()
-        initialize_model_parallel(tp_size=self.mf_config.parallel_config.model_parallel, order='tp')
+        initialize_model_parallel(self.mf_config.parallel_config.model_parallel, order='tp')
         network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
         network.set_train(False)
         network.phase = 'predict'
@@ -506,30 +506,30 @@ class MFParallelLlama2Helper(MFLlama2Helper):
             A list of tuples (cell_name, `Cell`) as decoder layers and names.
         """
         value_check('network', network, ParallelLlamaForCausalLM)
-        model: ParallelLlamaModel = network.model
+        model: ParallelTransformer = network.model
         layers = []
         for i, layer in enumerate(model.layers):
             layers.append((f"root.model.layers.{i}", layer))
         return layers
 
-    def get_linears(self, decoder_layer: ParallelLlamaTransformerLayer):
+    def get_linears(self, decoder_layer: ParallelTransformerLayer):
         """
         Get linear layers from decoder layer.
 
         Args:
-            decoder_layer (ParallelLlamaTransformerLayer): Decoder layer to get linear layers.
+            decoder_layer (ParallelTransformerLayer): Decoder layer to get linear layers.
 
         Returns:
             A list of `Cell` as linear layers of decoder layer.
         """
-        value_check('decoder_layer', decoder_layer, ParallelLlamaTransformerLayer)
-        attention: ParallelLlamaAttention = decoder_layer.attention
-        if not isinstance(attention, ParallelLlamaAttention):
-            raise RuntimeError(f"Only support ParallelLlamaAttention as attention but got {attention}")
+        value_check('decoder_layer', decoder_layer, ParallelTransformerLayer)
+        attention: ParallelAttention = decoder_layer.attention
+        if not isinstance(attention, ParallelAttention):
+            raise RuntimeError(f"Only support ParallelAttention as attention but got {attention}")
         qkv_concat = (attention.attn_type == "self_attn")
-        ffn: ParallelLlamaMLPWithGate = decoder_layer.feed_forward
-        if not isinstance(ffn, ParallelLlamaMLPWithGate):
-            raise RuntimeError(f"Only support ParallelLlamaMLPWithGate as FFN but got {ffn}")
+        ffn: ParallelMLP = decoder_layer.feed_forward
+        if not isinstance(ffn, ParallelMLP):
+            raise RuntimeError(f"Only support ParallelMLP as FFN but got {ffn}")
         ffn_concat = True
         linears = []
         if qkv_concat:
@@ -543,29 +543,29 @@ class MFParallelLlama2Helper(MFLlama2Helper):
             linears.extend([ffn.w1, ffn.w3, ffn.w2])
         return qkv_concat, ffn_concat, linears
 
-    def get_page_attention_mgr(self, decoder_layer: ParallelLlamaTransformerLayer):
+    def get_page_attention_mgr(self, decoder_layer: ParallelTransformerLayer):
         """
         Get PageAttentionMgr layers from decoder layer.
 
         Args:
-            decoder_layer (ParallelLlamaTransformerLayer): Decoder layer to get PageAttentionMgr layers.
+            decoder_layer (ParallelTransformerLayer): Decoder layer to get PageAttentionMgr layers.
 
         Returns:
             A list of `Cell` as PageAttentionMgr layers of decoder layer.
         """
-        value_check('decoder_layer', decoder_layer, ParallelLlamaTransformerLayer)
+        value_check('decoder_layer', decoder_layer, ParallelTransformerLayer)
         if not self.mf_config.model.model_config.use_past:
             raise ValueError("use_path need be True when doing kv cache quantizer.")
-        attention: ParallelLlamaAttention = decoder_layer.attention
-        if not isinstance(attention, ParallelLlamaAttention):
-            raise RuntimeError(f"Only support ParallelLlamaAttention as attention but got {attention}")
+        attention: ParallelAttention = decoder_layer.attention
+        if not isinstance(attention, ParallelAttention):
+            raise RuntimeError(f"Only support ParallelAttention as attention but got {attention}")
         return attention.paged_attention_mgr
 
     @staticmethod
     def _ffn_analysis(decoder_info: DecoderGroupInfo):
         """_ffn_analysis"""
         ffn_info: LayerInfo = decoder_info.ffn
-        ffn: ParallelLlamaMLPWithGate = ffn_info.layer
+        ffn: ParallelMLP = ffn_info.layer
         decoder_info.ffn_concat = True
         for name, cell in ffn.name_cells().items():
             full_cell_name = f"{ffn_info.name}.{name}"
@@ -593,7 +593,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
     def _attention_analysis(decoder_info: DecoderGroupInfo):
         """_attention_analysis"""
         attention_info: LayerInfo = decoder_info.attention
-        attention: ParallelLlamaAttention = attention_info.layer
+        attention: ParallelAttention = attention_info.layer
         decoder_info.qkv_concat = (attention.attn_type == "self_attn")
         for name, cell in attention.name_cells().items():
             full_cell_name = f"{attention_info.name}.{name}"
@@ -621,22 +621,22 @@ class MFParallelLlama2Helper(MFLlama2Helper):
                         continue
 
     @staticmethod
-    def _decoder_analysis(decoder_name: str, decoder: ParallelLlamaTransformerLayer) -> DecoderGroupInfo:
+    def _decoder_analysis(decoder_name: str, decoder: ParallelTransformerLayer) -> DecoderGroupInfo:
         """_decoder_analysis"""
         info: DecoderGroupInfo = DecoderGroupInfo(decoder_name, decoder)
         for name, cell in decoder.name_cells().items():
             full_cell_name = f"{decoder_name}.{name}"
-            if isinstance(cell, ParallelLlamaRMSNorm):
+            if isinstance(cell, RMSNorm):
                 if "attention" in name:
                     info.attention_norm = LayerInfo(full_cell_name, cell, LayerType.NORM_LAYER)
                 if "ffn" in name:
                     info.ffn_norm = LayerInfo(full_cell_name, cell, LayerType.NORM_LAYER)
                 continue
-            if isinstance(cell, ParallelLlamaAttention):
+            if isinstance(cell, ParallelAttention):
                 info.attention = LayerInfo(full_cell_name, cell, LayerType.UNKNOWN)
                 MFParallelLlama2Helper._attention_analysis(info)
                 continue
-            if isinstance(cell, ParallelLlamaMLPWithGate):
+            if isinstance(cell, ParallelMLP):
                 info.ffn = LayerInfo(full_cell_name, cell, LayerType.UNKNOWN)
                 MFParallelLlama2Helper._ffn_analysis(info)
         return info
@@ -657,7 +657,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
             def process_cell(self, cell_name: str, cell: nn.Cell):
                 if not isinstance(cell, nn.Cell):
                     return cell, True
-                if isinstance(cell, ParallelLlamaTransformerLayer):
+                if isinstance(cell, ParallelTransformerLayer):
                     self.infos[cell_name] = self._fn(cell_name, cell)
                     return cell, True
                 return cell, False

@@ -15,9 +15,7 @@
 """Wrapper cells for PTQ for MindFormers."""
 
 from mindformers import Linear
-from mindformers.experimental.distri_cores.tensor_parallel.layers import (
-    ColumnParallelLinear, RowParallelLinear
-)
+from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindformers.modules import PagedAttentionMgr
 from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer

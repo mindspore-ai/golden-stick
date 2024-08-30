@@ -21,7 +21,7 @@ import numpy as np
 
 from mindformers import MindFormerConfig, LlamaForCausalLM, LlamaTokenizer
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
-from mindformers.experimental.llama_demo import ParallelLlamaForCausalLM
+from mindformers.experimental.infer.models.llama.llama import ParallelLlamaForCausalLM
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
 @pytest.mark.level0

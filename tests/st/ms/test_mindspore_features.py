@@ -67,8 +67,13 @@ def test_qbmm_biasadd_fusion_executor(is_row_parallel):
             return x
 
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNEL_LIST'] = 'QbmmAllReduceAdd,QbmmAdd'
-    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
+    IS_INTERNAL_KERNEL = False
+    if not os.environ.get('MS_ENABLE_INTERNAL_KERNELS'):
+        IS_INTERNAL_KERNEL = True
+        os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
+    IS_ASCEND_HOME_PATH = False
     if not os.environ.get('ASCEND_HOME_PATH'):
+        IS_ASCEND_HOME_PATH = True
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'
     save_graphs_path = "./test_qbmm_biasadd_fusion_irs"
     context.set_context(mode=context.GRAPH_MODE, device_target="Ascend",
@@ -98,8 +103,10 @@ def test_qbmm_biasadd_fusion_executor(is_row_parallel):
                 res_ok = False
                 break
     os.environ.pop('MS_INTERNAL_ENABLE_CUSTOM_KERNEL_LIST')
-    os.environ.pop('MS_ENABLE_INTERNAL_KERNELS')
-    os.environ.pop('ASCEND_HOME_PATH')
+    if IS_INTERNAL_KERNEL:
+        os.environ.pop('MS_ENABLE_INTERNAL_KERNELS')
+    if IS_ASCEND_HOME_PATH:
+        os.environ.pop('ASCEND_HOME_PATH')
     assert res_ok
 
 
