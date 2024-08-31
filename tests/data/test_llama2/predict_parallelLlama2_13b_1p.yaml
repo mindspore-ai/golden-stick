@@ -124,7 +124,7 @@ processor:
     eos_token: '</s>'
     pad_token: '<unk>'
     type: LlamaTokenizer
-    vocab_file: ""
+    vocab_file: "../../../data/llama2-tokenizer.model"
   type: LlamaProcessor
 
 # metric

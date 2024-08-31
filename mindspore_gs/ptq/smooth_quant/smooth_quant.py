@@ -27,7 +27,7 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq import PTQMode
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, BackendTarget
+from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, BackendTarget, OutliersSuppressionType
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.smooth_quant.sq_cell import SQCell
 from mindspore_gs.common import logger
@@ -49,9 +49,7 @@ class SmoothQuant(CompAlgo):
             self._config = PTQConfig()
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig.inner_config(self._config, approach=PTQApproach.SMOOTH_QUANT)
-        self._config.act_quant_dtype = msdtype.int8
-        self._config.weight_quant_dtype = msdtype.int8
-        self._config.kvcache_quant_dtype = None
+        SmoothQuant._ptq_config_check(self._config)
         if self._config.backend != BackendTarget.ASCEND:
             raise ValueError("SmoothQuant only support ASCEND as BackendTarget now, "
                              f"but got {self._config.backend}.")
@@ -72,6 +70,21 @@ class SmoothQuant(CompAlgo):
     def _init_net_policy(config):
         SmoothQuant.load_mindformers_plugin()
         return SQNetPolicy(config)
+
+    @staticmethod
+    def _ptq_config_check(config):
+        """_ptq_config_check"""
+        do_a8w8 = config.act_quant_dtype == msdtype.int8 and \
+                config.weight_quant_dtype == msdtype.int8 and \
+                    config.outliers_suppression == OutliersSuppressionType.SMOOTH and \
+                    config.kvcache_quant_dtype is None
+        do_nothing = config.act_quant_dtype is None and \
+                config.weight_quant_dtype is None and \
+                    config.outliers_suppression is None and \
+                    config.kvcache_quant_dtype is None
+        if not do_a8w8 and not do_nothing:
+            raise ValueError("SmoothQuant algorithm only support A8W8 now, please set act_quant_dtype=int8."
+                             "weight_quant_dtype=int8 and outliers_suppression='smooth'.")
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: Dataset = None) -> Cell:
