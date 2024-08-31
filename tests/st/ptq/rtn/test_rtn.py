@@ -17,9 +17,9 @@ import os
 import sys
 
 import pytest
-from mindspore import nn
+from mindspore import nn, dtype
 from mindspore_gs.ptq import RoundToNearest as RTN
-from mindspore_gs.ptq.ptq_config import PTQConfig, BackendTarget
+from mindspore_gs.ptq.ptq_config import PTQConfig, BackendTarget, OutliersSuppressionType
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
 
 
@@ -74,7 +74,8 @@ def test_convert_error():
     Expectation: Except TypeError.
     """
     network = nn.Conv2d(6, 5, kernel_size=2)
-    ptq = RTN()
+    config = PTQConfig()
+    ptq = RTN(config)
     new_network = ptq.apply(network)
     with pytest.raises(TypeError, match="Type of net_opt should be"):
         ptq.convert(100)
@@ -84,3 +85,49 @@ def test_convert_error():
 
     with pytest.raises(ValueError, match="The parameter `ckpt_path` can only be empty or a valid file"):
         ptq.convert(new_network, "file_path")
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_ptq_config_error():
+    """
+    Feature: simulated RoundToNearest _ptq_config_check function.
+    Description: Feed invalid value of PTQConfig to _ptq_config_check function.
+    Expectation: Except ValueError.
+    """
+    config = PTQConfig(act_quant_dtype=dtype.int8)
+    with pytest.raises(ValueError):
+        _ = RTN(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.int8)
+    with pytest.raises(ValueError):
+        _ = RTN(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, kvcache_quant_dtype=dtype.int8)
+    with pytest.raises(ValueError):
+        _ = RTN(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
+    with pytest.raises(ValueError):
+        _ = RTN(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.int8,
+                       kvcache_quant_dtype=dtype.int8)
+    with pytest.raises(ValueError):
+        _ = RTN(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.int8,
+                       outliers_suppression=OutliersSuppressionType.SMOOTH)
+    with pytest.raises(ValueError):
+        _ = RTN(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None,
+                       kvcache_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
+    with pytest.raises(ValueError):
+        _ = RTN(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.int8,
+                       kvcache_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
+    with pytest.raises(ValueError):
+        _ = RTN(config)

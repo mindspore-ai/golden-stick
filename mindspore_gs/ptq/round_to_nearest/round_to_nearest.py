@@ -30,7 +30,8 @@ from mindspore_gs import CompAlgo
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQMode, PTQApproach, BackendTarget
+from mindspore_gs.ptq.ptq_config import (PTQConfig, InnerPTQConfig, PTQMode,
+                                         PTQApproach, BackendTarget, OutliersSuppressionType)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.common.utils import value_check
 from .rtn_net_policy import RTNNetPolicy
@@ -73,6 +74,7 @@ class RoundToNearest(CompAlgo):
         if self._config.backend != BackendTarget.ASCEND:
             raise ValueError("RoundToNearest only support ASCEND as BackendTarget now, "
                              f"but got {self._config.backend}.")
+        RoundToNearest._ptq_config_check(self._config)
         self._ptq_policy = RoundToNearest._init_net_policy(self._config)
         self._custom_transforms = {}
         self._custom_layer_policy_map = {}
@@ -95,6 +97,11 @@ class RoundToNearest(CompAlgo):
     def _create_config(self):
         """Create SimulatedQuantizationConfig."""
         self._config = PTQConfig()
+
+    @staticmethod
+    def _ptq_config_check(config):
+        if config.act_quant_dtype is not None or config.outliers_suppression != OutliersSuppressionType.NONE:
+            raise ValueError(f"RTN algorithm only support A16W8、C8、A16W8C8, please set the correct configuration.")
 
     @staticmethod
     def _convert2list(name, value):

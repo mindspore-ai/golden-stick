@@ -18,6 +18,7 @@ import numpy as np
 
 from mindspore import Parameter, Tensor, dtype
 from mindspore import ops as msops
+from mindspore.ops import functional as F
 from mindspore.common.initializer import initializer
 from mindspore.nn import Cell
 from mindspore.ops.operations.comm_ops import ReduceOp
@@ -399,17 +400,77 @@ class DeployLinearCell(WrapperLinearCell):
     def deploy(self):
         return self
 
+    def col_linear_forward(self, input_, weight=None):
+        """col_linear_forward"""
+        out_shape = input_.shape[:-1] + (self.oc,)
+        input_ = msops.reshape(input_, (-1, self.ic))
+        if weight is None and self.layer.skip_weight_param_allocation:
+            raise ValueError("For ColumnParallelLinear, when skip_weight_param_allocation=True,"
+                             " weight should be passed to construct(), but got None.")
+
+        if self.layer.sequence_parallel or self.layer.explicit_expert_comm:
+            input_parallel = input_
+        else:
+            input_parallel = self.layer.copy_to_mp_region(input_)
+
+        origin_dtype = F.dtype(input_parallel)
+        if not self.layer.skip_weight_param_allocation:
+            weight = self.layer.weight
+        input_parallel = self.layer.cast(input_parallel, self.layer.compute_dtype)
+
+        if self.layer.sequence_parallel:
+            input_parallel = input_parallel.swapaxes(0, 1).contiguous()
+            input_parallel = self.layer.gather_from_sp_region(input_parallel)
+            input_parallel = input_parallel.swapaxes(0, 1).contiguous()
+        output_parallel = self.layer.matmul(input_parallel, weight)
+        if self.layer.has_bias:
+            output_parallel = self.layer.bias_add(
+                output_parallel, self.layer.cast(self.layer.bias, self.layer.compute_dtype)
+            )
+        output_parallel = self.layer.cast(output_parallel, origin_dtype)
+
+        if self.layer.gather_output:
+            output = self.layer.gather_from_mp_region(output_parallel)
+        else:
+            output = output_parallel
+        output = msops.reshape(output, out_shape)
+        return output
+
+    def row_linear_forward(self, input_):
+        """row_linear_forward"""
+        out_shape = input_.shape[:-1] + (self.oc,)
+        input_ = msops.reshape(input_, (-1, self.ic))
+        if self.layer.input_is_parallel:
+            input_parallel = input_
+        else:
+            input_parallel = self.layer.scatter_to_mp_region(input_)
+
+        origin_dtype = F.dtype(input_parallel)
+        input_parallel = self.layer.cast(input_parallel, self.layer.compute_dtype)
+        output_parallel = self.layer.matmul(input_parallel, self.layer.weight)
+        if self.layer.explicit_expert_comm:
+            output = output_parallel
+        elif self.layer.sequence_parallel:
+            output_parallel = output_parallel.swapaxes(0, 1).contiguous()
+            output = self.layer.reduce_scatter_to_sp_region(output_parallel)
+            output = output.swapaxes(0, 1).contiguous()
+        else:
+            output = self.layer.reduce_from_mp_region(output_parallel)
+
+        if self.layer.has_bias:
+            output = self.layer.bias_add(output, self.layer.cast(self.layer.bias, self.layer.compute_dtype))
+        output = self.layer.cast(output, origin_dtype)
+        output = msops.reshape(output, out_shape)
+        return output
+
     def construct(self, x, *args, **kwargs):
         """linear deploy construct"""
         if self.is_linear:
             return self.layer(x)
-        out_shape = x.shape[:-1] + (self.oc,)
-        x = msops.reshape(x, (-1, self.ic))
         if self.is_colparallel:
-            x = self.layer(x, *args, **kwargs)
+            x = self.col_linear_forward(x, *args, **kwargs)
         if self.is_rowparallel:
-            x = self.layer(x)
-        x = msops.reshape(x, out_shape)
+            x = self.row_linear_forward(x)
         return x
 
 

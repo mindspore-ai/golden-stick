@@ -61,6 +61,7 @@ class PTQ(CompAlgo):
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig().inner_config(self._config, approach=PTQApproach.PTQ)
         logger.info(f"Config for PTQ: {self._config}")
+        PTQ._ptq_config_check(self._config)
         self.pipeline: List[Algorithm] = []
         self.build_pipeline()
         self.context_mode = get_context("mode")
@@ -85,6 +86,7 @@ class PTQ(CompAlgo):
 
     @staticmethod
     def _ptq_config_check(config):
+        """_ptq_config_check"""
         if config.outliers_suppression is None and \
             config.weight_quant_dtype == dtype.int8 and \
                 config.act_quant_dtype == dtype.int8:
@@ -92,6 +94,8 @@ class PTQ(CompAlgo):
         if config.weight_quant_dtype is None and \
                 config.act_quant_dtype == dtype.int8:
             raise ValueError("PTQ algorithm not support only quant activation.")
+        if  config.mode == PTQMode.QUANTIZE and get_context("mode") != PYNATIVE_MODE:
+            raise ValueError("Quantization phase only support PYNATIVE MODE.")
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper, ds=None, **kwargs) -> Cell:
@@ -107,7 +111,6 @@ class PTQ(CompAlgo):
                     processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
-        self._ptq_config_check(self._config)
         if not ds:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
         if self.context_mode != PYNATIVE_MODE:

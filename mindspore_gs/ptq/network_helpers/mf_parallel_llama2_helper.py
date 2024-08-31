@@ -71,7 +71,9 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
         network.set_train(False)
         network.phase = 'predict'
-        transform_and_load_checkpoint(self.mf_config, None, network, None)
+        ckpt_path = self.mf_config.load_checkpoint
+        if ckpt_path:
+            transform_and_load_checkpoint(self.mf_config, None, network, None)
         return network
 
     def get_decoder_layers(self, network: ParallelLlamaForCausalLM):

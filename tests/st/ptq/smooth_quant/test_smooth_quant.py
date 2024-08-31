@@ -34,7 +34,7 @@ from mindformers import LlamaForCausalLM
 
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, SmoothQuantConfig, PTQApproach
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, SmoothQuantConfig, PTQApproach, OutliersSuppressionType
 from mindspore_gs.ptq.smooth_quant.smooth_quant import SmoothQuant
 from mindspore_gs.ptq.smooth_quant.quant_cells.mindformers.layer_policys import LinearLayerPolicy
 from mindspore_gs.ptq.smooth_quant.quant_cells.mindformers.quant_cells import SQLinearActObserver, \
@@ -57,7 +57,8 @@ def test_constructor():
     Description: Call constructor of smooth quant and check config.
     Expectation: smooth_quant related is updated according to argument `config` of constructor.
     """
-    sq = SmoothQuant()
+    config = PTQConfig(act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
+    sq = SmoothQuant(config)
     assert isinstance(sq._config, InnerPTQConfig)
     assert sq._config.algo_args.get("alpha", None) == 0.5
     assert sq._config.act_quant_dtype == dtype.int8
@@ -65,13 +66,42 @@ def test_constructor():
     assert sq._config.kvcache_quant_dtype is None
 
     sq_args = SmoothQuantConfig(alpha=0.8)
-    cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, algo_args=sq_args)
+    cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, act_quant_dtype=dtype.int8,
+                    outliers_suppression=OutliersSuppressionType.SMOOTH, algo_args=sq_args)
     sq = SmoothQuant(cfg)
     assert isinstance(sq._config, InnerPTQConfig)
     assert sq._config.algo_args.get("alpha", None) == 0.8
     assert sq._config.act_quant_dtype == dtype.int8
     assert sq._config.weight_quant_dtype == dtype.int8
     assert sq._config.kvcache_quant_dtype is None
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_ptq_config_error():
+    """
+    Feature: simulated SmoothQuant _ptq_config_check function.
+    Description: Feed invalid value of PTQConfig to _ptq_config_check function.
+    Expectation: Except ValueError.
+    """
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None)
+    with pytest.raises(ValueError):
+        _ = SmoothQuant(config)
+
+    config = PTQConfig()
+    with pytest.raises(ValueError):
+        _ = SmoothQuant(config)
+
+    config = PTQConfig(weight_quant_dtype=None, kvcache_quant_dtype=dtype.int8)
+    with pytest.raises(ValueError):
+        _ = SmoothQuant(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None,
+                       kvcache_quant_dtype=dtype.int8)
+    with pytest.raises(ValueError):
+        _ = SmoothQuant(config)
+
 
 
 class SimpleNet(nn.Cell):
@@ -183,7 +213,8 @@ def test_apply_convert():
     Expectation: network structure changed.
     """
 
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                    act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
     ptq = SmoothQuant(cfg)
     network = SimpleNet(transpose_b=False)
     net_helper = SimpleNetworkHelper(batch_size=1, seq_length=5)
@@ -257,7 +288,8 @@ def test_apply_convert_error():
     Description: Apply SmoothQuant on SimpleNet with error arguments.
     Expectation: raise error.
     """
-    ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
+    ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH))
     network = SimpleNet()
     net_helper = SimpleNetworkHelper(batch_size=1, seq_length=1)
     ds = create_foo_ds(1)
@@ -290,7 +322,8 @@ def test_nothing_to_apply_convert():
     Description: Apply SmoothQuant on NoQuantNet.
     Expectation: warning log.
     """
-    ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
+    ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH))
     network = NoQuantNet()
     net_helper = SimpleNetworkHelper(batch_size=1, seq_length=1)
     ds = create_foo_ds(1)
@@ -320,7 +353,8 @@ def test_sq_linear_wrapper(mode, transpose_b):
     Expectation: Same with numpy.
     """
     context.set_context(device_target="Ascend", mode=mode)
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, act_quant_dtype=dtype.int8)
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                    act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
     inner_cfg = InnerPTQConfig.inner_config(cfg, PTQApproach.SMOOTH_QUANT)
     act_in = 5
     act_out = 6
@@ -432,7 +466,8 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
         set_algo_parameters(elementwise_op_strategy_follow=True)
 
     def quant(input_):
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                        act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = SmoothQuant(cfg)
 
         network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
@@ -451,7 +486,8 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
 
     def infer(input_):
         context.set_context(mode=mode)
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND,
+                        act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = SmoothQuant(cfg)
         network = SimpleNet(in_channels=weight_in, out_channels=weight_out, transpose_b=transpose_b,
                             strategy=p_strategy)
@@ -559,7 +595,8 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
             load_checkpoint(ckpt_path, network)
         else:
             network = load_distribut_checkpoint(config, ckpt_path, network)
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"])
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
+                        act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = SmoothQuant(config=cfg)
         net_helper = MFLlama2HelloNetworkHelper(config)
         ds = create_hello_ds(tokenizer, 1)
@@ -577,7 +614,8 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     def w8a8_infer(input_, ckpt_path, config_path):
         config = set_config(config_path)
         network = LlamaForCausalLM(config.model.model_config)
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"])
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
+                        act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = SmoothQuant(config=cfg)
         network = ptq.apply(network)
         network = ptq.convert(network)

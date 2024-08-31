@@ -19,7 +19,8 @@ import sys
 import pytest
 from mindspore import dtype as msdtype
 
-from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig, PTQApproach, PTQMode
+from mindspore_gs.ptq.ptq_config import (PTQConfig, SmoothQuantConfig, InnerPTQConfig,
+                                         PTQApproach, PTQMode, OutliersSuppressionType)
 from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
@@ -82,6 +83,14 @@ def test_ptq_config_construct():
         _ = PTQConfig(act_quant_dtype=["1"])
     with pytest.raises(ValueError):
         _ = PTQConfig(act_quant_dtype=msdtype.float16)
+    with pytest.raises(TypeError):
+        _ = PTQConfig(outliers_suppression=1)
+    with pytest.raises(TypeError):
+        _ = PTQConfig(outliers_suppression='awq')
+    with pytest.raises(ValueError):
+        _ = PTQConfig(algo_args="1")
+    with pytest.raises(ValueError):
+        _ = PTQConfig(algo_args=["1", 1])
 
 
 @pytest.mark.level0
@@ -172,6 +181,7 @@ def test_ptq_yaml_dump_and_load():
     cfg.weight_quant_dtype = None
     cfg.kvcache_quant_dtype = msdtype.int8
     cfg.act_quant_dtype = msdtype.int8
+    cfg.outliers_suppression = OutliersSuppressionType.SMOOTH
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
@@ -180,6 +190,7 @@ def test_ptq_yaml_dump_and_load():
     assert new_cfg.kvcache_quant_dtype is msdtype.int8
     assert new_cfg.weight_quant_dtype is None
     assert new_cfg.act_quant_dtype is msdtype.int8
+    assert new_cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
 
 
 @pytest.mark.level0
