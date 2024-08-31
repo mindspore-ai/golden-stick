@@ -62,11 +62,13 @@ def test_apply_convert(device, mode):
     Description: Apply RoundToNearestPTQ on SimpleNet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
+    device_id = os.environ.get('DEVICE_ID', '0')
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     print(f"---------------- Testing params: {device} {mode} ", flush=True)
-    context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    context.set_context(device_target=device, mode=mode, device_id=int(device_id),
+                        jit_config={"jit_level": "O0", "infer_boost": "on"})
     network = SimpleNet()
     ptq = RTN()
     # pylint: disable=W0212
@@ -128,11 +130,13 @@ def test_apply_convert(device, mode):
 def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=False):
     """test_kv_predict_llama2_2stage"""
     os.environ['GRAPH_OP_RUN'] = "1"
+    device_id = os.environ.get('DEVICE_ID', '0')
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     print(f"---------------- Testing params: {device} {mode} ", flush=True)
-    context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    context.set_context(device_target=device, mode=mode, device_id=int(device_id),
+                        jit_config={"jit_level": "O0", "infer_boost": "on"})
     if model_parallel == 1:
         fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
         w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
