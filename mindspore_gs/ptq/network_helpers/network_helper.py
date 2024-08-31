@@ -21,6 +21,8 @@ from dataclasses import dataclass
 import numpy as np
 from mindspore.nn import Cell
 
+from mindspore_gs.common.utils import value_check
+
 
 class LayerType(enum.Enum):
     UNKNOWN = 0
@@ -34,6 +36,11 @@ class LayerInfo:
     name: str = ""
     layer: Cell = None
     type_: LayerType = LayerType.UNKNOWN
+
+    def __post_init__(self):
+        value_check('name', self.name, str)
+        value_check('layer', self.layer, Cell)
+        value_check('type', self.type_, LayerType)
 
 
 class DecoderGroupInfo:

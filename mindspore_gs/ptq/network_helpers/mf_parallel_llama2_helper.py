@@ -101,6 +101,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         Returns:
             A list of `Cell` as linear layers of decoder layer.
         """
+        value_check('decoder_layer', decoder_layer, ParallelLlamaTransformerLayer)
         attention: ParallelLlamaAttention = decoder_layer.attention
         if not isinstance(attention, ParallelLlamaAttention):
             raise RuntimeError(f"Only support ParallelLlamaAttention as attention but got {attention}")
@@ -131,6 +132,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         Returns:
             A list of `Cell` as PageAttentionMgr layers of decoder layer.
         """
+        value_check('decoder_layer', decoder_layer, ParallelLlamaTransformerLayer)
         if not self.mf_config.model.model_config.use_past:
             raise ValueError("use_path need be True when doing kv cache quantizer.")
         attention: ParallelLlamaAttention = decoder_layer.attention
@@ -239,6 +241,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
                     return cell, True
                 return cell, False
 
+        value_check('network', network, ParallelLlamaForCausalLM)
         self._decoder_infos.clear()
         analyzer = Llama2Analyzer(MFParallelLlama2Helper._decoder_analysis)
         analyzer.process(network)

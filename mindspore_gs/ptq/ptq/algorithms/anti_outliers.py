@@ -89,7 +89,7 @@ class LinearSmoother(Algorithm):
         smooth_linear_type = LinearSmoother._linear_map.get(linear_type[0])
         self._replace(decoder_layer_name, decoder_layer, tuple(linear_type), smooth_linear_type, network_helper)
 
-    def process(self, decoder_layer_name: str, decoder_layer, args_list, kwargs_list, network_helper: NetworkHelper):
+    def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
         """process"""
         _, _, linears = network_helper.get_linears(decoder_layer)
         for linear in linears:

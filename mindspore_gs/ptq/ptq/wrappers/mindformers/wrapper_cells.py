@@ -33,7 +33,7 @@ from mindformers.experimental.distri_cores.tensor_parallel.collective_primitives
     MaxFromTensorParallelRegion, MinFromTensorParallelRegion
 )
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import LayerType, NetworkHelper
@@ -325,7 +325,7 @@ class QuantLinearCell(WrapperLinearCell):
             self.layer.has_bias = True
             self.layer.bias = Parameter(bias.astype(self.compute_type), name=bias_name)
             # FIXME hangangqiang, decouple with smooth
-            if self.cfg.outliers_suppression == "smooth" and not self.cfg.smooth_to_pre_layer:
+            if self.cfg.outliers_suppression == OutliersSuppressionType.SMOOTH and not self.cfg.smooth_to_pre_layer:
                 smooth_scale = self.layer.matmul.mm.mul_scale.asnumpy()
             else:
                 smooth_scale = None
@@ -350,7 +350,7 @@ class QuantLinearCell(WrapperLinearCell):
         def hook_fn(_, inps):
             x = inps[0]
             self.samples.append(msops.squeeze(x))
-        if self.cfg.outliers_suppression == "smooth" and not self.cfg.smooth_to_pre_layer:
+        if self.cfg.outliers_suppression == OutliersSuppressionType.SMOOTH and not self.cfg.smooth_to_pre_layer:
             self._layer.matmul.mm.mm.register_forward_pre_hook(hook_fn)
         else:
             self._layer.matmul.register_forward_pre_hook(hook_fn)

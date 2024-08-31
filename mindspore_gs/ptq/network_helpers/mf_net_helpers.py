@@ -118,7 +118,7 @@ class MFLlama2Helper(MFNetworkHelper):
     Raises:
         TypeError: If input `config` is not an instance of `MindFormerConfig`.
     """
-    def __init__(self, config: MindFormerConfig = None):
+    def __init__(self, config: Union[str, MindFormerConfig] = None):
         super().__init__(config)
         self._decoder_infos = OrderedDict()
 
@@ -320,7 +320,7 @@ class MFLlama2Helper(MFNetworkHelper):
                     self.infos[cell_name] = self._fn(cell_name, cell)
                     return cell, True
                 return cell, False
-
+        value_check('network', network, LlamaForCausalLM)
         self._decoder_infos.clear()
         analyzer = Llama2Analyzer(MFLlama2Helper._decoder_analysis)
         analyzer.process(network)
@@ -361,6 +361,7 @@ class MFLlama2Helper(MFNetworkHelper):
 
     def get_pre_layer(self, linear_name: str):
         """get_pre_layer"""
+        value_check('linear_name', linear_name, str)
         splits = linear_name.split('.')
         decoder_info: DecoderGroupInfo = self._decoder_infos.get(f'root.model.layers.{splits[3]}')
         if not decoder_info:

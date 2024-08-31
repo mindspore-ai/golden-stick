@@ -617,6 +617,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
 
 
+#FIXME hangangqiang, because of timeout
 # @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -632,6 +633,7 @@ def test_sq_llama2_predict_2stage_1p(device, mode):
     assert sq_predict_llama2_2stage(device, mode, model_parallel)
 
 
+#FIXME hangangqiang, because of timeout
 # @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single

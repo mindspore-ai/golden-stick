@@ -50,6 +50,17 @@ class PTQMode(Enum):
     DEPLOY = 'deploy'
 
 
+class OutliersSuppressionType(Enum):
+    """
+    Outliers suppression type for ptq quantizer.
+
+    - ``SMOOTH``: apply smooth scale between weight and activate.
+    - ``NONE``: not doing any outliers suppression.
+    """
+    SMOOTH = 'smooth'
+    NONE = 'none'
+
+
 @algo_cfg_register.register(PTQApproach.OMNI_QUANT)
 @dataclass
 class OmniQuantConfig:
@@ -77,10 +88,6 @@ class OmniQuantConfig:
 @dataclass
 class PTQQuantConfig:
     """config for omni quant algorithm"""
-    enable_smooth: bool = False
-
-    def __post_init__(self):
-        value_check('enable_smooth', self.enable_smooth, bool)
 
 
 @algo_cfg_register.register(PTQApproach.SMOOTH_QUANT)
@@ -143,7 +150,7 @@ class PTQConfig:
     weight_quant_dtype: msdtype = msdtype.int8
     kvcache_quant_dtype: msdtype = None
     act_quant_dtype: msdtype = None
-    outliers_suppression: str = None
+    outliers_suppression: OutliersSuppressionType = OutliersSuppressionType.NONE
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():
@@ -156,8 +163,9 @@ class PTQConfig:
             raise ValueError(f'self.kvcache_quant_dtype: {self.kvcache_quant_dtype} is not mindspore.dtype.int8 or None.')
         if self.act_quant_dtype != msdtype.int8 and self.act_quant_dtype is not None:
             raise ValueError(f'self.act_quant_dtype: {self.act_quant_dtype} is not mindspore.dtype.int8 or None.')
-        if self.outliers_suppression is not None and self.outliers_suppression != 'smooth':
-            raise ValueError(f"outliers_suppression only support 'smooth' or 'None' currently.")
+        value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
+        if not isinstance(self.algo_args, dict) and not is_dataclass(self.algo_args):
+            raise ValueError(f"algo_args's type should be dict or dataclass, but now is {type(self.algo_args)}")
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
@@ -255,6 +263,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['kvcache_quant_dtype'] = str(self.kvcache_quant_dtype)
         parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
         parsed_dict['act_quant_dtype'] = str(self.act_quant_dtype)
+        parsed_dict['outliers_suppression'] = self.outliers_suppression.name
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
@@ -271,6 +280,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('mode', PTQMode),
             ('backend', BackendTarget),
             ('approach', PTQApproach),
+            ('outliers_suppression', OutliersSuppressionType),
             ('kvcache_quant_dtype', MSDTypeLoader()),
             ('weight_quant_dtype', MSDTypeLoader()),
             ('act_quant_dtype', MSDTypeLoader())
