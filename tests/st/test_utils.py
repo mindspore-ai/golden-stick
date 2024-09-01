@@ -19,6 +19,8 @@ import shutil
 import subprocess
 import time
 import re
+from typing import Union, List
+
 import numpy as np
 from mindspore import log as logger
 from mindspore import load_checkpoint, Model
@@ -166,6 +168,9 @@ def set_config(config_path):
         parallel_config = TransformerOpParallelConfig(**mfconfig.parallel_config)
         mfconfig.model.model_config.parallel_config = parallel_config
     mfconfig.model.model_config.checkpoint_name_or_path = mfconfig.load_checkpoint
+    device_id = int(os.environ.get('DEVICE_ID', '0'))
+    mfconfig.context.device_id = device_id
+    print(f"---- use device_id: {device_id}", flush=True)
     return mfconfig
 
 
@@ -191,12 +196,14 @@ def load_distribut_checkpoint(config, ckpt_path, network):
 class MFLlama2HelloNetworkHelper(MFLlama2Helper):
     """SimpleNetworkHelper"""
 
-    def generate(self, mf_network, input_ids, max_new_tokens=1):
+    def generate(self, mf_network, input_ids: Union[np.ndarray, List[int], List[List[int]]],
+                 max_new_tokens=1, **kwargs):
         do_sample = self.mf_config.model.model_config.do_sample
         seq = self.mf_config.model.model_config.seq_length
         top_p = self.mf_config.model.model_config.top_p
         top_k = self.mf_config.model.model_config.top_k
         return mf_network.generate(input_ids, do_sample=do_sample, max_length=seq, top_p=top_p, top_k=top_k)
+
 
 def create_hello_ds(tokenizer, repeat=1):
     """create_hello_ds"""

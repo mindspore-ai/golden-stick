@@ -102,7 +102,6 @@ def create_cfg(quant_algo_, mode):
 
 def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     """omni quant to quant llama2"""
-    os.environ['HCCL_BUFFSIZE'] = "100"
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
@@ -115,6 +114,9 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     helper.mf_config.load_checkpoint = os.path.join(cur_dir, ckpt_path)
     helper.mf_config.output_dir = os.path.join(cur_dir, output_dir_)
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
+    device_id = int(os.environ.get('DEVICE_ID', '0'))
+    helper.mf_config.context.device_id = device_id
+    print(f"---- use device_id: {device_id}", flush=True)
     config = helper.mf_config
 
     init()
@@ -159,7 +161,6 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
 
 def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     """eval llama2 by float ckpt and int ckpt"""
-    os.environ['HCCL_BUFFSIZE'] = "100"
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
@@ -172,6 +173,9 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = os.path.join(cur_dir, ckpt_path_)
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
+    device_id = int(os.environ.get('DEVICE_ID', '0'))
+    helper.mf_config.context.device_id = device_id
+    print(f"---- use device_id: {device_id}", flush=True)
     config = helper.mf_config
 
     set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})

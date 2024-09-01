@@ -651,11 +651,13 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     npfoutput = np.array(foutput)
     npqoutput = np.array(qoutput)
     if not np.allclose(npqoutput[:, :329], npfoutput[:, :329], 0, 0):
+        print(f"npfoutput: {npfoutput}", flush=True)
+        print(f"npqoutput: {npqoutput}", flush=True)
+        print(f"First not equal index {np.min(np.where((npfoutput - npqoutput) != 0))}", flush=True)
         return False
     return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
 
 
-#FIXME hangangqiang, because of timeout
 # @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -671,7 +673,6 @@ def test_sq_llama2_predict_2stage_1p(device, mode):
     assert sq_predict_llama2_2stage(device, mode, model_parallel)
 
 
-#FIXME hangangqiang, because of timeout
 # @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single

@@ -87,7 +87,6 @@ def test_layer_info_error():
         _ = LayerInfo(type_="1")
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A8W8'])
@@ -112,7 +111,6 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A16W8'])
@@ -137,7 +135,6 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A8W8C8'])
@@ -162,7 +159,6 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8c8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A16W8C8'])
@@ -187,7 +183,6 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8c8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['C8'])
@@ -212,7 +207,6 @@ def test_ptq_llama2_predict_2stage_1p_run_c8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize("quant_algo", ['A8W8'])
@@ -238,7 +232,6 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize("quant_algo", ['A16W8'])
@@ -264,7 +257,6 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize("quant_algo", ['A8W8C8'])
@@ -290,7 +282,6 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8c8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize("quant_algo", ['A16W8C8'])
@@ -316,7 +307,6 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8c8(quant_algo):
     assert return_code == 0
 
 
-# @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize("quant_algo", ['C8'])
