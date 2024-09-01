@@ -83,8 +83,12 @@ class SmoothQuant(CompAlgo):
                     config.outliers_suppression is None and \
                     config.kvcache_quant_dtype is None
         if not do_a8w8 and not do_nothing:
-            raise ValueError("SmoothQuant algorithm only support A8W8 now, please set act_quant_dtype=int8."
-                             "weight_quant_dtype=int8 and outliers_suppression='smooth'.")
+            raise ValueError("SmoothQuant algorithm only support A8W8, please set act_quant_dtype=int8,"
+                             "weight_quant_dtype=int8 and outliers_suppression='smooth'."
+                             f"Now the configuration is act_quant_dtype={config.act_quant_dtype},"
+                             f"weight_quant_dtype={config.weight_quant_dtype},"
+                             f"kvcache_quant_dtype={config.kvcache_quant_dtype},"
+                             f"outliers_suppression={config.outliers_suppression}")
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets: Dataset = None) -> Cell:

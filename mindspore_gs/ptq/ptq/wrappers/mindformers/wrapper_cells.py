@@ -333,7 +333,7 @@ class QuantLinearCell(WrapperLinearCell):
             qmm = AllQuantMatmul(x_scale, x_zp, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b,
                                  smooth_scale=smooth_scale)
         if self.a16w8:
-            qmm = WeightQuantMatmul(w_scale, w_zp, transpose_b=self.layer.transpose_b)
+            qmm = WeightQuantMatmul(w_scale, w_zp, in_channels=self.ic, transpose_b=self.layer.transpose_b)
         if self.a8w8 or self.a16w8:
             self.layer.weight = Parameter(weight.astype(dtype.int8), name=self.layer.weight.name)
             self.layer.matmul = qmm
@@ -391,7 +391,7 @@ class DeployLinearCell(WrapperLinearCell):
             x_zp = np.array(1.0)
             qmm = AllQuantMatmul(x_scale, x_zp, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b)
         elif self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
-            qmm = WeightQuantMatmul(w_scale, w_zp, transpose_b=self.layer.transpose_b)
+            qmm = WeightQuantMatmul(w_scale, w_zp, in_channels=self.ic, transpose_b=self.layer.transpose_b)
         self.layer.matmul = qmm
         self.is_rowparallel = (isinstance(self.layer, RowParallelLinear))
         self.is_colparallel = (isinstance(self.layer, ColumnParallelLinear))
@@ -403,7 +403,6 @@ class DeployLinearCell(WrapperLinearCell):
     def col_linear_forward(self, input_, weight=None):
         """col_linear_forward"""
         out_shape = input_.shape[:-1] + (self.oc,)
-        input_ = msops.reshape(input_, (-1, self.ic))
         if weight is None and self.layer.skip_weight_param_allocation:
             raise ValueError("For ColumnParallelLinear, when skip_weight_param_allocation=True,"
                              " weight should be passed to construct(), but got None.")
@@ -439,7 +438,6 @@ class DeployLinearCell(WrapperLinearCell):
     def row_linear_forward(self, input_):
         """row_linear_forward"""
         out_shape = input_.shape[:-1] + (self.oc,)
-        input_ = msops.reshape(input_, (-1, self.ic))
         if self.layer.input_is_parallel:
             input_parallel = input_
         else:
@@ -504,24 +502,25 @@ class AllQuantMatmul(Cell):
 
     def construct(self, x, quant_weight):
         # x: fp16 quant_weight: int8
-        quant_weight = quant_weight.astype(dtype.int8)
         qx = self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
+        qx = msops.reshape(qx, (-1, self.ic))
         return self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, None)
 
 
 class WeightQuantMatmul(Cell):
     """quant batch matmul"""
 
-    def __init__(self, t_scale, t_zp, transpose_a=False, transpose_b=False, dst_type=dtype.float16):
+    def __init__(self, t_scale, t_zp, in_channels=None, transpose_a=False, transpose_b=False, dst_type=dtype.float16):
         super().__init__()
         self.dst_dtype = dst_type
+        self.ic = in_channels
         self.t_scale = Parameter(Tensor(np.squeeze(t_scale), dtype=self.dst_dtype))
         self.t_zp_neg = Parameter(Tensor(np.squeeze(t_zp) * -1, dtype=self.dst_dtype))
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b)
 
     def construct(self, x, weight):
         """forward for antiquant bmm cell"""
-        weight = weight.astype(dtype.int8)
+        x = msops.reshape(x, (-1, self.ic))
         output = self.weight_qbmm(x, weight, self.t_scale, self.t_zp_neg, None, None, None)
         return output.astype(self.dst_dtype)
 
