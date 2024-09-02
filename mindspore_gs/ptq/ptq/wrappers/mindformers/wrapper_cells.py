@@ -595,6 +595,7 @@ class QuantPageAttentionMgrCell(WrapperCell):
         return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
                                                      block_tables, batch_valid_length, alibi_tensor)
 
+
 class QuantPageAttentionMgrDeployCell(Cell):
     """QuantPageAttentionMgrDeployCell"""
 
@@ -658,6 +659,7 @@ class QuantPageAttentionMgrDeployCell(Cell):
                                                      block_tables, batch_valid_length, self.key_value_t_scale,
                                                      self.key_value_t_zp, alibi_tensor)
 
+
 class DeployPageAttentionMgrCell(WrapperCell):
     """DeployPageAttentionMgrCell"""
 
@@ -679,6 +681,7 @@ class DeployPageAttentionMgrCell(WrapperCell):
         if self.enable_deploy_fusion:
             return PagedAttentionDeployFusion(self.layer)
         return PagedAttentionDeploy(self.layer)
+
 
 class PagedAttentionDeployBase(Cell):
     """PagedAttention deploy base class"""
@@ -736,6 +739,7 @@ class PagedAttentionDeployBase(Cell):
     def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
         """The forward compute of KVCache for Paged Attention with alibi tensor."""
         return NotImplementedError
+
 
 class PagedAttentionDeploy(PagedAttentionDeployBase):
     """PagedAttention deploy with no fuison"""
