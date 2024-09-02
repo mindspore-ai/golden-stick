@@ -59,6 +59,12 @@ class MFNetworkHelper(NetworkHelper):
         self.mf_config.model.model_config.parallel_config = self.mf_config.parallel_config
 
     def create_network(self):
+        """
+        Create network of type LlamaForCasualLM.
+
+        Returns:
+            Network of type LlamaForCasualLM.
+        """
         build_context(self.mf_config)
         network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
         network.set_train(False)
@@ -77,6 +83,15 @@ class MFNetworkHelper(NetworkHelper):
         return network
 
     def get_spec(self, name: str):
+        """
+        Get network specific, such as batch_size, seq_length and so on.
+
+        Args:
+            name (str): Name of specific.
+
+        Returns:
+            Object as network specific.
+        """
         value_check('name', name, str)
         if name == 'vocab_file':
             return self.mf_config.processor.tokenizer.vocab_file
@@ -87,12 +102,29 @@ class MFNetworkHelper(NetworkHelper):
 
     # pylint: disable=arguments-differ
     def create_tokenizer(self):
-        """create_tokenizer."""
+        """
+        Get network tokenizer.
+
+        Returns:
+            Object as network tokenizer.
+        """
         return build_tokenizer(self.mf_config.processor.tokenizer)
 
     # pylint: disable=arguments-differ
     def generate(self, mf_network, input_ids: Union[np.ndarray, List[int], List[List[int]]],
                  max_new_tokens=None, **kwargs):
+        """
+        Invoke `network` and generate tokens.
+
+        Args:
+            mf_network (Cell): Network to generate tokens.
+            input_ids (numpy.ndarray): Input tokens for generate.
+            max_new_tokens (int): Max number of tokens to be generated, default ``1``.
+            kwargs (Dict): Extensible parameter for subclasses.
+
+        Returns:
+            A list as generated tokens.
+        """
         value_check('mf_network', mf_network, PreTrainedModel)
         value_check('input_ids', input_ids, (np.ndarray, List))
         if max_new_tokens:
@@ -156,6 +188,16 @@ class MFLlama2Helper(MFNetworkHelper):
         return block_tables, slot_mapping
 
     def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
+        """
+        Assemble network inputs for predict from input tokens in numpy ndarray format.
+
+        Args:
+            input_ids (numpy.ndarray): Input tokens.
+            kwargs (Dict): Extensible parameter for subclasses.
+
+        Returns:
+            A list of `mindspore.Tensor` as inputs of network predict.
+        """
         value_check('input_ids', input_ids, np.ndarray)
         shape = input_ids.shape
         if len(shape) > 2:
@@ -177,6 +219,15 @@ class MFLlama2Helper(MFNetworkHelper):
         return t_input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping
 
     def get_decoder_layers(self, network: LlamaForCausalLM):
+        """
+        Get decoder layers from network.
+
+        Args:
+            network (LlamaForCausalLM): Network to get decoder layers.
+
+        Returns:
+            A list of tuple of (cell_name, `Cell`) as decoder layers of network.
+        """
         value_check('network', network, LlamaForCausalLM)
         model: LlamaModel = network.model
         layers = []
@@ -185,6 +236,15 @@ class MFLlama2Helper(MFNetworkHelper):
         return layers
 
     def get_linears(self, decoder_layer: LLamaDecodeLayer):
+        """
+        Get linears from decoder_layer.
+
+        Args:
+            decoder_layer (LLamaDecodeLayer): Decoder_layer to get linears.
+
+        Returns:
+            A list of `Cell` as linears of decoder layers.
+        """
         value_check('decoder_layer', decoder_layer, LLamaDecodeLayer)
         attention: LLamaAttention = decoder_layer.attention
         if not isinstance(attention, LLamaAttention):
@@ -305,7 +365,12 @@ class MFLlama2Helper(MFNetworkHelper):
         return info
 
     def analysis_decoder_groups(self, network):
-        """get_decoder_group."""
+        """
+        Analyze decoder groups information of network.
+
+        Args:
+            network (Cell): network to analyze decoder groups information.
+        """
 
         class Llama2Analyzer(Processor):
             """A network iterator for applying algorithm on network."""
@@ -360,7 +425,15 @@ class MFLlama2Helper(MFNetworkHelper):
         return None
 
     def get_pre_layer(self, linear_name: str):
-        """get_pre_layer"""
+        """
+        Get pre layer information from current linear_name.
+
+        Args:
+            linear_name (str): linear layer name.
+
+        Returns:
+            A dict of pre layer information which include pre layer name, layer and type.
+        """
         value_check('linear_name', linear_name, str)
         splits = linear_name.split('.')
         decoder_info: DecoderGroupInfo = self._decoder_infos.get(f'root.model.layers.{splits[3]}')
