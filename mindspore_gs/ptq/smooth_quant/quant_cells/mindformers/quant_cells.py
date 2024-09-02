@@ -405,13 +405,19 @@ class SQLinearWrapper(PTQCell):
         return (strategy[1],)
 
     def _adjust_parameter(self):
+        """_adjust_parameter"""
         weight_scale = self._expand(self._weight_observer_cell.scale_store, 0)
+        weight_scale.asnumpy()
         if not self._handler.transpose_b:
             weight_scale = weight_scale.transpose()
+            weight_scale.asnumpy()
         orin_dtype = self._handler.weight.dtype
         weight = self._weight_mul(self._handler.weight, weight_scale)
+        weight.asnumpy()
         weight = self._handler.cast(weight, orin_dtype)
+        weight.asnumpy()
         self._weight_assign(self._handler.weight, weight)
+        self._handler.weight.asnumpy()
 
     def weight_quantizer(self):
         return self._weight_quantizer
