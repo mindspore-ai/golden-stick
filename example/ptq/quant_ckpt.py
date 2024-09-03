@@ -36,37 +36,56 @@ def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
-    parser.add_argument('--approach', '-a', type=str, required=True, help="Available: w8a16, w8a8, c8, ptq, omni_quant")
+    parser.add_argument('--approach', '-a', type=str, required=True,
+                        help="Available: rtn-a16w8, rtn-c8, smooth_quant, ptq, omni_quant")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
     parser.add_argument('--network', '-n', type=str, required=True)
+
+    parser.add_argument('--weight_quant_dtype', '-w', type=str, default='none', help="Available: 'int8', 'none'")
+    parser.add_argument('--act_quant_dtype', '-q', type=str, default='none', help="Available: 'int8', 'none'")
+    parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
+    parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
+
     args = parser.parse_args()
     logger.info(f"quant args: {args}")
     return args
 
 
-def create_ptq(approach, backend=BackendTarget.ASCEND):
+def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     """Create ptq algorithm."""
     start_time = time.time()
-    if approach == 'c8':
+    approach = uargs_.approach
+    if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=None,
                         kvcache_quant_dtype=msdtype.int8)
         ptq = RTN(config=cfg)
-    elif approach == 'w8a8':
+    elif approach == 'smooth_quant':
         logger.info("Use SmoothQuant(W8A8) algo to quant network and weight.")
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
                         act_quant_dtype=msdtype.int8)
         ptq = SQ(config=cfg)
-    elif approach == 'w8a16':
+    elif approach == 'rtn-a16w8':
         logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["lm_head"])
         ptq = RTN(config=cfg)
     elif approach == 'ptq':
         logger.info("Use ptq algo to quant network and weight.")
+
+        def dtype_formatter(name: str):
+            if name == 'int8':
+                return msdtype.int8
+            return None
+
+        weight_quant_dtype = dtype_formatter(uargs_.weight_quant_dtype)
+        act_quant_dtype = dtype_formatter(uargs_.act_quant_dtype)
+        kvcache_quant_dtype = dtype_formatter(uargs_.kvcache_quant_dtype)
+        outliers_suppression = OutliersSuppressionType.SMOOTH if uargs_.outliers_suppression == 'smooth' \
+            else OutliersSuppressionType.NONE
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
-                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+                        weight_quant_dtype=weight_quant_dtype, act_quant_dtype=act_quant_dtype,
+                        kvcache_quant_dtype=kvcache_quant_dtype, outliers_suppression=outliers_suppression)
         ptq = PTQ(config=cfg)
     elif approach == 'omni_quant':
         logger.info("Use omni quant algo to quant network and weight.")
@@ -74,7 +93,7 @@ def create_ptq(approach, backend=BackendTarget.ASCEND):
                         weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8)
         ptq = OQ(config=cfg)
     else:
-        raise ValueError(f"uargs.approach = {uargs.approach} is unexpected, "
+        raise ValueError(f"uargs.approach = {uargs_.approach} is unexpected, "
                          "Available: w8a16, w8a8, c8, ptq, omni_quant.")
     logger.info(f'Create quantizer cost time is {time.time() - start_time} s.')
     return ptq
@@ -117,7 +136,7 @@ def quant_net(net: LlamaForCausalLM, network_helper, ptq, ds):
 
 if __name__ == "__main__":
     uargs = get_args()
-    algo = create_ptq(approach=uargs.approach)
+    algo = create_ptq(uargs)
     if uargs.network == "LlamaForCausalLM":
         helper = MFLlama2Helper(uargs.config_path)
     elif uargs.network == "ParallelLlamaForCausalLM":
