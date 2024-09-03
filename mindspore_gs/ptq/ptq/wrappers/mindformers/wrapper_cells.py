@@ -400,6 +400,26 @@ class DeployLinearCell(WrapperLinearCell):
     def deploy(self):
         return self
 
+    def linear_forward(self, x):
+        """Forward process, x should be a tensor"""
+        out_shape = self.layer.shape(x)[:-1] + (self.layer.out_channels,)
+        if self.layer.expert_flag and not self.layer.use_gmm:
+            if self.layer.use_expert_group_size is True:
+                x = self.layer.reshape(x, (-1, self.layer.expert_num, self.layer.expert_group_size,
+                                           self.layer.in_channels))
+            else:
+                x = self.layer.reshape(x, (self.layer.outer_batch, self.layer.expert_num, -1, self.layer.in_channels))
+        ori_dtype = F.dtype(x)
+        x = self.layer.cast(x, self.layer.dtype)
+        x = self.layer.matmul(x, self.layer.weight)
+        if self.layer.has_bias:
+            x = self.layer.bias_add(x, self.layer.cast(self.layer.bias, self.layer.dtype))
+        if self.layer.activation_flag:
+            x = self.layer.activation(x)
+        x = F.cast(x, ori_dtype)
+        output = self.layer.reshape(x, out_shape)
+        return output
+
     def col_linear_forward(self, input_, weight=None):
         """col_linear_forward"""
         out_shape = input_.shape[:-1] + (self.oc,)
@@ -464,7 +484,7 @@ class DeployLinearCell(WrapperLinearCell):
     def construct(self, x, *args, **kwargs):
         """linear deploy construct"""
         if self.is_linear:
-            return self.layer(x)
+            return self.linear_forward(x)
         if self.is_colparallel:
             x = self.col_linear_forward(x, *args, **kwargs)
         if self.is_rowparallel:
