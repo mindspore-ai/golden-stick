@@ -19,6 +19,7 @@ from mindspore.ops import functional as F
 from mindspore.ops import operations as P
 from mindspore import Parameter, Tensor, dtype, context, nn
 from mindspore.common.initializer import initializer
+from mindspore.common.api import _pynative_executor
 from mindformers.modules.layers import Linear
 
 from mindspore_gs.common.gs_enum import BackendTarget
@@ -479,8 +480,9 @@ class SQLinearWrapper(PTQCell):
             self._input_quantizer = convert_to_smooth_quant(input_quant_params,
                                                             self._weight_observer_cell.scale_store,
                                                             strategy=iq_strategy)
-            context.set_context(mode=mode_store)
-            context.set_auto_parallel_context(parallel_mode=parallel_mode_store)
+        _pynative_executor.sync()
+        context.set_context(mode=mode_store)
+        context.set_auto_parallel_context(parallel_mode=parallel_mode_store)
 
     def core_construct(self, *args):
         pass
