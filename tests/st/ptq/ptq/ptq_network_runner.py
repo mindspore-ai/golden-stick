@@ -31,7 +31,7 @@ from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.ptq import PTQ
-from mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper import MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
 
 

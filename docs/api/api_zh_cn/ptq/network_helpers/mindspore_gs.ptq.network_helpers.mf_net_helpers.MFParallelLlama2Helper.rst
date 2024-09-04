@@ -1,7 +1,7 @@
-mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper.MFParallelLlama2Helper
+mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 ====================================================================================================
 
-.. py:class:: mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper.MFParallelLlama2Helper(config: MindFormerConfig = None)
+.. py:class:: mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper(config: MindFormerConfig = None)
 
     从 `NetworkHelper` 类派生，用于MindFormers框架ParallelLlamaForCasualLM网络的工具类。
 
