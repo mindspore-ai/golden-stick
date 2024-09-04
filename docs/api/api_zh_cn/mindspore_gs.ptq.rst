@@ -27,6 +27,28 @@ PTQ 模式枚举
 
     mindspore_gs.ptq.PTQMode
 
+异常值抑制类型枚举
+--------------------
+
+.. mscnautosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.OutliersSuppressionType
+
+NetworkHelper
+-----------------
+
+.. mscnautosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.NetworkHelper
+    mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
+    mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper.MFParallelLlama2Helper
+
 网络适配层
 -------------
 
@@ -48,4 +70,14 @@ RoundToNearest 算法
     :template: classtemplate.rst
 
     mindspore_gs.ptq.RoundToNearest
+
+PTQ 算法
+-------------
+
+.. mscnautosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.PTQ
 

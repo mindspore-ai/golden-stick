@@ -25,6 +25,14 @@ from mindspore_gs.common.utils import value_check
 
 
 class LayerType(enum.Enum):
+    """
+    Pre layer type Enum.
+
+    - ``UNKNOWN`` : pre layer type is unknown.
+    - ``NORM_LAYER`` : pre layer type is norm layer.
+    - ``LINEAR_LAYER`` : pre layer type is linear layer.
+    - ``CONCAT_LINEAR_LAYER`` : pre layer type is qkv concat linear layer.
+    """
     UNKNOWN = 0
     NORM_LAYER = 1
     LINEAR_LAYER = 2
@@ -33,6 +41,26 @@ class LayerType(enum.Enum):
 
 @dataclass
 class LayerInfo:
+    """
+    Dataclass for recording layer information.
+
+    Args:
+        name (str) - name of layer。
+        layer (Cell) - layer。
+        type_ (LayerType) - type of layer, ``NORM_LAYER``is norm layer,
+            ``LINEAR_LAYER`` is linear,``CONCAT_LINEAR_LAYER``is qkv concat linear layer,
+            ``UNKNOWN``is unknown type.
+
+    Raises:
+        TypeError: `name` is not str.
+        TypeError: `layer` type is not Cell.
+        TypeError: `type_` not in [LayerType.UNKNOWN, LayerType.NORM_LAYER, LayerType.LINEAR_LAYER,
+            LayerType.CONCAT_LINEAR_LAYER].
+
+    Example:
+        >>> from mindspore_gs.ptq.network_helper import LayerInfo, LayerType
+        >>> LayerInfo(name='model.layers.0.w_qkv', layer=layer, type=LayerType.CONCAT_LINEAR_LAYER)
+    """
     name: str = ""
     layer: Cell = None
     type_: LayerType = LayerType.UNKNOWN
@@ -67,6 +95,20 @@ class DecoderGroupInfo:
 class NetworkHelper:
     """NetworkHelper for decoupling algorithm with network framework."""
     def create_network(self):
+        """
+        Create a network.
+
+        Returns:
+            Created network.
+
+        Examples:
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = helper.create_network()
+        """
         raise NotImplementedError
 
     def get_spec(self, name: str):
@@ -244,5 +286,51 @@ class NetworkHelper:
             >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
             >>> decoder_layers = helper.get_decoder_layers(network)
             >>> page_attention_mgr = helper.get_page_attention_mgr(decoder_layers[0])
+        """
+        raise NotImplementedError
+
+    def analysis_decoder_groups(self, network):
+        """
+        Analyze decoder groups information of network.
+
+        Args:
+            network (Cell): network to analyze decoder groups information.
+
+        Examples:
+            >>> from mindspore import context
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+            >>> from mindformers import LlamaForCausalLM, LlamaConfig
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+            >>> helper.analysis_decoder_groups(network)
+        """
+        raise NotImplementedError
+
+    def get_pre_layer(self, linear_name):
+        """
+        Get pre layer information from current linear_name.
+
+        Args:
+            linear_name (str): linear layer name.
+
+        Returns:
+            A dict of pre layer information which include pre layer name、layer and type.
+
+        Examples:
+            >>> from mindspore import context
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+            >>> from mindformers import LlamaForCausalLM, LlamaConfig
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+            >>> helper.analysis_decoder_groups(network)
+            >>> helper.get_pre_layer(linear_name)
         """
         raise NotImplementedError

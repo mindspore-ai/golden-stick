@@ -48,7 +48,36 @@ class InputCatcher(Cell):
 
 
 class PTQ(CompAlgo):
-    """ptq"""
+    """
+    Implementation of PTQ algorithm which supports the combination quantization of activation,
+    weight, and kvcache.
+
+    Args:
+        config(:class:`mindspore_gs.ptq.PTQConfig`): config for PTQ, default is ``None``.
+
+    Raises:
+        TypeError: If `config` type is not PTQConfig when it's not ``None``.
+        ValueError: If not PYNATIVE mode when mode in config is PTQMode.QUANTIZE.
+        ValueError: If act_quant_dtype is int8 and weight_quant_dtype is None.
+
+    Examples:
+        >>> import mindspore_gs
+        >>> from mindspore_gs.ptq import PTQ
+        >>> from mindspore_gs.ptq import PTQConfig
+        >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+        >>> from mindformers.tools.register.config import MindFormerConfig
+        >>> from mindformers import LlamaForCausalLM, LlamaConfig
+        >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+        >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+        >>> helper = MFLlama2Helper(mfconfig)
+        >>> ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
+                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+        >>> ptq = PTQ(ptq_config)
+        >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+        >>> fake_quant_net = ptq.apply(network, helper)
+        >>> quant_net = ptq.convert(fake_quant_net)
+    """
 
     def __init__(self, config: Union[dict, PTQConfig] = None):
         super().__init__()
@@ -99,7 +128,22 @@ class PTQ(CompAlgo):
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper, ds=None, **kwargs) -> Cell:
-        """Apply"""
+        """
+        Define how to add fake quantizer to `network`.
+
+        Args:
+            network (Cell): Network to be fake quantized.
+            network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
+            datasets (Dataset): Datasets for calibrating.
+
+        Raises:
+            RuntimeError: If PTQ is not well inited.
+            TypeError: If input `network` is not a Cell.
+            ValueError: If input `network_helper` is None.
+            ValueError: If input datasets is None.
+        Returns:
+            fake quantized network.
+        """
         if not network_helper:
             raise ValueError("Please provide network_helper when omni quant in apply phase.")
         if self._config.mode == PTQMode.DEPLOY:
@@ -113,8 +157,6 @@ class PTQ(CompAlgo):
             return network
         if not ds:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
-        if self.context_mode != PYNATIVE_MODE:
-            raise ValueError("Quantization phase only support PYNATIVE MODE.")
         start_time = time.time()
         logger.info("Analysis network structure.")
         network_helper.analysis_decoder_groups(network)
@@ -195,7 +237,22 @@ class PTQ(CompAlgo):
         return catcher, network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
-        """convert"""
+        """
+        Define how to convert a compressed network to a standard network before exporting.
+
+        Args:
+            net_opt (Cell): Network to be converted which is transformed by `RoundToNearest.apply`.
+            ckpt_path (str): Path to checkpoint file for `net_opt`. Default is ``""``, which means not loading
+                checkpoint file to `net_opt`.
+
+        Returns:
+            An instance of Cell represents quantized network.
+
+        Raises:
+            TypeError: If `net_opt` is not Cell.
+            TypeError: If `ckpt_path` is not string.
+            ValueError: If `ckpt_path` is not empty and invalid.
+        """
         if not isinstance(net_opt, Cell):
             raise TypeError(
                 f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
