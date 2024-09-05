@@ -28,14 +28,8 @@ Table 2: Before and after quantization of the network using RTN algorithm
     <th colspan='3'>llama2-70B</th>
     <th colspan='3'>baichuan2-13B</th>
     <th colspan='3'>chatGLM3-6B</th>
-    <th colspan='3'>QWEN-14B</th>
-    <th colspan='3'>Yi-34B</th>
-    <th colspan='3'>GPT2</th>
 </tr>
 <tr>
-    <th>FP16</th><th>W8A16</th><th>Profit</th>
-    <th>FP16</th><th>W8A16</th><th>Profit</th>
-    <th>FP16</th><th>W8A16</th><th>Profit</th>
     <th>FP16</th><th>W8A16</th><th>Profit</th>
     <th>FP16</th><th>W8A16</th><th>Profit</th>
     <th>FP16</th><th>W8A16</th><th>Profit</th>
@@ -49,9 +43,6 @@ Table 2: Before and after quantization of the network using RTN algorithm
     <td>129</td><td>65</td><td>-49.61%</td>
     <td>26</td><td>15</td><td>-42.31%</td>
     <td>12</td><td>6.1</td><td>-49.17%</td>
-    <td>27</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
 </tr>
 <tr>
     <td>wikitext2-Perplexity↓</td>
@@ -60,16 +51,10 @@ Table 2: Before and after quantization of the network using RTN algorithm
     <td>10.379</td><td>10.435</td><td bgcolor='#FA8072'>0.046</td>
     <td>23.955</td><td>23.912</td><td>-0.043</td>
     <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
 </tr>
 <tr>
     <td>squad1.1-F1↑</td>
     <td>60.48</td><td>60.76</td><td>0.28</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
@@ -82,16 +67,10 @@ Table 2: Before and after quantization of the network using RTN algorithm
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
 </tr>
 <tr>
     <td>Full-scale Performance (tokens/s)</td>
     <td>9.08</td><td>9.04</td><td>0</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
@@ -104,17 +83,11 @@ Table 2: Before and after quantization of the network using RTN algorithm
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
 </tr>
 <tr>
     <td>Video Memory(GB)</td>
     <td>-</td><td>-</td><td>-</td>
     <td>27</td><td>16</td><td>-40.7%</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
-    <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>
     <td>-</td><td>-</td><td>-</td>

@@ -47,7 +47,7 @@ NetworkHelper
 
     mindspore_gs.ptq.NetworkHelper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
-    mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper.MFParallelLlama2Helper
+    mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
 网络适配层
 -------------

@@ -223,7 +223,7 @@ class NetworkHelper:
             network (Cell): Network to get decoder layers.
 
         Returns:
-            A list of tuple of (cell_name, `Cell`) as decoder layers of network.
+            A list of tuples (cell_name, `Cell`) as decoder layers of network.
 
         Examples:
             >>> from mindspore import context
