@@ -15,7 +15,7 @@
 """Network helper for network from MindFormers."""
 import os.path
 
-from typing import Union, List
+from typing import Union, List, Tuple
 
 import math
 from collections import OrderedDict
@@ -24,17 +24,18 @@ import mindspore as ms
 from mindspore import dtype as mstype
 from mindspore.communication.management import init
 from mindspore import Tensor, Model, nn
+from mindspore.nn import Cell
+
 from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
 from mindformers.models.modeling_utils import PreTrainedModel
 from mindformers.models.build_tokenizer import build_tokenizer
 from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.modules import Linear
-from mindformers.models.llama import LlamaForCausalLM, LlamaModel
+from mindformers.models.llama import LlamaForCausalLM
 from mindformers.models.llama.llama_transformer import LLamaDecodeLayer, LLamaAttention
 from mindformers.models.llama.llama_layer import LlamaFeedForward, LlamaRMSNorm
 from mindformers.experimental.infer.models.llama.llama import ParallelLlamaForCausalLM
-from mindformers.experimental.infer.core.transformer import (ParallelTransformer,
-                                                             ParallelTransformerLayer,
+from mindformers.experimental.infer.core.transformer import (ParallelTransformerLayer,
                                                              ParallelAttention,
                                                              ParallelMLP)
 from mindformers.experimental.infer.core.norm import RMSNorm
@@ -90,6 +91,39 @@ class MFNetworkHelper(NetworkHelper):
         ms.ms_memory_recycle()
         network.phase = 'predict'
         return network
+
+    def get_decoder_layers(self, network: nn.Cell):
+        """
+        Get decoder layers from network.
+
+        Args:
+            network (nn.Cell): Network to get decoder layers.
+
+        Returns:
+            A list of tuples (cell_name, `Cell`) as decoder layers of network.
+        """
+        value_check('network', network, nn.Cell)
+
+        class NetworkWalker(Processor):
+            def __init__(self):
+                self.layers = []
+                self._decoder_layers = (LLamaDecodeLayer, ParallelTransformerLayer)
+
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if isinstance(cell, self._decoder_layers):
+                    self.layers.append((cell_name, cell))
+                    return cell, True
+                return cell, False
+
+        walker = NetworkWalker()
+        walker.process(network)
+        return walker.layers
+
+    def analysis_decoder_groups(self, network):
+        raise NotImplementedError
+
+    def get_pre_layer(self, linear_name):
+        raise NotImplementedError
 
     def get_spec(self, name: str):
         """
@@ -226,72 +260,6 @@ class MFLlama2Helper(MFNetworkHelper):
 
         block_tables, slot_mapping = MFLlama2Helper._get_pa_inputs(bs, seq, block_size, shape[1])
         return t_input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping
-
-    def get_decoder_layers(self, network: LlamaForCausalLM):
-        """
-        Get decoder layers from network.
-
-        Args:
-            network (LlamaForCausalLM): Network to get decoder layers.
-
-        Returns:
-            A list of tuples (cell_name, `Cell`) as decoder layers of network.
-        """
-        value_check('network', network, LlamaForCausalLM)
-        model: LlamaModel = network.model
-        layers = []
-        for i, layer in enumerate(model.layers):
-            layers.append((f"root.model.layers.{i}", layer))
-        return layers
-
-    def get_linears(self, decoder_layer: LLamaDecodeLayer):
-        """
-        Get linears from decoder_layer.
-
-        Args:
-            decoder_layer (LLamaDecodeLayer): Decoder_layer to get linears.
-
-        Returns:
-            A list of `Cell` as linears of decoder layers.
-        """
-        value_check('decoder_layer', decoder_layer, LLamaDecodeLayer)
-        attention: LLamaAttention = decoder_layer.attention
-        if not isinstance(attention, LLamaAttention):
-            raise RuntimeError(f"Only support LLamaAttention as attention but got {attention}")
-        qkv_concat = attention.qkv_concat
-        ffn: LlamaFeedForward = decoder_layer.feed_forward
-        if not isinstance(ffn, LlamaFeedForward):
-            raise RuntimeError(f"Only support LlamaFeedForward as FFN but got {ffn}")
-        ffn_concat = ffn.ffn_concat
-        linears = []
-        if qkv_concat:
-            linears.extend([attention.w_qkv, attention.wo])
-        else:
-            linears.extend([attention.wq, attention.wk, attention.wv, attention.wo])
-
-        if ffn_concat:
-            linears.extend([ffn.w_gate_hidden, ffn.w2])
-        else:
-            linears.extend([ffn.w1, ffn.w3, ffn.w2])
-        return qkv_concat, ffn_concat, linears
-
-    def get_page_attention_mgr(self, decoder_layer: LLamaDecodeLayer):
-        """
-        Get PageAttentionMgr layers from decoder layer.
-
-        Args:
-            decoder_layer (LLamaDecodeLayer): Decoder layer to get PageAttentionMgr layers.
-
-        Returns:
-            A list of `Cell` as PageAttentionMgr layers of decoder layer.
-        """
-        value_check('decoder_layer', decoder_layer, LLamaDecodeLayer)
-        if not self.mf_config.model.model_config.use_past:
-            raise ValueError("use_path need be True when doing kv cache quantizer.")
-        attention: LLamaAttention = decoder_layer.attention
-        if not isinstance(attention, LLamaAttention):
-            raise RuntimeError(f"Only support LLamaAttention as attention but got {attention}")
-        return attention.infer_attention.paged_attention_mgr
 
     @staticmethod
     def _ffn_analysis(decoder_info: DecoderGroupInfo):
@@ -472,8 +440,6 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         >>> helper = MFParallelLlama2Helper(mfconfig)
         >>> network = helper.create_network()
         >>> decoder_layers = helper.get_decoder_layers(network)
-        >>> linears = helper.get_linears(decoder_layers[0][1])
-        >>> page_attention_mgrs = helper.get_page_attention_mgr(decoder_layers[0][1])
         >>> helper.analysis_decoder_groups(network)
     """
     def create_network(self):
@@ -494,72 +460,6 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         if ckpt_path:
             transform_and_load_checkpoint(self.mf_config, None, network, None)
         return network
-
-    def get_decoder_layers(self, network: ParallelLlamaForCausalLM):
-        """
-        Get decoder layers from network.
-
-        Args:
-            network (ParallelLlamaForCausalLM): Network to get decoder layers.
-
-        Returns:
-            A list of tuples (cell_name, `Cell`) as decoder layers and names.
-        """
-        value_check('network', network, ParallelLlamaForCausalLM)
-        model: ParallelTransformer = network.model
-        layers = []
-        for i, layer in enumerate(model.layers):
-            layers.append((f"root.model.layers.{i}", layer))
-        return layers
-
-    def get_linears(self, decoder_layer: ParallelTransformerLayer):
-        """
-        Get linear layers from decoder layer.
-
-        Args:
-            decoder_layer (ParallelTransformerLayer): Decoder layer to get linear layers.
-
-        Returns:
-            A list of `Cell` as linear layers of decoder layer.
-        """
-        value_check('decoder_layer', decoder_layer, ParallelTransformerLayer)
-        attention: ParallelAttention = decoder_layer.attention
-        if not isinstance(attention, ParallelAttention):
-            raise RuntimeError(f"Only support ParallelAttention as attention but got {attention}")
-        qkv_concat = (attention.attn_type == "self_attn")
-        ffn: ParallelMLP = decoder_layer.feed_forward
-        if not isinstance(ffn, ParallelMLP):
-            raise RuntimeError(f"Only support ParallelMLP as FFN but got {ffn}")
-        ffn_concat = True
-        linears = []
-        if qkv_concat:
-            linears.extend([attention.w_qkv, attention.wo])
-        else:
-            linears.extend([attention.wq, attention.wk, attention.wv, attention.wo])
-
-        if ffn_concat:
-            linears.extend([ffn.w_gate_hidden, ffn.w2])
-        else:
-            linears.extend([ffn.w1, ffn.w3, ffn.w2])
-        return qkv_concat, ffn_concat, linears
-
-    def get_page_attention_mgr(self, decoder_layer: ParallelTransformerLayer):
-        """
-        Get PageAttentionMgr layers from decoder layer.
-
-        Args:
-            decoder_layer (ParallelTransformerLayer): Decoder layer to get PageAttentionMgr layers.
-
-        Returns:
-            A list of `Cell` as PageAttentionMgr layers of decoder layer.
-        """
-        value_check('decoder_layer', decoder_layer, ParallelTransformerLayer)
-        if not self.mf_config.model.model_config.use_past:
-            raise ValueError("use_path need be True when doing kv cache quantizer.")
-        attention: ParallelAttention = decoder_layer.attention
-        if not isinstance(attention, ParallelAttention):
-            raise RuntimeError(f"Only support ParallelAttention as attention but got {attention}")
-        return attention.paged_attention_mgr
 
     @staticmethod
     def _ffn_analysis(decoder_info: DecoderGroupInfo):

@@ -24,6 +24,10 @@ from mindspore_gs.ptq.network_helpers import NetworkHelper
 class WrapperCell(abc.ABC, Cell):
     """WrapperCell"""
 
+    @staticmethod
+    def is_enable(cfg: InnerPTQConfig):
+        raise NotImplementedError
+
     def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
         super().__init__()
         self.cfg = cfg

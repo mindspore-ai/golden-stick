@@ -24,6 +24,7 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import offload_network
+from mindspore_gs.ptq.processor import transform_network_inplace
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
@@ -149,12 +150,15 @@ class PTQ(CompAlgo):
             for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = layers[i]
                 for processor in self.pipeline:
-                    processor.process(layer_name, layer, network_helper)
+                    processor.replace(layer_name, layer)
+                    processor.process(layer_name, layer)
                     processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
         if self._config.mode == PTQMode.QUANTIZE and get_context("mode") != PYNATIVE_MODE:
             raise ValueError("Quantization phase only support PYNATIVE MODE.")
+        if not network_helper:
+            raise ValueError("Please provide network_helper when omni quant in apply phase.")
         if not ds:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
         start_time = time.time()
@@ -179,17 +183,14 @@ class PTQ(CompAlgo):
 
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()
-                _, _, linears = network_helper.get_linears(layer)
-                for linear in linears:
-                    if isinstance(linear, WrapperCell):
-                        linear.add_hook()
+
+                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook())
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):
                     all_args[index][0] = layer(*args, **kwargs)
                     index += 1
-                for linear in linears:
-                    if isinstance(linear, WrapperCell):
-                        linear.remove_hook()
+
+                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook())
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
                 start_time = time.time()

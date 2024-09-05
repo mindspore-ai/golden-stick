@@ -57,6 +57,7 @@ def test_constructor():
     Description: Call constructor of smooth quant and check config.
     Expectation: smooth_quant related is updated according to argument `config` of constructor.
     """
+    context.set_context(device_target="CPU")
     config = PTQConfig(act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
     sq = SmoothQuant(config)
     assert isinstance(sq._config, InnerPTQConfig)
@@ -85,6 +86,7 @@ def test_ptq_config_error():
     Description: Feed invalid value of PTQConfig to _ptq_config_check function.
     Expectation: Except ValueError.
     """
+    context.set_context(device_target="CPU")
     config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None)
     with pytest.raises(ValueError):
         _ = SmoothQuant(config)
@@ -212,7 +214,7 @@ def test_apply_convert():
     Description: Invoke apply and convert api of smooth quant and check network structure.
     Expectation: network structure changed.
     """
-
+    context.set_context(device_target="CPU")
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
                     act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
     ptq = SmoothQuant(cfg)
@@ -288,6 +290,7 @@ def test_apply_convert_error():
     Description: Apply SmoothQuant on SimpleNet with error arguments.
     Expectation: raise error.
     """
+    context.set_context(device_target="CPU")
     ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
                                 act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH))
     network = SimpleNet()
@@ -322,6 +325,7 @@ def test_nothing_to_apply_convert():
     Description: Apply SmoothQuant on NoQuantNet.
     Expectation: warning log.
     """
+    context.set_context(device_target="CPU")
     ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
                                 act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH))
     network = NoQuantNet()
@@ -449,7 +453,7 @@ def sq_predict_simplenet_2stage(device, mode, transpose_b, model_parallel, p_str
         rank_id = os.getenv('RANK_ID')
         strategy_ckpt_save_file = "test_sq_predict_simplenet_2stage_parallel_strategy.ckpt"
 
-    cur_dir, _ = os.path.split(os.path.abspath(__file__))
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
     fp_ckpt_path = os.path.join(cur_dir, "../../../data/test_ckpt/test_sq_predict_simplenet_2stage_fp.ckpt")
     input_path = os.path.join(cur_dir, "../../../data/test_input/test_sq_predict_simplenet_2stage.npy")
     ckpt_path = f"test_sq_predict_simplenet_2stage_int8_rank{rank_id}.ckpt"
@@ -548,10 +552,11 @@ def test_sq_predict_simplenet_2stage_2p():
     Expectation: accuracy is good.
     """
     os.environ['sq_test_use_parallel'] = '1'
+    cur_file = os.path.abspath(__file__)
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_sq_predict_simplenet_logs "
-        "pytest -s test_smooth_quant.py::test_sq_predict_simplenet_2stage"
+        f"pytest -s {cur_file}::test_sq_predict_simplenet_2stage"
     )
     if return_code != 0:
         log_file = open("./test_sq_predict_simplenet_logs/worker_1.log", "r", encoding="utf-8")
@@ -580,7 +585,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
         w8a8_config_path = "../../../data/test_llama2/predict_llama2_13b_w8a8_910b_2p.yaml"
         fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
         w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8"
-    cur_dir, _ = os.path.split(os.path.abspath(__file__))
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
     tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
     fp16_config_path = os.path.join(cur_dir, fp16_config_path)
     w8a8_config_path = os.path.join(cur_dir, w8a8_config_path)
@@ -658,6 +663,7 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
 
 
+@pytest.mark.skip(reason="MindFormers not support smoothquant yet.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -673,6 +679,7 @@ def test_sq_llama2_predict_2stage_1p(device, mode):
     assert sq_predict_llama2_2stage(device, mode, model_parallel)
 
 
+@pytest.mark.skip(reason="MindFormers not support smoothquant yet.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
@@ -684,10 +691,11 @@ def test_sq_llama2_predict_2stage_2p():
     """
     model_parallel = 2
     os.environ['sq_test_model_parallel'] = str(model_parallel)
+    cur_file = os.path.abspath(__file__)
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
-        "pytest -s test_smooth_quant.py::test_sq_llama2_predict_2stage_1p"
+        f"pytest -s {cur_file}::test_sq_llama2_predict_2stage_1p"
     )
     if return_code != 0:
         log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")

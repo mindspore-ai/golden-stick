@@ -28,10 +28,12 @@ from .wrapper_cells import (
 LinearSmoother.reg_linear_map(Linear, SmoothLinearCell)
 LinearSmoother.reg_linear_map(ColumnParallelLinear, SmoothLinearCell)
 LinearSmoother.reg_linear_map(RowParallelLinear, SmoothLinearCell)
+
 Quantizer.reg_layer_map(Linear, QuantLinearCell)
 Quantizer.reg_layer_map(ColumnParallelLinear, QuantLinearCell)
 Quantizer.reg_layer_map(RowParallelLinear, QuantLinearCell)
 Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell)
+
 Deployer.reg_layer_map(Linear, DeployLinearCell)
 Deployer.reg_layer_map(ColumnParallelLinear, DeployLinearCell)
 Deployer.reg_layer_map(RowParallelLinear, DeployLinearCell)

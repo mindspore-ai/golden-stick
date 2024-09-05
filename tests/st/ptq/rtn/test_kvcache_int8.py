@@ -147,7 +147,7 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
         w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
         fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
         w8a16c8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a16c8"
-    cur_dir, _ = os.path.split(os.path.abspath(__file__))
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
     tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
     fp16_config_path = os.path.join(cur_dir, fp16_config_path)
     w8a16c8_config_path = os.path.join(cur_dir, w8a16c8_config_path)
@@ -231,6 +231,7 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
         return False
     return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 25.3)
 
+
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -245,6 +246,7 @@ def test_kv_llama2_predict_2stage_1p(device, mode):
     model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
     assert kv_predict_llama2_2stage(device, mode, model_parallel)
 
+
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_kv_llama2_predict_2stage_2p():
@@ -255,10 +257,11 @@ def test_kv_llama2_predict_2stage_2p():
     """
     model_parallel = 2
     os.environ['sq_test_model_parallel'] = str(model_parallel)
+    cur_file = os.path.abspath(__file__)
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
-        "pytest -s test_kvcache_int8.py::test_kv_llama2_predict_2stage_1p"
+        f"pytest -s {cur_file}::test_kv_llama2_predict_2stage_1p"
     )
     if return_code != 0:
         log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")
@@ -267,6 +270,7 @@ def test_kv_llama2_predict_2stage_2p():
         log_file.close()
 
     assert return_code == 0
+
 
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -281,6 +285,7 @@ def test_kv_fusion_ops_llama2_predict_2stage_1p(device, mode):
     model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
     assert kv_predict_llama2_2stage(device, mode, model_parallel, True)
 
+
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_kv_fusion_ops_llama2_predict_2stage_2p():
@@ -291,10 +296,11 @@ def test_kv_fusion_ops_llama2_predict_2stage_2p():
     """
     model_parallel = 2
     os.environ['sq_test_model_parallel'] = str(model_parallel)
+    cur_file = os.path.abspath(__file__)
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_sq_predict_llama2_13b_logs "
-        "pytest -s test_kvcache_int8.py::test_kv_fusion_ops_llama2_predict_2stage_1p"
+        f"pytest -s {cur_file}::test_kv_fusion_ops_llama2_predict_2stage_1p"
     )
     if return_code != 0:
         log_file = open("./test_sq_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")

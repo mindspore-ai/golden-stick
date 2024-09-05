@@ -67,6 +67,7 @@ def test_nothing_to_apply_convert():
     Description: Apply RoundToNearestPTQ on NoQuantNet.
     Expectation: warning log.
     """
+    context.set_context(device_target="CPU")
     ptq = RTN(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
     network = NoQuantNet()
     with pytest.warns(expected_warning=RuntimeWarning, match="No layer found in network is suitable for quantization"):
@@ -92,6 +93,7 @@ def test_apply_convert_error():
     Description: Apply RoundToNearestPTQ on SimpleNet with error arguments.
     Expectation: raise error.
     """
+    context.set_context(device_target="CPU")
     ptq = RTN(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
     network = NoQuantNet()
 
@@ -114,7 +116,7 @@ def test_apply_convert():
     Description: Apply RoundToNearestPTQ on SimpleNet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
-
+    context.set_context(device_target="CPU")
     network = SimpleNet()
     ptq = RTN()
     # apply & calibrate

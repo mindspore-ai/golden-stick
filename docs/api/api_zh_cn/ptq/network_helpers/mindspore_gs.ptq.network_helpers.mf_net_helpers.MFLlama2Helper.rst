@@ -39,26 +39,6 @@ mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
         返回：
             一个元组的列表，表示获取到的decoder层及其名称。
 
-    .. py:method:: get_linears(self, decoder_layer: LLamaDecodeLayer)
-
-        获取decoder中的所有linear层。
-
-        参数：
-            - **decoder_layer** (LLamaDecodeLayer) - 要获取linear层的decoder层。
-
-        返回：
-            一个列表，表示获取到的linears层。
-
-    .. py:method:: get_page_attention_mgr(self, decoder_layer: LLamaDecodeLayer)
-
-        获取decoder中的所有page_attention_mgr层。
-
-        参数：
-            - **decoder_layer** (LLamaDecodeLayer) - 要获取page_attention_mgr层的decoder层。
-
-        返回：
-            一个列表，表示获取到的page_attention_mgr层。
-
     .. py:method:: get_pre_layer(self, linear_name: str)
 
         通过当前linear层的名称，获取前一层的信息。

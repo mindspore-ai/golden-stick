@@ -43,6 +43,17 @@ class Processor(abc.ABC):
         return root
 
 
+def transform_network_inplace(network: Cell, target_layer_type: type, transform_fn, network_root_name="root"):
+    class Transformer(Processor):
+        def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+            if not isinstance(cell, target_layer_type):
+                return cell, False
+            transform_fn(cell_name, cell)
+            return cell, True
+
+    Transformer().process(network, network_root_name)
+
+
 def network_replace(network: Cell, src_layer: type, dst_layer: type, dst_layer_fn: callable, opname_blacklist: list,
                     network_root_name="root"):
     """network replace"""

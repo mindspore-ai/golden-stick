@@ -106,13 +106,13 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    config_path_ = os.path.join(cur_dir, config_path_)
-    vocab_file = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    cur_dir_ = os.path.dirname(os.path.abspath(__file__))
+    config_path_ = os.path.join(cur_dir_, config_path_)
+    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
-    helper.mf_config.load_checkpoint = os.path.join(cur_dir, ckpt_path)
-    helper.mf_config.output_dir = os.path.join(cur_dir, output_dir_)
+    helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path)
+    helper.mf_config.output_dir = os.path.join(cur_dir_, output_dir_)
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
     device_id = int(os.environ.get('DEVICE_ID', '0'))
     helper.mf_config.context.device_id = device_id
@@ -166,12 +166,12 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    config_path_ = os.path.join(cur_dir, config_path_)
-    vocab_file = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    cur_dir_ = os.path.dirname(os.path.abspath(__file__))
+    config_path_ = os.path.join(cur_dir_, config_path_)
+    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
-    helper.mf_config.load_checkpoint = os.path.join(cur_dir, ckpt_path_)
+    helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
     device_id = int(os.environ.get('DEVICE_ID', '0'))
     helper.mf_config.context.device_id = device_id
@@ -242,18 +242,21 @@ if __name__ == "__main__":
     model_parallel = uargs.model_parallel
     quant_algo = uargs.quant_algo
 
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
     if model_parallel == 1:
-        config_path = "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml"
-        fp16_ckpt_path = "../../../data/test_llama2/parallelLlama2-fp16-1decoder-1p.ckpt"
+        config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml")
+        fp16_ckpt_path = os.path.join(cur_dir, "../../../data/test_llama2/parallelLlama2-fp16-1decoder-1p.ckpt")
         quant_ckpt_path = f"../../../data/test_llama2/parallelLlama2-quant-1decoder-1p-{quant_algo}/rank_0/quant.ckpt"
-        output_dir = f"../../../data/test_llama2/parallelLlama2-quant-1decoder-1p-{quant_algo}"
+        quant_ckpt_path = os.path.join(cur_dir, quant_ckpt_path)
+        output_dir = os.path.join(cur_dir, f"../../../data/test_llama2/parallelLlama2-quant-1decoder-1p-{quant_algo}")
         assert ptq_llama2_predict_2stage(config_path, fp16_ckpt_path, quant_ckpt_path, output_dir,
                                          model_parallel, quant_algo)
     elif model_parallel == 2:
-        config_path = "../../../data/test_llama2/predict_parallelLlama2_13b_2p.yaml"
-        fp16_ckpt_path = "../../../data/test_llama2/parallelLlama2-fp16-1decoder-2p"
-        quant_ckpt_path = f"../../../data/test_llama2/parallelLlama2-quant-1decoder-2p-{quant_algo}"
-        output_dir = f"../../../data/test_llama2/parallelLlama2-quant-1decoder-2p-{quant_algo}"
+        config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_2p.yaml")
+        fp16_ckpt_path = os.path.join(cur_dir, "../../../data/test_llama2/parallelLlama2-fp16-1decoder-2p")
+        quant_ckpt_path = os.path.join(cur_dir,
+                                       f"../../../data/test_llama2/parallelLlama2-quant-1decoder-2p-{quant_algo}")
+        output_dir = os.path.join(cur_dir, f"../../../data/test_llama2/parallelLlama2-quant-1decoder-2p-{quant_algo}")
         assert ptq_llama2_predict_2stage(config_path, fp16_ckpt_path, quant_ckpt_path, output_dir,
                                          model_parallel, quant_algo)
     else:

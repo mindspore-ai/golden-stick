@@ -20,13 +20,12 @@ import time
 import mindspore as ms
 from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
-from mindformers import LlamaForCausalLM
+from mindformers import MindFormerConfig
 from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
 from mindspore_gs.ptq.ptq import PTQ
-from mindspore_gs.ptq.omni_quant import OmniQuant as OQ
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
@@ -35,20 +34,59 @@ def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
-    parser.add_argument('--approach', '-a', type=str, required=True,
-                        help="Available: rtn-a16w8, rtn-c8, smooth_quant, ptq, omni_quant")
+    parser.add_argument('--approach', '-q', type=str, required=True,
+                        help="Available: rtn-a16w8, rtn-c8, smooth_quant, ptq")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
-    parser.add_argument('--network', '-n', type=str, required=True)
 
     parser.add_argument('--weight_quant_dtype', '-w', type=str, default='none', help="Available: 'int8', 'none'")
-    parser.add_argument('--act_quant_dtype', '-q', type=str, default='none', help="Available: 'int8', 'none'")
+    parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo.")
 
     args = parser.parse_args()
+
+    if args.approach == 'rtn-a16w8':
+        logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
+                    f"according to approach: {args.approach}.")
+        args.weight_quant_dtype = msdtype.int8
+        args.act_quant_dtype = None
+        args.kvcache_quant_dtype = None
+        args.outliers_suppression = OutliersSuppressionType.NONE
+        args.opname_blacklist = ['lm_head']
+    elif args.approach == 'rtn-c8':
+        logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
+                    f"according to approach: {args.approach}.")
+        args.weight_quant_dtype = None
+        args.act_quant_dtype = None
+        args.kvcache_quant_dtype = msdtype.int8
+        args.outliers_suppression = OutliersSuppressionType.NONE
+        args.opname_blacklist = []
+    elif args.approach == 'smooth_quant':
+        logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
+                    f"according to approach: {args.approach}.")
+        args.weight_quant_dtype = msdtype.int8
+        args.act_quant_dtype = msdtype.int8
+        args.kvcache_quant_dtype = None
+        args.outliers_suppression = OutliersSuppressionType.SMOOTH
+        args.opname_blacklist = ['lm_head', 'w2']
+    elif args.approach == 'ptq':
+        def dtype_formatter(name: str):
+            if name == 'int8':
+                return msdtype.int8
+            return None
+
+        args.weight_quant_dtype = dtype_formatter(args.weight_quant_dtype)
+        args.act_quant_dtype = dtype_formatter(args.act_quant_dtype)
+        args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
+        args.outliers_suppression = OutliersSuppressionType.SMOOTH if args.outliers_suppression == 'smooth' \
+            else OutliersSuppressionType.NONE
+        args.opname_blacklist = ['lm_head', 'w2']
+    else:
+        raise ValueError(f"Unsupported approach: {args.approach}")
+
     logger.info(f"quant args: {args}")
     return args
 
@@ -57,46 +95,23 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     """Create ptq algorithm."""
     start_time = time.time()
     approach = uargs_.approach
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=uargs_.weight_quant_dtype,
+                    act_quant_dtype=uargs_.act_quant_dtype, kvcache_quant_dtype=uargs_.kvcache_quant_dtype,
+                    outliers_suppression=uargs_.outliers_suppression, opname_blacklist=uargs_.opname_blacklist)
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=None,
-                        kvcache_quant_dtype=msdtype.int8)
         ptq = RTN(config=cfg)
     elif approach == 'smooth_quant':
         logger.info("Use SmoothQuant(W8A8) algo to quant network and weight.")
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
-                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = SQ(config=cfg)
     elif approach == 'rtn-a16w8':
         logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["lm_head"])
         ptq = RTN(config=cfg)
     elif approach == 'ptq':
         logger.info("Use ptq algo to quant network and weight.")
-
-        def dtype_formatter(name: str):
-            if name == 'int8':
-                return msdtype.int8
-            return None
-
-        weight_quant_dtype = dtype_formatter(uargs_.weight_quant_dtype)
-        act_quant_dtype = dtype_formatter(uargs_.act_quant_dtype)
-        kvcache_quant_dtype = dtype_formatter(uargs_.kvcache_quant_dtype)
-        outliers_suppression = OutliersSuppressionType.SMOOTH if uargs_.outliers_suppression == 'smooth' \
-            else OutliersSuppressionType.NONE
-        opname_blacklist = uargs_.opname_blacklist if uargs_.opname_blacklist is not None else []
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=opname_blacklist,
-                        weight_quant_dtype=weight_quant_dtype, act_quant_dtype=act_quant_dtype,
-                        kvcache_quant_dtype=kvcache_quant_dtype, outliers_suppression=outliers_suppression)
         ptq = PTQ(config=cfg)
-    elif approach == 'omni_quant':
-        logger.info("Use omni quant algo to quant network and weight.")
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
-                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8)
-        ptq = OQ(config=cfg)
     else:
-        raise ValueError(f"uargs.approach = {uargs_.approach} is unexpected, "
-                         "Available: w8a16, w8a8, c8, ptq, omni_quant.")
+        raise ValueError(f"uargs.approach = {uargs_.approach} is unexpected, Available: w8a16, w8a8, c8, ptq.")
     logger.info(f'Create quantizer cost time is {time.time() - start_time} s.')
     return ptq
 
@@ -121,7 +136,7 @@ def create_ds(network_helper, ds_path, ds_type, approach):
     return None
 
 
-def quant_net(net: LlamaForCausalLM, network_helper, ptq, ds):
+def quant_net(net, network_helper, ptq, ds):
     """Quant network with algorithm."""
     quant_start = time.time()
     logger.info('Quantize-ing network...')
@@ -139,12 +154,15 @@ def quant_net(net: LlamaForCausalLM, network_helper, ptq, ds):
 if __name__ == "__main__":
     uargs = get_args()
     algo = create_ptq(uargs)
-    if uargs.network == "LlamaForCausalLM":
+    msconfig = MindFormerConfig(uargs.config_path)
+    if msconfig.model.arch == "LlamaForCausalLM":
         helper = MFLlama2Helper(uargs.config_path)
-    elif uargs.network == "ParallelLlamaForCausalLM":
+    elif msconfig.model.arch == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(uargs.config_path)
     else:
-        raise ValueError(f"Unsupported network: {uargs.network}")
+        err_msg = f"Unsupported network arch: {msconfig.model.arch}, please check model.arch in yaml config, " \
+                  f"only support LlamaForCausalLM and ParallelLlamaForCausalLM now"
+        raise ValueError(err_msg)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     start = time.time()
     logger.info('Creating network...')
