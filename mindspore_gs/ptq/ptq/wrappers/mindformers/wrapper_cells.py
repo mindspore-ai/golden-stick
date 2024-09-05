@@ -16,7 +16,7 @@
 import abc
 import numpy as np
 
-from mindspore import Parameter, Tensor, dtype
+from mindspore import nn, Parameter, Tensor, dtype
 from mindspore import ops as msops
 from mindspore.ops import functional as F
 from mindspore.common.initializer import initializer
@@ -27,12 +27,8 @@ from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
-from mindformers.experimental.distri_cores.tensor_parallel.layers import (
-    ColumnParallelLinear, RowParallelLinear
-)
-from mindformers.experimental.distri_cores.tensor_parallel.collective_primitives import (
-    MaxFromTensorParallelRegion, MinFromTensorParallelRegion
-)
+from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
+from mindformers.experimental.distri_cores.create_comm import get_tp_group
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
@@ -44,6 +40,30 @@ from mindspore_gs.ptq.convert_utils import (
     convert_to_quant_for_deploy,
     convert_to_antiquant_for_deploy
 )
+
+
+class MinFromTensorParallelRegion(nn.Cell):
+    "Get argmin from tensor-parallel region"
+    def __init__(self):
+        super().__init__()
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tp_group())
+
+    def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
+        output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
+        output = self.all_reduce(output_parallel)
+        return output, _
+
+
+class MaxFromTensorParallelRegion(nn.Cell):
+    "Get argmax from tensor-parallel region"
+    def __init__(self):
+        super().__init__()
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tp_group())
+
+    def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
+        output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
+        output = self.all_reduce(output_parallel)
+        return output, _
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
@@ -420,17 +440,15 @@ class DeployLinearCell(WrapperLinearCell):
         output = self.layer.reshape(x, out_shape)
         return output
 
-    def col_linear_forward(self, input_, weight=None):
-        """col_linear_forward"""
-        out_shape = input_.shape[:-1] + (self.oc,)
+    def col_linear_forward(self, input_parallel, weight=None):
+        """
+        Forward of ColumnParallelLinear.
+        Performs a linear transformation considering various parallel modes and data type conversions.
+        """
+
         if weight is None and self.layer.skip_weight_param_allocation:
             raise ValueError("For ColumnParallelLinear, when skip_weight_param_allocation=True,"
                              " weight should be passed to construct(), but got None.")
-
-        if self.layer.sequence_parallel or self.layer.explicit_expert_comm:
-            input_parallel = input_
-        else:
-            input_parallel = self.layer.copy_to_mp_region(input_)
 
         origin_dtype = F.dtype(input_parallel)
         if not self.layer.skip_weight_param_allocation:
@@ -441,23 +459,29 @@ class DeployLinearCell(WrapperLinearCell):
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
             input_parallel = self.layer.gather_from_sp_region(input_parallel)
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
+
+        output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size_per_partition,)
+        input_parallel = self.layer.reshape(input_parallel, (-1, self.layer.input_size))
         output_parallel = self.layer.matmul(input_parallel, weight)
         if self.layer.has_bias:
             output_parallel = self.layer.bias_add(
                 output_parallel, self.layer.cast(self.layer.bias, self.layer.compute_dtype)
             )
         output_parallel = self.layer.cast(output_parallel, origin_dtype)
+        output_parallel = self.layer.reshape(output_parallel, output_shape)
 
         if self.layer.gather_output:
             output = self.layer.gather_from_mp_region(output_parallel)
         else:
             output = output_parallel
-        output = msops.reshape(output, out_shape)
         return output
 
     def row_linear_forward(self, input_):
-        """row_linear_forward"""
-        out_shape = input_.shape[:-1] + (self.oc,)
+        """
+        Forward of RowParallelLinear.
+        Performs a linear transformation considering various parallel modes and data type conversions.
+        """
+
         if self.layer.input_is_parallel:
             input_parallel = input_
         else:
@@ -465,10 +489,11 @@ class DeployLinearCell(WrapperLinearCell):
 
         origin_dtype = F.dtype(input_parallel)
         input_parallel = self.layer.cast(input_parallel, self.layer.compute_dtype)
+        output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size,)
+        input_parallel = self.layer.reshape(input_parallel, (-1, self.layer.input_size_per_partition))
         output_parallel = self.layer.matmul(input_parallel, self.layer.weight)
-        if self.layer.explicit_expert_comm:
-            output = output_parallel
-        elif self.layer.sequence_parallel:
+
+        if self.layer.sequence_parallel:
             output_parallel = output_parallel.swapaxes(0, 1).contiguous()
             output = self.layer.reduce_scatter_to_sp_region(output_parallel)
             output = output.swapaxes(0, 1).contiguous()
@@ -478,7 +503,7 @@ class DeployLinearCell(WrapperLinearCell):
         if self.layer.has_bias:
             output = self.layer.bias_add(output, self.layer.cast(self.layer.bias, self.layer.compute_dtype))
         output = self.layer.cast(output, origin_dtype)
-        output = msops.reshape(output, out_shape)
+        output = self.layer.reshape(output, output_shape)
         return output
 
     def construct(self, x, *args, **kwargs):
@@ -605,7 +630,8 @@ class QuantPageAttentionMgrCell(WrapperCell):
         slot_mapping = args[1]
         self.layer.reshape_and_cache(x, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
 
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         return self.layer.paged_attention(query, self.layer.key_cache, self.layer.value_cache, block_tables,
                                           batch_valid_length)
@@ -659,7 +685,8 @@ class QuantPageAttentionMgrDeployCell(Cell):
         value = self._value_input_quantizer(value)
         self.layer.reshape_and_cache(key, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
 
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         if not self.enable_deploy_fusion:
             kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
@@ -751,7 +778,7 @@ class PagedAttentionDeployBase(Cell):
         return self.layer.reshape_and_cache(key, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
 
     @abc.abstractmethod
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         return NotImplementedError
 
@@ -764,7 +791,8 @@ class PagedAttentionDeployBase(Cell):
 class PagedAttentionDeploy(PagedAttentionDeployBase):
     """PagedAttention deploy with no fuison"""
 
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
         vcache = self._value_output_quantizer(self.layer.value_cache, self.value_t_zp, self.value_t_scale)
@@ -788,7 +816,8 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
         self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.float16),
                                            name="key_value_t_scale")
 
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         kcache = self.layer.key_cache
         vcache = self.layer.value_cache

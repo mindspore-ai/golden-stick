@@ -17,7 +17,7 @@ from typing import Union
 import numpy as np
 
 import mindspore as ms
-from mindspore import Parameter, Tensor, dtype
+from mindspore import nn, Parameter, Tensor, dtype
 from mindspore.nn import Cell
 from mindspore import ops as msops
 from mindspore.ops import functional as F
@@ -28,18 +28,37 @@ from mindspore.common.initializer import initializer
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindformers.modules.layers import Linear
-from mindformers.experimental.distri_cores.tensor_parallel.layers import (
-    ColumnParallelLinear, RowParallelLinear
-)
-from mindformers.experimental.distri_cores.tensor_parallel.collective_primitives import (
-    MaxFromTensorParallelRegion, MinFromTensorParallelRegion
-)
-
+from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
+from mindformers.experimental.distri_cores.create_comm import get_tp_group
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.quantization.quant_utils import (
     get_quant_min_max, cal_quantization_params,
     quant_tensor_data)
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
+
+
+class MinFromTensorParallelRegion(nn.Cell):
+    "Get argmin from tensor-parallel region"
+    def __init__(self):
+        super().__init__()
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tp_group())
+
+    def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
+        output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
+        output = self.all_reduce(output_parallel)
+        return output, _
+
+
+class MaxFromTensorParallelRegion(nn.Cell):
+    "Get argmax from tensor-parallel region"
+    def __init__(self):
+        super().__init__()
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tp_group())
+
+    def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
+        output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
+        output = self.all_reduce(output_parallel)
+        return output, _
 
 
 class MinMaxLinearWrapper(Cell):

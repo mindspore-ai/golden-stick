@@ -20,8 +20,7 @@ import numpy as np
 from mindformers.core.metric import EmF1Metric
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_squad_dataset
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
-from mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper import MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
 
 def evaluate(net, dataset_path, network_helper):

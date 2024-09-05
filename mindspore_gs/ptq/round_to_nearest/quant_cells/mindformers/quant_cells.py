@@ -320,7 +320,8 @@ class PagedAttentionQuant(PTQCell):
         return self._kvcache.reshape_and_cache(key, value, self._kvcache.key_cache, self._kvcache.value_cache,
                                                slot_mapping)
 
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         return self._kvcache.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache, block_tables,
                                              batch_valid_length)
@@ -394,7 +395,7 @@ class PagedAttentionDeployBase(PTQCell):
                                                slot_mapping)
 
     @abc.abstractmethod
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         return NotImplementedError
 
@@ -408,7 +409,8 @@ class PagedAttentionDeployBase(PTQCell):
 class PagedAttentionDeploy(PagedAttentionDeployBase):
     """PagedAttention deploy with no fuison"""
 
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         kcache = self._key_output_quantizer(self._kvcache.key_cache, self.key_t_zp, self.key_t_scale)
         vcache = self._value_output_quantizer(self._kvcache.value_cache, self.value_t_zp, self.value_t_scale)
@@ -429,7 +431,8 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
             antiquant_strategy = (1, self._key_in_strategy[2],)
             self._kvcache.paged_attention.shard((*pa_strategy, antiquant_strategy, antiquant_strategy))
 
-    def paged_attn(self, query, batch_valid_length, block_tables):
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
         kcache = self._kvcache.key_cache
         vcache = self._kvcache.value_cache
