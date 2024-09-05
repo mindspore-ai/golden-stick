@@ -35,7 +35,11 @@ from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppres
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import LayerType, NetworkHelper
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params, quant_tensor_data
+from mindspore_gs.quantization.quant_utils import (
+    get_quant_min_max, cal_quantization_params,
+    quant_tensor_data,
+    convert_fp32_to_int64
+)
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.ptq.convert_utils import (
     convert_to_quant_for_deploy,
@@ -488,6 +492,7 @@ class DeployLinearCell(WrapperLinearCell):
         if self.a8w8:
             input_parallel = self.quant(input_parallel, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size_per_partition,)
+        input_parallel = self.layer.reshape(input_parallel, (-1, self.layer.input_size))
         output_parallel = self.layer.matmul(input_parallel, weight)
         if self.layer.has_bias:
             output_parallel = self.layer.bias_add(
@@ -518,6 +523,7 @@ class DeployLinearCell(WrapperLinearCell):
         if self.a8w8:
             input_parallel = self.quant(input_parallel, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size,)
+        input_parallel = self.layer.reshape(input_parallel, (-1, self.layer.input_size_per_partition))
         output_parallel = self.layer.matmul(input_parallel, self.layer.weight)
 
         if self.layer.sequence_parallel:
@@ -725,13 +731,17 @@ class QuantPageAttentionMgrDeployCell(Cell):
         self.value_t_scale = Parameter(Tensor(value_t_scale, dtype=dtype.float16), name="value_t_scale")
 
         t_scale_len = key_t_scale.shape[0]
+        key_t_scale = convert_fp32_to_int64(key_t_scale.astype(np.float32))
+        value_t_scale = convert_fp32_to_int64(value_t_scale.astype(np.float32))
         key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
                                             value_t_scale.reshape((1, t_scale_len))))
-        self.key_value_t_scale = Parameter(Tensor(key_value_t_scale, dtype=dtype.float16), name="key_value_t_scale")
+        self.key_value_t_scale = Parameter(Tensor(key_value_t_scale, dtype=dtype.int64), name="key_value_t_scale")
 
         t_zp_len = value_t_zp.shape[0]
+        key_t_zp = key_t_zp.astype(np.int32)
+        value_t_zp = value_t_zp.astype(np.int32)
         key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
-        self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.float16), name="key_value_t_zp")
+        self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.int32), name="key_value_t_zp")
 
     def construct(self, key, value, slot_mapping):
         """The forward compute of KVCache for Paged Attention."""
@@ -869,9 +879,9 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
 
     def __init__(self, kvcache: PagedAttentionMgr):
         super(PagedAttentionDeployFusion, self).__init__(kvcache)
-        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.float16),
+        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.int32),
                                         name="key_value_t_zp")
-        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.float16),
+        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.int64),
                                            name="key_value_t_scale")
 
     # pylint: disable=W0613
