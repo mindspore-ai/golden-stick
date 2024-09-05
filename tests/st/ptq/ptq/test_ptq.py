@@ -61,11 +61,18 @@ def test_context_mode_error():
     Description:set GRAPH mode to QUANTIZE when using PTQ alogrith to quant network.
     Expectation: Except ValueError.
     """
-    set_context(mode=GRAPH_MODE, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"})
+    from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
     config = PTQConfig(mode=PTQMode.QUANTIZE, act_quant_dtype=dtype.int8,
                        outliers_suppression=OutliersSuppressionType.SMOOTH)
-    with pytest.raises(ValueError):
-        _ = PTQ(config)
+    ptq = PTQ(config)
+    set_context(mode=GRAPH_MODE, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"})
+
+    cur_dir, _ = os.path.split(os.path.abspath(__file__))
+    config_path_ = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml")
+    helper = MFLlama2Helper(config_path_)
+    network = helper.create_network()
+    with pytest.raises(ValueError, match="Quantization phase only support PYNATIVE MODE."):
+        ptq.apply(network, helper)
 
 
 @pytest.mark.level0
