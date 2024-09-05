@@ -123,8 +123,6 @@ class PTQ(CompAlgo):
         if config.weight_quant_dtype is None and \
                 config.act_quant_dtype == dtype.int8:
             raise ValueError("PTQ algorithm not support only quant activation.")
-        if  config.mode == PTQMode.QUANTIZE and get_context("mode") != PYNATIVE_MODE:
-            raise ValueError("Quantization phase only support PYNATIVE MODE.")
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper, ds=None, **kwargs) -> Cell:
@@ -155,6 +153,8 @@ class PTQ(CompAlgo):
                     processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
+        if self._config.mode == PTQMode.QUANTIZE and get_context("mode") != PYNATIVE_MODE:
+            raise ValueError("Quantization phase only support PYNATIVE MODE.")
         if not ds:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
         start_time = time.time()
