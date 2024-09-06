@@ -15,11 +15,65 @@
 """test interfaces of smooth quant."""
 import os
 import pytest
-from mindspore import set_context
-from mindspore import dtype, GRAPH_MODE
+import numpy as np
+
+from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE
+from mindformers.modules import Linear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers.network_helper import LayerInfo
+
+
+class SimpleNet(nn.Cell):
+    """
+    Network with single linear to be quant
+    """
+    def __init__(self):
+        super(SimpleNet, self).__init__()
+        self.linear = Linear(in_channels=5, out_channels=6, weight_init="ones")
+
+    def construct(self, x):
+        return self.linear(x)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend", "CPU"])
+def test_input_catcher(device):
+    """
+    Feature: InputCatcher.
+    Description: Apply InputCatcher on SimpleNet and check if inputs being caught correctly.
+    Expectation: Inputs being caught correctly.
+    """
+    from mindspore_gs.ptq.ptq.quant import InputCatcher
+    context.set_context(mode=context.PYNATIVE_MODE, device_target=device)
+
+    net = SimpleNet()
+    foo_input = Tensor(np.ones((1, 3), dtype=np.float16))
+    catcher = InputCatcher(net.linear)
+    net.linear = catcher
+
+    try:
+        net(foo_input)
+    except GeneratorExit:
+        pass
+    try:
+        net(foo_input)
+    except GeneratorExit:
+        pass
+    assert len(catcher.args) == 2
+    assert len(catcher.kwargs) == 2
+
+    for i in range(2):
+        assert isinstance(catcher.args[i], list)
+        assert len(catcher.args[i]) == 1
+        assert isinstance(catcher.args[i][0], Tensor)
+        assert catcher.args[i][0].shape == (1, 3)
+        assert catcher.args[i][0].dtype == dtype.float16
+
+        assert isinstance(catcher.kwargs[i], dict)
+        assert not catcher.kwargs[i]
 
 
 @pytest.mark.level0
@@ -330,6 +384,32 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8c8(quant_algo):
 @pytest.mark.env_single
 @pytest.mark.parametrize("quant_algo", ['C8'])
 def test_ptq_llama2_predict_2stage_2p_run_c8(quant_algo):
+    """
+    Feature: test omni quant adjust parameter in two stages with two cards.
+    Description: apply OQ on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    return_code = os.system(
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_2p_logs "
+        f"python {run_file} -m 2 -a {quant_algo}"
+    )
+    if return_code != 0:
+        log_file = open("./test_ptq_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+
+    assert return_code == 0
+
+
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+@pytest.mark.parametrize("quant_algo", ['A8W8_FallBack'])
+def test_ptq_llama2_predict_2stage_2p_run_a8w8_fallback(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply OQ on llama2 and check accuracy.

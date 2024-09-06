@@ -466,7 +466,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         """_ffn_analysis"""
         ffn_info: LayerInfo = decoder_info.ffn
         ffn: ParallelMLP = ffn_info.layer
-        decoder_info.ffn_concat = True
+        decoder_info.ffn_concat = ffn.ffn_concat
         for name, cell in ffn.name_cells().items():
             full_cell_name = f"{ffn_info.name}.{name}"
             if decoder_info.ffn_concat:
@@ -494,7 +494,7 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         """_attention_analysis"""
         attention_info: LayerInfo = decoder_info.attention
         attention: ParallelAttention = attention_info.layer
-        decoder_info.qkv_concat = (attention.attn_type == "self_attn")
+        decoder_info.qkv_concat = attention.qkv_concat
         for name, cell in attention.name_cells().items():
             full_cell_name = f"{attention_info.name}.{name}"
             if decoder_info.qkv_concat:

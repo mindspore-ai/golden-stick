@@ -38,14 +38,15 @@ class InputCatcher(Cell):
     def __init__(self, handler):
         super().__init__()
         self.handler = handler
-        self.attention = handler.attention
+        if hasattr(handler, "attention"):
+            self.attention = handler.attention
         self.args = []
         self.kwargs = []
 
     def construct(self, *args, **kwargs):
         self.args.append(list(args))
         self.kwargs.append(kwargs)
-        raise GeneratorExit(f"already catch first layer inputs, do not need continue.")
+        raise GeneratorExit("already catch first layer inputs, do not need continue.")
 
 
 class PTQ(CompAlgo):
@@ -124,6 +125,13 @@ class PTQ(CompAlgo):
         if config.weight_quant_dtype is None and \
                 config.act_quant_dtype == dtype.int8:
             raise ValueError("PTQ algorithm not support only quant activation.")
+        if config.weight_quant_dtype is None and config.act_quant_dtype is None \
+            and config.kvcache_quant_dtype is None and config.outliers_suppression is None:
+            logger.warning("PTQ algorithm does not quantify any layers when"
+                           "weight_quant_dtype=None,"
+                           "act_quant_dtype=None,"
+                           "kvcache_quant_dtype=None and"
+                           "outliers_suppression=None")
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper, ds=None, **kwargs) -> Cell:
@@ -144,7 +152,7 @@ class PTQ(CompAlgo):
             fake quantized network.
         """
         if not network_helper:
-            raise ValueError("Please provide network_helper when omni quant in apply phase.")
+            raise ValueError("Please provide network_helper when PTQ algo in apply phase.")
         if self._config.mode == PTQMode.DEPLOY:
             layers = network_helper.get_decoder_layers(network)
             for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ Deploy..."):
@@ -158,9 +166,11 @@ class PTQ(CompAlgo):
         if self._config.mode == PTQMode.QUANTIZE and get_context("mode") != PYNATIVE_MODE:
             raise ValueError("Quantization phase only support PYNATIVE MODE.")
         if not network_helper:
-            raise ValueError("Please provide network_helper when omni quant in apply phase.")
+            raise ValueError("Please provide network_helper when PTQ in apply phase.")
         if not ds:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
+        if self._config.kvcache_quant_dtype == dtype.int8 and not network_helper.get_spec("use_past"):
+            raise ValueError("use_past need be true when doing kvcache quantize.")
         start_time = time.time()
         logger.info("Analysis network structure.")
         network_helper.analysis_decoder_groups(network)
@@ -221,7 +231,7 @@ class PTQ(CompAlgo):
 
         replace_first_decoder(network, layers[0][1], catcher)
         if not ds:
-            raise ValueError("OmniQuant need dataset to calibrate, please provide dataset.")
+            raise ValueError("PTQ need dataset to calibrate, please provide dataset.")
         total_count = ds.get_dataset_size()
         data_count = 1
         for _, ds_item in enumerate(ds.create_dict_iterator()):

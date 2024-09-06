@@ -14,19 +14,35 @@
 # ============================================================================
 """Algorithm base class."""
 import warnings
-
+import copy
 from typing import Tuple
 
+from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq.ptq_config import LayerQuantizeAlgo, OutliersSuppressionType
 from mindspore_gs.common import logger
 from .wrapper_cell import WrapperCell
 
 
 class Algorithm:
     """Algorithm"""
+    @staticmethod
+    def _get_fallback_config(fallback_algo, origin_config):
+        """get fallback config"""
+        new_config = copy.deepcopy(origin_config)
+        if fallback_algo == LayerQuantizeAlgo.A16W8:
+            new_config.weight_quant_dtype = msdtype.int8
+            new_config.act_quant_dtype = None
+            new_config.kvcache_quant_dtype = None
+            new_config.outliers_suppression = OutliersSuppressionType.NONE
+        else:
+            raise ValueError("Only support fallback layer quantization algorithm to A16w8 Now.")
+        return new_config
+
     def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
+        """replace"""
         raise NotImplementedError
 
     def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):

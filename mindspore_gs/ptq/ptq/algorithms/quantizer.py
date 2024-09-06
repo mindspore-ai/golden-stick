@@ -13,8 +13,9 @@
 # limitations under the License.
 # ============================================================================
 """quantizer algorithm."""
-
+import warnings
 from typing import Tuple
+
 from mindspore.nn import Cell
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
@@ -69,11 +70,28 @@ class Quantizer(Algorithm):
                                        f"a subclass of {WrapperCell}.")
                 if not wrapper_cell_type.is_enable(self._inner_config):
                     return cell, False
+                nonlocal changed
+                for exclude_name in self._inner_config.fallback_blacklist.keys():
+                    if exclude_name in cell_name:
+                        # pylint: disable=W0212
+                        inner_config = Quantizer._get_fallback_config(
+                            self._inner_config.fallback_blacklist.get(exclude_name),
+                            self._inner_config)
+                        wrapper_cell = wrapper_cell_type(cell_name, cell, inner_config, network_helper)
+                        logger.info(f"fallback: replacing {cell_name} with quant cell({type(wrapper_cell)}).")
+                        changed = True
+                        return wrapper_cell, True
                 wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with quant cell {wrapper_cell_type}.")
+                changed = True
                 return wrapper_cell, True
 
+        changed = False
         Replacer(self._config).process(decoder_layer, decoder_layer_name)
+        if not changed:
+            warn_str = f"No layer found in network is suitable to quantize, please check network and opname_blacklist" \
+                       f"({self._config.opname_blacklist})."
+            warnings.warn(warn_str, RuntimeWarning)
 
     def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
         """process"""

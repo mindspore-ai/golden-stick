@@ -61,6 +61,16 @@ class OutliersSuppressionType(Enum):
     NONE = 'none'
 
 
+class LayerQuantizeAlgo(Enum):
+    """
+    Quantization algorithm for each layer.
+
+    - ``A16W8``: apply.
+    """
+    A16W8 = 'a16w8'
+    A8W8 = 'a8w8'
+
+
 @algo_cfg_register.register(PTQApproach.OMNI_QUANT)
 @dataclass
 class OmniQuantConfig:
@@ -227,6 +237,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
     smooth_to_pre_layer: bool = True
+    fallback_blacklist: dict = field(default_factory=dict)
 
     def __post_init__(self):
         value_check('act_per_channel', self.act_per_channel, bool)
@@ -240,6 +251,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         value_check('kvcache_calibrate_max_new_tokens', self.kvcache_calibrate_max_new_tokens, int)
         value_check('smooth_to_pre_layer', self.smooth_to_pre_layer, bool)
+        value_check('fallback_blacklist', self.fallback_blacklist, dict)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
         if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8:
@@ -248,6 +260,10 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, {self.approach} isn't supported.")
         if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
             raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
+        if list(set(self.fallback_blacklist.keys()) & set(self.opname_blacklist)):
+            raise ValueError("There should be no repetition between opname_blacklist and fallback_a16w8_blacklist,"
+                             f"now opname_blacklist={self.opname_blacklist},"
+                             f"fallback_a16w8_blacklist={self.fallback_blacklist}")
         if not self.algo_args:
             args_config = algo_cfg_register[self.approach]
             if args_config is not None and is_dataclass(args_config):

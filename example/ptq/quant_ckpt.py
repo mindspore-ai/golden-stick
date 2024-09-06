@@ -83,7 +83,6 @@ def get_args():
         args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
         args.outliers_suppression = OutliersSuppressionType.SMOOTH if args.outliers_suppression == 'smooth' \
             else OutliersSuppressionType.NONE
-        args.opname_blacklist = ['lm_head', 'w2']
     else:
         raise ValueError(f"Unsupported approach: {args.approach}")
 
@@ -155,9 +154,9 @@ if __name__ == "__main__":
     uargs = get_args()
     algo = create_ptq(uargs)
     msconfig = MindFormerConfig(uargs.config_path)
-    if msconfig.model.arch == "LlamaForCausalLM":
+    if msconfig.model.arch.type == "LlamaForCausalLM":
         helper = MFLlama2Helper(uargs.config_path)
-    elif msconfig.model.arch == "ParallelLlamaForCausalLM":
+    elif msconfig.model.arch.type == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(uargs.config_path)
     else:
         err_msg = f"Unsupported network arch: {msconfig.model.arch}, please check model.arch in yaml config, " \

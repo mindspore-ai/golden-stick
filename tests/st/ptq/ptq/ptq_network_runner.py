@@ -29,7 +29,7 @@ from mindformers import AutoModel
 from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, LayerQuantizeAlgo
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
@@ -95,6 +95,13 @@ def create_cfg(quant_algo_, mode):
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["lm_head"],
                         kvcache_quant_dtype=dtype.int8)
+    elif quant_algo_ == 'A8W8_FallBack':
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["lm_head"],
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_algo_}")
     return cfg
@@ -121,7 +128,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
 
     init()
     if not is_initialized():
-        initialize_model_parallel(tp_size=config.parallel_config.model_parallel, order='tp')
+        initialize_model_parallel(config.parallel_config.model_parallel, order='tp')
     set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
     network = AutoModel.from_config(config, download_checkpoint=False)
     network.set_train(False)
@@ -143,6 +150,9 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
 
     cfg = create_cfg(quant_algo_, PTQMode.QUANTIZE)
     ptq = PTQ(config=cfg)
+    if quant_algo_ == "A8W8_FallBack":
+        # pylint: disable=W0212
+        ptq._config.fallback_blacklist = {'w2': LayerQuantizeAlgo.A16W8}
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_hello_ds(tokenizer, 1)
@@ -185,6 +195,9 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     if is_quant:
         cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
         ptq = PTQ(config=cfg)
+        if quant_algo_ == "A8W8_FallBack":
+            # pylint: disable=W0212
+            ptq._config.fallback_blacklist = {'w2': LayerQuantizeAlgo.A16W8}
         # pylint: disable=W0212
         ptq._config.enable_deploy_fusion = False
         network = ptq.apply(network, helper)
@@ -218,13 +231,21 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         if quant_algo_ == 'A16W8C8':
             return np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
         if quant_algo_ == 'A8W8C8':
-            return np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+            return np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
         if quant_algo_ == 'C8':
-            return np.allclose(qoutput[:, :44], foutput[:, :44], 0, 0)
+            return np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
     if quant_algo_ == 'A8W8':
         return np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
     if quant_algo_ == 'A16W8':
         return np.allclose(qoutput, foutput, 0, 0)
+    if quant_algo_ == 'A16W8C8':
+        return np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+    if quant_algo_ == 'A8W8C8':
+        return np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+    if quant_algo_ == 'C8':
+        return np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+    if quant_algo_ == "A8W8_FallBack":
+        return np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
     return True
 
 
