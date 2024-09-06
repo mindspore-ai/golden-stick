@@ -31,10 +31,11 @@ elif [[ ${backend} == 'gpu' ]]; then
   find ${sub_dir} -name 'test_*.py' -type f|xargs -r grep -A 6 'pytest.mark.level0'|grep 'pytest.mark.platform_x86_gpu_training'|awk -F'-' '{print $1}'|uniq|xargs python --disable-warnings -m pytest -vrt -q -m 'level0 and platform_x86_gpu_training'
 elif [[ ${backend} == 'ascend' ]]; then
   # shellcheck disable=SC2038
-  pytest --disable-warnings -vrt -m 'level0 and platform_arm_ascend910b_training' --ignore-glob=*ptq/network_helpers* --ignore-glob=*test_kvcache_int8.py* "${sub_dir}"
+  pytest --disable-warnings -vrt -m 'level0 and platform_arm_ascend910b_training' --ignore-glob=*ptq/network_helpers* --ignore-glob=*test_ptq* --ignore-glob=*test_kvcache_int8.py* "${sub_dir}"
   pytest --disable-warnings -vrt -m 'level0 and platform_arm_ascend910b_training' "${CURRPATH}/st/ptq/network_helpers"
   pytest --disable-warnings -vrt -m 'level0 and platform_arm_ascend910b_training' "${CURRPATH}/st/ptq/rtn/test_kvcache_int8.py::test_apply_convert"
   pytest --disable-warnings -vrt -m 'level0 and platform_arm_ascend910b_training' "${CURRPATH}/st/ptq/rtn/test_kvcache_int8.py::test_kv_llama2_predict_2stage_1p"
+  pytest --disable-warnings -vrt -m 'level0 and platform_arm_ascend910b_training' "${CURRPATH}/st/ptq/ptq/test_ptq.py"
 else
   echo "There is no ${backend} backend testcases, available: cpu, gpu, ascend."
 fi

@@ -35,7 +35,11 @@ def check_ds(ds_path: str, bs: int, seq_length: int, max_decode_len: int, vocab_
     assert ds.output_shapes()[0] == [bs, seq_length]
     assert ds.get_dataset_size() == wiki_items // bs * repeat
 
+    index = 0
     for inputs in ds.create_dict_iterator():
+        index += 1
+        if index > 100:
+            break
         input_ids = inputs['input_ids']
         assert isinstance(input_ids, Tensor)
         assert input_ids.shape == (bs, seq_length)

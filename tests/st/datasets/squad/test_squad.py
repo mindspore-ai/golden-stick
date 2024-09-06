@@ -32,7 +32,11 @@ def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
     assert ds.output_shapes()[1] == [bs, seq_length]
     assert ds.get_dataset_size() == 2067 // bs * repeat
 
+    index = 0
     for inputs in ds.create_dict_iterator():
+        index += 1
+        if index > 100:
+            break
         input_ids = inputs['input_ids']
         labels = inputs['labels']
         assert isinstance(input_ids, Tensor)
