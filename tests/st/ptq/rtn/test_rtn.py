@@ -17,7 +17,7 @@ import os
 import sys
 
 import pytest
-from mindspore import nn, dtype
+from mindspore import nn, dtype, context
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.ptq_config import PTQConfig, BackendTarget, OutliersSuppressionType
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
@@ -32,7 +32,7 @@ def test_constructor():
     Description: Call constructor of RoundToNearestPTQ and check config.
     Expectation: Config is updated according to argument `config` of constructor.
     """
-
+    context.set_context(device_target="CPU")
     config = PTQConfig()
     ptq = RTN(config)
     # pylint: disable=W0212
@@ -55,6 +55,7 @@ def test_constructor_error():
     Description: Feed invalid config to constructor of RoundToNearestPTQ and except error.
     Expectation: Except error.
     """
+    context.set_context(device_target="CPU")
     config = {"per_channel": (1, 1)}
     with pytest.raises(TypeError):
         RTN(config)
@@ -73,6 +74,7 @@ def test_convert_error():
     Description: Feed invalid type of bn_fold to convert function.
     Expectation: Except TypeError.
     """
+    context.set_context(device_target="CPU")
     network = nn.Conv2d(6, 5, kernel_size=2)
     config = PTQConfig()
     ptq = RTN(config)
@@ -96,6 +98,7 @@ def test_ptq_config_error():
     Description: Feed invalid value of PTQConfig to _ptq_config_check function.
     Expectation: Except ValueError.
     """
+    context.set_context(device_target="CPU")
     config = PTQConfig(act_quant_dtype=dtype.int8)
     with pytest.raises(ValueError):
         _ = RTN(config)

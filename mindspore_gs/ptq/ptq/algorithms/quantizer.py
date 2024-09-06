@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""anti-outliers algorithm."""
+"""quantizer algorithm."""
 
-from functools import partial
-from mindspore import dtype as msdtype
+from typing import Tuple
+from mindspore.nn import Cell
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.processor import network_replace
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
+from mindspore_gs.ptq.processor import Processor, transform_network_inplace
 
 
 class Quantizer(Algorithm):
     """quanter for linear and PageAttentionMgr"""
 
-    _layer_map = {}
+    layer_map = {}
 
     def __init__(self, config=None):
         super().__init__()
@@ -40,47 +40,45 @@ class Quantizer(Algorithm):
         if not issubclass(quant_layer_type, WrapperCell):
             raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {quant_layer_type}.")
-        Quantizer._layer_map[layer_type] = quant_layer_type
+        Quantizer.layer_map[layer_type] = quant_layer_type
 
     @staticmethod
     def load_mindformers_plugin():
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
-        if self._config.weight_quant_dtype == msdtype.int8 or self._config.act_quant_dtype == msdtype.int8:
-            _, _, linears = network_helper.get_linears(decoder_layer)
-            linear_type = [type(linears[k]) for k in range(len(linears))]
-            logger.info("Replacing Linear with Quant linear.")
-            quant_linear_type = Quantizer._layer_map.get(linear_type[0])
-            if not issubclass(quant_linear_type, WrapperCell):
-                raise RuntimeError(f"Not support linear type: {linear_type[0]}.")
-            quant_linear_creator = partial(quant_linear_type, cfg=self._config, network_helper=network_helper)
-            network_replace(decoder_layer, tuple(linear_type), quant_linear_type, quant_linear_creator,
-                            self._config.opname_blacklist, decoder_layer_name)
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
 
-        if self._config.kvcache_quant_dtype == msdtype.int8:
-            page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
-            page_attention_mgr_type = type(page_attention_mgr)
-            quant_page_attention_mgr_type = Quantizer._layer_map.get(page_attention_mgr_type)
-            if not issubclass(quant_page_attention_mgr_type, WrapperCell):
-                raise RuntimeError(f"Not support PageAttentionMgr type: {page_attention_mgr_type}")
-            quant_page_attention_mgr_creator = partial(quant_page_attention_mgr_type,
-                                                       cfg=self._config, network_helper=network_helper)
-            network_replace(decoder_layer, page_attention_mgr_type, quant_page_attention_mgr_type,
-                            quant_page_attention_mgr_creator, self._config.opname_blacklist, decoder_layer_name)
+        class Replacer(Processor):
+            """Replacer"""
+            def __init__(self, inner_config):
+                self._inner_config = inner_config
 
-    def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper):
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if isinstance(cell, tuple(Quantizer.layer_map.values())):
+                    return cell, True
+                if not isinstance(cell, tuple(Quantizer.layer_map.keys())):
+                    return cell, False
+                for opname in self._inner_config.opname_blacklist:
+                    if opname in cell_name:
+                        logger.info(f"{cell_name} is in blacklist, keep not being quant.")
+                        return cell, True
+                wrapper_cell_type = Quantizer.layer_map[type(cell)]
+                if not issubclass(wrapper_cell_type, WrapperCell):
+                    raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
+                                       f"a subclass of {WrapperCell}.")
+                if not wrapper_cell_type.is_enable(self._inner_config):
+                    return cell, False
+                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper)
+                logger.info(f"Replacing {cell_name} with quant cell {wrapper_cell_type}.")
+                return wrapper_cell, True
+
+        Replacer(self._config).process(decoder_layer, decoder_layer_name)
+
+    def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
         """process"""
-        if self._config.weight_quant_dtype == msdtype.int8 or self._config.act_quant_dtype == msdtype.int8:
-            _, _, linears = network_helper.get_linears(decoder_layer)
-            logger.info("Start quantizer Linear...")
-            for linear in linears:
-                if isinstance(linear, WrapperCell):
-                    logger.info(f"Quantize Linear {linear.layer_name}")
-                    linear.process()
+        def transform_fn(cell_name, cell):
+            logger.info(f"Quantize cell {cell_name}")
+            cell.process()
 
-        if self._config.kvcache_quant_dtype == msdtype.int8:
-            logger.info("Start quantizer KV Cache...")
-            page_attention_mgr = network_helper.get_page_attention_mgr(decoder_layer)
-            page_attention_mgr.process()
+        transform_network_inplace(decoder_layer, WrapperCell, transform_fn, decoder_layer_name)

@@ -98,6 +98,11 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
 
 class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
+
+    @staticmethod
+    def is_enable(cfg: InnerPTQConfig):
+        return cfg.mode == PTQMode.QUANTIZE and cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
+
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
         if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
@@ -249,6 +254,11 @@ class SmoothLinearCell(WrapperLinearCell):
 
 class QuantLinearCell(WrapperLinearCell):
     """QuantLinearCell"""
+
+    @staticmethod
+    def is_enable(cfg: InnerPTQConfig):
+        return cfg.mode == PTQMode.QUANTIZE and cfg.weight_quant_dtype == dtype.int8
+
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
         if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
@@ -379,6 +389,11 @@ class QuantLinearCell(WrapperLinearCell):
 
 class DeployLinearCell(WrapperLinearCell):
     """DeployLinearCell"""
+
+    @staticmethod
+    def is_enable(cfg: InnerPTQConfig):
+        return cfg.mode == PTQMode.DEPLOY and cfg.weight_quant_dtype == dtype.int8
+
     def __init__(self, linear_name, linear, cfg, network_helper=None):
         super().__init__(linear_name, linear, cfg, network_helper)
         if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
@@ -573,6 +588,10 @@ class WeightQuantMatmul(Cell):
 class QuantPageAttentionMgrCell(WrapperCell):
     """QuantPageAttentionMgrCell"""
 
+    @staticmethod
+    def is_enable(cfg: InnerPTQConfig):
+        return cfg.mode == PTQMode.QUANTIZE and cfg.kvcache_quant_dtype == dtype.int8
+
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
         self.key_samples = []
@@ -709,6 +728,10 @@ class QuantPageAttentionMgrDeployCell(Cell):
 
 class DeployPageAttentionMgrCell(WrapperCell):
     """DeployPageAttentionMgrCell"""
+
+    @staticmethod
+    def is_enable(cfg: InnerPTQConfig):
+        return cfg.mode == PTQMode.DEPLOY and cfg.kvcache_quant_dtype == dtype.int8
 
     def __init__(self, linear_name, linear, cfg, network_helper=None):
         super().__init__(linear_name, linear, cfg, network_helper)

@@ -31,6 +31,7 @@ def test_ptq_config_error():
     Description: Feed invalid value of PTQConfig to _ptq_config_check function.
     Expectation: Except ValueError.
     """
+    set_context(device_target="CPU")
     config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None)
     with pytest.raises(ValueError):
         _ = PTQ(config)
@@ -70,6 +71,7 @@ def test_context_mode_error():
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml")
     helper = MFLlama2Helper(config_path_)
+    delattr(helper.mf_config.context, 'max_device_memory')
     network = helper.create_network()
     with pytest.raises(ValueError, match="Quantization phase only support PYNATIVE MODE."):
         ptq.apply(network, helper)
@@ -84,6 +86,7 @@ def test_layer_info_error():
     Description: Feed invalid param to LayerInfo to raise type error.
     Expectation: Except ValueError.
     """
+    set_context(device_target="CPU")
     with pytest.raises(TypeError):
         _ = LayerInfo(name=1)
 
@@ -104,10 +107,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8(quant_algo):
     Expectation: accuracy is good.
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_1p_logs "
-        f"python ptq_network_runner.py -m 1 -a {quant_algo}"
+        f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
@@ -128,10 +132,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8(quant_algo):
     Expectation: accuracy is good.
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_1p_logs "
-        f"python ptq_network_runner.py -m 1 -a {quant_algo}"
+        f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
@@ -152,10 +157,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8c8(quant_algo):
     Expectation: accuracy is good.
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_1p_logs "
-        f"python ptq_network_runner.py -m 1 -a {quant_algo}"
+        f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
@@ -176,10 +182,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8c8(quant_algo):
     Expectation: accuracy is good.
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_1p_logs "
-        f"python ptq_network_runner.py -m 1 -a {quant_algo}"
+        f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
@@ -200,10 +207,11 @@ def test_ptq_llama2_predict_2stage_1p_run_c8(quant_algo):
     Expectation: accuracy is good.
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_1p_logs "
-        f"python ptq_network_runner.py -m 1 -a {quant_algo}"
+        f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
@@ -225,10 +233,11 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8(quant_algo):
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
     os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_2p_logs "
-        f"python ptq_network_runner.py -m 2 -a {quant_algo}"
+        f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
@@ -250,10 +259,11 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8(quant_algo):
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
     os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_2p_logs "
-        f"python ptq_network_runner.py -m 2 -a {quant_algo}"
+        f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
@@ -275,10 +285,11 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8c8(quant_algo):
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
     os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_2p_logs "
-        f"python ptq_network_runner.py -m 2 -a {quant_algo}"
+        f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
@@ -300,10 +311,11 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8c8(quant_algo):
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
     os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_2p_logs "
-        f"python ptq_network_runner.py -m 2 -a {quant_algo}"
+        f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
@@ -325,10 +337,11 @@ def test_ptq_llama2_predict_2stage_2p_run_c8(quant_algo):
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
     os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_ptq_predict_llama2_2p_logs "
-        f"python ptq_network_runner.py -m 2 -a {quant_algo}"
+        f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open("./test_ptq_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")

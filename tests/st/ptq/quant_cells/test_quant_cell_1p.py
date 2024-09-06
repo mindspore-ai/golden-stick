@@ -155,6 +155,7 @@ def test_numpy_full_quant_with_bias_correction():
     Description: test numpy full quant with bias correction
     Expectation: accuracy in tolerance
     """
+    context.set_context(device_target="CPU")
     weight = np.array([[2., 4.], [1., 3.]]).astype(np.float16)
     activation = np.array([[1, 10.], [12, 14]]).astype(np.float16)
     weight_scale = np.array([0.5, 0.7]).astype(np.float16)

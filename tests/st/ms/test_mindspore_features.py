@@ -26,7 +26,7 @@ from mindspore.ops.auto_generate import QuantBatchMatmul
 from mindspore.common.initializer import initializer
 from mindspore.parallel import set_algo_parameters
 from mindspore.communication.management import get_rank
-import mindspore.communication.management as mcm
+from mindspore.communication import init
 
 
 @pytest.mark.parametrize("is_row_parallel", [True, False])
@@ -67,19 +67,19 @@ def test_qbmm_biasadd_fusion_executor(is_row_parallel):
             return x
 
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNEL_LIST'] = 'QbmmAllReduceAdd,QbmmAdd'
-    IS_INTERNAL_KERNEL = False
+    has_internal_kernels_env = True
     if not os.environ.get('MS_ENABLE_INTERNAL_KERNELS'):
-        IS_INTERNAL_KERNEL = True
+        has_internal_kernels_env = False
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
-    IS_ASCEND_HOME_PATH = False
+    has_ascend_home_env = True
     if not os.environ.get('ASCEND_HOME_PATH'):
-        IS_ASCEND_HOME_PATH = True
+        has_ascend_home_env = False
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'
     save_graphs_path = "./test_qbmm_biasadd_fusion_irs"
     context.set_context(mode=context.GRAPH_MODE, device_target="Ascend",
                         jit_config={"jit_level": "O0", "infer_boost": "on"}, save_graphs=True,
                         save_graphs_path=save_graphs_path)
-    mcm.init()
+    init()
     context.set_auto_parallel_context(parallel_mode=context.ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
                                       full_batch=True, strategy_ckpt_save_file='strategy.ckpt')
     set_algo_parameters(elementwise_op_strategy_follow=True)
@@ -103,9 +103,9 @@ def test_qbmm_biasadd_fusion_executor(is_row_parallel):
                 res_ok = False
                 break
     os.environ.pop('MS_INTERNAL_ENABLE_CUSTOM_KERNEL_LIST')
-    if IS_INTERNAL_KERNEL:
+    if not has_internal_kernels_env:
         os.environ.pop('MS_ENABLE_INTERNAL_KERNELS')
-    if IS_ASCEND_HOME_PATH:
+    if not has_ascend_home_env:
         os.environ.pop('ASCEND_HOME_PATH')
     assert res_ok
 
@@ -119,13 +119,14 @@ def test_qbmm_biasadd_fusion():
     Description: build reshape_shape_reshape pattern network and try building network in parallel.
     Expectation: output shape as expect.
     """
+    cur_file = os.path.abspath(__file__)
     return_code = os.system(
-        "msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_reshape_shape_reshape_parallel_fusion_logs "
-        "pytest -s test_mindspore_features.py::test_qbmm_biasadd_fusion_executor"
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_qbmm_biasadd_fusion_logs "
+        f"pytest -s {cur_file}::test_qbmm_biasadd_fusion_executor"
     )
     if return_code != 0:
-        log_file = open("./test_reshape_shape_reshape_parallel_fusion_logs/worker_0.log", "r", encoding="utf-8")
+        log_file = open("./test_qbmm_biasadd_fusion_logs/worker_0.log", "r", encoding="utf-8")
         for line in log_file:
             print(line, flush=True)
         log_file.close()

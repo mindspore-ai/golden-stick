@@ -20,9 +20,9 @@ import pytest
 import numpy as np
 
 from mindformers import MindFormerConfig, LlamaForCausalLM, LlamaTokenizer
-from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.infer.models.llama.llama import ParallelLlamaForCausalLM
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -37,7 +37,8 @@ def test_mf_llama_net_helper_inputs():
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml")
     with pytest.raises(TypeError):
         MFLlama2Helper(1)
     cfg = MindFormerConfig(config_path)
@@ -70,16 +71,11 @@ def test_mf_llama_net_helper_inputs():
         _ = helper.get_decoder_layers(1)
 
     with pytest.raises(TypeError):
-        _ = helper.get_linears(1)
-
-    with pytest.raises(TypeError):
-        _ = helper.get_page_attention_mgr("1")
-
-    with pytest.raises(TypeError):
         helper.analysis_decoder_groups("1")
 
     with pytest.raises(TypeError):
         _ = helper.get_pre_layer(1)
+
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -94,13 +90,17 @@ def test_mf_llama_net_helper():
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
+
     with pytest.raises(TypeError):
         MFLlama2Helper(1)
-    cfg = MindFormerConfig(config_path)
-    assert isinstance(MFLlama2Helper(cfg).mf_config, MindFormerConfig)
-    helper = MFLlama2Helper(config_path)
 
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml")
+    cfg = MindFormerConfig(config_path)
+    helper = MFLlama2Helper(cfg)
+    assert isinstance(helper.mf_config, MindFormerConfig)
+
+    helper = MFLlama2Helper(config_path)
     helper.mf_config.model.model_config.use_past = True
     helper.mf_config.model.model_config.block_size = 16
     network = helper.create_network()
@@ -108,13 +108,6 @@ def test_mf_llama_net_helper():
     layers = helper.get_decoder_layers(network)
     assert isinstance(layers, List)
     assert len(layers) == 1
-    _, layer = layers[0]
-    qkv_concat, ffn_concat, linears = helper.get_linears(layer)
-    assert qkv_concat is False
-    assert ffn_concat is False
-    assert isinstance(linears, List)
-    paged_attention_mgr = helper.get_page_attention_mgr(layer)
-    assert isinstance(paged_attention_mgr, PagedAttentionMgr)
     helper.analysis_decoder_groups(network)
     pre_layer = helper.get_pre_layer("root.model.layers.0")
     assert pre_layer is None
@@ -128,6 +121,7 @@ def test_mf_llama_net_helper():
     assert isinstance(inputs, tuple)
     network(*inputs)
 
+
 # @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -138,10 +132,11 @@ def test_mf_parallel_llama_net_helper_inputs_1p():
     Expectation: correct output of each function
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    cur_file = os.path.abspath(__file__)
     return_code = os.system(
-        "msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_mf_llama_helpers_1p_logs "
-        f"pytest test_mf_llama_helpers.py::test_mf_parallel_llama_net_helper_inputs"
+        f"pytest {cur_file}::test_mf_parallel_llama_net_helper_inputs"
     )
     if return_code != 0:
         log_file = open("./test_mf_llama_helpers_1p_logs/worker_0.log", "r", encoding="utf-8")
@@ -150,6 +145,7 @@ def test_mf_parallel_llama_net_helper_inputs_1p():
         log_file.close()
 
     assert return_code == 0
+
 
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -163,7 +159,8 @@ def test_mf_parallel_llama_net_helper_inputs():
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    config_path = "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml"
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml")
     with pytest.raises(TypeError):
         MFParallelLlama2Helper(1)
     cfg = MindFormerConfig(config_path)
@@ -196,16 +193,11 @@ def test_mf_parallel_llama_net_helper_inputs():
         _ = helper.get_decoder_layers(1)
 
     with pytest.raises(TypeError):
-        _ = helper.get_linears(1)
-
-    with pytest.raises(TypeError):
-        _ = helper.get_page_attention_mgr("1")
-
-    with pytest.raises(TypeError):
         helper.analysis_decoder_groups("1")
 
     with pytest.raises(TypeError):
         _ = helper.get_pre_layer(1)
+
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -217,10 +209,11 @@ def test_mf_parallel_llama_net_helper_1p():
     Expectation: correct output of each function
     """
     os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    cur_file = os.path.abspath(__file__)
     return_code = os.system(
-        "msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
         "--master_port=10926 --join=True --log_dir=./test_mf_llama_helpers_1p_logs "
-        f"pytest test_mf_llama_helpers.py::test_mf_parallel_llama_net_helper"
+        f"pytest {cur_file}::test_mf_parallel_llama_net_helper"
     )
     if return_code != 0:
         log_file = open("./test_mf_llama_helpers_1p_logs/worker_0.log", "r", encoding="utf-8")
@@ -229,6 +222,7 @@ def test_mf_parallel_llama_net_helper_1p():
         log_file.close()
 
     assert return_code == 0
+
 
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -243,7 +237,8 @@ def test_mf_parallel_llama_net_helper():
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    config_path = "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml"
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml")
     with pytest.raises(TypeError):
         MFParallelLlama2Helper(1)
     cfg = MindFormerConfig(config_path)
@@ -257,13 +252,6 @@ def test_mf_parallel_llama_net_helper():
     layers = helper.get_decoder_layers(network)
     assert isinstance(layers, List)
     assert len(layers) == 1
-    _, layer = layers[0]
-    qkv_concat, ffn_concat, linears = helper.get_linears(layer)
-    assert qkv_concat is True
-    assert ffn_concat is True
-    assert isinstance(linears, List)
-    paged_attention_mgr = helper.get_page_attention_mgr(layer)
-    assert isinstance(paged_attention_mgr, PagedAttentionMgr)
     helper.analysis_decoder_groups(network)
     pre_layer = helper.get_pre_layer("root.model.layers.0")
     assert pre_layer is None
