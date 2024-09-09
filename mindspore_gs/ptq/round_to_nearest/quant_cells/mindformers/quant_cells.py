@@ -229,7 +229,7 @@ class PagedAttentionQuant(PTQCell):
         self._kvcache = kvcache
 
         # PagedAttentionMgr's shape is BSH currently.
-        n = kvcache.n_heads
+        n = kvcache.n_kv_heads
         d = kvcache.head_dim
         key_fq_args = {}
         value_fq_args = {}
@@ -340,7 +340,7 @@ class PagedAttentionDeployBase(PTQCell):
         self._converted = True
         self._kvcache = kvcache
         # PagedAttentionMgr's shape is BSH currently.
-        n = kvcache.n_heads
+        n = kvcache.n_kv_heads
         d = kvcache.head_dim
         self._key_in_strategy = None
         self._value_in_strategy = None
