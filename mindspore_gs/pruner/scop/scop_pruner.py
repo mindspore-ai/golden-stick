@@ -351,6 +351,7 @@ class PrunerKfCompressAlgo(CompAlgo):
 
         Args:
             network (Cell): Network to be pruned.
+            kwargs (Dict): Extensible parameter for subclasses.
 
         Returns:
             Knockoff network.
@@ -520,6 +521,7 @@ class PrunerFtCompressAlgo(CompAlgo):
 
         Args:
             network (Cell): Knockoff network.
+            kwargs (Dict): Extensible parameter for subclasses.
 
         Returns:
             Pruned network.

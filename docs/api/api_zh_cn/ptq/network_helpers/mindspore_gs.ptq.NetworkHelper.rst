@@ -5,7 +5,7 @@ mindspore_gs.ptq.NetworkHelper
 
     工具类，用于解耦算法层和网络框架层，使算法实现不依赖于具体的框架。
 
-    .. py:method:: analysis_decoder_groups(self, network: Cell)
+    .. py:method:: analysis_decoder_groups(network: Cell)
 
         分析网络中decoder组的信息。
 
@@ -53,7 +53,7 @@ mindspore_gs.ptq.NetworkHelper
         返回：
             一个列表，表示生成的tokens。
 
-    .. py:method:: get_decoder_layers(self, network: Cell)
+    .. py:method:: get_decoder_layers(network: Cell)
 
         获取网络的decoder层。
 
@@ -63,7 +63,7 @@ mindspore_gs.ptq.NetworkHelper
         返回：
             一个元组的列表，表示获取到的decoder层及其名称。
 
-    .. py:method:: get_pre_layer(self, linear_name: str)
+    .. py:method:: get_pre_layer(linear_name: str)
 
         通过当前linear层的名称，获取前一层的信息。
 
@@ -73,7 +73,7 @@ mindspore_gs.ptq.NetworkHelper
         返回：
             一个字典，表示获取到的前一层layer的信息，包含了layer名称、layer和类型。
 
-    .. py:method:: get_spec(self, name: str)
+    .. py:method:: get_spec(name: str)
 
         获取网络的规格，比如batch_size、seq_length等。
 

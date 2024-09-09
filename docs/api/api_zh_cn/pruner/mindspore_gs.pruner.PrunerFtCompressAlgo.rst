@@ -14,12 +14,13 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
         - **TypeError** - `prune_rate` 的数据类型不是 `float` 。
         - **ValueError** - `prune_rate` 小于0或者大于等于1。
 
-    .. py:method:: apply(network)
+    .. py:method:: apply(network, **kwargs)
 
         将Konckoff网络变为剪枝后的网络。
 
         参数：
             - **network** (Cell) - Konckoff网络。
+            - **kwargs** (Dict) - 用于子类的可扩展入参。
 
         返回：
             返回剪枝后的网络。

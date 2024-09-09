@@ -58,7 +58,7 @@ class SmoothQuant(CompAlgo):
         self._is_deploy = mode == PTQMode.DEPLOY
 
     @staticmethod
-    def load_mindformers_plugin():
+    def _load_mindformers_plugin():
         """
         Load quant cells, layer policy for MindFormers as plugin so that `SmoothQuant` can support network from
         MindFormers. Invoking this static method before creating `SmoothQuant`.
@@ -68,7 +68,7 @@ class SmoothQuant(CompAlgo):
 
     @staticmethod
     def _init_net_policy(config):
-        SmoothQuant.load_mindformers_plugin()
+        SmoothQuant._load_mindformers_plugin()
         return SQNetPolicy(config)
 
     @staticmethod

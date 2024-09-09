@@ -81,7 +81,7 @@ class RoundToNearest(CompAlgo):
         self._is_deploy: bool = self._config.mode == PTQMode.DEPLOY
 
     @staticmethod
-    def load_mindformers_plugin():
+    def _load_mindformers_plugin():
         """
         Load quant cells, layer policy for MindFormers as plugin so that `RoundToNearest` can support network from
         MindFormers. Invoking this static method before creating `RoundToNearest`.
@@ -91,7 +91,7 @@ class RoundToNearest(CompAlgo):
 
     @staticmethod
     def _init_net_policy(config):
-        RoundToNearest.load_mindformers_plugin()
+        RoundToNearest._load_mindformers_plugin()
         return RTNNetPolicy(config)
 
     def _create_config(self):

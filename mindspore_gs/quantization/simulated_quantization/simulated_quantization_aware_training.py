@@ -438,6 +438,7 @@ class SimulatedQuantizationAwareTraining(QuantizationAwareTraining):
 
         Args:
             network (Cell): Network to be quantized.
+            kwargs (Dict): Extensible parameter for subclasses.
 
         Returns:
             Quantized network.
