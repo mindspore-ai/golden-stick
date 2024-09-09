@@ -31,8 +31,8 @@ from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
-from tests.st.test_utils import relative_tolerance_acceptable, \
-    set_config, load_distribut_checkpoint, MFLlama2HelloNetworkHelper, create_hello_ds
+from tests.st.test_utils import relative_tolerance_acceptable, load_distribut_checkpoint
+from tests.st.mindformers_utils import MFLlama2HelloNetworkHelper, create_hello_ds, set_config
 from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
 from mindformers.modules import PagedAttentionMgr
 from mindformers import LlamaForCausalLM

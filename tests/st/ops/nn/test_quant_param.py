@@ -160,7 +160,7 @@ def test_quant_cell_v2_perchannel(mode):
     assert (expect == output2.asnumpy()).all()
 
 
-# FIXME @hangangqiang wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
+# FIXME wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
@@ -172,24 +172,24 @@ def test_antiquant_cell(mode):
     """
 
     context.set_context(device_target="Ascend", mode=mode)
-    scale = [2.0, 3.0]
-    zp = [-1.0, 1.0]
+    scale = Tensor([2.0, 3.0], dtype=dtype.float16)
+    zp = Tensor([-1.0, 1.0], dtype=dtype.float16)
     origin = np.ones((4, 2), dtype=np.int8)
     expect = origin.astype(np.float32)
-    expect = (expect - zp) * scale
+    expect = (expect - zp.asnumpy()) * scale.asnumpy()
 
     def check_1stage():
         x = Tensor(origin, dtype=dtype.int8)
-        aqcell = AntiQuantCell(scale, zp, dtype.float16)
-        output = aqcell(x)
+        aqcell = AntiQuantCell(1, 2, dtype.float16)
+        output = aqcell(x, scale, zp)
         assert (output.asnumpy() == expect).all()
         mindspore.save_checkpoint(aqcell, "ascend-antiquant-cell.ckpt")
 
     def check_2stage():
         x = Tensor(origin, dtype=dtype.int8)
-        aqcell2 = AntiQuantCell([1.0, 1.0], [0.0, 0.0], dtype.float16)
+        aqcell2 = AntiQuantCell(1, 2, dtype.float16)
         mindspore.load_checkpoint("ascend-antiquant-cell.ckpt", aqcell2)
-        output2 = aqcell2(x)
+        output2 = aqcell2(x, Tensor([1.0, 1.0], dtype.float16), Tensor([0.0, 0.0], dtype.float16))
         assert (output2.asnumpy() == expect).all()
 
     check_1stage()
@@ -198,19 +198,19 @@ def test_antiquant_cell(mode):
 
 class AntiQuantBMMNet(nn.Cell):
     """BatchMatMul network with AntiQuantCell."""
-    def __init__(self, scale, zp, ic=5, oc=6):
+    def __init__(self, ic=5, oc=6):
         super().__init__()
-        self.antiquant = AntiQuantCell(scale, zp, dtype.float16)
+        self.antiquant = AntiQuantCell(1, oc, dtype.float16)
         self.matmul = BatchMatMul(transpose_a=False, transpose_b=False)
         self.weight = Parameter(Tensor(np.ones((ic, oc), np.int8), dtype.int8))
 
-    def construct(self, x):
-        weight = self.antiquant(self.weight)
+    def construct(self, x, scale, zp):
+        weight = self.antiquant(self.weight, scale, zp)
         y = self.matmul(x, weight)
         return y
 
 
-# FIXME @hangangqiang wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
+# FIXME wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
@@ -225,23 +225,23 @@ def test_antiquantbmm_cell(mode):
     bs = 2
     ic = 5
     oc = 2
-    scale = [2.0, 3.0]
-    zp = [-1.0, 1.0]
+    scale = Tensor([2.0, 3.0], dtype.float16)
+    zp = Tensor([-1.0, 1.0], dtype.float16)
     expect = np.array([[[20., 0.], [20., 0.], [20., 0.], [20., 0.], [20., 0.]],
                        [[20., 0.], [20., 0.], [20., 0.], [20., 0.], [20., 0.]]])
 
     def check_1stage():
-        net = AntiQuantBMMNet(scale, zp, ic, oc)
+        net = AntiQuantBMMNet(ic, oc)
         x = Tensor(np.ones((bs, ic, ic)), dtype=dtype.float16)
-        output = net(x)
+        output = net(x, scale, zp)
         assert relative_tolerance_acceptable(output.asnumpy(), expect, 1e-5)
         mindspore.save_checkpoint(net, "test_antiquantbmm_cell.ckpt")
 
     def check_2stage():
-        net = AntiQuantBMMNet([1.0, 1.0], [0.0, 0.0], ic, oc)
+        net = AntiQuantBMMNet(ic, oc)
         mindspore.load_checkpoint("test_antiquantbmm_cell.ckpt", net)
         x = Tensor(np.ones((bs, ic, ic)), dtype=dtype.float16)
-        output2 = net(x)
+        output2 = net(x, Tensor([1.0, 1.0], dtype.float16), Tensor([0.0, 0.0], dtype.float16))
         assert relative_tolerance_acceptable(output2.asnumpy(), expect, 1e-5)
 
     check_1stage()
@@ -250,19 +250,19 @@ def test_antiquantbmm_cell(mode):
 
 class AntiQuantMMNet(nn.Cell):
     """MatMul network with AntiQuantCell."""
-    def __init__(self, scale, zp, ic=5, oc=6):
+    def __init__(self, ic=5, oc=6):
         super().__init__()
-        self.antiquant = AntiQuantCell(scale, zp, dtype.float16)
+        self.antiquant = AntiQuantCell(1, oc, dtype.float16)
         self.matmul = MatMul(transpose_a=False, transpose_b=False)
         self.weight = Parameter(Tensor(np.ones((ic, oc), np.int8), dtype.int8))
 
-    def construct(self, x):
-        weight = self.antiquant(self.weight)
+    def construct(self, x, scale, zp):
+        weight = self.antiquant(self.weight, scale, zp)
         y = self.matmul(x, weight)
         return y
 
 
-# FIXME @hangangqiang wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
+# FIXME wait for debug on mindspore.ops.AntiQuant by dingjinshan: @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
@@ -276,22 +276,22 @@ def test_antiquantmm_cell(mode):
     context.set_context(device_target="Ascend", mode=mode)
     ic = 5
     oc = 2
-    scale = [2.0, 3.0]
-    zp = [-1.0, 1.0]
+    scale = Tensor([2.0, 3.0], dtype.float16)
+    zp = Tensor([-1.0, 1.0], dtype.float16)
     expect = np.array([[[20., 0.], [20., 0.], [20., 0.], [20., 0.], [20., 0.]]])
 
     def check_1stage():
-        net = AntiQuantMMNet(scale, zp, ic, oc)
+        net = AntiQuantMMNet(ic, oc)
         x = Tensor(np.ones((ic, ic)), dtype=dtype.float16)
-        output = net(x)
+        output = net(x, scale, zp)
         assert relative_tolerance_acceptable(output.asnumpy(), expect, 1e-5)
         mindspore.save_checkpoint(net, "test_antiquantmm_cell.ckpt")
 
     def check_2stage():
-        net = AntiQuantMMNet([1.0, 1.0], [0.0, 0.0], ic, oc)
+        net = AntiQuantMMNet(ic, oc)
         mindspore.load_checkpoint("test_antiquantmm_cell.ckpt", net)
         x = Tensor(np.ones((ic, ic)), dtype=dtype.float16)
-        output2 = net(x)
+        output2 = net(x, Tensor([1.0, 1.0], dtype.float16), Tensor([0.0, 0.0], dtype.float16))
         assert relative_tolerance_acceptable(output2.asnumpy(), expect, 1e-5)
 
     check_1stage()

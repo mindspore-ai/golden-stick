@@ -125,8 +125,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     helper.mf_config.context.device_id = device_id
     config = helper.mf_config
 
-    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB",
-                pynative_synchronize=True)
+    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
     init()
     if not is_initialized():
         initialize_model_parallel(config.parallel_config.model_parallel, order='tp')
@@ -185,7 +184,6 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
     device_id = int(os.environ.get('DEVICE_ID', '0'))
     helper.mf_config.context.device_id = device_id
-    print(f"---- use device_id: {device_id}", flush=True)
     config = helper.mf_config
 
     set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
@@ -212,6 +210,12 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     return outputs, answer
 
 
+def print_output(qoutput_, foutput_):
+    print(f"qoutput: {qoutput_}", flush=True)
+    print(f"foutput: {foutput_}", flush=True)
+    print(f"First not equal index {np.min(np.where((qoutput_ - foutput_) != 0))}", flush=True)
+
+
 def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, output_dir_, model_parallel_,
                               quant_algo_):
     """ptq_llama2_predict_2stage"""
@@ -224,28 +228,37 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
     qoutput = np.array(qoutput)
     if model_parallel_ == 1:
         if quant_algo_ == 'A8W8':
-            return np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
-        if quant_algo_ == 'A16W8':
-            return np.allclose(qoutput, foutput, 0, 0)
-        if quant_algo_ == 'A16W8C8':
-            return np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
-        if quant_algo_ == 'A8W8C8':
-            return np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
-        if quant_algo_ == 'C8':
-            return np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
+            ret = np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
+        elif quant_algo_ == 'A16W8':
+            ret = np.allclose(qoutput, foutput, 0, 0)
+        elif quant_algo_ == 'A16W8C8':
+            ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+        elif quant_algo_ == 'A8W8C8':
+            ret = np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
+        elif quant_algo_ == 'C8':
+            ret = np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
+        else:
+            assert False
+        if not ret:
+            print_output(qoutput, foutput)
+        return ret
     if quant_algo_ == 'A8W8':
-        return np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
-    if quant_algo_ == 'A16W8':
-        return np.allclose(qoutput, foutput, 0, 0)
-    if quant_algo_ == 'A16W8C8':
-        return np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
-    if quant_algo_ == 'A8W8C8':
-        return np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
-    if quant_algo_ == 'C8':
-        return np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
-    if quant_algo_ == "A8W8_FallBack":
-        return np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
-    return True
+        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+    elif quant_algo_ == 'A16W8':
+        ret = np.allclose(qoutput, foutput, 0, 0)
+    elif quant_algo_ == 'A16W8C8':
+        ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+    elif quant_algo_ == 'A8W8C8':
+        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+    elif quant_algo_ == 'C8':
+        ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+    elif quant_algo_ == "A8W8_FallBack":
+        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+    else:
+        assert False
+    if not ret:
+        print_output(qoutput, foutput)
+    return ret
 
 
 def get_args():

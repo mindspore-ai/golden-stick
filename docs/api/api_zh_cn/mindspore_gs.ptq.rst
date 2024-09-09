@@ -37,7 +37,7 @@ PTQ 模式枚举
 
     mindspore_gs.ptq.OutliersSuppressionType
 
-NetworkHelper
+网络适配层
 -----------------
 
 .. mscnautosummary::
@@ -48,18 +48,6 @@ NetworkHelper
     mindspore_gs.ptq.NetworkHelper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
-
-网络适配层
--------------
-
-.. mscnautosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.NetworkHelper
-    mindspore_gs.ptq.MFLlama2Helper
-    mindspore_gs.ptq.MFParallelLlama2Helper
 
 RoundToNearest 算法
 --------------------------------

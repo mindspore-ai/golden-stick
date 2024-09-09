@@ -15,7 +15,7 @@
 """test interfaces of smooth quant."""
 import os
 import time
-
+import socket
 import pytest
 import numpy as np
 
@@ -36,6 +36,23 @@ class SimpleNet(nn.Cell):
 
     def construct(self, x):
         return self.linear(x)
+
+
+def get_available_port(start=10000, end=11000):
+    """get_available_port"""
+    def is_port_available(port_):
+        """is_port_available"""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.connect(('localhost', port_))
+                return True
+            except ConnectionRefusedError:
+                return False
+
+    for port in range(start, end):
+        if is_port_available(port):
+            return port
+    return start
 
 
 @pytest.mark.level0
@@ -155,7 +172,6 @@ def test_layer_info_error():
         _ = LayerInfo(type_="1")
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A8W8'])
@@ -166,9 +182,12 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8(quant_algo):
     Expectation: accuracy is good.
     """
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A8W8_predict_llama2_1p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8_predict_llama2_1p_logs "
         f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
@@ -177,12 +196,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A16W8'])
@@ -193,9 +211,12 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8(quant_algo):
     Expectation: accuracy is good.
     """
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A16W8_predict_llama2_1p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8_predict_llama2_1p_logs "
         f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
@@ -204,12 +225,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A8W8C8'])
@@ -220,9 +240,12 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8c8(quant_algo):
     Expectation: accuracy is good.
     """
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A8W8C8_predict_llama2_1p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8C8_predict_llama2_1p_logs "
         f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
@@ -231,12 +254,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8c8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A16W8C8'])
@@ -247,9 +269,12 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8c8(quant_algo):
     Expectation: accuracy is good.
     """
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A16W8C8_predict_llama2_1p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8C8_predict_llama2_1p_logs "
         f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
@@ -258,12 +283,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a16w8c8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['C8'])
@@ -274,9 +298,12 @@ def test_ptq_llama2_predict_2stage_1p_run_c8(quant_algo):
     Expectation: accuracy is good.
     """
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_C8_predict_llama2_1p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_C8_predict_llama2_1p_logs "
         f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
@@ -285,7 +312,7 @@ def test_ptq_llama2_predict_2stage_1p_run_c8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
@@ -301,9 +328,12 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8(quant_algo):
     """
     os.environ['quant_algo'] = f"{quant_algo}"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A8W8_predict_llama2_2p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8_predict_llama2_2p_logs "
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
@@ -312,7 +342,7 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
@@ -329,9 +359,12 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8(quant_algo):
     """
     os.environ['quant_algo'] = f"{quant_algo}"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A16W8_predict_llama2_2p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8_predict_llama2_2p_logs "
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
@@ -340,7 +373,7 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
@@ -356,9 +389,12 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8c8(quant_algo):
     """
     os.environ['quant_algo'] = f"{quant_algo}"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A8W8C8_predict_llama2_2p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8C8_predict_llama2_2p_logs "
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
@@ -367,7 +403,7 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8c8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
@@ -384,9 +420,12 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8c8(quant_algo):
     """
     os.environ['quant_algo'] = f"{quant_algo}"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A16W8C8_predict_llama2_2p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8C8_predict_llama2_2p_logs "
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
@@ -395,7 +434,7 @@ def test_ptq_llama2_predict_2stage_2p_run_a16w8c8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
@@ -412,9 +451,12 @@ def test_ptq_llama2_predict_2stage_2p_run_c8(quant_algo):
     """
     os.environ['quant_algo'] = f"{quant_algo}"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_C8_predict_llama2_2p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_C8_predict_llama2_2p_logs "
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
@@ -423,7 +465,7 @@ def test_ptq_llama2_predict_2stage_2p_run_c8(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
 
@@ -440,9 +482,12 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8_fallback(quant_algo):
     """
     os.environ['quant_algo'] = f"{quant_algo}"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_ptq_A8W8_FallBack_predict_llama2_2p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8_FallBack_predict_llama2_2p_logs "
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
@@ -451,6 +496,6 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8_fallback(quant_algo):
             print(line, flush=True)
         log_file.close()
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system("kill -9 $(lsof -i:10926 | awk '{print $2}')")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0

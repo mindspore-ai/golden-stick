@@ -117,7 +117,7 @@ def test_lenet_convert(run_mode, enable_act_quant):
     mindspore.nn.GraphCell(graph)
 
 
-# FIXME @hangangqiang: @pytest.mark.level0
+# FIXME GPU issue: @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W1", "W4A8", "W1A8"])
@@ -189,7 +189,7 @@ def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
     assert acc['Accuracy'] > 0.95
 
 
-# FIXME @hangangqiang: @pytest.mark.level0
+# FIXME GPU issue: @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W1"])
@@ -204,7 +204,7 @@ def test_lenet_accuracy_bnon_graph_woq(quant_bit, enable_bn_calibration):
     lenet_accuracy_bnon(quant_bit, enable_bn_calibration)
 
 
-# FIXME @hangangqiang: @pytest.mark.level0
+# FIXME GPU issue: @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4A8", "W1A8"])
@@ -234,7 +234,7 @@ def test_lenet_accuracy_bnon_pynative(quant_bit, enable_bn_calibration):
     lenet_accuracy_bnon(quant_bit, enable_bn_calibration)
 
 
-# FIXME @hangangqiang: @pytest.mark.level0
+# FIXME GPU issue: @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W1A8"])
@@ -308,7 +308,7 @@ def test_lenet_accuracy_bnoff_w1a8(quant_bit, enable_bn_calibration, run_mode):
     assert acc['Accuracy'] > 0.95
 
 
-# FIXME @hangangqiang: @pytest.mark.level0
+# FIXME GPU issue: @pytest.mark.level0
 @pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W1"])
