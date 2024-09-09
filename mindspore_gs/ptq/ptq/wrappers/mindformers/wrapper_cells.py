@@ -14,6 +14,7 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 import abc
+import copy
 import numpy as np
 
 from mindspore import nn, Parameter, Tensor, dtype
@@ -301,7 +302,8 @@ class QuantLinearCell(WrapperLinearCell):
             self.compute_type = self.layer.dtype
         else:
             self.compute_type = self.layer.compute_dtype
-
+        self.input_scale = None
+        self.input_zp = None
         self.a16w8 = self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
         self.a8w8 = self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
 
@@ -362,6 +364,8 @@ class QuantLinearCell(WrapperLinearCell):
                 smooth_scale = None
             qmm = AllQuantMatmul(x_scale, x_zp, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b,
                                  smooth_scale=smooth_scale)
+            self.input_scale = copy.deepcopy(qmm.input_scale)
+            self.input_zp = copy.deepcopy(qmm.input_zp)
         if self.a16w8:
             qmm = WeightQuantMatmul(w_scale, w_zp, in_channels=self.ic, transpose_b=self.layer.transpose_b)
         if self.a8w8 or self.a16w8:
@@ -412,6 +416,9 @@ class DeployLinearCell(WrapperLinearCell):
         self.layer.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
         w_scale = np.array([1] * self.oc)
         w_zp = np.array([0] * self.oc)
+        self.input_scale = None
+        self.input_zp = None
+        self.quant = QuantV2()
         if self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
             if linear.has_bias:
                 self.layer.bias = Parameter(initializer("ones", linear.bias.shape, linear.bias.dtype),
@@ -423,20 +430,24 @@ class DeployLinearCell(WrapperLinearCell):
                 self.layer.bias = Parameter(initializer("ones", bias_shape, self.compute_type), name=bias_name)
                 self.layer.bias_add = msops.Add()
             x_scale = np.array(1.0)
-            x_zp = np.array(1.0)
-            qmm = AllQuantMatmul(x_scale, x_zp, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b)
+            self.input_scale = Parameter(initializer("ones", [self.ic], dtype.float16), name="input_scale")
+            self.input_zp = Parameter(initializer("ones", [self.ic], dtype.int8), name="input_zp")
+            qmm = AllQuantMatmulDeploy(x_scale, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b)
         elif self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
             qmm = WeightQuantMatmul(w_scale, w_zp, in_channels=self.ic, transpose_b=self.layer.transpose_b)
         self.layer.matmul = qmm
         self.is_rowparallel = (isinstance(self.layer, RowParallelLinear))
         self.is_colparallel = (isinstance(self.layer, ColumnParallelLinear))
         self.is_linear = isinstance(self.layer, Linear)
+        self.a8w8 = self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
 
     def deploy(self):
         return self
 
     def linear_forward(self, x):
         """Forward process, x should be a tensor"""
+        if self.a8w8:
+            x = self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         out_shape = self.layer.shape(x)[:-1] + (self.layer.out_channels,)
         if self.layer.expert_flag and not self.layer.use_gmm:
             if self.layer.use_expert_group_size is True:
@@ -474,7 +485,8 @@ class DeployLinearCell(WrapperLinearCell):
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
             input_parallel = self.layer.gather_from_sp_region(input_parallel)
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
-
+        if self.a8w8:
+            input_parallel = self.quant(input_parallel, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size_per_partition,)
         output_parallel = self.layer.matmul(input_parallel, weight)
         if self.layer.has_bias:
@@ -503,6 +515,8 @@ class DeployLinearCell(WrapperLinearCell):
 
         origin_dtype = F.dtype(input_parallel)
         input_parallel = self.layer.cast(input_parallel, self.layer.compute_dtype)
+        if self.a8w8:
+            input_parallel = self.quant(input_parallel, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size,)
         output_parallel = self.layer.matmul(input_parallel, self.layer.weight)
 
@@ -581,6 +595,29 @@ class WeightQuantMatmul(Cell):
         x = msops.reshape(x, (-1, self.ic))
         output = self.weight_qbmm(x, weight, self.t_scale, self.t_zp_neg, None, None, None)
         return output.astype(self.dst_dtype)
+
+class AllQuantMatmulDeploy(Cell):
+    """quant weight"""
+
+    def __init__(self, input_scale, weight_scale, in_channels=None, out_channels=None, offset=None,
+                 transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
+        super().__init__()
+        self.transpose_b = transpose_b
+        self.offset = offset
+        self.ic = in_channels
+        self.oc = out_channels
+        dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
+        scale_i64 = NumpyQuantOps.trans_fp32_to_i64(np.squeeze(dequant_scale))
+        self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64))
+        self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
+        if offset is None:
+            self.offset = None
+        else:
+            self.offset = Parameter(Tensor(offset, dtype=dtype.float32))
+
+    def construct(self, qx, quant_weight):
+        # x: fp16 quant_weight: int8
+        return self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, None)
 
 
 class QuantPageAttentionMgrCell(WrapperCell):
