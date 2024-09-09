@@ -116,7 +116,7 @@ class PTQConfig:
     Args:
         mode (:class:`mindspore_gs.ptq.PTQMode`): Flag for ptq mode, ``QUANTIZATION`` for quantization mode,
             ``DEPLOY`` for deploy mode.
-        backend (:class:`mindspore_gs.ptq.BackendTarget`): Flag for backend target, ``NONE`` for no specific backend,
+        backend (:class:`mindspore_gs.common.BackendTarget`): Flag for backend target, ``NONE`` for no specific backend,
             ``ASCEND`` for ascend backend.
         opname_blacklist (List[str]): Blacklist of opname. Layers in network with name fuzzy matched with this blacklist
             will not being quanted.

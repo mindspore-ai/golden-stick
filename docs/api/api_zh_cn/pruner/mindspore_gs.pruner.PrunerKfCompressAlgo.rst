@@ -11,12 +11,13 @@ mindspore_gs.pruner.PrunerKfCompressAlgo
     参数：
         - **config** (dict) - 算法配置参数。
 
-    .. py:method:: apply(network)
+    .. py:method:: apply(network, **kwargs)
 
         将网络变成Konckoff网络。
 
         参数：
             - **network** (Cell) - 原始待剪枝网络。
+            - **kwargs** (Dict) - 用于子类的可扩展入参。
 
         返回：
             返回变换后的Konckoff网络。

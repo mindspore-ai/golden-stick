@@ -33,7 +33,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
         - **ValueError** - `t_start_time` 或 `t_end_time` 小于0.0。
         - **ValueError** - `t_start_time` 或 `t_end_time` 大于1.0。       
 
-    .. py:method:: apply(network: Cell)
+    .. py:method:: apply(network: Cell, **kwargs)
 
         按照下面4个步骤对给定网络应用量化算法，得到带有伪量化节点的网络。
 
@@ -44,6 +44,7 @@ mindspore_gs.quantization.SlbQuantAwareTraining
 
         参数：
             - **network** (Cell) - 即将被量化的网络。
+            - **kwargs** (Dict) - 用于子类的可扩展入参。
 
         返回：
             在原网络定义的基础上，修改需要量化的网络层后生成带有伪量化节点的网络。

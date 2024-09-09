@@ -32,7 +32,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
         - **ValueError** - `quant_dtype` 的数据类型不是 `QuantDtype.INT8` 或者 `quant_dtype` 存在不是 `QuantDtype.INT8` 的元素。
         - **ValueError** - `per_channel` 为True， 或者 `per_channel` 的第一个元素为 ``True``。
 
-    .. py:method:: apply(network: Cell)
+    .. py:method:: apply(network: Cell, **kwargs)
 
         按照以下步骤在 `network` 中应用SimQAT算法，使 `network` 可用于量化感知训练：
 
@@ -46,6 +46,7 @@ mindspore_gs.quantization.SimulatedQuantizationAwareTraining
 
         参数：
             - **network** (Cell) - 待量化的网络。
+            - **kwargs** (Dict) - 用于子类的可扩展入参。
 
         返回：
             量化后的网络。

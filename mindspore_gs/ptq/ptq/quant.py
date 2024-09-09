@@ -96,22 +96,23 @@ class PTQ(CompAlgo):
         self.build_pipeline()
         self.context_mode = get_context("mode")
 
+    # pylint: disable=protected-access
     def build_pipeline(self):
         """build pipline"""
         if self._config.mode == PTQMode.QUANTIZE:
             if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
                 logger.info("Adding LinearSmoother to pipeline.")
-                LinearSmoother.load_mindformers_plugin()
+                LinearSmoother._load_mindformers_plugin()
                 self.pipeline.append(LinearSmoother(self._config))
             if self._config.act_quant_dtype == dtype.int8 or \
                 self._config.weight_quant_dtype == dtype.int8 or \
                     self._config.kvcache_quant_dtype == dtype.int8:
                 logger.info("Adding Quantizer to pipeline.")
-                Quantizer.load_mindformers_plugin()
+                Quantizer._load_mindformers_plugin()
                 self.pipeline.append(Quantizer(self._config))
         elif self._config.mode == PTQMode.DEPLOY:
             logger.info("Adding Deploy to pipeline.")
-            Deployer.load_mindformers_plugin()
+            Deployer._load_mindformers_plugin()
             self.pipeline.append(Deployer(self._config))
 
     @staticmethod
