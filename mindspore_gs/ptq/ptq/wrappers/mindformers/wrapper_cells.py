@@ -476,7 +476,6 @@ class DeployLinearCell(WrapperLinearCell):
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
 
         output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size_per_partition,)
-        input_parallel = self.layer.reshape(input_parallel, (-1, self.layer.input_size))
         output_parallel = self.layer.matmul(input_parallel, weight)
         if self.layer.has_bias:
             output_parallel = self.layer.bias_add(
@@ -505,7 +504,6 @@ class DeployLinearCell(WrapperLinearCell):
         origin_dtype = F.dtype(input_parallel)
         input_parallel = self.layer.cast(input_parallel, self.layer.compute_dtype)
         output_shape = self.layer.shape(input_parallel)[:-1] + (self.layer.output_size,)
-        input_parallel = self.layer.reshape(input_parallel, (-1, self.layer.input_size_per_partition))
         output_parallel = self.layer.matmul(input_parallel, self.layer.weight)
 
         if self.layer.sequence_parallel:
