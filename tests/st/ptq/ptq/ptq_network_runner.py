@@ -123,13 +123,13 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
     device_id = int(os.environ.get('DEVICE_ID', '0'))
     helper.mf_config.context.device_id = device_id
-    print(f"---- use device_id: {device_id}", flush=True)
     config = helper.mf_config
 
+    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB",
+                pynative_synchronize=True)
     init()
     if not is_initialized():
         initialize_model_parallel(config.parallel_config.model_parallel, order='tp')
-    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
     network = AutoModel.from_config(config, download_checkpoint=False)
     network.set_train(False)
     network.phase = 'predict'
@@ -188,7 +188,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     print(f"---- use device_id: {device_id}", flush=True)
     config = helper.mf_config
 
-    set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
     network = AutoModel.from_config(config, download_checkpoint=False)
     network.set_train(False)
     network.phase = 'predict'
@@ -209,7 +209,6 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     input_ids = tokenizer(input_)['input_ids']
     outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
     answer = tokenizer.decode(outputs, skip_special_tokens=True)
-    offload_network(network)
     return outputs, answer
 
 
