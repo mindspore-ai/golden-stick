@@ -713,7 +713,7 @@ class QuantPageAttentionMgrDeployCell(Cell):
         self._value_input_quantizer = QuantCellV2(Tensor(value_t_scale, dtype=dtype.float16),
                                                   Tensor(np.array(value_t_zp).astype(np.int8), dtype=dtype.int8))
         dst_type = self.layer.key_cache.dtype
-        n = kvcache.n_heads
+        n = kvcache.n_kv_heads
         d = kvcache.head_dim
         self._key_output_quantizer = AntiQuantCell(n, d, dst_type)
         self._value_output_quantizer = AntiQuantCell(n, d, dst_type)
@@ -796,7 +796,7 @@ class PagedAttentionDeployBase(Cell):
         self._converted = True
         self.layer = kvcache
         # PagedAttentionMgr's shape is BSH currently.
-        n = kvcache.n_heads
+        n = kvcache.n_kv_heads
         d = kvcache.head_dim
         ic = n * d
         self._key_input_quantizer = convert_to_quant_for_deploy(ic)
