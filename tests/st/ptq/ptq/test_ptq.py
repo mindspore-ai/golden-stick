@@ -19,23 +19,100 @@ import socket
 import pytest
 import numpy as np
 
-from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE
+import mindspore as ms
+from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE
+from mindspore.dataset import GeneratorDataset
 from mindformers.modules import Linear
 from mindspore_gs.ptq.ptq import PTQ
+from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers.network_helper import LayerInfo
+from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 
 class SimpleNet(nn.Cell):
     """
     Network with single linear to be quant
     """
+    class DecoderCell(nn.Cell):
+        """decoder cell"""
+        def __init__(self, linear):
+            super().__init__()
+            self.linear = linear
+
+        def construct(self, *args, **kwargs):
+            """linear"""
+            return self.linear(*args, **kwargs)
+
     def __init__(self):
         super(SimpleNet, self).__init__()
-        self.linear = Linear(in_channels=5, out_channels=6, weight_init="ones")
+        linear = Linear(in_channels=1024, out_channels=1024, weight_init="ones")
+        self.decoder = SimpleNet.DecoderCell(linear)
 
     def construct(self, x):
-        return self.linear(x)
+        """decoder"""
+        return self.decoder(x)
+
+
+class SimpleNetworkHelper(NetworkHelper):
+    """SimpleNetworkHelper"""
+    def __init__(self, **kwargs) -> None:
+        self.attrs = kwargs
+
+    def create_network(self):
+        return SimpleNet()
+
+    def get_spec(self, name: str):
+        return self.attrs.get(name, None)
+
+    def create_tokenizer(self, **kwargs):
+        return None
+
+    def generate(self, network: nn.Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
+        input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',
+                           constant_values=0)
+        return network(Tensor(input_ids, dtype=dtype.float16))
+
+    def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
+        raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
+
+    def analysis_decoder_groups(self, network):
+        pass
+
+    def get_decoder_layers(self, network):
+        layers = []
+        layers.append(('layer0', network.decoder))
+        return layers
+
+    def get_pre_layer(self, linear_name):
+        return None
+
+
+def create_foo_ds(repeat=1):
+    """create_hello_ds"""
+    class SimpleIterable:
+        """SimpleIterable"""
+        def __init__(self, repeat=1):
+            self._index = 0
+            self.data = []
+            for _ in range(repeat):
+                self.data.append(np.array([[1, 1, 1]], dtype=np.int32))
+
+        def __next__(self):
+            if self._index >= len(self.data):
+                raise StopIteration
+            item = (self.data[self._index],)
+            self._index += 1
+            return item
+
+        def __iter__(self):
+            self._index = 0
+            return self
+
+        def __len__(self):
+            return len(self.data)
+
+    return GeneratorDataset(source=SimpleIterable(repeat), column_names=["input_ids"])
 
 
 def get_available_port(start=10000, end=11000):
@@ -69,9 +146,9 @@ def test_input_catcher(device):
     context.set_context(mode=context.PYNATIVE_MODE, device_target=device, max_device_memory="8GB")
 
     net = SimpleNet()
-    foo_input = Tensor(np.ones((1, 3), dtype=np.float16))
-    catcher = InputCatcher(net.linear)
-    net.linear = catcher
+    foo_input = Tensor(np.ones((1, 512), dtype=np.float16))
+    catcher = InputCatcher(net.decoder)
+    net.decoder = catcher
 
     try:
         net(foo_input)
@@ -88,7 +165,7 @@ def test_input_catcher(device):
         assert isinstance(catcher.args[i], list)
         assert len(catcher.args[i]) == 1
         assert isinstance(catcher.args[i][0], Tensor)
-        assert catcher.args[i][0].shape == (1, 3)
+        assert catcher.args[i][0].shape == (1, 512)
         assert catcher.args[i][0].dtype == dtype.float16
 
         assert isinstance(catcher.kwargs[i], dict)
@@ -172,6 +249,88 @@ def test_layer_info_error():
         _ = LayerInfo(type_="1")
 
 
+def quant_simplenet():
+    """
+    Feature: quant simplenet which including one linear.
+    Description: quant simplenet with A8W8C8 PTQ algorithm.
+    Expectation: correct quant simplenet.
+    """
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+
+    net_helper = SimpleNetworkHelper(seq_length=1024)
+    network = net_helper.create_network()
+    ds = create_foo_ds(1)
+
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                    backend=BackendTarget.ASCEND,
+                    opname_blacklist=["w2", "lm_head"],
+                    act_quant_dtype=dtype.int8,
+                    weight_quant_dtype=dtype.int8)
+    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    ptq = PTQ(config=cfg)
+    # pylint: disable=w0212
+    ptq._config.enable_deploy_fusion = False
+    network = ptq.apply(network, net_helper, ds=ds)
+    network = ptq.convert(network)
+    ms.save_checkpoint(network.parameters_dict(), os.path.join("./simplenet-quant.ckpt"),
+                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
+                        "float_weight" not in x)
+
+
+def eval_simplenet():
+    """
+    Feature: eval simplenet which including one linear.
+    Description: eval the accuracy of quantized simplenet.
+    Expectation: correct accuracy.
+    """
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
+
+    net_helper = SimpleNetworkHelper(seq_length=1024)
+    network = net_helper.create_network()
+    ds = create_foo_ds(1)
+
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        input_ids = ds_item['input_ids'].asnumpy()
+        foutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+
+    cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                    backend=BackendTarget.ASCEND,
+                    opname_blacklist=["w2", "lm_head"],
+                    act_quant_dtype=dtype.int8,
+                    weight_quant_dtype=dtype.int8)
+    ptq = PTQ(config=cfg)
+    network = ptq.apply(network, net_helper, ds=ds)
+    network = ptq.convert(network)
+    param_dict = ms.load_checkpoint('./simplenet-quant.ckpt')
+    ms.load_param_into_net(network, param_dict)
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        input_ids = ds_item['input_ids'].asnumpy()
+        qoutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+    np.allclose(foutput.asnumpy(), qoutput.asnumpy(), 0, 0)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+def test_ptq_simplenet():
+    """
+    Feature: quant and eval simplenet which including one linear.
+    Description: quant net and eval the accuracy of quantized simplenet.
+    Expectation: correct accuracy.
+    """
+    quant_simplenet()
+    eval_simplenet()
+
+
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_algo", ['A8W8'])

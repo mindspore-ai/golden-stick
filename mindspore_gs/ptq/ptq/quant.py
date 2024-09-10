@@ -127,7 +127,8 @@ class PTQ(CompAlgo):
                 config.act_quant_dtype == dtype.int8:
             raise ValueError("PTQ algorithm not support only quant activation.")
         if config.weight_quant_dtype is None and config.act_quant_dtype is None \
-            and config.kvcache_quant_dtype is None and config.outliers_suppression is None:
+            and config.kvcache_quant_dtype is None and \
+                config.outliers_suppression == OutliersSuppressionType.NONE:
             logger.warning("PTQ algorithm does not quantify any layers when"
                            "weight_quant_dtype=None,"
                            "act_quant_dtype=None,"
@@ -241,7 +242,7 @@ class PTQ(CompAlgo):
             try:
                 network_helper.generate(network, input_ids, max_new_tokens=1)
             except GeneratorExit:
-                if network.block_mgr:
+                if hasattr(network, "block_mgr"):
                     network.block_mgr.clear_cache()
             data_count += 1
         replace_first_decoder(network, catcher, catcher.handler)
