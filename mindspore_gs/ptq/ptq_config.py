@@ -138,14 +138,19 @@ class PTQConfig:
             indicates that the weight is quantized by 8 bits, and None indicates that it is not quantized.
         kvcache_quant_dtype (mindspore.dtype): Used to configure the quantization type of kvcache. mindspore.dtype.int8
             indicates that the kvcache is quantized by 8 bits, and None indicates that it is not quantized.
+        outliers_suppression (:class:`mindspore_gs.ptq.OutliersSuppressionType`): Used to configure outliers suppression
+            method before quantization. OutliersSuppressionType.SMOOTH indicates using smooth method from SmoothQuant
+            to suppress outliers, and OutliersSuppressionType.NONE as default indicates doing nothing for outliers.
+
 
     Raises:
         ValueError: If `mode` is not PTQMode.QUANTIZE or PTQMode.DEPLOY.
         ValueError: If `backend` is not BackendTarget.NONE or BackendTarget.ASCEND.
-        TypeError: if `opname_blacklist` is not a list of str.
+        TypeError: If `opname_blacklist` is not a list of str.
         ValueError: If `weight_quant_dtype` is not mindspore.dtype.int8 or None.
         ValueError: If `kvcache_quant_dtype` is not mindspore.dtype.int8 or None.
         ValueError: If `act_quant_dtype` is not mindspore.dtype.int8 or None.
+        TypeError: If `outliers_suppression` is not a OutliersSuppressionType.
 
     Example:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode

@@ -20,15 +20,15 @@ mindspore_gs.ptq.RoundToNearest
             - **network** (Cell) - 待伪量化的网络。
             - **network_helper** (NetworkHelper) - 网络量化工具，用于解耦算法层和网络框架层。
             - **datasets** (Dataset) - 校准用的数据集。
+
+        返回：
+            伪量化后的网络。
         
         异常：
             - **RuntimeError** - 如果当前算法没有有效的初始化。
             - **TypeError** - `network` 不是一个 `Cell` 对象。
             - **TypeError** - `network_helper` 不为空且不是一个 `NetworkHelper` 对象。
             - **ValueError** - 当kvcache_quant_dtype `mindspore.int8` 时 `network_helper` 为空。
-
-        返回：
-            伪量化后的网络。
 
     .. py:method:: convert(net_opt: Cell, ckpt_path="")
 
@@ -38,13 +38,13 @@ mindspore_gs.ptq.RoundToNearest
             - **net_opt** (Cell) - 经过量化算法apply之后的网络。
             - **ckpt_path** (str) - 网络的checkpoint file文件路径，默认值为 ``""``，表示不加载。注意，该参数会在后续版本中被遗弃。
 
+        返回：
+            转换后的网络。
+
         异常：
             - **TypeError** - `net_opt` 数据类型不是Cell。
             - **TypeError** - `ckpt_path` 数据类型不是str。
             - **ValueError** - `ckpt_path` 非空但不是有效路径。
-
-        返回：
-            转换后的网络。
 
     .. py:method:: load_mindformers_plugin()
         ::staticmethod        

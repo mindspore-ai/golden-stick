@@ -150,9 +150,9 @@ class NetworkHelper:
             >>> helper = MFLlama2Helper(mfconfig)
             >>> helper.create_tokenizer()
             LlamaTokenizer(name_or_path='', vocab_size=32000, model_max_length=100000,  added_tokens_decoder={
-                    0: AddedToken("<unk>", rstrip=False, lstrip=False, normalized=True, special=True),
-                    1: AddedToken("<s>", rstrip=False, lstrip=False, normalized=True, special=True),
-                    2: AddedToken("</s>", rstrip=False, lstrip=False, normalized=True, special=True),
+                0: AddedToken("<unk>", rstrip=False, lstrip=False, normalized=True, special=True),
+                1: AddedToken("<s>", rstrip=False, lstrip=False, normalized=True, special=True),
+                2: AddedToken("</s>", rstrip=False, lstrip=False, normalized=True, special=True),
             }
         """
         raise NotImplementedError

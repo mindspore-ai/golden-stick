@@ -57,6 +57,9 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **model** (Model) - 经过算法修改后的网络构造的mindspore的Model对象。
             - **dataset** (Dataset) - 加载了特定数据集的Dataset对象。
 
+        返回：
+            SLB量化算法特有的一些callbacks的列表。
+
         异常：
             - **RuntimeError** - `epoch_size` 没有初始化。
             - **RuntimeError** - `has_trained_epoch` 没有初始化。
@@ -64,9 +67,6 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **ValueError** - `t_end_time` 小于 `t_start_time` 。
             - **TypeError** - `model` 的数据类型不是 `mindspore.train.Model`。
             - **TypeError** - `dataset` 的数据类型不是 `mindspore.dataset.Dataset`。
-
-        返回：
-            SLB量化算法特有的一些callbacks的列表。            
 
     .. py:method:: convert(net_opt: Cell, ckpt_path="")
 
@@ -76,14 +76,14 @@ mindspore_gs.quantization.SlbQuantAwareTraining
             - **net_opt** (Cell) - 经过SLB量化算法量化后的网络。
             - **ckpt_path** (str) - checkpoint文件的存储路径，为空时不加载，默认值为 ``""``。
 
+        返回：
+            能适配MindIR的标准网络。
+
         异常：
             - **TypeError** - `net_opt` 的数据类型不是 `mindspore.nn.Cell`。
             - **TypeError** - `ckpt_path` 的数据类型不是str。
             - **ValueError** - `ckpt_path` 不为空，但不是有效文件。
             - **RuntimeError** - `ckpt_path` 是有效文件，但加载失败。
-
-        返回：
-            能适配MindIR的标准网络。
 
     .. py:method:: set_act_quant_dtype(act_quant_dtype=QuantDtype.INT8)
 

@@ -125,14 +125,14 @@ class RoundToNearest(CompAlgo):
             network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
             datasets (Dataset): Datasets for calibrating.
 
+        Returns:
+            fake quantized network.
+
         Raises:
             RuntimeError: If RoundToNearest is not well inited.
             TypeError: If input `network` is not a Cell.
             TypeError: If input `network_helper` is not None and is not a NetworkHelper.
             ValueError: if `network_helper` is None when kvcache_quant_dtype is `mindspore.int8`.
-
-        Returns:
-            fake quantized network.
         """
         value_check('network', network, Cell)
         if network_helper:
