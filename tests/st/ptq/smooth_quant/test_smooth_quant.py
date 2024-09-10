@@ -45,7 +45,8 @@ from mindspore_gs.ptq.network_helpers import NetworkHelper
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
 from tests.st.test_utils import check_network_contain_layer, relative_tolerance_acceptable, \
-    absolute_tolerance_acceptable, set_config, load_distribut_checkpoint, MFLlama2HelloNetworkHelper, create_hello_ds
+    absolute_tolerance_acceptable, load_distribut_checkpoint
+from tests.st.mindformers_utils import MFLlama2HelloNetworkHelper, create_hello_ds, set_config
 
 
 @pytest.mark.level0
@@ -206,15 +207,17 @@ def create_foo_ds(repeat=1):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_apply_convert():
+# FIXME: wait for cpu round ops bugfix
+@pytest.mark.parametrize("device_target", ['Ascend'])
+def test_apply_convert(device_target):
     """
     Feature: test apply and convert api of smooth quant
     Description: Invoke apply and convert api of smooth quant and check network structure.
     Expectation: network structure changed.
     """
-    context.set_context(device_target="CPU")
+    context.set_context(device_target=device_target)
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
                     act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
     ptq = SmoothQuant(cfg)
@@ -317,15 +320,17 @@ class NoQuantNet(nn.Cell):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_nothing_to_apply_convert():
+# FIXME: wait for cpu round ops bugfix
+@pytest.mark.parametrize("device_target", ['Ascend'])
+def test_nothing_to_apply_convert(device_target):
     """
     Feature: SmoothQuant algorithm set functions.
     Description: Apply SmoothQuant on NoQuantNet.
     Expectation: warning log.
     """
-    context.set_context(device_target="CPU")
+    context.set_context(device_target=device_target)
     ptq = SmoothQuant(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
                                 act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH))
     network = NoQuantNet()

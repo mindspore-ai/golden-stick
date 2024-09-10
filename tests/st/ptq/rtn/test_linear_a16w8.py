@@ -59,15 +59,17 @@ class SimpleNet(nn.Cell):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_nothing_to_apply_convert():
+# FIXME: wait for cpu round ops bugfix
+@pytest.mark.parametrize("device_target", ['Ascend'])
+def test_nothing_to_apply_convert(device_target):
     """
     Feature: RoundToNearestPTQ algorithm set functions.
     Description: Apply RoundToNearestPTQ on NoQuantNet.
     Expectation: warning log.
     """
-    context.set_context(device_target="CPU")
+    context.set_context(device_target=device_target)
     ptq = RTN(PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND))
     network = NoQuantNet()
     with pytest.warns(expected_warning=RuntimeWarning, match="No layer found in network is suitable for quantization"):
@@ -108,15 +110,17 @@ def test_apply_convert_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_apply_convert():
+# FIXME: wait for cpu round ops bugfix
+@pytest.mark.parametrize("device_target", ['Ascend'])
+def test_apply_convert(device_target):
     """
     Feature: RoundToNearestPTQ algorithm set functions.
     Description: Apply RoundToNearestPTQ on SimpleNet.
     Expectation: Apply success and coordinate attributes are same as config.
     """
-    context.set_context(device_target="CPU")
+    context.set_context(device_target=device_target)
     network = SimpleNet()
     ptq = RTN()
     # apply & calibrate
