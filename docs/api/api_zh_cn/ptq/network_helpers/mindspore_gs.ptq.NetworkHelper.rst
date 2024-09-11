@@ -53,16 +53,6 @@ mindspore_gs.ptq.NetworkHelper
         返回：
             一个列表，表示生成的tokens。
 
-    .. py:method:: get_decoder_layers(network: Cell)
-
-        获取网络的decoder层。
-
-        参数：
-            - **network** (Cell) - 要获取decoder层的网络。
-
-        返回：
-            一个元组的列表，表示获取到的decoder层及其名称。
-
     .. py:method:: get_pre_layer(linear_name: str)
 
         通过当前linear层的名称，获取前一层的信息。

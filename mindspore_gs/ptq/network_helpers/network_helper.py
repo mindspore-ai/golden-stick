@@ -215,30 +215,6 @@ class NetworkHelper:
         """
         raise NotImplementedError
 
-    def get_decoder_layers(self, network):
-        """
-        Get decoder layers from network.
-
-        Args:
-            network (Cell): Network to get decoder layers.
-
-        Returns:
-            A list of tuples (cell_name, `Cell`) as decoder layers of network.
-
-        Examples:
-            >>> from mindspore import context
-            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
-            >>> from mindformers import LlamaForCausalLM, LlamaConfig
-            >>> from mindformers.tools.register.config import MindFormerConfig
-            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
-            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
-            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
-            >>> helper = MFLlama2Helper(mfconfig)
-            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
-            >>> decoder_layers = helper.get_decoder_layers(network)
-        """
-        raise NotImplementedError
-
     def analysis_decoder_groups(self, network):
         """
         Analyze decoder groups information of network.

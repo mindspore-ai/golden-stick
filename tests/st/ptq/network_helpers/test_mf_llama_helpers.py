@@ -68,9 +68,6 @@ def test_mf_llama_net_helper_inputs():
         helper.assemble_inputs(1)
 
     with pytest.raises(TypeError):
-        _ = helper.get_decoder_layers(1)
-
-    with pytest.raises(TypeError):
         helper.analysis_decoder_groups("1")
 
     with pytest.raises(TypeError):
@@ -105,9 +102,6 @@ def test_mf_llama_net_helper():
     helper.mf_config.model.model_config.block_size = 16
     network = helper.create_network()
     assert isinstance(network, LlamaForCausalLM)
-    layers = helper.get_decoder_layers(network)
-    assert isinstance(layers, List)
-    assert len(layers) == 1
     helper.analysis_decoder_groups(network)
     pre_layer = helper.get_pre_layer("root.model.layers.0")
     assert pre_layer is None
@@ -190,9 +184,6 @@ def test_mf_parallel_llama_net_helper_inputs():
         helper.assemble_inputs(1)
 
     with pytest.raises(TypeError):
-        _ = helper.get_decoder_layers(1)
-
-    with pytest.raises(TypeError):
         helper.analysis_decoder_groups("1")
 
     with pytest.raises(TypeError):
@@ -249,9 +240,6 @@ def test_mf_parallel_llama_net_helper():
     network = helper.create_network()
     assert isinstance(network, ParallelLlamaForCausalLM)
 
-    layers = helper.get_decoder_layers(network)
-    assert isinstance(layers, List)
-    assert len(layers) == 1
     helper.analysis_decoder_groups(network)
     pre_layer = helper.get_pre_layer("root.model.layers.0")
     assert pre_layer is None

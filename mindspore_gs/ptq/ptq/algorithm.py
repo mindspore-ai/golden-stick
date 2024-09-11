@@ -41,6 +41,10 @@ class Algorithm:
             raise ValueError("Only support fallback layer quantization algorithm to A16w8 Now.")
         return new_config
 
+    def load_mindformers_plugin(self):
+        """load_mindformers_plugin"""
+        raise NotImplementedError
+
     def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
         """replace"""
         raise NotImplementedError

@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """PTQ algorithm."""
-from typing import List, Union
+from typing import List, Union, Tuple
 import time
 import os
 import copy
@@ -23,11 +23,12 @@ from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
-from mindspore_gs.common.utils import offload_network
+from mindspore_gs.common.utils import offload_network, value_check
 from mindspore_gs.ptq.processor import transform_network_inplace
 from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
+from mindspore_gs.ptq.processor import Processor
 from .algorithm import Algorithm
 from .algorithms import LinearSmoother, Quantizer, Deployer
 
@@ -94,27 +95,60 @@ class PTQ(CompAlgo):
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
         self.pipeline: List[Algorithm] = []
+        self.decoder_layer_types: list = []
         self.build_pipeline()
+        self._load_mindformers_plugin()
         self.context_mode = get_context("mode")
 
-    # pylint: disable=protected-access
     def build_pipeline(self):
         """build pipline"""
         if self._config.mode == PTQMode.QUANTIZE:
             if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
                 logger.info("Adding LinearSmoother to pipeline.")
-                LinearSmoother._load_mindformers_plugin()
                 self.pipeline.append(LinearSmoother(self._config))
             if self._config.act_quant_dtype == dtype.int8 or \
                 self._config.weight_quant_dtype == dtype.int8 or \
                     self._config.kvcache_quant_dtype == dtype.int8:
                 logger.info("Adding Quantizer to pipeline.")
-                Quantizer._load_mindformers_plugin()
                 self.pipeline.append(Quantizer(self._config))
         elif self._config.mode == PTQMode.DEPLOY:
             logger.info("Adding Deploy to pipeline.")
-            Deployer._load_mindformers_plugin()
             self.pipeline.append(Deployer(self._config))
+
+    def _load_mindformers_plugin(self):
+        for algorithm in self.pipeline:
+            algorithm.load_mindformers_plugin()
+        from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
+        from mindformers.experimental.infer.core.transformer import ParallelTransformerLayer
+        self.decoder_layer_types.append(LLamaDecodeLayer)
+        self.decoder_layer_types.append(ParallelTransformerLayer)
+
+    def _get_decoder_layers(self, network: Cell):
+        """
+        Get decoder layers from network.
+
+        Args:
+            network (nn.Cell): Network to get decoder layers.
+
+        Returns:
+            A list of tuples (cell_name, `Cell`) as decoder layers of network.
+        """
+        value_check('network', network, Cell)
+
+        class NetworkWalker(Processor):
+            def __init__(self, decoder_layer_types_):
+                self.layers = []
+                self._decoder_layer_types = decoder_layer_types_
+
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if isinstance(cell, self._decoder_layer_types):
+                    self.layers.append((cell_name, cell))
+                    return cell, True
+                return cell, False
+
+        walker = NetworkWalker(tuple(self.decoder_layer_types))
+        walker.process(network)
+        return walker.layers
 
     @staticmethod
     def _ptq_config_check(config):
@@ -136,7 +170,7 @@ class PTQ(CompAlgo):
                            "outliers_suppression=None")
 
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper, ds=None, **kwargs) -> Cell:
+    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets=None, **kwargs) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 
@@ -151,13 +185,11 @@ class PTQ(CompAlgo):
         Raises:
             RuntimeError: If PTQ is not well inited.
             TypeError: If input `network` is not a Cell.
-            ValueError: If input `network_helper` is None.
+            ValueError: If input `network_helper` is None when mode is `PTQMode.DEPLOY`.
             ValueError: If input datasets is None.
         """
-        if not network_helper:
-            raise ValueError("Please provide network_helper when PTQ algo in apply phase.")
         if self._config.mode == PTQMode.DEPLOY:
-            layers = network_helper.get_decoder_layers(network)
+            layers = self._get_decoder_layers(network)
             for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = layers[i]
                 for processor in self.pipeline:
@@ -170,23 +202,30 @@ class PTQ(CompAlgo):
             raise ValueError("Quantization phase only support PYNATIVE MODE.")
         if not network_helper:
             raise ValueError("Please provide network_helper when PTQ in apply phase.")
-        if not ds:
+        if not datasets:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
         if self._config.kvcache_quant_dtype == dtype.int8 and not network_helper.get_spec("use_past"):
             raise ValueError("use_past need be true when doing kvcache quantize.")
+        logger.info(f"Visible decoder layer types: {self.decoder_layer_types}. If decoder layer type of target network "
+                    "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
         start_time = time.time()
         logger.info("Analysis network structure.")
         network_helper.analysis_decoder_groups(network)
         logger.info(f"analysis_decoder_groups time cost {time.time() - start_time}")
         start_time = time.time()
-        logger.info(f"Catching inputs for first decoder layer with {ds.get_dataset_size()} samples from datasets.")
-        catcher, network = PTQ._get_first_layer_input(network, network_helper, ds)
+        logger.info(f"Catching inputs for first decoder layer with {datasets.get_dataset_size()} datasets samples.")
+        catcher, network = self._get_first_layer_input(network, network_helper, datasets)
         all_args = catcher.args
         all_kwargs = catcher.kwargs
         logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
         start_time = time.time()
-        layers = network_helper.get_decoder_layers(network)
-        logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
+        layers = self._get_decoder_layers(network)
+        if not layers:
+            logger.warning(
+                f"No decoder layer found in network. Visible decoder layer types: {self.decoder_layer_types}, "
+                "please modify PTQ.decoder_layer_types before invoking apply method.")
+        else:
+            logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
         for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ..."):
             logger.info(f"Quantize {i}th decoder layer.")
             layer_name, layer = layers[i]
@@ -217,10 +256,9 @@ class PTQ(CompAlgo):
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
-    @staticmethod
-    def _get_first_layer_input(network: Cell, network_helper: NetworkHelper = None, ds=None):
+    def _get_first_layer_input(self, network: Cell, network_helper: NetworkHelper = None, ds=None):
         """get first layer input"""
-        layers = network_helper.get_decoder_layers(network)
+        layers = self._get_decoder_layers(network)
         catcher = InputCatcher(layers[0][1])
 
         def replace_first_decoder(root: Cell, src: Cell, dst: Cell):

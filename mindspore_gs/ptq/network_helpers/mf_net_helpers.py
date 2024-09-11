@@ -15,7 +15,7 @@
 """Network helper for network from MindFormers."""
 import os.path
 
-from typing import Union, List, Tuple
+from typing import Union, List
 
 import math
 from collections import OrderedDict
@@ -24,7 +24,6 @@ import mindspore as ms
 from mindspore import dtype as mstype
 from mindspore.communication.management import init
 from mindspore import Tensor, Model, nn
-from mindspore.nn import Cell
 
 from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
 from mindformers.models.modeling_utils import PreTrainedModel
@@ -91,33 +90,6 @@ class MFNetworkHelper(NetworkHelper):
         ms.ms_memory_recycle()
         network.phase = 'predict'
         return network
-
-    def get_decoder_layers(self, network: nn.Cell):
-        """
-        Get decoder layers from network.
-
-        Args:
-            network (nn.Cell): Network to get decoder layers.
-
-        Returns:
-            A list of tuples (cell_name, `Cell`) as decoder layers of network.
-        """
-        value_check('network', network, nn.Cell)
-
-        class NetworkWalker(Processor):
-            def __init__(self):
-                self.layers = []
-                self._decoder_layers = (LLamaDecodeLayer, ParallelTransformerLayer)
-
-            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                if isinstance(cell, self._decoder_layers):
-                    self.layers.append((cell_name, cell))
-                    return cell, True
-                return cell, False
-
-        walker = NetworkWalker()
-        walker.process(network)
-        return walker.layers
 
     def analysis_decoder_groups(self, network):
         raise NotImplementedError
