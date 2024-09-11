@@ -281,7 +281,7 @@ class PTQ(CompAlgo):
             try:
                 network_helper.generate(network, input_ids, max_new_tokens=1)
             except GeneratorExit:
-                if hasattr(network, "block_mgr"):
+                if hasattr(network, "block_mgr") and network.block_mgr:
                     network.block_mgr.clear_cache()
             data_count += 1
         replace_first_decoder(network, catcher, catcher.handler)
