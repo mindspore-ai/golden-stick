@@ -13,6 +13,7 @@ mindspore_gs.ptq.PTQConfig
         - **act_quant_dtype** (mindspore.dtype) - 用于配置激活的量化类型。mindspore.dtype.int8表示对激活进行8bit量化，None表示不进行量化。
         - **weight_quant_dtype** (mindspore.dtype) - 用于配置权重的量化类型。mindspore.dtype.int8表示对权重进行8bit量化，None表示不进行量化。
         - **kvcache_quant_dtype** (mindspore.dtype) - 用于配置kvcache的量化类型。mindspore.dtype.int8表示对kvcache进行8bit量化，None表示不进行量化。
+        - **outliers_suppression** (:class:`mindspore_gs.ptq.OutliersSuppressionType`): 用于配置离群值抑制方法。OutliersSuppressionType.SMOOTH 表示使用 类似于SmoothQuant算法中的smooth方法来抑制离群值，OutliersSuppressionType.NONE 作为默认值表示不对异常值执行任何操作。
     
     异常：
         - **ValueError** - `mode` 输入不在 [PTQMode.QUANTIZE, PTQMode.DEPLOY] 中。
@@ -21,3 +22,4 @@ mindspore_gs.ptq.PTQConfig
         - **ValueError** - `act_quant_dtype` 输入不在 [mindspore.dtype.int8, None] 中。
         - **ValueError** - `weight_quant_dtype` 输入不在 [mindspore.dtype.int8, None] 中。
         - **ValueError** - `kvcache_quant_type` 输入不在 [mindspore.dtype.int8, None] 中。
+        - **TypeError** - `outliers_suppression` 不是 OutliersSuppressionType 类型。

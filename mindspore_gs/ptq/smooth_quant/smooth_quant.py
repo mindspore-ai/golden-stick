@@ -100,14 +100,14 @@ class SmoothQuant(CompAlgo):
             network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
             datasets (Dataset): Datasets for calibrating.
 
+        Returns:
+            fake quantized network.
+
         Raises:
             RuntimeError: If SmoothQuant is not well inited.
             TypeError: If input `network` is not a Cell.
             TypeError: If input `network_helper` is not a NetworkHelper if mode is `PTQMode.QUANTIZE`.
             TypeError: If input `datasets` is not a GeneratorDataset if mode is `PTQMode.QUANTIZE`.
-
-        Returns:
-            fake quantized network.
         """
         value_check('network', network, Cell)
         if not self._is_deploy:

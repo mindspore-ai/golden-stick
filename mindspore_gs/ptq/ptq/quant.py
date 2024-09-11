@@ -144,13 +144,14 @@ class PTQ(CompAlgo):
             network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
             datasets (Dataset): Datasets for calibrating.
 
+        Returns:
+            fake quantized network.
+
         Raises:
             RuntimeError: If PTQ is not well inited.
             TypeError: If input `network` is not a Cell.
             ValueError: If input `network_helper` is None.
             ValueError: If input datasets is None.
-        Returns:
-            fake quantized network.
         """
         if not network_helper:
             raise ValueError("Please provide network_helper when PTQ algo in apply phase.")
