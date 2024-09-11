@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """quantizer algorithm."""
-import warnings
 from typing import Tuple
 
 from mindspore.nn import Cell
@@ -91,7 +90,7 @@ class Quantizer(Algorithm):
         if not changed:
             warn_str = f"No layer found in network is suitable to quantize, please check network and opname_blacklist" \
                        f"({self._config.opname_blacklist})."
-            warnings.warn(warn_str, RuntimeWarning)
+            logger.warning(warn_str)
 
     def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
         """process"""
