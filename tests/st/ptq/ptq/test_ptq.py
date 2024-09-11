@@ -79,11 +79,6 @@ class SimpleNetworkHelper(NetworkHelper):
     def analysis_decoder_groups(self, network):
         pass
 
-    def get_decoder_layers(self, network):
-        layers = []
-        layers.append(('layer0', network.decoder))
-        return layers
-
     def get_pre_layer(self, linear_name):
         return None
 
@@ -273,7 +268,8 @@ def quant_simplenet():
     ptq = PTQ(config=cfg)
     # pylint: disable=w0212
     ptq._config.enable_deploy_fusion = False
-    network = ptq.apply(network, net_helper, ds=ds)
+    ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
+    network = ptq.apply(network, net_helper, datasets=ds)
     network = ptq.convert(network)
     ms.save_checkpoint(network.parameters_dict(), os.path.join("./simplenet-quant.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
@@ -307,7 +303,8 @@ def eval_simplenet():
                     act_quant_dtype=dtype.int8,
                     weight_quant_dtype=dtype.int8)
     ptq = PTQ(config=cfg)
-    network = ptq.apply(network, net_helper, ds=ds)
+    ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
+    network = ptq.apply(network, ds=ds)
     network = ptq.convert(network)
     param_dict = ms.load_checkpoint('./simplenet-quant.ckpt')
     ms.load_param_into_net(network, param_dict)

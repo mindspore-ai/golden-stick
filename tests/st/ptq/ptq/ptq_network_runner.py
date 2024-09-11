@@ -155,7 +155,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_hello_ds(tokenizer, 1)
-    network = ptq.apply(network, helper, ds=ds)
+    network = ptq.apply(network, helper, datasets=ds)
     network = ptq.convert(network)
     try:
         rank_id = get_rank()
@@ -198,7 +198,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
             ptq._config.fallback_blacklist = {'w2': LayerQuantizeAlgo.A16W8}
         # pylint: disable=W0212
         ptq._config.enable_deploy_fusion = False
-        network = ptq.apply(network, helper)
+        network = ptq.apply(network)
         network = ptq.convert(network)
     transform_and_load_checkpoint(config, None, network, None)
     tokenizer = helper.create_tokenizer()
