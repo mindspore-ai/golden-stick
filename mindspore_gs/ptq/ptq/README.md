@@ -1,6 +1,6 @@
 # 应用PTQ算法
 
-[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/ptq/README.md)
+[查看中文](./README_CN.md)
 
 ## PTQ算法简介
 
@@ -12,7 +12,7 @@
 
 ### 设计思路
 
-![架构图](https://gitee.com/mindspore/golden-stick/raw/master/docs/images/ptq/ptq/arch.png)
+![架构图](../../../docs/images/zh_cn/ptq/ptq/arch.png)
 
 分层实现量化算法，主要分为config、量化算法、算法模块、量化Cell、量化工具函数。
 

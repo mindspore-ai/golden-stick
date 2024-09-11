@@ -6,16 +6,13 @@
 
 - MindSpore Golden Stick
     - [概述](#概述)
-    - [设计思路](#设计思路)
+    - [应用MindSpore Golden Stick算法的一般流程](#应用mindspore-golden-stick算法的一般流程)
     - [未来规划](#未来规划)
-    - [安装](#安装)
-        - [MindSpore版本依赖关系](#mindSpore版本依赖关系)
-        - [pip安装](#pip安装)
-        - [源码编译安装](#源码编译安装)
-        - [验证](#验证安装是否成功)
-    - [快速入门](#快速入门)
     - [文档](#文档)
-        - [开发者教程](#开发者教程)
+        - [安装](#安装)
+        - [快速入门](#快速入门)
+        - [压缩算法](#压缩算法)
+        - [模型部署](#模型部署)
     - [社区](#社区)
         - [治理](#治理)
         - [交流](#交流)
@@ -38,7 +35,7 @@ MindSpore Golden Stick是华为诺亚团队和华为MindSpore团队联合设计�
 
 5. 在最外层，MindSpore Golden Stick封装了一套简洁的用户接口。
 
-![金箍棒架构图](docs/images/golden-stick-arch.png)
+![金箍棒架构图](docs/images/zh_cn/golden-stick-arch.png)
 
 > 架构图是MindSpore Golden Stick的全貌，其中包含了当前已经实现的功能以及规划在RoadMap中能力。具体开放的功能可以参考对应版本的ReleaseNotes。
 
@@ -54,80 +51,46 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 
    模型压缩算法往往会针对特定的网络结构做设计或者优化，如感知量化算法往往在网络中的Conv2d、Conv2d + BatchNorm2d或者Conv2d + BatchNorm2d + Relu结构上插入伪量化节点。MindSpore Golden Stick提供了通过接口修改前端网络的能力，算法开发者可以基于此能力制定通用的改图规则去实现算法逻辑，而不需要对每个特定的网络都实现一遍算法逻辑算法。此外MindSpore Golden Stick还会提供了一些调测能力，包括网络dump、逐层profiling、算法效果分析、可视化等能力，旨在帮助算法开发者提升开发和研究效率，帮助用户寻找契合于自己需求的算法。
 
-## 未来规划
+## 应用MindSpore Golden Stick算法的一般流程
 
-  MindSpore Golden Stick初始版本提供一套稳定的API，并提供一个线性量化算法，一个非线性量化算法和一个结构化剪枝算法。后续会提供更多的算法和更完善的网络支持，调测能力也会在后续版本提供。将来随着算法的丰富，MindSpore Golden Stick还会探索自动模型压缩、硬件感知自动量化和网络结构搜索等能力，敬请期待。
+![金箍棒流程图](docs/images/zh_cn/workflow.png)
 
-## 安装
+1. 压缩阶段
 
-### 环境限制
+    压缩阶段是指使用MindSpore Golden Stick算法对网络进行压缩的过程，以量化算法为例，压缩阶段主要包含改造网络为伪量化网络、量化重训或者校正、量化参数统计、量化权重、改造网络为真实量化网络。
 
-下表列出了安装、编译和运行MindSpore Golden Stick所需的系统环境：
+2. 部署阶段
 
-| 软件名称 |  版本   |
-| :-----: | :-----: |
-| Ubuntu  |  18.04  |
-| Python  |  3.7-3.9 |
+    部署阶段是将压缩后的网络在部署环境进行推理的过程，由于MindSpore暂不支持将前端网络进行序列化，所以部署同样需要调用对应的算法接口对网络进行改造，以加载压缩后的checkpoint文件。加载完压缩的checkpoint文件以后的流程和一般的推理流程无异。
 
-> 其他的三方依赖请参考[requirements文件](https://gitee.com/mindspore/golden-stick/blob/r0.1/requirements.txt)。
-> 当前MindSpore Golden Stick仅能在Ubuntu18.04上运行。
-
-### MindSpore版本依赖关系
-
-MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表中所指示的对应关系，并参考[MindSpore安装指导](https://mindspore.cn/install)安装对应版本的MindSpore：
-
-| MindSpore Golden Stick版本 |                             分支                             | MindSpore版本 |
-| :---------------------: | :----------------------------------------------------------: | :-------: |
-|          0.5.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/) |   2.3.1   |
-|          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/) |   2.3.0   |
-|          0.4.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4/) |   2.3.0-rc1   |
-|          0.3.0          | [r0.3](https://gitee.com/mindspore/golden-stick/tree/r0.3/) |   2.0.0-rc1, 2.0.0   |
-|       0.3.0-alpha       | [r0.3](https://gitee.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha   |
-|          0.2.0          | [r0.2](https://gitee.com/mindspore/golden-stick/tree/r0.2/) |   1.9.0   |
-|          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/) |   1.8.0   |
-
-安装完MindSpore后，继续安装MindSpore Golden Stick。可以采用pip安装或者源码编译安装两种方式。
-
-### pip安装
-
-使用pip命令安装，请从[MindSpore Golden Stick下载页面](https://www.mindspore.cn/versions)下载并安装whl包。
-
- ```shell
-pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{ms_version}/GoldenStick/any/mindspore_gs-{mg_version}-py3-none-any.whl --trusted-host ms-release.obs.cn-north-4.myhuaweicloud.com -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-> - 在联网状态下，安装whl包时会自动下载MindSpore Golden Stick安装包的依赖项（依赖项详情参见requirement.txt），其余情况需自行安装。
-> - `{ms_version}`表示与MindSpore Golden Stick匹配的MindSpore版本号，例如下载0.1.0版本MindSpore Golden Stick时，`{ms_version}`应写为1.8.0。
-> - `{mg_version}`表示MindSpore Golden Stick版本号，例如下载0.1.0版本MindSpore Golden Stick时，`{mg_version}`应写为0.1.0。
-
-### 源码编译安装
-
-下载[源码](https://gitee.com/mindspore/golden-stick)，下载后进入`golden_stick`目录。
-
-```shell
-bash build.sh
-pip install output/mindspore_gs-0.1.0-py3-none-any.whl
-```
-
-其中，`build.sh`为`golden_stick`目录下的编译脚本文件。
-
-### 验证安装是否成功
-
-执行以下命令，验证安装结果。导入Python模块不报错即安装成功：
-
-```python
-import mindspore_gs
-```
-
-## 快速入门
-
-以一个简单的算法[Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) 作为例子，演示如何在训练中应用金箍棒中的算法。
+> - 应用MindSpore Golden Stick算法的细节，可以在每个算法章节中找到详细说明和示例代码。
+> - 流程中的"ms.export"步骤可以参考[导出mindir格式文件](https://www.mindspore.cn/tutorials/zh-CN/master/beginner/save_load.html#保存和加载mindir)章节。
+> - 流程中的"昇思推理优化工具和运行时"步骤可以参考[昇思推理](https://mindspore.cn/docs/zh-CN/master/model_infer/ms_infer/overview.html)章节。
 
 ## 文档
 
-### 开发者教程
+### 安装
 
-有关安装指南、教程和API的更多详细信息，请参阅[用户文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html)。
+请参考[MindSpore Golden Stick安装教程](docs/docs/docs_zh_cn/install.md)。
+
+### 快速入门
+
+以一个简单的算法[Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) 作为例子，演示如何在训练中应用金箍棒中的算法。
+
+### 压缩算法
+
+| 类型 |                             链接                                  |
+| :---------------------: | :-----------------------------------------------------------------: |
+| API         | [API文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master) |
+| 自动化压缩   | TBD |
+| 训练后量化   | [PTQ](mindspore_gs/ptq/ptq/README.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README.ipynb) |
+| [量化感知训练](mindspore_gs/quantization/README.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README.md) [SLB](mindspore_gs/quantization/slb/README.md) |
+| [剪枝](mindspore_gs/pruner/README.md) | [SCOP](mindspore_gs/pruner/scop/README.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
+| 其他 | [Ghost](mindspore_gs/ghost/README.md)  |
+
+### 模型部署
+
+请参考[MindSpore Golden Stick部署教程](docs/docs/docs_zh_cn/deployment/overview.md)。
 
 ## 社区
 

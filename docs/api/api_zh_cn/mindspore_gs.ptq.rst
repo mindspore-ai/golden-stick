@@ -49,16 +49,6 @@ PTQ 模式枚举
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
-RoundToNearest 算法
---------------------------------
-
-.. mscnautosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.RoundToNearest
-
 PTQ 算法
 -------------
 
@@ -69,3 +59,12 @@ PTQ 算法
 
     mindspore_gs.ptq.PTQ
 
+RoundToNearest 算法
+--------------------------------
+
+.. mscnautosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.RoundToNearest

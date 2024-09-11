@@ -49,16 +49,6 @@ NetworkHelper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
-RoundToNearest Algorithm
---------------------------------
-
-.. autosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.RoundToNearest
-
 PTQ Algorithm
 -------------
 
@@ -69,3 +59,12 @@ PTQ Algorithm
 
     mindspore_gs.ptq.PTQ
 
+RoundToNearest Algorithm
+--------------------------------
+
+.. autosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.RoundToNearest
