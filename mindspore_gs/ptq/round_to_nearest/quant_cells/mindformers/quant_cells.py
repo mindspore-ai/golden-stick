@@ -25,7 +25,7 @@ from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.common import logger
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
+from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data, convert_fp32_to_int64
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
@@ -283,9 +283,11 @@ class PagedAttentionQuant(PTQCell):
             key_t_scale_np = self.key_t_scale.asnumpy()
             value_t_scale_np = self.value_t_scale.asnumpy()
             t_scale_len = key_t_scale_np.shape[0]
+            key_t_scale_np = convert_fp32_to_int64(key_t_scale_np.astype(np.float32))
+            value_t_scale_np = convert_fp32_to_int64(value_t_scale_np.astype(np.float32))
             key_value_t_scale_np = np.concatenate((key_t_scale_np.reshape((1, t_scale_len)),
                                                    value_t_scale_np.reshape((1, t_scale_len))))
-            self.key_value_t_scale = Parameter(Tensor(key_value_t_scale_np, dtype=dtype.float16),
+            self.key_value_t_scale = Parameter(Tensor(key_value_t_scale_np, dtype=dtype.int64),
                                                name="key_value_t_scale")
 
             key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
@@ -297,8 +299,10 @@ class PagedAttentionQuant(PTQCell):
             self.value_t_zp = Parameter(Tensor(value_t_zp_np, dtype=dtype.float16), name=value_t_zp.name)
 
             t_zp_len = value_t_zp_np.shape[0]
+            key_t_zp_np = key_t_zp_np.astype(np.int32)
+            value_t_zp_np = value_t_zp_np.astype(np.int32)
             key_value_t_zp = np.concatenate((key_t_zp_np.reshape((1, t_zp_len)), value_t_zp_np.reshape((1, t_zp_len))))
-            self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.float16), name="key_value_t_zp")
+            self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.int32), name="key_value_t_zp")
 
             self._kvcache.key_cache = Parameter(initializer('ones', self._kvcache.key_cache.shape, dtype.int8),
                                                 name=self._kvcache.key_cache.name, requires_grad=False)
@@ -422,9 +426,9 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
 
     def __init__(self, kvcache: PagedAttentionMgr, policy: PTQLayerPolicy):
         super(PagedAttentionDeployFusion, self).__init__(kvcache, policy)
-        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.float16),
+        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.int32),
                                         name="key_value_t_zp")
-        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.float16),
+        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.int64),
                                            name="key_value_t_scale")
         if "in_strategy" in kvcache.paged_attention.get_attr_dict():
             pa_strategy = kvcache.paged_attention.in_strategy

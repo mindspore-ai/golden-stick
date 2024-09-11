@@ -70,6 +70,10 @@ def cal_quantization_params(input_min,
         zp = np.round(zp_double).astype(np.int32)
     return scale, zp
 
+def convert_fp32_to_int64(scale) -> np.ndarray:
+    '''convert_fp32_to_int64'''
+    new_scale = np.frombuffer(scale.tobytes(), dtype=np.uint32)
+    return new_scale.astype(np.int64)
 
 def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
     """Calculate quantization params for minimum/maximum quantization integer"""
