@@ -1,7 +1,7 @@
 mindspore_gs.ptq.PTQ
 ============================================================
 
-.. py:class:: mindspore_gs.ptq.PTQ(config=None)
+.. py:class:: mindspore_gs.ptq.PTQ(config: Union[dict, PTQConfig] = None)
 
     量化算法PTQ的基本实现，支持激活、权重和kvcache的组合量化。
 
@@ -13,14 +13,14 @@ mindspore_gs.ptq.PTQ
         - **ValueError** - `config` 中的 `mode` 是PTQMode.QUANTIZE时非PYNATIVE模式。
         - **ValueError** - 当act_quant_dtype是int8类型，weight_quant_dtype为None时。
 
-    .. py:method:: apply(network: Cell, network_helper: NetworkHelper = None, ds: Dataset = None, **kwargs)
+    .. py:method:: apply(network: Cell, network_helper: NetworkHelper = None, datasets=None, **kwargs)
 
         将 `network` 中添加伪量化节点，转换成一个伪量化网络。
 
         参数：
             - **network** (Cell) - 待伪量化的网络。
             - **network_helper** (NetworkHelper) - 网络量化工具，用于解耦算法层和网络框架层。
-            - **datasets** (Datasets) - 校准用的数据集。
+            - **datasets** (Dataset) - 校准用的数据集。
 
         返回：
             伪量化后的网络。

@@ -152,7 +152,7 @@ class PTQConfig:
         ValueError: If `act_quant_dtype` is not mindspore.dtype.int8 or None.
         TypeError: If `outliers_suppression` is not a OutliersSuppressionType.
 
-    Example:
+    Examples:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
         >>> from mindspore_gs.common import BackendTarget
         >>> PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=['layer0'])
