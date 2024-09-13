@@ -16,6 +16,7 @@
 
 
 import os
+import time
 
 import pytest
 import numpy as np
@@ -27,6 +28,7 @@ from mindspore.common.initializer import initializer
 from mindspore.parallel import set_algo_parameters
 from mindspore.communication.management import get_rank
 from mindspore.communication import init
+from tests.st.test_utils import get_available_port
 
 
 @pytest.mark.parametrize("is_row_parallel", [True, False])
@@ -131,4 +133,65 @@ def test_qbmm_biasadd_fusion():
             print(line, flush=True)
         log_file.close()
 
+    assert return_code == 0
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_add_rmsnorm_quant_fusion_ptq():
+    """
+    Feature: test add_rmsnorm_quant fusion pattern in ptq approach.
+    Description: build add_rmsnorm_quant pattern network in ptq approach.
+    Expectation: success fused add_rmsnorm_quant ops in ptq without any redundant rmsnorm ops.
+    """
+    os.environ['GRAPH_OP_RUN'] = "1"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mindspore_features.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    return_code = os.system(
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_add_rmsnorm_quant_fusion_llama2_1p_logs "
+        f"python {run_file} -a ptq"
+    )
+    if return_code != 0:
+        log_file = open("./test_ptq_add_rmsnorm_quant_fusion_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+    os.system("ps -u | grep 'mindspore_features' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    assert return_code == 0
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_add_rmsnorm_quant_fusion_sq():
+    """
+    Feature: test add_rmsnorm_quant fusion pattern in smooth-quant approach.
+    Description: build add_rmsnorm_quant pattern network in smooth-quant approach.
+    Expectation: success fused add_rmsnorm_quant ops in smooth-quant without any redundant rmsnorm ops.
+    """
+    os.environ['GRAPH_OP_RUN'] = "1"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mindspore_features.py")
+    return_code = os.system(
+        f"python {run_file} -a smooth-quant > test_add_rmsnorm_quant_fusion_sq.log 2>&1 "
+    )
+    if return_code != 0:
+        log_file = open("./test_add_rmsnorm_quant_fusion_sq.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+    os.system("ps -u | grep 'mindspore_features' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
     assert return_code == 0

@@ -15,7 +15,6 @@
 """test interfaces of smooth quant."""
 import os
 import time
-import socket
 import pytest
 import numpy as np
 
@@ -28,6 +27,7 @@ from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers.network_helper import LayerInfo
 from mindspore_gs.ptq.network_helpers import NetworkHelper
+from tests.st.test_utils import get_available_port
 
 
 class SimpleNet(nn.Cell):
@@ -108,23 +108,6 @@ def create_foo_ds(repeat=1):
             return len(self.data)
 
     return GeneratorDataset(source=SimpleIterable(repeat), column_names=["input_ids"])
-
-
-def get_available_port(start=10000, end=11000):
-    """get_available_port"""
-    def is_port_available(port_):
-        """is_port_available"""
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.connect(('localhost', port_))
-                return True
-            except ConnectionRefusedError:
-                return False
-
-    for port in range(start, end):
-        if is_port_available(port):
-            return port
-    return start
 
 
 @pytest.mark.level0
