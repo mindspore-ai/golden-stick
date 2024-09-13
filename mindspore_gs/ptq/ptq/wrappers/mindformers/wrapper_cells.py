@@ -450,6 +450,8 @@ class DeployLinearCell(WrapperLinearCell):
 
     def linear_forward(self, x):
         """Forward process, x should be a tensor"""
+        ori_dtype = F.dtype(x)
+        x = self.layer.cast(x, self.layer.dtype)
         if self.a8w8:
             x = self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         out_shape = self.layer.shape(x)[:-1] + (self.layer.out_channels,)
@@ -459,8 +461,6 @@ class DeployLinearCell(WrapperLinearCell):
                                            self.layer.in_channels))
             else:
                 x = self.layer.reshape(x, (self.layer.outer_batch, self.layer.expert_num, -1, self.layer.in_channels))
-        ori_dtype = F.dtype(x)
-        x = self.layer.cast(x, self.layer.dtype)
         x = self.layer.matmul(x, self.layer.weight)
         if self.layer.has_bias:
             x = self.layer.bias_add(x, self.layer.cast(self.layer.bias, self.layer.dtype))
