@@ -16,6 +16,7 @@
 
 import os
 import shutil
+import socket
 import subprocess
 import time
 import re
@@ -172,6 +173,23 @@ def load_distribut_checkpoint(config, ckpt_path, network):
     print(f'Loading ckpt :{ckpt_path}.')
     load_checkpoint(ckpt_path, network)
     return network
+
+
+def get_available_port(start=10000, end=11000):
+    """get_available_port"""
+    def is_port_available(port_):
+        """is_port_available"""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.connect(('localhost', port_))
+                return True
+            except ConnectionRefusedError:
+                return False
+
+    for port in range(start, end):
+        if is_port_available(port):
+            return port
+    return start
 
 
 class TrainEvalConfig:
