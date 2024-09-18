@@ -351,7 +351,7 @@ class MFLlama2Helper(MFNetworkHelper):
         if (decoder_info.q_mm and linear_name == decoder_info.q_mm.name) or \
            (decoder_info.k_mm and linear_name == decoder_info.k_mm.name) or \
            (decoder_info.v_mm and linear_name == decoder_info.v_mm.name):
-            return None
+            raise ValueError("outliers suppression not support qkv_concat=False now!")
         # attn.o
         if linear_name == decoder_info.o_mm.name:
             return decoder_info.qkv_mm if decoder_info.qkv_concat else decoder_info.v_mm
@@ -367,7 +367,7 @@ class MFLlama2Helper(MFNetworkHelper):
         # ffn.gate ffn.hidden
         if (decoder_info.gate_mm and linear_name == decoder_info.gate_mm.name) or \
            (decoder_info.hidden_mm and linear_name == decoder_info.hidden_mm.name):
-            return None
+            raise ValueError("outliers suppression not support ffn_concat=False now!")
         # ffn.w2
         if linear_name == decoder_info.w2_mm.name:
             return decoder_info.gate_hidden_mm if decoder_info.ffn_concat else decoder_info.gate_mm
