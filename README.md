@@ -7,15 +7,12 @@
 - MindSpore Golden Stick
     - [Overview](#overview)
     - [Design Features](#design-features)
-    - [Future Roadmap](#future-roadmap)
-    - [Installation](#installation)
-        - [Version dependency](#version-dependency)
-        - [Installing from pip command](#installing-from-pip-command)
-        - [Installing from source code](#installing-from-source-code)
-        - [Verification](#verification)
-    - [Quick Start](#quick-start)
+    - [General Process of Applying the MindSpore Golden Stick](#general-process-of-applying-the-mindspore-golden-stick)
     - [Documents](#documents)
-        - [Developer Guide](#developer-guide)
+        - [Installation](#installation)
+        - [Quick Start](#quick-start)
+        - [Compression Algorithm](#compression-algorithm)
+        - [Model Deployment](#model-deployment)
     - [Community](#community)
         - [Governance](#governance)
         - [Communication](#communication)
@@ -38,7 +35,7 @@ MindSpore Golden Stick is a model compression algorithm set jointly designed and
 
 5. In the outermost layer, MindSpore Golden Stick encapsulates a set of concise user interface.
 
-![MindSpore_GS_Architecture](docs/images/golden-stick-arch.png)
+![MindSpore_GS_Architecture](docs/images/en/golden-stick-arch.png)
 
 > The architecture diagram is the overall picture of MindSpore Golden Stick, which includes the features that have been implemented in the current version and the capabilities planned in RoadMap. Please refer to release notes for available features in current version.
 
@@ -54,80 +51,46 @@ In addition to providing rich model compression algorithms, an important design 
 
    Model compression algorithms are often designed or optimized for specific network structures. For example, perceptual quantization algorithms often insert fake-quantization nodes on the Conv2d, Conv2d + BatchNorm2d, or Conv2d + BatchNorm2d + Relu structures in the network. MindSpore Golden Stick provides the ability to modify the front-end network through API. Based on this ability, algorithm developers can formulate general network transform rules to implement the algorithm logic without needing to implement the algorithm logic for each specific network. In addition, MindSpore Golden Stick also provides some debugging capabilities, including visualization tool, profiler tool, summary tool, aiming to help algorithm developers improve development and research efficiency, and help users find algorithms that meet their needs.
 
-### Future Roadmap
+## General Process of Applying the MindSpore Golden Stick
 
-The current release version of MindSpore Golden Stick provides a stable API and provides a linear quantization algorithm, a nonlinear quantization algorithm and a structured pruning algorithm. More algorithms and better network support will be provided in the future version, and debugging capabilities will also be provided in subsequent versions. With the enrichment of algorithms in the future, MindSpore Golden Stick will also explore capabilities such as AMC, HAQ, NAS, etc., so stay tuned.
+![workflow](docs/images/en/workflow.png)
 
-## Installation
+1. Compress Phase
 
-### Environmental restrictions
+    Taking the quantization algorithm as an example, the compression phase mainly includes transforming the network into a fake-quantized network, quantization retraining or calibration, quantizing parameter statistics, quantizing weights, and transforming the network into a real quantized network.
 
-The following table lists the environment required for installing, compiling and running MindSpore Golden Stick:
+2. Deplyment Phase
 
-| software | version  |
-| :-----: | :-----: |
-| Ubuntu  |  18.04  |
-| Python  |  3.7-3.9 |
+    The deployment phase is the process of inferring the compressed network in the deployment environment. Since MindSpore does not support serialization of the front-end network, the deployment also needs to call the corresponding algorithm interface to transform the network to load the compressed checkpoint file. The flow after loading the compressed checkpoint file is the same as the normal inference process.
 
-> Please refer to [requirements](https://gitee.com/mindspore/golden-stick/blob/r0.1/requirements.txt) for other third party dependencies.
-> MindSpore Golden Stick can only run on Ubuntu18.04.
-
-### Version dependency
-
-The MindSpore Golden Stick depends on the MindSpore training and inference framework, please refer the table below and [MindSpore Installation Guide](https://mindspore.cn/install) to install the corresponding MindSpore verision:
-
-| MindSpore Golden Stick Version |                            Branch                            | MindSpore version |
-| :-----------------------------: | :----------------------------------------------------------: | :-------: |
-|          0.5.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/) |   2.3.1   |
-|          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/) |   2.3.0   |
-|          0.4.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4/) |   2.3.0-rc1   |
-|          0.3.0          | [r0.3](https://gitee.com/mindspore/golden-stick/tree/r0.3/) |   2.0.0-rc1, 2.0.0   |
-|       0.3.0-alpha       | [r0.3](https://gitee.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha   |
-|          0.2.0          | [r0.2](https://gitee.com/mindspore/golden-stick/tree/r0.2/) |   1.9.0   |
-|          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/) |   1.8.0   |
-
-After MindSpore is installed, you can use pip or source code build for MindSpore Golden Stick installation.
-
-### Installing from pip command
-
-If you use the pip command, please download the whl package from [MindSpore Golden Stick](https://www.mindspore.cn/versions/en) page and install it.
-
-```shell
-pip install  https://ms-release.obs.cn-north-4.myhuaweicloud.com/{MindSpore_version}/GoldenStick/any/mindspore_gs-{mg_version}-py3-none-any.whl --trusted-host ms-release.obs.cn-north-4.myhuaweicloud.com -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-> - Installing whl package will download MindSpore Golden Stick dependencies automatically (detail of dependencies is shown in requirement.txt),  other dependencies should install manually.
-> - `{MindSpore_version}` stands for the version of MindSpore. For the version matching relationship between MindSpore and MindSpore Golden Stick, please refer to [page](https://www.mindspore.cn/versions).
-> - `{ms_version}` stands for the version of MindSpore Golden Stick. For example, if you would like to download version 0.1.0, you should fill 1.8.0 in `{MindSpore_version}` and fill 0.1.0 in `{mg_version}`.
-
-### Installing from source code
-
-Download [source code](https://gitee.com/mindspore/golden-stick), then enter the `golden-stick` directory.
-
-```shell
-bash build.sh
-pip install output/mindspore_gs-{mg_version}-py3-none-any.whl
-```
-
-`build.sh` is the compiling script in `golden-stick` directory.
-
-### Verification
-
-If you can successfully execute following command, then the installation is completed.
-
-```python
-import mindspore_gs
-```
-
-## Quick Start
-
-Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) as an example for demonstrating how to use MindSpore Golden Stick.
+> - For details about how to apply the MindSpore Golden Stick, see the detailed description and sample code in each algorithm section.
+> - For details about the "ms.export" step in the process, see [Exporting MINDIR Model](https://www.mindspore.cn/tutorials/en/master/beginner/save_load.html#saving-and-loading-mindir).
+> - For details about the "MindSpore infer" step in the process, see [MindSpore Inference Runtime](https://mindspore.cn/docs/en/master/model_infer/ms_infer/overview.html).
 
 ## Documents
 
-### Developer Guide
+### Installation
 
-For more details about the installation guide, tutorials, and APIs, see [MindSpore Golden Stick Docs](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html).
+Please refer to [MindSpore Golden Stick Installation](docs/docs/docs_en/install.md).
+
+### Quick Start
+
+Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) as an example for demonstrating how to use MindSpore Golden Stick.
+
+### Compression Algorithm
+
+| type |                             link                                  |
+| :---------------------: | :-----------------------------------------------------------------: |
+| API         | [API doc](https://www.mindspore.cn/golden_stick/docs/en/master) |
+| AutoCompress   | TBD |
+| Post-Training Quantization   | [PTQ](mindspore_gs/ptq/ptq/README_EN.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README_EN.md) |
+| [Quant-Aware Quantization](mindspore_gs/quantization/README_EN.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README_EN.md) [SLB](mindspore_gs/quantization/slb/README_EN.md) |
+| [Pruner](mindspore_gs/pruner/README_EN.md) | [SCOP](mindspore_gs/pruner/scop/README_EN.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
+| Others | [Ghost](mindspore_gs/ghost/README_EN.md)  |
+
+### Model Deployment
+
+Please refer to [MindSpore Golden Stick Model Deployment](docs/docs/docs_en/deployment/overview.md)。
 
 ## Community
 

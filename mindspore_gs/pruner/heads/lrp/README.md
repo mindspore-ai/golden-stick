@@ -1,11 +1,9 @@
 # LRP Head Pruning
 
-[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/tree/master/mindspore_gs/pruner/heads/lrp/README.md)
-
 MindSpore Golden Stick LRP module is an implementation of the LRP method for head pruning first presented in the article
 [Analyzing Multi-Head Self-Attention: Specialized Heads Do the Heavy Lifting, the Rest Can Be Pruned](https://www.aclweb.org/anthology/P19-1580) and explained below.
 
-For a complete tutorial of how to use this module please refer to the [tutorial page](https://www.mindspore.cn/golden_stick/docs/en/master/pruner/lrp_tutorial.html).
+For a complete tutorial of how to use this module please refer to the [tutorial page](lrp_tutorial.md).
 
 ## Introduction
 
@@ -33,7 +31,7 @@ Unfortunately, a direct implementation of this idea leads to an objective functi
 So instead, the algorithm uses a stochastic relaxation in which each gate is modeled as a continuous random variable drawn independently of a head-specific
 [Hard Concrete distribution](https://openreview.net/pdf?id=H1Y8hhg0b). The distributions have non-zero probability mass at 0 and 1; look at the illustration.
 
-![concrete](https://www.mindspore.cn/golden_stick/docs/en/master/_images/concrete_crop.gif)
+![concrete](../../../../docs/images/en/pruner/heads/concrete_crop.gif)
 
 The non-differentiable $L0$ norm is replaced by the sum of the probabilities of heads being non-zero ($L_C$) as a stochastic relaxation,
 and the resulting training objective is
@@ -43,7 +41,7 @@ $L = L_{xent} + \lambda L_C$
 By varying the coefficient $\lambda$ in the optimized objective, we obtain models with different numbers of retained heads. Below is shown how the probabilities of encoder heads being completely closed $(P(g_i)=0)$ change in training for different values of $\lambda$ (pruning starts from a converged model). 
 White color denotes $P(g_i=0) = 1$, which means that a head is completely removed from the model.
 
-![enc_head_gif](https://www.mindspore.cn/golden_stick/docs/en/master/_images/enc_head_gif_delay7-min.gif)
+![enc_head_gif](../../../../docs/images/en/pruner/heads/enc_head_gif_delay7-min.gif)
 
 (Gif is for the model trained on EN-RU WMT. For other datasets, values of $\lambda$ can be different.)
 
@@ -66,7 +64,7 @@ Overall, there are 3 main parameters that the user needs to know in order to get
 
 (From Differentiable Subset Pruning of Transformer Heads article)
 
-![l0_graph](https://www.mindspore.cn/golden_stick/docs/en/master/_images/l0_graph.png)
+![l0_graph](../../../../docs/images/en/pruner/heads/l0_graph.png)
 
 #### Link to the article
 
@@ -184,7 +182,7 @@ The function has an option to get another parameter:
 
 ### BERT on MNLI
 
-We provide a code example for LRP pruning of Bert model in [run_sample_bert.py](https://gitee.com/mindspore/golden-stick/tree/master/mindspore_gs/pruner/heads/lrp/bert/samples/run_sample_bert.py) file. It can be run using the following shell command
+We provide a code example for LRP pruning of Bert model in [run_sample_bert.py](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/heads/lrp/bert/samples/run_sample_bert.py) file. It can be run using the following shell command
 
 ```bash
 export DEVICE_TARGET = "GPU"
