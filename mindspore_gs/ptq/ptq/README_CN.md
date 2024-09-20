@@ -30,7 +30,9 @@
 | --- | --- |
 | 硬件支持 | Atlas 800I A2 |
 | 网络支持 | ParallelLlamaForCausalLM，具体请参见[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/experimental/infer/models/llama/llama.py) |
-| 运行模式支持 | 量化checkpoint阶段仅支持PyNative模式，量化推理阶段支持GraphMode和PyNativeMode |
+| 运行模式支持 | 量化checkpoint阶段仅支持PyNative模式，量化推理阶段不限定模式，建议GraphMode获得更好的性能 |
+
+> 当前PTQ算法依赖于完整的DecoderLayer做网络拓扑分析，所以不支持任意基于MindFormers的Linear层构造的网络，我们计划在后续版本改进这一点，以提升PTQ算法的网络泛化能力。
 
 ## 示例
 
@@ -64,13 +66,13 @@ PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[Mind
 
 需要预先下载[squad1.1数据集](https://data.deepai.org/squad1.1.zip)、[Llama2 7B预训练权重](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/llama2_7b.ckpt)和[Llama2分词器文件](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model)。
 
-第一步创建工作目录：
+**第一步**创建工作目录：
 
 ```shell
 mkdir workspace
 ```
 
-第二步准备数据集，由于权限限制，需要手动下载squad数据集：
+**第二步**准备数据集，由于权限限制，需要手动下载squad数据集：
 
 数据集下载地址：[squad1.1数据集](https://data.deepai.org/squad1.1.zip)
 
@@ -83,7 +85,7 @@ unzip squad1.1.zip -d ./squad
 
 使用unzip命令解压squad1.1.zip文件后，可以得到train-v1.1.json和dev-v1.1.json量化数据集文件，我们先使用train数据集进行量化校准，然后使用dev数据集进行量化评测。
 
-第三步准备Llama2 7b网络的checkpoint文件，Llama2分词器文件，Llama2模型配置文件：
+**第三步**准备Llama2 7b网络的checkpoint文件，Llama2分词器文件，Llama2模型配置文件：
 
 下载地址：
 
@@ -111,9 +113,7 @@ workspace
 
 #### 2.1. 构造非量化网络
 
-第一步构造MindFormers仓的ParallelLlamaForCausalLM 7B网络。
-
-修改predict_llama2_7b.yaml文件的如下内容。
+构造MindFormers仓的ParallelLlamaForCausalLM 7B网络，首先需要修改predict_llama2_7b.yaml文件的如下内容：
 
 1. 更新load_checkpoint字段为llama2_7b.ckpt所在路径。
 
@@ -226,7 +226,7 @@ ptq = PTQ(config=ptq_config)
 
 #### 2.4. 量化网络并保存量化checkpoint文件
 
-接下来对网络进行量化矫正，主要分为两个步骤：第一步是使用PTQ的apply接口，对网络进行量化矫正；第二步是使用PTQ的convert接口，将量化矫正后的网络改造成对应后端的真实量化网络：
+接下来对网络进行量化矫正，主要分为两个步骤：**第一步**是使用PTQ的apply接口，对网络进行量化矫正；**第二步**是使用PTQ的convert接口，将量化矫正后的网络改造成对应后端的真实量化网络：
 
 ```python
 import mindspore as ms
@@ -240,13 +240,13 @@ print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
 
 成功运行后，量化后的checkpoint文件会保存在 `/path/to/workspace/a8w8c8.ckpt` 路径下。
 
-需要注意的是样例代码中对多卡做了简化，实际上ParallelLlamaForCausalLM 7B网络必须使用msrun来运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/tutorials/experts/zh-CN/r2.3.1/parallel/msrun_launcher.html)，完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
+需要注意的是样例代码中对多卡做了简化，实际上ParallelLlamaForCausalLM 7B网络必须使用msrun来运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/master/model_train/parallel/msrun_launcher.html)，完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
 
 ### 步骤3. 模型部署
 
 #### 3.1. 评估FP16网络的F1EM指标
 
-使用squad1.1 dev数据集评估ParallelLlamaForCausalLM-7B网络的F1EM指标。完整样例可以参考[eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py)。注意需用msrun运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/tutorials/experts/zh-CN/r2.3.1/parallel/msrun_launcher.html)。
+使用squad1.1 dev数据集评估ParallelLlamaForCausalLM-7B网络的F1EM指标。完整样例可以参考[eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py)。注意需用msrun运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/master/model_train/parallel/msrun_launcher.html)。
 
 > 评测前请确认yaml配置文件中的load_checkpoint字段已正确配置了非量化的网络checkpoint文件路径:`/path/to/workspace/llama2_7b.ckpt`。并配置context.mode为0，即静态图模式。
 
