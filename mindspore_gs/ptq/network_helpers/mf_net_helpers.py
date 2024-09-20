@@ -39,7 +39,7 @@ from mindformers.experimental.infer.core.transformer import (ParallelTransformer
                                                              ParallelMLP)
 from mindformers.experimental.infer.core.norm import RMSNorm
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-from mindformers.experimental.distri_cores.create_comm import initialize_model_parallel
+from mindformers.experimental.parallel_core.pynative.parallel_state import initialize_model_parallel
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.ptq.processor import Processor
 from .network_helper import NetworkHelper, DecoderGroupInfo, LayerInfo, LayerType

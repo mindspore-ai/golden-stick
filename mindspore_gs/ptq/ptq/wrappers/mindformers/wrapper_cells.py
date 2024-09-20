@@ -29,7 +29,7 @@ from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-from mindformers.experimental.distri_cores.create_comm import get_tp_group
+from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_group
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
@@ -51,7 +51,7 @@ class MinFromTensorParallelRegion(nn.Cell):
     "Get argmin from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tp_group())
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group())
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
@@ -63,7 +63,7 @@ class MaxFromTensorParallelRegion(nn.Cell):
     "Get argmax from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tp_group())
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group())
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
