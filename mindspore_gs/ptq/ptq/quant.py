@@ -56,7 +56,7 @@ class PTQ(CompAlgo):
     weight, and kvcache.
 
     Args:
-        config(:class:`mindspore_gs.ptq.PTQConfig`): config for PTQ, default is ``None``.
+        config(:class:`mindspore_gs.ptq.PTQConfig`, optional): config for PTQ, default is ``None``.
 
     Raises:
         TypeError: If `config` type is not PTQConfig when it's not ``None``.
@@ -96,11 +96,11 @@ class PTQ(CompAlgo):
         PTQ._ptq_config_check(self._config)
         self.pipeline: List[Algorithm] = []
         self.decoder_layer_types: list = []
-        self.build_pipeline()
+        self._build_pipeline()
         self._load_mindformers_plugin()
         self.context_mode = get_context("mode")
 
-    def build_pipeline(self):
+    def _build_pipeline(self):
         """build pipline"""
         if self._config.mode == PTQMode.QUANTIZE:
             if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:

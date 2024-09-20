@@ -45,8 +45,3 @@ mindspore_gs.ptq.RoundToNearest
             - **TypeError** - `net_opt` 数据类型不是Cell。
             - **TypeError** - `ckpt_path` 数据类型不是str。
             - **ValueError** - `ckpt_path` 非空但不是有效路径。
-
-    .. py:method:: load_mindformers_plugin()
-        ::staticmethod        
-
-        将针对MindFormers的quant-cells、layer-policy作为插件加载进来，从而使算法支持量化来自MindFormers的网络。需要在算法创建之前调用该静态方法。

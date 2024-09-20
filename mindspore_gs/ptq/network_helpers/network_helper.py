@@ -153,7 +153,7 @@ class NetworkHelper:
                 0: AddedToken("<unk>", rstrip=False, lstrip=False, normalized=True, special=True),
                 1: AddedToken("<s>", rstrip=False, lstrip=False, normalized=True, special=True),
                 2: AddedToken("</s>", rstrip=False, lstrip=False, normalized=True, special=True),
-            }
+            })
         """
         raise NotImplementedError
 

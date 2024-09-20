@@ -42,7 +42,7 @@ class RoundToNearest(CompAlgo):
     Native implementation for post training quantization based on min/max statistic values.
 
     Args:
-        config(:class:`mindspore_gs.ptq.PTQConfig`): config for RoundToNearst, default is ``None``.
+        config(:class:`mindspore_gs.ptq.PTQConfig`, optional): config for RoundToNearst, default is ``None``.
 
     Raises:
         TypeError: If `config` type is not PTQConfig when it's not ``None``.
