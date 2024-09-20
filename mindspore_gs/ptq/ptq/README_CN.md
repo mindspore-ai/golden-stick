@@ -46,7 +46,7 @@
 
 #### 1.1. Ascend环境
 
-RTN算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[MindSpore安装指南](https://www.mindspore.cn/install)安装昇腾AI处理器配套软件包小节和配置环境变量小节。
+PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[MindSpore安装指南](https://www.mindspore.cn/install)安装昇腾AI处理器配套软件包小节和配置环境变量小节。
 
 #### 1.2. MindSpore环境
 
@@ -62,36 +62,89 @@ RTN算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[Mind
 
 #### 1.5. 相关文件准备
 
-需要预先下载[squad1.1数据集](https://data.deepai.org/squad1.1.zip)和[Llama2 7B预训练权重](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/llama2_7b.ckpt)。
+需要预先下载[squad1.1数据集](https://data.deepai.org/squad1.1.zip)、[Llama2 7B预训练权重](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/llama2_7b.ckpt)和[Llama2分词器文件](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model)。
 
-下载完后会得到llama2_7b.ckpt文件和squad1.1.zip。使用unzip命令解压squad1.1.zip文件后，可以得到train-v1.1.json和dev-v1.1.json量化数据集文件，我们先使用train数据集进行量化校准，然后使用dev数据集进行量化评测。
+第一步创建工作目录：
+
+```shell
+mkdir workspace
+```
+
+第二步准备数据集，由于权限限制，需要手动下载squad数据集：
+
+数据集下载地址：[squad1.1数据集](https://data.deepai.org/squad1.1.zip)
+
+下载完成后，将得到的数据集squad1.1.zip拷贝至第一步创建的workspace目录下，并确保数据集名称为squad1.1.zip，然后运行解压代码：
+
+```shell
+cd workspace
+unzip squad1.1.zip -d ./squad
+```
+
+使用unzip命令解压squad1.1.zip文件后，可以得到train-v1.1.json和dev-v1.1.json量化数据集文件，我们先使用train数据集进行量化校准，然后使用dev数据集进行量化评测。
+
+第三步准备Llama2 7b网络的checkpoint文件，Llama2分词器文件，Llama2模型配置文件：
+
+下载地址：
+
+[Llama2 7b checkpoint](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/llama2_7b.ckpt)
+
+[Llama2分词器文件](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model)
+
+[llama2模型配置文件](https://gitee.com/mindspore/mindformers/blob/dev/configs/llama2/predict_llama2_7b.yaml)
+
+下载好上述3个文件后，将其拷贝至workspace目录下。
+
+准备完上述文件后，目录结构为：
+
+```shell
+workspace
+  ├── squad
+  ├     ├── train-v1.1.json
+  ├     └── dev-v1.1.json
+  ├── predict_llama2_7b.yaml
+  ├── tokenizer.model
+  └── llama2_7b.ckpt
+```
 
 ### 步骤2. 模型量化
 
-完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
+#### 2.1. 构造非量化网络
 
-#### 构造非量化网络
+第一步构造MindFormers仓的ParallelLlamaForCausalLM 7B网络。
 
-构造MindFormers仓的ParallelLlamaForCausalLM 7B网络。可以将MindFormers中的llama2-70b网络的predict配置文件中网络的规格修改成7b的规格，以此作为llama2-7b的predict配置文件。我们假设修改后的文件存放在`/path/to/llama2_7b/config.yaml`路径下。需要注意的是PTQ量化阶段只能使用动态图，所以需要保证yaml中context.mode字段已经被正确配置到动态图模式，并确认load_checkpoint字段已经配置了正确的非量化的网络checkpoint文件路径，然后就可以使用金箍棒提供的MFParallelLlama2Helper方便地通过配置文件构造网络并加载checkpoint，代码如下：
+修改predict_llama2_7b.yaml文件的如下内容。
+
+1. 更新load_checkpoint字段为llama2_7b.ckpt所在路径。
+
+2. 更新process中的vocab_file字段为tokenizer.model所在路径。没有该字段的话，可手动添加。
+
+3. 修改context中的device_id为当前机器空闲的设备id，context中的mode为1，即PYNATIVE模式。
+
+4. 修改model.arch.type字段为ParallelLlamaForCausalLM。
+
+5. 修改use_parallel为True, parallel.parallel_mode为3，parallel_config.data_parallel为1。
+
+修改完成后，可以使用金箍棒提供的MFParallelLlama2Helper方便地通过配置文件构造网络并加载checkpoint，代码如下：
 
 ```python
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 
-config_path = '/path/to/llama2_7b/config.yaml'
+config_path = '/path/to/workspace/predict_llama2_7b.yaml'
 helper = MFParallelLlama2Helper(config_path)
 network = helper.create_network()
 ```
 
-#### 构造squad-v1.1数据集loader
+#### 2.2. 构造squad-v1.1数据集loader
 
-我们假设数据集文件存放在`/path/to/squad/train-v1.1.json`，然后可以用mindspore_gs的get_datasets接口构造squad-v1.1数据集loader。
+我们基于squad的train-v1.1.json进行量化过程中的校准，用mindspore_gs的get_datasets接口构造squad-v1.1数据集loader。
 
 一般量化校准阶段只会使用数百条数据进行校准，当前样例中，我们使用n_samples参数指定仅加载数据集中的200条数据，代码如下：
 
 ```python
 from mindspore_gs.datasets import get_datasets
 
-ds_path = '/path/to/squad/train-v1.1.json'
+ds_path = '/path/to/workspace/squad/train-v1.1.json'
 bs_ = helper.get_spec('batch_size')
 seq_ = helper.get_spec('seq_length')
 max_decode_length = helper.get_spec('max_decode_length')
@@ -101,7 +154,7 @@ ds = get_datasets('squad1.1', ds_path, "train", bs_, seq_, max_decode_length, to
                   False, n_samples=200)
 ```
 
-#### 构造量化算法
+#### 2.3. 构造量化算法
 
 PTQ算法支持基础的round to nearest方法实现的a16w8权重量化和c8（kvcache int8）算法，也支持smooth-quant方法实现的a8w8算法，同时也支持a16w8权重量化算法和c8算法组合量化算法，smooth-quant和c8组合量化算法。
 
@@ -157,7 +210,9 @@ PTQ算法支持基础的round to nearest方法实现的a16w8权重量化和c8（
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
     ```
 
-有了PTQConfig以后，就可以构造PTQ算法了。对于ParallelLlamaForCausalLM网络，某些层对于量化比较敏感，不适合量化，我们通常通过来跳过这些层的量化：
+有了PTQConfig以后，接下来构造PTQ算法了，代码如下：
+
+> 对于ParallelLlamaForCausalLM网络，某些层对于量化比较敏感，不适合量化，我们通常通过opname_blacklist字段来帮助跳过这些层的量化。
 
 ```python
 from mindspore_gs.ptq.ptq import PTQ
@@ -165,12 +220,11 @@ from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
 
 ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
-                       weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                       outliers_suppression=OutliersSuppressionType.SMOOTH)
+                       weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8)
 ptq = PTQ(config=ptq_config)
 ```
 
-#### 量化校准网络并保存量化checkpoint文件
+#### 2.4. 量化网络并保存量化checkpoint文件
 
 接下来对网络进行量化矫正，主要分为两个步骤：第一步是使用PTQ的apply接口，对网络进行量化矫正；第二步是使用PTQ的convert接口，将量化矫正后的网络改造成对应后端的真实量化网络：
 
@@ -184,7 +238,7 @@ ms.save_checkpoint(network.parameters_dict(), "a8w8c8.ckpt",
 print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
 ```
 
-成功运行后，量化后的checkpoint文件会保存在 `a8w8c8.ckpt` 路径下。
+成功运行后，量化后的checkpoint文件会保存在 `/path/to/workspace/a8w8c8.ckpt` 路径下。
 
 需要注意的是样例代码中对多卡做了简化，实际上ParallelLlamaForCausalLM 7B网络必须使用msrun来运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/tutorials/experts/zh-CN/r2.3.1/parallel/msrun_launcher.html)，完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
 
@@ -192,21 +246,23 @@ print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
 
 #### 3.1. 评估FP16网络的F1EM指标
 
-使用squad1.1 dev数据集评估ParallelLlamaForCausalLM-7B网络的F1EM指标。完整样例可以参考[eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py)。评测前请确认yaml配置文件中的load_checkpoint字段已经配置了正确的非量化的网络checkpoint文件路径。
+使用squad1.1 dev数据集评估ParallelLlamaForCausalLM-7B网络的F1EM指标。完整样例可以参考[eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py)。注意需用msrun运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/tutorials/experts/zh-CN/r2.3.1/parallel/msrun_launcher.html)。
+
+> 评测前请确认yaml配置文件中的load_checkpoint字段已正确配置了非量化的网络checkpoint文件路径:`/path/to/workspace/llama2_7b.ckpt`。并配置context.mode为0，即静态图模式。
 
 ```python
 import numpy as np
 import mindspore as ms
 from mindformers.core.metric import EmF1Metric
-from mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper import MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import logger
 
-config_path = '/path/to/llama2_7b/config.yaml'
+config_path = '/path/to/workspace/predict_llama2_7b.yaml'
 helper = MFParallelLlama2Helper(config_path)
 network = helper.create_network()
 
-ds_path = '/path/to/squad/dev-v1.1.json'
+ds_path = '/path/to/workspace/squad/dev-v1.1.json'
 bs_ = helper.get_spec('batch_size')
 seq_ = helper.get_spec('seq_length')
 max_decode_length = helper.get_spec('max_decode_length')
@@ -249,16 +305,20 @@ metric.eval()
 
 #### 3.2. 评估量化后网络的F1EM指标
 
-由于MindSpore当前不支持保存修改后的网络，所以在加载量化ckpt之前，需要先用算法恢复带量化结构的网络，然后再加载ckpt到网络。
+由于MindSpore当前不支持保存修改后的网络，所以在加载量化ckpt之前，需要先用算法恢复带量化结构的网络，然后再加载checkpoint到网络。
 
-评估脚本逻辑与非量化网络的一致，不过中间增加一步修改网络为量化网络的过程。评测前请确认yaml配置文件中的load_checkpoint字段已经配置了正确的量化的网络checkpoint文件路径，也就是步骤2中获得的checkpoint文件。
+评估脚本逻辑与非量化网络的一致，不过中间增加一步修改网络为量化网络的过程。
+
+> 评测前请确认yaml配置文件中的load_checkpoint字段已经配置了正确的量化的网络checkpoint文件路径: `/path/to/workspace/a8w8c8.ckpt`。
 
 ```python
 import numpy as np
 import mindspore as ms
+from mindspore.communication.management import init
 from mindformers.core.metric import EmF1Metric
-from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
-from mindspore_gs.ptq.network_helpers.mf_parallel_llama2_helper import MFParallelLlama2Helper
+from mindformers import MindFormerConfig, AutoModel
+from mindformers.experimental.parallel_core.pynative.parallel_state import initialize_model_parallel
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq import PTQ
@@ -266,23 +326,24 @@ from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
 
 
-config_path = '/path/to/llama2_7b/config.yaml'
+config_path = '/path/to/workspace/predict_llama2_7b.yaml'
 mf_config = MindFormerConfig(config_path)
-build_parallel_config(mf_config)
-mf_config.model.model_config.parallel_config = mf_config.parallel_config
-build_context(self.mf_config)
-network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
+
+ms.set_context(mode=mf_config.context.mode, device_target=mf_config.context.device_target,
+                jit_config={"jit_level": "O0", "infer_boost": "on"})
+init()
+initialize_model_parallel(mf_config.parallel_config.model_parallel, order='tp')
+network = AutoModel.from_config(mf_config, download_checkpoint=False)
 network.set_train(False)
 network.phase = 'predict'
 
 ptq_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
-                       weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                       outliers_suppression=OutliersSuppressionType.SMOOTH)
-ptq = PTQ(config=cfg)
+                       weight_quant_dtype=ms.dtype.int8, act_quant_dtype=ms.dtype.int8, kvcache_quant_dtype=ms.dtype.int8)
+ptq = PTQ(config=ptq_config)
 ptq.apply(network)
 ptq.convert(network)
 
-load_checkpoint(network, mf_config.load_checkpoint)
+ms.load_checkpoint(mf_config.load_checkpoint, network)
 
 helper = MFParallelLlama2Helper(mf_config)
 ds_path = '/path/to/squad/dev-v1.1.json'
