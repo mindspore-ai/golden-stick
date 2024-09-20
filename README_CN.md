@@ -83,10 +83,10 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 | :---------------------: | :-----------------------------------------------------------------: |
 | API         | [API文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master) |
 | 自动化压缩   | TBD |
-| 训练后量化   | [PTQ](mindspore_gs/ptq/ptq/README.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README.ipynb) |
-| [量化感知训练](mindspore_gs/quantization/README.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README.md) [SLB](mindspore_gs/quantization/slb/README.md) |
-| [剪枝](mindspore_gs/pruner/README.md) | [SCOP](mindspore_gs/pruner/scop/README.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
-| 其他 | [Ghost](mindspore_gs/ghost/README.md)  |
+| 训练后量化   | [PTQ](mindspore_gs/ptq/ptq/README_CN.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README_CN.ipynb) |
+| [量化感知训练](mindspore_gs/quantization/README_CN.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README_CN.md) [SLB](mindspore_gs/quantization/slb/README_CN.md) |
+| [剪枝](mindspore_gs/pruner/README_CN.md) | [SCOP](mindspore_gs/pruner/scop/README_CN.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
+| 其他 | [Ghost](mindspore_gs/ghost/README_CN.md)  |
 
 ### 模型部署
 

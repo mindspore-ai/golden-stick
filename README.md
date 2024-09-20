@@ -83,10 +83,10 @@ Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/mas
 | :---------------------: | :-----------------------------------------------------------------: |
 | API         | [API doc](https://www.mindspore.cn/golden_stick/docs/en/master) |
 | AutoCompress   | TBD |
-| Post-Training Quantization   | [PTQ](mindspore_gs/ptq/ptq/README_EN.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README_EN.md) |
-| [Quant-Aware Quantization](mindspore_gs/quantization/README_EN.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README_EN.md) [SLB](mindspore_gs/quantization/slb/README_EN.md) |
-| [Pruner](mindspore_gs/pruner/README_EN.md) | [SCOP](mindspore_gs/pruner/scop/README_EN.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
-| Others | [Ghost](mindspore_gs/ghost/README_EN.md)  |
+| Post-Training Quantization   | [PTQ](mindspore_gs/ptq/ptq/README.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README.md) |
+| [Quant-Aware Quantization](mindspore_gs/quantization/README.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README.md) [SLB](mindspore_gs/quantization/slb/README.md) |
+| [Pruner](mindspore_gs/pruner/README.md) | [SCOP](mindspore_gs/pruner/scop/README.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
+| Others | [Ghost](mindspore_gs/ghost/README.md)  |
 
 ### Model Deployment
 
