@@ -24,7 +24,7 @@ from mindspore import save_checkpoint, set_context
 from mindspore import GRAPH_MODE, PYNATIVE_MODE, dtype
 from mindspore.dataset import GeneratorDataset
 from mindspore.communication.management import init
-from mindformers.experimental.distri_cores.create_comm import initialize_model_parallel, is_initialized
+from mindformers.experimental.parallel_core.pynative.parallel_state import initialize_model_parallel, get_group_info
 from mindformers import AutoModel
 from mindformers.trainer.utils import transform_and_load_checkpoint
 
@@ -127,7 +127,8 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
 
     set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
     init()
-    if not is_initialized():
+    is_initialized = get_group_info('dp').group is not None
+    if not is_initialized:
         initialize_model_parallel(config.parallel_config.model_parallel, order='tp')
     network = AutoModel.from_config(config, download_checkpoint=False)
     network.set_train(False)
