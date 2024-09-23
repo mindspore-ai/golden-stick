@@ -12,7 +12,7 @@ Neural network pruning is a general model compression method. It reduces the num
 
 Finding a redundant convolution kernel is a key step in structured pruning. There are two common methods: In the first method, no training data is required, and the importance of different convolution kernels is determined by defining some assumptions about importance of the convolution kernels. A typical assumption is that a convolution kernel with a small norm is not important, and cutting off some convolution kernels with small norm does not affect network performance too much. Another method is data driven, in which training data is introduced to learn importance of different convolution kernels. For example, an additional control coefficient is introduced for each convolution kernel, and importance of different convolution kernels is measured by learning their control coefficients. A convolution kernel that corresponds to a small control coefficient is considered unimportant.
 
-![](../../../docs/images/en/pruner/scop/scop.png)
+![](images/en/scop.png)
 
 A typical neural network pruning method: Reliable Neural Network Pruning (SCOP) based on Scientific Control is driven by data. It introduces knockoff features as a reference, sets up control experiments to reduce the interference of various irrelevant factors to the pruning process and improve the reliability of pruning results. As shown in the preceding figure, real data and knockoff data are input to the network at the same time to generate real features and knockoff features separately. If the knockoff feature corresponding to a convolution kernel suppresses the real feature, the convolution kernel is considered redundant and should be deleted.
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     export(network, inputs, file_name="ResNet_SCOP", file_format='MINDIR')
 ```
 
-After the pruned model is exported, [use MindSpore for inference](https://www.mindspore.cn/docs/en/master/model_infer/ms_infer/overview.html).
+After the pruned model is exported, [use MindSpore for inference](https://www.mindspore.cn/docs/en/master/model_infer/ms_infer/llm_inference_overview.html).
 
 ## Summary
 

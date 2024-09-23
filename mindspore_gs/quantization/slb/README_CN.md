@@ -12,7 +12,7 @@ SLB(Searching for low-bit weights) [3]是华为诺亚自研的权重量化算法
 
 下面左边图是用传统量化算法做二值量化，训练时用不准确的梯度更新浮点权重，最后对浮点权重做二值化(用sigmoid函数)处理得到量化权重。右边图是用SLB量化算法做二值量化，利用连续松弛策略搜索离散权重，训练时优化离散权重的权值概率矩阵，最后根据概率挑选离散权重实现量化。左边图中红色点对应的单个值是由sigmoid函数得到，表示权重被量化为-1的概率。蓝色点对应的单个值是由sigmoid函数得到，表示权重被量化为+1的概率。传统量化算法中不准确的梯度更新会影响浮点权重的更新，从而导致这里的概率出现较大的偏差。右边图中红蓝相间的点对应的2个值是由softmax函数得到，表示权重被量化为-1或+1的概率。由于避开了不准确的梯度更新，这里的概率会更精准。
 
-![SLB算法对比](../../../docs/images/zh_cn/quantization/slb/slb_1.png)
+![SLB算法对比](images/zh_cn/slb_1.png)
 
 ### 温度因子
 
@@ -20,11 +20,11 @@ SLB(Searching for low-bit weights) [3]是华为诺亚自研的权重量化算法
 
 下面左边公式是标准的softmax函数，右边是SLB算法中引入了温度因子后的softmax函数。
 
-![softmax函数](../../../docs/images/zh_cn/quantization/slb/slb_2.png)
+![softmax函数](images/zh_cn/slb_2.png)
 
 下图展示了逐步调整温度因子时，softmax分布的变化过程，最右侧是one-hot分布。
 
-![softmax分布变化](../../../docs/images/zh_cn/quantization/slb/slb_3.png)
+![softmax分布变化](images/zh_cn/slb_3.png)
 
 ## 算法特点
 

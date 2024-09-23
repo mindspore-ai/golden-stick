@@ -17,7 +17,7 @@ SimQAT是一种最基础的感知量化算法，其具体原理来源于谷歌�
 
 为了归一化输出数据，卷积或者全连接层后通常会加入BatchNorm算子，在训练阶段BatchNorm作为一个独立的算子，统计输出的均值和方差（如下左图），在推理阶段则将其融入权重和Bias中，称为BatchNorm折叠（如下右图）。
 
-![](../../../docs/images/zh_cn/quantization/simqat/bnfold_in_infer.png)
+![](images/zh_cn/bnfold_in_infer.png)
 
 BatchNorm折叠的公式如下：
 
@@ -25,7 +25,7 @@ $$y_{bn}=\operatorname{BN}\left(y_{cout}\right)=BN(w \cdot x+b)=\widehat{w} \cdo
 
 在感知量化训练中，为精确模拟推理中的折叠操作，论文[1]使用两套卷积分别用于计算当前的BatchNorm参数，并用计算得到的参数归一化实际作用卷积的权重值（如下左图），其中CorrectionMul用于权重校正，MulFold用于权重数据归一化。在MindSpore Golden Stick中会进一步将权重校正和权重数据融合（如下右图），提升训练性能。
 
-![](../../../docs/images/zh_cn/quantization/simqat/bnfold_in_train.png)
+![](images/zh_cn/bnfold_in_train.png)
 
 ## 感知量化训练
 

@@ -1,6 +1,6 @@
 # 模型部署概述
 
-[View English](../../docs_en/deployment/overview.md)
+[View English](../../en/deployment/overview.md)
 
 经过MindSpore Golden Stick压缩的网络可能需要额外的步骤，将网络中模型压缩相关的结构从训练形态转化为部署形态，方便进一步进行模型导出和模型部署。主要考虑以下三点：
 
@@ -16,4 +16,4 @@
 2. 模型导出：将模型导出为MindIR格式。MindSpore Golden Stick模型导出使用MindSpore已有能力，详情请见[mindspore.export 文档](https://www.mindspore.cn/docs/zh-CN/master/api_python/mindspore/mindspore.export.html)；
 3. 模型推理：将算法优化后导出的MindIR模型在端侧、GPU或者Ascend上进行部署推理。端侧部署分为两步，可参考[端侧模型转换](https://www.mindspore.cn/lite/docs/zh-CN/master/converter/converter_tool.html)和[执行推理](https://www.mindspore.cn/lite/docs/zh-CN/master/infer/runtime_cpp.html)。
 
-![](../../../images/zh_cn/deployment/arc.png)
+![](../images/deployment/arc.png)

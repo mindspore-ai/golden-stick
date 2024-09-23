@@ -35,7 +35,7 @@ MindSpore Golden Stick是华为诺亚团队和华为MindSpore团队联合设计�
 
 5. 在最外层，MindSpore Golden Stick封装了一套简洁的用户接口。
 
-![金箍棒架构图](docs/images/zh_cn/golden-stick-arch.png)
+![金箍棒架构图](docs/zh_cn/images/golden-stick-arch.png)
 
 > 架构图是MindSpore Golden Stick的全貌，其中包含了当前已经实现的功能以及规划在RoadMap中能力。具体开放的功能可以参考对应版本的ReleaseNotes。
 
@@ -53,7 +53,7 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 
 ## 应用MindSpore Golden Stick算法的一般流程
 
-![金箍棒流程图](docs/images/zh_cn/workflow.png)
+![金箍棒流程图](docs/zh_cn/images/workflow.png)
 
 1. 压缩阶段
 
@@ -65,17 +65,17 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 
 > - 应用MindSpore Golden Stick算法的细节，可以在每个算法章节中找到详细说明和示例代码。
 > - 流程中的"ms.export"步骤可以参考[导出mindir格式文件](https://www.mindspore.cn/tutorials/zh-CN/master/beginner/save_load.html#保存和加载mindir)章节。
-> - 流程中的"昇思推理优化工具和运行时"步骤可以参考[昇思推理](https://mindspore.cn/docs/zh-CN/master/model_infer/ms_infer/overview.html)章节。
+> - 流程中的"昇思推理优化工具和运行时"步骤可以参考[昇思推理](https://www.mindspore.cn/docs/zh-CN/master/model_infer/ms_infer/llm_inference_overview.html)章节。
 
 ## 文档
 
 ### 安装
 
-请参考[MindSpore Golden Stick安装教程](docs/docs/docs_zh_cn/install.md)。
+请参考[MindSpore Golden Stick安装教程](docs/zh_cn/install.md)。
 
 ### 快速入门
 
-以一个简单的算法[Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) 作为例子，演示如何在训练中应用金箍棒中的算法。
+以一个简单的算法[Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quantization/README_CN.md) 作为例子，演示如何在训练中应用金箍棒中的算法。
 
 ### 压缩算法
 
@@ -90,7 +90,7 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 
 ### 模型部署
 
-请参考[MindSpore Golden Stick部署教程](docs/docs/docs_zh_cn/deployment/overview.md)。
+请参考[MindSpore Golden Stick部署教程](docs/zh_cn/deployment/overview.md)。
 
 ## 社区
 

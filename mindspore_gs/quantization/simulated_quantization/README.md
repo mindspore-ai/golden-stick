@@ -17,7 +17,7 @@ A fake quantization node is a kind of node which is inserted into network during
 
 To normalize the output data, the BatchNorm operator is added after the convolutional or fully connected layer. In the training phase, the BatchNorm operator is used as an independent operator to collect statistics on the output average value and variance (as shown in the left figure in the following figure). In the inference phase, the BatchNorm operator is integrated into the weight and bias. It is called BatchNorm folding (as shown in the right figure below).
 
-![](../../../docs/images/en/quantization/simqat/bnfold_in_infer.png)
+![](images/en/bnfold_in_infer.png)
 
 The formula for folding BatchNorm is as follows:
 
@@ -25,7 +25,7 @@ $$y_{bn}=\operatorname{BN}\left(y_{cout}\right)=BN(w \cdot x+b)=\widehat{w} \cdo
 
 In quantization aware training, to accurately simulate the folding operation in inference, the paper [1] uses two sets of convolutions to calculate the current BatchNorm parameter, and uses the calculated parameter to normalize the weight value of the actual convolution (as shown in the left figure below). CorrectionMul is used for weight calibration, and mulFold is used for weight data specification. The weight calibration and weight data specification are further integrated in the MindSpore Golden Stick (as shown in the right figure below) to improve training performance.
 
-![](../../../docs/images/en/quantization/simqat/bnfold_in_train.png)
+![](images/en/bnfold_in_train.png)
 
 ## Quantization Aware Training
 

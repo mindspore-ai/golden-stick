@@ -31,7 +31,7 @@ Unfortunately, a direct implementation of this idea leads to an objective functi
 So instead, the algorithm uses a stochastic relaxation in which each gate is modeled as a continuous random variable drawn independently of a head-specific
 [Hard Concrete distribution](https://openreview.net/pdf?id=H1Y8hhg0b). The distributions have non-zero probability mass at 0 and 1; look at the illustration.
 
-![concrete](../../../../docs/images/en/pruner/heads/concrete_crop.gif)
+![concrete](images/en/concrete_crop.gif)
 
 The non-differentiable $L0$ norm is replaced by the sum of the probabilities of heads being non-zero ($L_C$) as a stochastic relaxation,
 and the resulting training objective is
@@ -41,7 +41,7 @@ $L = L_{xent} + \lambda L_C$
 By varying the coefficient $\lambda$ in the optimized objective, we obtain models with different numbers of retained heads. Below is shown how the probabilities of encoder heads being completely closed $(P(g_i)=0)$ change in training for different values of $\lambda$ (pruning starts from a converged model). 
 White color denotes $P(g_i=0) = 1$, which means that a head is completely removed from the model.
 
-![enc_head_gif](../../../../docs/images/en/pruner/heads/enc_head_gif_delay7-min.gif)
+![enc_head_gif](images/en/enc_head_gif_delay7-min.gif)
 
 (Gif is for the model trained on EN-RU WMT. For other datasets, values of $\lambda$ can be different.)
 
@@ -64,7 +64,7 @@ Overall, there are 3 main parameters that the user needs to know in order to get
 
 (From Differentiable Subset Pruning of Transformer Heads article)
 
-![l0_graph](../../../../docs/images/en/pruner/heads/l0_graph.png)
+![l0_graph](images/en/l0_graph.png)
 
 #### Link to the article
 

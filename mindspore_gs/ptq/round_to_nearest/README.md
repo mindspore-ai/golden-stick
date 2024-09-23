@@ -8,7 +8,7 @@ The RoundToNearest algorithm is a plainer class of post-quantization algorithms 
 
 The current RoundToNearest post-quantization (RTN is used later for short) in Golden Stick focuses on the LLM (Large Language Model scenario) and uses the MinMax corrector to quantize the linear layer (Linear). The network structure for pseudo-quantization is schematically shown below:
 
-![fakequantizer](../../../docs/images/en/ptq/rtn/rtn-fakequantizer.png)
+![fakequantizer](images/en/rtn-fakequantizer.png)
 
 Table 1: RTN algorithm specifications
 

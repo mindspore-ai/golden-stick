@@ -12,7 +12,7 @@ Neural network inference can be regarded as the process of activation and weight
 
 Weight pruning is classified into structured pruning mode and unstructured pruning mode. As shown in the figure, from left to right, there are three types of pruning method: neuron pruning, channel pruning and filter pruning. The difference between them is the granularity of their pruning: a single neuron, a single channel or the entire filter, respectively. It can be seen that the pruning granularity of these three types of pruning is getting coarser and coarser, and the corresponding weights obtained after pruning are becoming more and more structured:
 
-![Pruning modes](../../docs/images/en/pruner/pruner.png)
+![Pruning modes](images/en/pruner.png)
 
 Usually we take neuron pruning as unstructured pruning which can prune the weight at any position in the weight with a single weight as the granularity. This pruning mode has less impact on the accuracy of the network due to its fine granularity, but it leads to the sparseness of the weight tensor. The sparse weight tensor is not friendly to memory access and parallel computing. Therefore, it is difficult for the unstructured pruned network to obtain a high acceleration ratio.
 
