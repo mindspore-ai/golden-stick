@@ -29,8 +29,7 @@ from mindspore import Tensor, context, save_checkpoint, load_checkpoint, Model, 
 from mindspore import nn, Parameter, GRAPH_MODE, dtype, ops
 from mindspore.communication import get_rank
 from mindformers.modules import Linear
-from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
-from mindformers import LlamaForCausalLM
+from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -42,11 +41,12 @@ from mindspore_gs.ptq.smooth_quant.quant_cells.mindformers.quant_cells import SQ
 from mindspore_gs.ptq.convert_utils import SmoothAndQuantCell, DequantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerLayer, MinMaxPerChannel
 from mindspore_gs.ptq.network_helpers import NetworkHelper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
 from tests.st.test_utils import check_network_contain_layer, relative_tolerance_acceptable, \
-    absolute_tolerance_acceptable, load_distribut_checkpoint
-from tests.st.mindformers_utils import MFLlama2HelloNetworkHelper, create_hello_ds, set_config
+    absolute_tolerance_acceptable
+from tests.st.mindformers_utils import create_hello_ds
 
 
 @pytest.mark.level0
@@ -572,8 +572,14 @@ def test_sq_predict_simplenet_2stage_2p():
     assert return_code == 0
 
 
-def sq_predict_llama2_2stage(device, mode, model_parallel):
+def sq_predict_llama2_2stage():
     """test_sq_predict_llama2_2stage"""
+    device = str(os.environ.get("device"))
+    if os.environ.get("mode") == "GRAPH_MODE":
+        mode = GRAPH_MODE
+    else:
+        raise ValueError("SmoothQuant do not support PYNATIVE_MODE now!")
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
     os.environ['GRAPH_OP_RUN'] = "1"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
@@ -581,91 +587,95 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
     print(f"---------------- Testing params: {device} {mode} ", flush=True)
     context.set_context(device_target=device, mode=mode, jit_config={"jit_level": "O0", "infer_boost": "on"})
     if model_parallel == 1:
-        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
-        w8a8_config_path = "../../../data/test_llama2/predict_llama2_13b_w8a8_910b_1p.yaml"
-        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16-1decoder.ckpt"
-        w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8-1decoder.ckpt"
+        config_path = "../../../data/test_llama2/predict_llama2_13b_1p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-1p"
+        w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8-1p"
     else:
-        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
-        w8a8_config_path = "../../../data/test_llama2/predict_llama2_13b_w8a8_910b_2p.yaml"
-        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
-        w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8"
-    cur_dir = os.path.dirname(os.path.abspath(__file__))
-    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
-    fp16_config_path = os.path.join(cur_dir, fp16_config_path)
-    w8a8_config_path = os.path.join(cur_dir, w8a8_config_path)
-    fp16_ckpt_path = os.path.join(cur_dir, fp16_ckpt_path)
-    w8a8_ckpt_path = os.path.join(cur_dir, w8a8_ckpt_path)
+        config_path = "../../../data/test_llama2/predict_llama2_13b_2p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-2p"
+        w8a8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a8-2p"
 
-    def quant(ckpt_path, config_path):
-        config = set_config(config_path)
-        network = LlamaForCausalLM(config.model.model_config)
-        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
-        if model_parallel == 1:
-            load_checkpoint(ckpt_path, network)
-        else:
-            network = load_distribut_checkpoint(config, ckpt_path, network)
+    cur_dir_ = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(cur_dir_, config_path)
+    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    fp16_ckpt_path = os.path.join(cur_dir_, fp16_ckpt_path)
+    w8a8_ckpt_path = os.path.join(cur_dir_, w8a8_ckpt_path)
+
+    helper = MFLlama2Helper(config_path)
+    helper.mf_config.processor.tokenizer.vocab_file = vocab_file
+    device_id = int(os.environ.get('DEVICE_ID', '0'))
+    helper.mf_config.context.device_id = device_id
+
+    def quant():
+        helper.mf_config.load_checkpoint = fp16_ckpt_path
+        network = helper.create_network()
+        tokenizer = helper.create_tokenizer()
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
                         act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = SmoothQuant(config=cfg)
-        net_helper = MFLlama2HelloNetworkHelper(config)
         ds = create_hello_ds(tokenizer, 1)
-        network = ptq.apply(network, net_helper, datasets=ds)
+        network = ptq.apply(network, helper, datasets=ds)
         network = ptq.convert(network)
-        if model_parallel == 1:
-            save_checkpoint(network.parameters_dict(), w8a8_ckpt_path, integrated_save=False)
-        else:
-            rank_id = get_rank() or 0
-            save_path = os.path.join(w8a8_ckpt_path, f"rank_{rank_id}")
-            os.makedirs(save_path, exist_ok=True)
-            save_checkpoint(network.parameters_dict(), os.path.join(save_path, "w8a8.ckpt"),
-                            choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
+        try:
+            rank_id = get_rank()
+        except RuntimeError:
+            rank_id = 0
+        save_path = os.path.join(w8a8_ckpt_path, f"rank_{rank_id}")
+        os.makedirs(save_path, exist_ok=True)
+        save_checkpoint(network.parameters_dict(), os.path.join(save_path, "quant.ckpt"),
+                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
 
-    def w8a8_infer(input_, ckpt_path, config_path):
-        config = set_config(config_path)
-        network = LlamaForCausalLM(config.model.model_config)
+    def w8a8_infer(input_):
+        helper.mf_config.load_checkpoint = ""
+        network = helper.create_network()
         cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
                         act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
         ptq = SmoothQuant(config=cfg)
         network = ptq.apply(network)
         network = ptq.convert(network)
 
-        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
-        if model_parallel == 1:
-            load_checkpoint(ckpt_path, network)
-        else:
-            network = load_distribut_checkpoint(config, ckpt_path, network)
+        helper.mf_config.load_checkpoint = w8a8_ckpt_path
+        model = Model(network)
+        input_ids = np.ones(shape=[helper.get_spec('batch_size'), helper.get_spec('seq_length')], dtype=np.int32)
+        infer_data = network.prepare_inputs_for_predict_layout(input_ids)
+        if helper.mf_config.use_parallel:
+            network.phase = 'infer_predict_layout'
+            model.infer_predict_layout(*infer_data)
+        transform_and_load_checkpoint(helper.mf_config, model, network, infer_data, do_predict=True)
+
+        seq_len = 500
+        tokenizer = helper.create_tokenizer()
+        input_ids = tokenizer(input_)['input_ids']
+        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+        answer = tokenizer.decode(outputs, skip_special_tokens=True)
+        return outputs, answer
+
+    def fp16_infer(input_):
+        helper.mf_config.load_checkpoint = fp16_ckpt_path
+        network = helper.create_network()
+        tokenizer = helper.create_tokenizer()
+
         seq_len = 500
         input_ids = tokenizer(input_)['input_ids']
         outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
         answer = tokenizer.decode(outputs, skip_special_tokens=True)
         return outputs, answer
 
-    def fp16_infer(input_, ckpt_path, config_path):
-        config = set_config(config_path)
-        network = LlamaForCausalLM(config.model.model_config)
-        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
-        if model_parallel == 1:
-            load_checkpoint(ckpt_path, network)
-        else:
-            network = load_distribut_checkpoint(config, ckpt_path, network)
-        seq_len = 500
-        input_ids = tokenizer(input_)['input_ids']
-        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
-        answer = tokenizer.decode(outputs, skip_special_tokens=True)
-        return outputs, answer
     example = "Hello"
-    quant(fp16_ckpt_path, fp16_config_path)
-    foutput, _ = fp16_infer(example, fp16_ckpt_path, fp16_config_path)
-    qoutput, _ = w8a8_infer(example, w8a8_ckpt_path, w8a8_config_path)
+    quant()
+    foutput, _ = fp16_infer(example)
+    qoutput, _ = w8a8_infer(example)
     npfoutput = np.array(foutput)
     npqoutput = np.array(qoutput)
-    if not np.allclose(npqoutput[:, :329], npfoutput[:, :329], 0, 0):
+    if model_parallel == 1:
+        res = np.allclose(npqoutput[:, :5], npfoutput[:, :5], 0, 0)
+    elif model_parallel == 2:
+        res = np.allclose(npqoutput, npfoutput, 0, 0)
+    if not res:
         print(f"npfoutput: {npfoutput}", flush=True)
         print(f"npqoutput: {npqoutput}", flush=True)
         print(f"First not equal index {np.min(np.where((npfoutput - npqoutput) != 0))}", flush=True)
-        return False
-    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 50.8)
+    return res
 
 
 @pytest.mark.skip(reason="MindFormers not support smoothquant yet.")
@@ -673,29 +683,35 @@ def sq_predict_llama2_2stage(device, mode, model_parallel):
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
-@pytest.mark.parametrize("mode", [GRAPH_MODE])
+@pytest.mark.parametrize("mode", ["GRAPH_MODE"])
 def test_sq_llama2_predict_2stage_1p(device, mode):
     """
     Feature: test smooth quant adjust parameter in two stages with one cards.
     Description: apply SQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
-    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
-    assert sq_predict_llama2_2stage(device, mode, model_parallel)
+    os.environ['device'] = device
+    os.environ['mode'] = mode
+
+    assert sq_predict_llama2_2stage()
 
 
 @pytest.mark.skip(reason="MindFormers not support smoothquant yet.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_sq_llama2_predict_2stage_2p():
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", ["GRAPH_MODE"])
+def test_sq_llama2_predict_2stage_2p(device, mode):
     """
     Feature: test smooth quant adjust parameter in two stages with two cards.
     Description: apply SQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
-    model_parallel = 2
-    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    os.environ['sq_test_model_parallel'] = "2"
+    os.environ['device'] = device
+    os.environ['mode'] = mode
+
     cur_file = os.path.abspath(__file__)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "

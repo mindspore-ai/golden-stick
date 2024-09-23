@@ -83,7 +83,7 @@ class MFNetworkHelper(NetworkHelper):
         if ckpt_path:
             input_ids = np.ones(shape=[self.get_spec('batch_size'), self.get_spec('seq_length')], dtype=np.int32)
             infer_data = network.prepare_inputs_for_predict_layout(input_ids)
-            if os.path.isdir(ckpt_path):
+            if self.mf_config.use_parallel:
                 network.phase = 'infer_predict_layout'
                 model.infer_predict_layout(*infer_data)
             transform_and_load_checkpoint(self.mf_config, model, network, infer_data, do_predict=True)

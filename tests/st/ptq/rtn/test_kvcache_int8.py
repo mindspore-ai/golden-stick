@@ -31,7 +31,7 @@ from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 # pylint: disable=wrong-import-position
-from tests.st.test_utils import relative_tolerance_acceptable, load_distribut_checkpoint
+from tests.st.test_utils import load_distribut_checkpoint
 from tests.st.mindformers_utils import MFLlama2HelloNetworkHelper, create_hello_ds, set_config
 from mindformers.models.llama.llama_tokenizer import LlamaTokenizer
 from mindformers.modules import PagedAttentionMgr
@@ -138,19 +138,16 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
     context.set_context(device_target=device, mode=mode, device_id=int(device_id),
                         jit_config={"jit_level": "O0", "infer_boost": "on"})
     if model_parallel == 1:
-        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
-        w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml"
-        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16-1decoder.ckpt"
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_1p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-1p/rank_0/fp16.ckpt"
         w8a16c8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a16c8-1decoder.ckpt"
     else:
-        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
-        w8a16c8_config_path = "../../../data/test_llama2/predict_llama2_13b_fp16_910b_2p.yaml"
-        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-fp16"
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_2p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-2p"
         w8a16c8_ckpt_path = "../../../data/test_llama2/llama2-13b-w8a16c8"
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
     fp16_config_path = os.path.join(cur_dir, fp16_config_path)
-    w8a16c8_config_path = os.path.join(cur_dir, w8a16c8_config_path)
     fp16_ckpt_path = os.path.join(cur_dir, fp16_ckpt_path)
     w8a16c8_ckpt_path = os.path.join(cur_dir, w8a16c8_ckpt_path)
 
@@ -169,6 +166,7 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
                         kvcache_quant_dtype=msdtype.int8)
         ptq = RTN(config=cfg)
         net_helper = MFLlama2HelloNetworkHelper(config)
+        net_helper.mf_config.processor.tokenizer.vocab_file = tokenizer_path
         ds = create_hello_ds(tokenizer, 1)
         network = ptq.apply(network, net_helper, datasets=ds)
         network = ptq.convert(network)
@@ -222,14 +220,12 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
     example = "hello"
     quant(fp16_ckpt_path, fp16_config_path)
     foutput, _ = fp16_infer(example, fp16_ckpt_path, fp16_config_path)
-    qoutput, _ = w8a16c8_infer(example, w8a16c8_ckpt_path, w8a16c8_config_path)
+    qoutput, _ = w8a16c8_infer(example, w8a16c8_ckpt_path, fp16_config_path)
     npfoutput = np.array(foutput)
     npqoutput = np.array(qoutput)
     print(npfoutput)
     print(npqoutput)
-    if not np.allclose(npqoutput[:, :30], npfoutput[:, :30], 0, 0):
-        return False
-    return relative_tolerance_acceptable(np.array(qoutput), np.array(foutput), 25.3)
+    return np.allclose(npqoutput[:, :75], npfoutput[:, :75], 0, 0)
 
 
 @pytest.mark.level0
