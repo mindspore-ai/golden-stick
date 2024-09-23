@@ -12,7 +12,7 @@
 
 ### 设计思路
 
-![架构图](../../../docs/images/zh_cn/ptq/ptq/arch.png)
+![架构图](images/zh_cn/arch.png)
 
 分层实现量化算法，主要分为config、量化算法、算法模块、量化Cell、量化工具函数。
 

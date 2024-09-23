@@ -12,7 +12,7 @@
 
 发现冗余的卷积核是结构化剪枝的关键一步，常用的方法可分为两种：第一种方法不需要训练数据，通过定义一些卷积核重要性的假设，来判定不同卷积核的重要性。一个典型的假设是范数小的卷积核不重要，砍掉一些范数小的卷积核不会太多地影响网络的表现。 还有一类方法是数据驱动的方法，引入训练数据来学习不同卷积核的重要性。比如通过给每个卷积核引入额外的控制系数，学习这些控制系数，来度量不同卷积核的重要性，小的控制系数对应的卷积核被认为不重要。
 
-![](../../../docs/images/zh_cn/pruner/scop/scop.png)
+![](images/zh_cn/scop.png)
 
 一个典型的神经网络剪枝方法：基于科学控制法的神经网络剪枝（SCOP: Scientific Control for Reliable Neural Network Pruning）是在数据驱动下，通过引入高仿特征作为参照，通过设置对照实验来减少各种无关因素对剪枝过程的干扰，提高剪枝结果的可靠性。整体流程如上图所示，真实数据（Real data）和高仿数据（Knockoff data）同时输入到网络中，分别生成真实特征和高仿特征。如果一个卷积核对应的高仿特征抑制住了真实特征，则认为这个卷积核是冗余的，应当被删除。
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     export(network, inputs, file_name="ResNet_SCOP", file_format='MINDIR')
 ```
 
-导出剪枝模型后，请[使用MindSpore进行推理](https://www.mindspore.cn/docs/zh-CN/master/model_infer/ms_infer/overview.html)。
+导出剪枝模型后，请[使用MindSpore进行推理](https://www.mindspore.cn/docs/zh-CN/master/model_infer/ms_infer/llm_inference_overview.html)。
 
 ## 算法效果汇总
 

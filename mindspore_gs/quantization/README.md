@@ -18,7 +18,7 @@ Quantization is a process of approximating floating-point weights and inputs to 
 
 Quantization will cause accuracy loss, which is equivalent to introducing noise to a network. However, a neural network is generally insensitive to noise. As long as a quantization degree is well controlled, impact on precision of an advanced task may be very small. The performance of the quantized network can be greatly improved compared to the original network by using INT8 operations instead of the original FP32 computation in network inference.
 
-![](../../docs/images/en/quantization/bit_define.png)
+![](images/en/bit_define.png)
 
 As shown in the preceding figure, compared with the FP32 type, low-precision data representation types such as FP16 and INT8 occupy less space. Replacing the high-precision data representation type with the low-precision data representation type can greatly reduce the storage space and transmission time. Low-bit computing has higher performance. Compared with FP32, INT8 has a three-fold or even higher acceleration ratio. For the same computing, INT8 has obvious advantages in power consumption.
 

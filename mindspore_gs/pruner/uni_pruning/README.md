@@ -102,7 +102,7 @@ If you want to prune already trained model, you just have to load pretrained wei
 
 ## Summary
 
-![results](../../../docs/images/en/pruner/unipruning/results.png)
+![results](images/en/results.png)
 
 ## Ascend porting notes
 

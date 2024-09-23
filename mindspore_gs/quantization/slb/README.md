@@ -12,7 +12,7 @@ Searching for low-bit weights (SLB) [3] is a weight quantization algorithm devel
 
 The figure on the left shows the traditional quantization algorithm used to do binary quantization. During training, the floating-point weights are updated with inaccurate gradients. Finally, the floating-point weights are processed by binarization (sigmoid function) to obtain the quantized weights. The figure on the right shows the SLB quantization algorithm used to do binary quantization. It uses the continuous relaxation strategy to search for discrete weights, optimizes the weight probability matrix of discrete weights during training, and selects discrete weights based on the probability to implement quantization. The single value corresponding to the red dots in the left figure is obtained by the sigmoid function, which represents the probability that the weight is quantized to -1. The single value corresponding to the blue dots is obtained by the sigmoid function, which represents the probability that the weight is quantized to +1. Inaccurate gradient update in traditional quantization algorithm will affect the update of floating point weight, resulting in a large deviation in the probability here. The two values corresponding to the red and blue dots in the right figure are obtained by the softmax function and represent the probability that the weight is quantized to -1 or +1. By avoiding inaccurate gradient updates, the probability is more accurate.
 
-![SLB algorithm comparison](../../../docs/images/en/quantization/slb/slb_1.png)
+![SLB algorithm comparison](images/en/slb_1.png)
 
 ### Temperature Factor
 
@@ -20,11 +20,11 @@ In classification tasks, softmax distribution is used to calculate the probabili
 
 The formula on the left is a standard softmax function, and the formula on the right is the softmax function after the temperature factor is introduced in the SLB algorithm.
 
-![Softmax function](../../../docs/images/en/quantization/slb/slb_2.png)
+![Softmax function](images/en/slb_2.png)
 
 The following figure shows the change process of softmax distribution when the temperature factor is gradually adjusted. The rightmost figure shows the one-hot distribution.
 
-![Softmax distribution change](../../../docs/images/en/quantization/slb/slb_3.png)
+![Softmax distribution change](images/en/slb_3.png)
 
 ## Algorithm Features
 

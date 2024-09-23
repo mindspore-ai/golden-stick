@@ -35,7 +35,7 @@ MindSpore Golden Stick is a model compression algorithm set jointly designed and
 
 5. In the outermost layer, MindSpore Golden Stick encapsulates a set of concise user interface.
 
-![MindSpore_GS_Architecture](docs/images/en/golden-stick-arch.png)
+![MindSpore_GS_Architecture](docs/en/images/golden-stick-arch.png)
 
 > The architecture diagram is the overall picture of MindSpore Golden Stick, which includes the features that have been implemented in the current version and the capabilities planned in RoadMap. Please refer to release notes for available features in current version.
 
@@ -53,7 +53,7 @@ In addition to providing rich model compression algorithms, an important design 
 
 ## General Process of Applying the MindSpore Golden Stick
 
-![workflow](docs/images/en/workflow.png)
+![workflow](docs/en/images/workflow.png)
 
 1. Compress Phase
 
@@ -65,17 +65,17 @@ In addition to providing rich model compression algorithms, an important design 
 
 > - For details about how to apply the MindSpore Golden Stick, see the detailed description and sample code in each algorithm section.
 > - For details about the "ms.export" step in the process, see [Exporting MINDIR Model](https://www.mindspore.cn/tutorials/en/master/beginner/save_load.html#saving-and-loading-mindir).
-> - For details about the "MindSpore infer" step in the process, see [MindSpore Inference Runtime](https://mindspore.cn/docs/en/master/model_infer/ms_infer/overview.html).
+> - For details about the "MindSpore infer" step in the process, see [MindSpore Inference Runtime](https://www.mindspore.cn/docs/en/master/model_infer/ms_infer/llm_inference_overview.html).
 
 ## Documents
 
 ### Installation
 
-Please refer to [MindSpore Golden Stick Installation](docs/docs/docs_en/install.md).
+Please refer to [MindSpore Golden Stick Installation](docs/en/install.md).
 
 ### Quick Start
 
-Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/master/docs/golden_stick/docs/source_zh_cn/quantization/simqat.md) as an example for demonstrating how to use MindSpore Golden Stick.
+Take [Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quantization/README.md) as an example for demonstrating how to use MindSpore Golden Stick.
 
 ### Compression Algorithm
 
@@ -90,7 +90,7 @@ Take [Simulated Quantization (SimQAT)](https://gitee.com/mindspore/docs/blob/mas
 
 ### Model Deployment
 
-Please refer to [MindSpore Golden Stick Model Deployment](docs/docs/docs_en/deployment/overview.md)。
+Please refer to [MindSpore Golden Stick Model Deployment](docs/en/deployment/overview.md)。
 
 ## Community
 
