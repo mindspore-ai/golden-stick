@@ -313,7 +313,7 @@ def test_ptq_simplenet():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8'])
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_Dynamic'])
 def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with one cards.
@@ -343,7 +343,7 @@ def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack'])
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack', 'A8W8_Dynamic'])
 def test_ptq_llama2_predict_2stage_2p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with two cards.

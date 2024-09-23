@@ -25,14 +25,14 @@ from mindspore.nn import Cell
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.ops.operations._infer_ops import QuantV2
-from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
+from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindformers.experimental.parallel_core.pynative.parallel_state import (
     get_tensor_model_parallel_group, get_tensor_model_parallel_world_size)
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType, QuantType
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import LayerType, NetworkHelper
@@ -74,10 +74,17 @@ def need_insert_ops_for_smooth(cfg):
         return False
     if cfg.smooth_to_pre_layer:
         return False
-    # when set no smooth_to_pre_layer, w8a8 fusion the smooth_scale with quantv2 ops, not need insert ops
+    # when set no smooth_to_pre_layer, w8a8 fusion the smooth_scale with quantv2 ops and
+    # w8a8_dynamic use smooth_scale in dynamic_quant ops, not need insert ops
     if cfg.act_quant_dtype == dtype.int8 and cfg.weight_quant_dtype == dtype.int8:
         return False
     return True
+
+
+def need_smooth_params_for_a8w8_dynamic(cfg):
+    '''need_smooth_params_for_a8w8_dynamic'''
+    return cfg.act_weight_quant_type == QuantType.A8W8_DYNAMIC and cfg.outliers_suppression == \
+        OutliersSuppressionType.SMOOTH and not cfg.smooth_to_pre_layer
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
@@ -368,11 +375,11 @@ class QuantLinearCell(WrapperLinearCell):
         self.w_scale = Parameter(initializer('ones', (self.oc), dtype=self.compute_type))
         self.x_scale = Parameter(initializer('ones', (1,), dtype=self.compute_type))
         self.w_zp = Parameter(initializer('ones', (self.oc), dtype=dtype.int32))
-
-        self.a16w8 = self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
-        self.a8w8 = self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
+        self.quant_type = cfg.act_weight_quant_type
+        if self.quant_type is QuantType.UNDEFINED:
+            raise ValueError("config quant type is undefined in QuantLinearCell, config is {cfg}.")
         self.bias = None
-        if self.a8w8:
+        if self.quant_type is QuantType.A8W8:
             self.bias_name = self.layer.bias.name if self.layer.has_bias else linear.weight.name + "_bias"
             self.bias = Parameter(initializer("ones", (self.oc), self.compute_type), name=self.bias_name)
 
@@ -391,8 +398,6 @@ class QuantLinearCell(WrapperLinearCell):
     #pylint: disable=protected-access
     def quant_weight(self):
         """quant weight"""
-        if not self.a16w8 and not self.a8w8:
-            return
         self.quantizer_w_max = self.w_quant_max(self.layer.weight, self.weight_quantizer_min_max_axis,
                                                 keepdims=True)[0]
         self.quantizer_w_min = self.w_quant_min(self.layer.weight, self.weight_quantizer_min_max_axis,
@@ -405,7 +410,7 @@ class QuantLinearCell(WrapperLinearCell):
         self.weight.set_data(Tensor(weight.asnumpy(), dtype=dtype.int8))
         self.w_scale.set_data(Tensor(np.squeeze(w_scale), dtype=self.compute_type))
         self.w_zp.set_data(Tensor(np.squeeze(w_zp), dtype=dtype.int32))
-        if self.a8w8:
+        if self.quant_type is QuantType.A8W8:
             self.quantizer_x_max = self.x_quant_max(self.cat_samples)[0]
             self.quantizer_x_min = self.x_quant_min(self.cat_samples)[0]
             x_scale, x_zp = cal_quantization_params(self.quantizer_x_min.asnumpy(), self.quantizer_x_max.asnumpy(),
@@ -436,8 +441,9 @@ class QuantLinearCell(WrapperLinearCell):
             self.input_scale.set_data(Tensor(input_scale, dtype=dtype.float16))
             input_zp = np.array([x_zp] * len(input_scale)).astype(np.int8)
             self.input_zp.set_data(Tensor(input_zp, dtype=dtype.int8))
-        if need_insert_ops_for_smooth(self.cfg):
-            self.smooth_scale = Parameter(Tensor(self.layer.matmul.mm.smooth_scale.asnumpy(), dtype=self.compute_type))
+        if need_insert_ops_for_smooth(self.cfg) or need_smooth_params_for_a8w8_dynamic(self.cfg):
+            self.smooth_scale.set_data(Tensor(self.layer.matmul.mm.smooth_scale.asnumpy(), dtype=self.compute_type))
+
     def process(self):
         super(QuantLinearCell, self).process()
         self.quant_weight()
@@ -466,11 +472,12 @@ class DeployLinearCell(Cell):
         self._layer = linear
         self.cfg = cfg
         self.quant = QuantV2()
-        self.a8w8 = self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
-        self.a16w8 = self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
+        self.quant_type = cfg.act_weight_quant_type
+        if self.quant_type is QuantType.UNDEFINED:
+            raise ValueError("config quant type is undefined in DeployLinearCell, config is {cfg}.")
         is_deploy = cfg.mode == PTQMode.DEPLOY
         self.need_insert_ops_for_smooth = need_insert_ops_for_smooth(cfg)
-        if self.a8w8:
+        if self.quant_type is QuantType.A8W8:
             if linear.has_bias is False:
                 self.layer.has_bias = True
                 self.layer.bias_add = msops.Add()
@@ -478,8 +485,12 @@ class DeployLinearCell(Cell):
             self.input_scale = input_scale
             self.input_zp = input_zp
             qmm = AllQuantMatmul(is_deploy, x_scale.asnumpy(), w_scale.asnumpy(), transpose_b=self.layer.transpose_b)
-        elif self.a16w8:
+        elif self.quant_type is QuantType.A16W8:
             qmm = WeightQuantMatmul(is_deploy, w_scale.asnumpy(), w_zp.asnumpy(), transpose_b=self.layer.transpose_b)
+        elif self.quant_type is QuantType.A8W8_DYNAMIC:
+            need_smooth = need_smooth_params_for_a8w8_dynamic(self.cfg)
+            qmm = DynamicQuantMatmul(is_deploy, need_smooth, w_scale.asnumpy(),
+                                     transpose_b=self.layer.transpose_b, smooth_scale=smooth_scale)
         if self.need_insert_ops_for_smooth:
             self.smooth_scale = smooth_scale
         self.layer.weight = weight
@@ -497,7 +508,7 @@ class DeployLinearCell(Cell):
         """Forward process, x should be a tensor"""
         ori_dtype = F.dtype(x)
         x = self.layer.cast(x, self.layer.dtype)
-        if self.a8w8:
+        if self.quant_type == QuantType.A8W8:
             x = self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         if self.need_insert_ops_for_smooth:
             x = msops.mul(x, self.smooth_scale)
@@ -536,7 +547,7 @@ class DeployLinearCell(Cell):
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
             input_parallel = self.layer.gather_from_sp_region(input_parallel)
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
-        if self.a8w8:
+        if self.quant_type == QuantType.A8W8:
             input_parallel = self.quant(input_parallel, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         if self.need_insert_ops_for_smooth:
             input_parallel = msops.mul(input_parallel, self.smooth_scale)
@@ -569,7 +580,7 @@ class DeployLinearCell(Cell):
 
         origin_dtype = F.dtype(input_parallel)
         input_parallel = self.layer.cast(input_parallel, self.layer.compute_dtype)
-        if self.a8w8:
+        if self.quant_type == QuantType.A8W8:
             input_parallel = self.quant(input_parallel, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
         if self.need_insert_ops_for_smooth:
             input_parallel = msops.mul(input_parallel, self.smooth_scale)
@@ -600,6 +611,22 @@ class DeployLinearCell(Cell):
             x = self.row_linear_forward(x)
         return x
 
+    def compute_a8w8_dynamic_sharded_state_dict(self, state_dict):
+        '''compute_a8w8_dynamic_sharded_state_dict'''
+        if self.is_colparallel:
+            weight_scale_shard = (self.layer.tensor_parallel_group_size,)
+        elif self.is_rowparallel:
+            weight_scale_shard = (1,)
+        state_dict[self.layer.matmul.weight_scale.name] = {'shape': self.layer.matmul.weight_scale.shape,
+                                                           'shard': weight_scale_shard}
+        if need_smooth_params_for_a8w8_dynamic(self.cfg):
+            if self.is_colparallel:
+                smooth_scale_shard = (1,)
+            elif self.is_rowparallel:
+                smooth_scale_shard = (self.layer.tensor_parallel_group_size,)
+            state_dict[self.layer.matmul.smooth_scale.name] = {'shape': self.layer.matmul.smooth_scale.shape,
+                                                               'shard': smooth_scale_shard}
+
     def sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
         state_dict = {}
@@ -616,7 +643,7 @@ class DeployLinearCell(Cell):
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape, 'shard': (1,)}
         state_dict[self.layer.weight.name] = {'shape': self.layer.weight.shape, 'shard': w_shard}
 
-        if self.a8w8:
+        if self.quant_type is QuantType.A8W8:
             if self.is_colparallel:
                 input_scale_shard = (1,)
                 input_zp_shard = (1,)
@@ -629,7 +656,7 @@ class DeployLinearCell(Cell):
             state_dict[self.input_zp.name] = {'shape': self.input_zp.shape, 'shard': input_zp_shard}
             state_dict[self.layer.matmul.dequant_scale.name] = {'shape': self.layer.matmul.dequant_scale.shape,
                                                                 'shard': dequant_scale_shard}
-        else:
+        elif self.quant_type is QuantType.A16W8:
             if self.is_colparallel:
                 t_scale_shard = (self.layer.tensor_parallel_group_size,)
                 t_zp_shard = {self.layer.tensor_parallel_group_size}
@@ -640,6 +667,8 @@ class DeployLinearCell(Cell):
                                                           'shard': t_scale_shard}
             state_dict[self.layer.matmul.t_zp_neg.name] = {'shape': self.layer.matmul.t_zp_neg.shape,
                                                            'shard': t_zp_shard}
+        elif self.quant_type is QuantType.A8W8_DYNAMIC:
+            self.compute_a8w8_dynamic_sharded_state_dict(state_dict)
         if not self.need_insert_ops_for_smooth:
             return state_dict
         if self.is_colparallel:
@@ -648,6 +677,25 @@ class DeployLinearCell(Cell):
             smooth_scale_shard = (self.layer.tensor_parallel_group_size,)
         state_dict[self.smooth_scale.name] = {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}
         return state_dict
+
+
+class DynamicQuantMatmul(Cell):
+    """dynamic quant"""
+
+    def __init__(self, is_deploy, need_smooth, weight_scale,
+                 transpose_a=False, transpose_b=False, dst_dtype=dtype.float16, smooth_scale=None):
+        super().__init__()
+        if is_deploy:
+            self.weight_scale = Parameter(initializer('ones', weight_scale.shape, dtype.float32))
+        else:
+            self.weight_scale = Parameter(Tensor(weight_scale, dtype=dtype.float32))
+        self.dynamic_quant = DynamicQuantExt()
+        self.smooth_scale = smooth_scale if need_smooth else None
+        self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
+
+    def construct(self, x, quant_weight):
+        qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
+        return self.qbmm(qx, quant_weight, self.weight_scale, None, None, x_scale)
 
 
 class WeightQuantMatmul(Cell):
