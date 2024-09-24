@@ -38,7 +38,7 @@ def test_mf_llama_net_helper_inputs():
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml")
+    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_1p.yaml")
     with pytest.raises(TypeError):
         MFLlama2Helper(1)
     cfg = MindFormerConfig(config_path)
@@ -49,6 +49,8 @@ def test_mf_llama_net_helper_inputs():
     with pytest.raises(TypeError):
         _ = helper.get_spec(1)
 
+    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    helper.mf_config.processor.tokenizer.vocab_file = tokenizer_path
     tokenizer = helper.create_tokenizer()
     assert isinstance(tokenizer, LlamaTokenizer)
     input_ids = tokenizer.encode('Hello', add_special_tokens=True)
@@ -92,7 +94,7 @@ def test_mf_llama_net_helper():
         MFLlama2Helper(1)
 
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml")
+    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_1p.yaml")
     cfg = MindFormerConfig(config_path)
     helper = MFLlama2Helper(cfg)
     assert isinstance(helper.mf_config, MindFormerConfig)

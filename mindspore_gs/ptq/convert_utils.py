@@ -354,7 +354,7 @@ def convert_to_dequant_bmm(input_qparams, weight_qparams, weight_quant, offset=N
         if new_bias_need_allreduce:
             t_new_bias = Tensor(new_bias)
             reduce_sum = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)
-            t_new_bias = reduce_sum(t_new_bias)
+            t_new_bias, _ = reduce_sum(t_new_bias)
             new_bias = t_new_bias.asnumpy()
         return new_bias
 

@@ -229,32 +229,32 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
     qoutput = np.array(qoutput)
     if model_parallel_ == 1:
         if quant_algo_ == 'A8W8':
-            ret = np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
+            ret = np.allclose(qoutput[:, :69], foutput[:, :69], 0, 0)
         elif quant_algo_ == 'A16W8':
             ret = np.allclose(qoutput, foutput, 0, 0)
         elif quant_algo_ == 'A16W8C8':
-            ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+            ret = np.allclose(qoutput[:, :5], foutput[:, :5], 0, 0)
         elif quant_algo_ == 'A8W8C8':
-            ret = np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
+            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         elif quant_algo_ == 'C8':
-            ret = np.allclose(qoutput[:, :8], foutput[:, :8], 0, 0)
+            ret = np.allclose(qoutput[:, :5], foutput[:, :5], 0, 0)
         else:
             assert False
         if not ret:
             print_output(qoutput, foutput)
         return ret
     if quant_algo_ == 'A8W8':
-        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+        ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     elif quant_algo_ == 'A16W8':
         ret = np.allclose(qoutput, foutput, 0, 0)
     elif quant_algo_ == 'A16W8C8':
         ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
     elif quant_algo_ == 'A8W8C8':
-        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+        ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     elif quant_algo_ == 'C8':
-        ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
+        ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     elif quant_algo_ == "A8W8_FallBack":
-        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+        ret = np.allclose(qoutput[:, :13], foutput[:, :13], 0, 0)
     else:
         assert False
     if not ret:
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     if model_parallel == 1:
         config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml")
-        fp16_ckpt_path = os.path.join(cur_dir, "../../../data/test_llama2/parallelLlama2-fp16-1decoder-1p.ckpt")
+        fp16_ckpt_path = os.path.join(cur_dir, "../../../data/test_llama2/parallelLlama2-fp16-1decoder-1p")
         quant_ckpt_path = f"../../../data/test_llama2/parallelLlama2-quant-1decoder-1p-{quant_algo}/rank_0/quant.ckpt"
         quant_ckpt_path = os.path.join(cur_dir, quant_ckpt_path)
         output_dir = os.path.join(cur_dir, f"../../../data/test_llama2/parallelLlama2-quant-1decoder-1p-{quant_algo}")

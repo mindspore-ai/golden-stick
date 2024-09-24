@@ -55,7 +55,7 @@ class MinFromTensorParallelRegion(nn.Cell):
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
-        output = self.all_reduce(output_parallel)
+        output, _ = self.all_reduce(output_parallel)
         return output, _
 
 
@@ -67,7 +67,7 @@ class MaxFromTensorParallelRegion(nn.Cell):
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
-        output = self.all_reduce(output_parallel)
+        output, _ = self.all_reduce(output_parallel)
         return output, _
 
 
@@ -320,7 +320,7 @@ class QuantLinearCell(WrapperLinearCell):
         if new_bias_need_allreduce:
             t_new_bias = Tensor(new_bias)
             reduce_sum = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)
-            t_new_bias = reduce_sum(t_new_bias)
+            t_new_bias, _ = reduce_sum(t_new_bias)
             new_bias = t_new_bias.asnumpy()
         return new_bias
 
@@ -601,6 +601,7 @@ class WeightQuantMatmul(Cell):
         x = msops.reshape(x, (-1, self.ic))
         output = self.weight_qbmm(x, weight, self.t_scale, self.t_zp_neg, None, None, None)
         return output.astype(self.dst_dtype)
+
 
 class AllQuantMatmulDeploy(Cell):
     """quant weight"""

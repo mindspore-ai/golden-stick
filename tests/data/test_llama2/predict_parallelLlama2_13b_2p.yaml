@@ -83,7 +83,7 @@ model:
     type: LlamaConfig
     batch_size: 1 # add for increase predict
     seq_length: 1024
-    hidden_size: 40
+    hidden_size: 64
     num_layers: 1
     num_heads: 4
     max_position_embedding: 4096

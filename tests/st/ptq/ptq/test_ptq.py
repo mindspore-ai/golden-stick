@@ -198,7 +198,7 @@ def test_context_mode_error():
     ptq = PTQ(config)
 
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    config_path_ = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_fp16_910b_1p.yaml")
+    config_path_ = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_1p.yaml")
     helper = MFLlama2Helper(config_path_)
     set_context(mode=GRAPH_MODE, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"},
                 max_device_memory=helper.mf_config.context.max_device_memory)
@@ -313,8 +313,8 @@ def test_ptq_simplenet():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W8'])
-def test_ptq_llama2_predict_2stage_1p_run_a8w8(quant_algo):
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8'])
+def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with one cards.
     Description: apply OQ on llama2 and check accuracy.
@@ -326,127 +326,11 @@ def test_ptq_llama2_predict_2stage_1p_run_a8w8(quant_algo):
     time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8_predict_llama2_1p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_llama2_1p_logs "
         f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
-        log_file = open("./test_ptq_A8W8_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A16W8'])
-def test_ptq_llama2_predict_2stage_1p_run_a16w8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with one cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8_predict_llama2_1p_logs "
-        f"python {run_file} -m 1 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_A16W8_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W8C8'])
-def test_ptq_llama2_predict_2stage_1p_run_a8w8c8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with one cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8C8_predict_llama2_1p_logs "
-        f"python {run_file} -m 1 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_A8W8C8_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A16W8C8'])
-def test_ptq_llama2_predict_2stage_1p_run_a16w8c8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with one cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8C8_predict_llama2_1p_logs "
-        f"python {run_file} -m 1 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_A16W8C8_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['C8'])
-def test_ptq_llama2_predict_2stage_1p_run_c8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with one cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_C8_predict_llama2_1p_logs "
-        f"python {run_file} -m 1 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_C8_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
+        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
         for line in log_file:
             print(line, flush=True)
         log_file.close()
@@ -458,8 +342,8 @@ def test_ptq_llama2_predict_2stage_1p_run_c8(quant_algo):
 
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8'])
-def test_ptq_llama2_predict_2stage_2p_run_a8w8(quant_algo):
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack'])
+def test_ptq_llama2_predict_2stage_2p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply OQ on llama2 and check accuracy.
@@ -472,165 +356,11 @@ def test_ptq_llama2_predict_2stage_2p_run_a8w8(quant_algo):
     time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8_predict_llama2_2p_logs "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_llama2_2p_logs "
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
-        log_file = open("./test_ptq_A8W8_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A16W8'])
-def test_ptq_llama2_predict_2stage_2p_run_a16w8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    os.environ['quant_algo'] = f"{quant_algo}"
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8_predict_llama2_2p_logs "
-        f"python {run_file} -m 2 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_A16W8_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8C8'])
-def test_ptq_llama2_predict_2stage_2p_run_a8w8c8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    os.environ['quant_algo'] = f"{quant_algo}"
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8C8_predict_llama2_2p_logs "
-        f"python {run_file} -m 2 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_A8W8C8_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A16W8C8'])
-def test_ptq_llama2_predict_2stage_2p_run_a16w8c8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    os.environ['quant_algo'] = f"{quant_algo}"
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A16W8C8_predict_llama2_2p_logs "
-        f"python {run_file} -m 2 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_A16W8C8_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['C8'])
-def test_ptq_llama2_predict_2stage_2p_run_c8(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    os.environ['quant_algo'] = f"{quant_algo}"
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_C8_predict_llama2_2p_logs "
-        f"python {run_file} -m 2 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_C8_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
-    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8_FallBack'])
-def test_ptq_llama2_predict_2stage_2p_run_a8w8_fallback(quant_algo):
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply OQ on llama2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    os.environ['quant_algo'] = f"{quant_algo}"
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_A8W8_FallBack_predict_llama2_2p_logs "
-        f"python {run_file} -m 2 -a {quant_algo}"
-    )
-    if return_code != 0:
-        log_file = open("./test_ptq_A8W8_FallBack_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
+        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
         for line in log_file:
             print(line, flush=True)
         log_file.close()
