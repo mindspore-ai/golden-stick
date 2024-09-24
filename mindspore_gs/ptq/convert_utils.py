@@ -46,7 +46,7 @@ class AntiQuantCell(Cell):
         scale = self.reshape(scale, self._pre_shape)
         zp = self.reshape(zp, self._pre_shape)
         x = self.cast(x, self.outdtype)
-        x = self.add(x, zp)
+        x = self.sub(x, zp)
         x = self.mul(x, scale)
         x = self.cast(x, self.outdtype)
         return x

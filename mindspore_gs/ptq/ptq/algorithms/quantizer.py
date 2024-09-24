@@ -21,7 +21,7 @@ from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
-from mindspore_gs.ptq.processor import Processor, transform_network_inplace
+from mindspore_gs.ptq.processor import Processor
 
 
 class Quantizer(Algorithm):
@@ -91,11 +91,3 @@ class Quantizer(Algorithm):
             warn_str = f"No layer found in network is suitable to quantize, please check network and opname_blacklist" \
                        f"({self._config.opname_blacklist})."
             logger.warning(warn_str)
-
-    def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
-        """process"""
-        def transform_fn(cell_name, cell):
-            logger.info(f"Quantize cell {cell_name}")
-            cell.process()
-
-        transform_network_inplace(decoder_layer, WrapperCell, transform_fn, decoder_layer_name)

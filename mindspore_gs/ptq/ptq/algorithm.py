@@ -20,7 +20,7 @@ from typing import Tuple
 from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq.processor import Processor, transform_network_inplace
 from mindspore_gs.ptq.ptq_config import LayerQuantizeAlgo, OutliersSuppressionType
 from mindspore_gs.common import logger
 from .wrapper_cell import WrapperCell
@@ -49,9 +49,18 @@ class Algorithm:
         """replace"""
         raise NotImplementedError
 
-    def process(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
+    @classmethod
+    def class_name(cls):
+        '''class name'''
+        return cls.__name__
+
+    def process(self, decoder_layer_name: str, decoder_layer):
         """process"""
-        raise NotImplementedError
+        def transform_fn(cell_name, cell):
+            logger.info(f"process {cell_name} in {self.class_name()}")
+            cell.process()
+
+        transform_network_inplace(decoder_layer, WrapperCell, transform_fn, decoder_layer_name)
 
     def deploy(self, decoder_layer_name, decoder_layer):
         """deploy"""

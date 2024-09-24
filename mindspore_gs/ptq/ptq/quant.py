@@ -30,7 +30,7 @@ from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.processor import Processor
 from .algorithm import Algorithm
-from .algorithms import LinearSmoother, Quantizer, Deployer
+from .algorithms import LinearSmoother, Quantizer
 
 
 class InputCatcher(Cell):
@@ -102,18 +102,14 @@ class PTQ(CompAlgo):
 
     def _build_pipeline(self):
         """build pipline"""
-        if self._config.mode == PTQMode.QUANTIZE:
-            if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
-                logger.info("Adding LinearSmoother to pipeline.")
-                self.pipeline.append(LinearSmoother(self._config))
-            if self._config.act_quant_dtype == dtype.int8 or \
-                self._config.weight_quant_dtype == dtype.int8 or \
-                    self._config.kvcache_quant_dtype == dtype.int8:
-                logger.info("Adding Quantizer to pipeline.")
-                self.pipeline.append(Quantizer(self._config))
-        elif self._config.mode == PTQMode.DEPLOY:
-            logger.info("Adding Deploy to pipeline.")
-            self.pipeline.append(Deployer(self._config))
+        if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
+            logger.info("Adding LinearSmoother to pipeline.")
+            self.pipeline.append(LinearSmoother(self._config))
+        if self._config.act_quant_dtype == dtype.int8 or \
+            self._config.weight_quant_dtype == dtype.int8 or \
+                self._config.kvcache_quant_dtype == dtype.int8:
+            logger.info("Adding Quantizer to pipeline.")
+            self.pipeline.append(Quantizer(self._config))
 
     def _load_mindformers_plugin(self):
         for algorithm in self.pipeline:
@@ -194,7 +190,6 @@ class PTQ(CompAlgo):
                 layer_name, layer = layers[i]
                 for processor in self.pipeline:
                     processor.replace(layer_name, layer)
-                    processor.process(layer_name, layer)
                     processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
@@ -246,7 +241,7 @@ class PTQ(CompAlgo):
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
                 start_time = time.time()
-                processor.process(layer_name, layer, network_helper)
+                processor.process(layer_name, layer)
                 processor.deploy(layer_name, layer)
                 network.update_parameters_name()
                 logger.info(f"{i}th layer do {type(processor)} time cost {time.time() - start_time}")
