@@ -30,7 +30,8 @@ from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_group
+from mindformers.experimental.parallel_core.pynative.parallel_state import (
+    get_tensor_model_parallel_group, get_tensor_model_parallel_world_size)
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
@@ -541,6 +542,48 @@ class DeployLinearCell(WrapperLinearCell):
             x = self.row_linear_forward(x)
         return x
 
+    def sharded_state_dict(self):
+        """provide the sharded state dict based on the config"""
+        state_dict = {}
+        if self.is_colparallel:
+            w_shard = (self.layer.tensor_parallel_group_size, 1) if self.layer.transpose_b \
+                  else (1, self.layer.tensor_parallel_group_size)
+            if self.layer.has_bias:
+                state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape,
+                                                    'shard': (self.layer.tensor_parallel_group_size,)}
+        elif self.is_rowparallel:
+            w_shard = (1, self.layer.tensor_parallel_group_size) if self.layer.transpose_b \
+                  else (self.layer.tensor_parallel_group_size, 1)
+            if self.layer.has_bias:
+                state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape, 'shard': (1,)}
+        state_dict[self.layer.weight.name] = {'shape': self.layer.weight.shape, 'shard': w_shard}
+
+        if self.a8w8:
+            if self.is_colparallel:
+                input_scale_shard = (1,)
+                input_zp_shard = (1,)
+                dequant_scale_shard = (self.layer.tensor_parallel_group_size,)
+            elif self.is_rowparallel:
+                input_scale_shard = (self.layer.tensor_parallel_group_size,)
+                input_zp_shard = (self.layer.tensor_parallel_group_size,)
+                dequant_scale_shard = (1,)
+            state_dict[self.input_scale.name] = {'shape': self.input_scale.shape, 'shard': input_scale_shard}
+            state_dict[self.input_zp.name] = {'shape': self.input_zp.shape, 'shard': input_zp_shard}
+            state_dict[self.layer.matmul.dequant_scale.name] = {'shape': self.layer.matmul.dequant_scale.shape,
+                                                                'shard': dequant_scale_shard}
+        else:
+            if self.is_colparallel:
+                t_scale_shard = (self.layer.tensor_parallel_group_size,)
+                t_zp_shard = {self.layer.tensor_parallel_group_size}
+            elif self.is_rowparallel:
+                t_scale_shard = (1,)
+                t_zp_shard = (1,)
+            state_dict[self.layer.matmul.t_scale.name] = {'shape': self.layer.matmul.t_scale.shape,
+                                                          'shard': t_scale_shard}
+            state_dict[self.layer.matmul.t_zp_neg.name] = {'shape': self.layer.matmul.t_zp_neg.shape,
+                                                           'shard': t_zp_shard}
+        return state_dict
+
 
 class AllQuantMatmul(Cell):
     """quant act and weight"""
@@ -580,12 +623,13 @@ class AllQuantMatmul(Cell):
 class WeightQuantMatmul(Cell):
     """quant batch matmul"""
 
-    def __init__(self, t_scale, t_zp, in_channels=None, transpose_a=False, transpose_b=False, dst_type=dtype.float16):
+    def __init__(self, t_scale, t_zp, in_channels=None, transpose_a=False, transpose_b=False,
+                 dst_type=dtype.float16):
         super().__init__()
         self.dst_dtype = dst_type
         self.ic = in_channels
-        self.t_scale = Parameter(Tensor(np.squeeze(t_scale), dtype=self.dst_dtype))
-        self.t_zp_neg = Parameter(Tensor(np.squeeze(t_zp) * -1, dtype=self.dst_dtype))
+        self.t_scale = Parameter(Tensor(np.squeeze(t_scale), dtype=self.dst_dtype), name="t_scale")
+        self.t_zp_neg = Parameter(Tensor(np.squeeze(t_zp) * -1, dtype=self.dst_dtype), name="t_zp_neg")
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b)
 
     def construct(self, x, weight):
@@ -607,7 +651,7 @@ class AllQuantMatmulDeploy(Cell):
         self.oc = out_channels
         dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
         scale_i64 = NumpyQuantOps.trans_fp32_to_i64(np.squeeze(dequant_scale))
-        self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64))
+        self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64), name='dequant_scale')
         self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
         if offset is None:
             self.offset = None
@@ -819,6 +863,7 @@ class PagedAttentionDeployBase(Cell):
                                          name=self.layer.key_cache.name, requires_grad=False)
         self.layer.value_cache = Parameter(initializer('ones', self.layer.value_cache.shape, dtype.int8),
                                            name=self.layer.value_cache.name, requires_grad=False)
+        self.tensor_parallel_group_size = get_tensor_model_parallel_world_size()
 
     def weight_quantizer(self):
         return self._weight_quantizer
@@ -847,6 +892,24 @@ class PagedAttentionDeployBase(Cell):
     def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
         """The forward compute of KVCache for Paged Attention with alibi tensor."""
         return NotImplementedError
+
+    def sharded_state_dict(self):
+        """provide the sharded state dict based on the config"""
+        key_t_scale_shard = (self.tensor_parallel_group_size,)
+        key_t_zp_shard = (self.tensor_parallel_group_size,)
+
+        value_t_scale_shard = (self.tensor_parallel_group_size,)
+        value_t_zp_shard = (self.tensor_parallel_group_size,)
+        state_dict = {}
+        state_dict[self.key_t_scale.name] = {'shape': self.key_t_scale.shape,
+                                             'shard': key_t_scale_shard}
+        state_dict[self.key_t_zp.name] = {'shape': self.key_t_zp.shape,
+                                          'shard': key_t_zp_shard}
+        state_dict[self.value_t_scale.name] = {'shape': self.value_t_scale.shape,
+                                               'shard': value_t_scale_shard}
+        state_dict[self.value_t_zp.name] = {'shape': self.value_t_zp.shape,
+                                            'shard': value_t_zp_shard}
+        return state_dict
 
 
 class PagedAttentionDeploy(PagedAttentionDeployBase):
@@ -890,3 +953,15 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
         return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
                                                      block_tables, batch_valid_length, self.key_value_t_scale,
                                                      self.key_value_t_zp, alibi_tensor)
+
+    def sharded_state_dict(self):
+        """provide the sharded state dict based on the config"""
+        key_value_t_scale_shard = (1, self.tensor_parallel_group_size)
+        key_value_t_zp_shard = (1, self.tensor_parallel_group_size)
+
+        state_dict = {}
+        state_dict[self.key_value_t_scale.name] = {'shape': self.key_value_t_scale.shape,
+                                                   'shard': key_value_t_scale_shard}
+        state_dict[self.key_value_t_zp.name] = {'shape': self.key_value_t_zp.shape,
+                                                'shard': key_value_t_zp_shard}
+        return state_dict
