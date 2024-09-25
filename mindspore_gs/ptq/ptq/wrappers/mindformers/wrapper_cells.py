@@ -900,6 +900,7 @@ class PagedAttentionDeployBase(Cell):
 
         value_t_scale_shard = (self.tensor_parallel_group_size,)
         value_t_zp_shard = (self.tensor_parallel_group_size,)
+
         state_dict = {}
         state_dict[self.key_t_scale.name] = {'shape': self.key_t_scale.shape,
                                              'shard': key_t_scale_shard}
@@ -909,6 +910,25 @@ class PagedAttentionDeployBase(Cell):
                                                'shard': value_t_scale_shard}
         state_dict[self.value_t_zp.name] = {'shape': self.value_t_zp.shape,
                                             'shard': value_t_zp_shard}
+        state_dict = self.sharded_input_quantizer_state_dict(state_dict)
+        return state_dict
+
+    def sharded_input_quantizer_state_dict(self, state_dict):
+        """provide the sharded state dict based on the config"""
+
+        key_input_quantizer_t_scale_shard = (self.tensor_parallel_group_size,)
+        key_input_quantizer_t_zp_shard = (self.tensor_parallel_group_size,)
+        value_input_quantizer_t_scale_shard = (self.tensor_parallel_group_size,)
+        value_input_quantizer_t_zp_shard = (self.tensor_parallel_group_size,)
+
+        state_dict[self._key_input_quantizer.t_scale.name] = {'shape': self._key_input_quantizer.t_scale.shape,
+                                                              'shard': key_input_quantizer_t_scale_shard}
+        state_dict[self._key_input_quantizer.t_zp.name] = {'shape': self._key_input_quantizer.t_zp.shape,
+                                                           'shard': key_input_quantizer_t_zp_shard}
+        state_dict[self._value_input_quantizer.t_scale.name] = {'shape': self._value_input_quantizer.t_scale.shape,
+                                                                'shard': value_input_quantizer_t_scale_shard}
+        state_dict[self._value_input_quantizer.t_zp.name] = {'shape': self._value_input_quantizer.t_zp.shape,
+                                                             'shard': value_input_quantizer_t_zp_shard}
         return state_dict
 
 
@@ -964,4 +984,5 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
                                                    'shard': key_value_t_scale_shard}
         state_dict[self.key_value_t_zp.name] = {'shape': self.key_value_t_zp.shape,
                                                 'shard': key_value_t_zp_shard}
+        state_dict = self.sharded_input_quantizer_state_dict(state_dict)
         return state_dict
