@@ -317,7 +317,6 @@ import mindspore as ms
 from mindspore.communication.management import init
 from mindformers.core.metric import EmF1Metric
 from mindformers import MindFormerConfig, AutoModel
-from mindformers.experimental.parallel_core.pynative.parallel_state import initialize_model_parallel
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import logger
@@ -332,7 +331,6 @@ mf_config = MindFormerConfig(config_path)
 ms.set_context(mode=mf_config.context.mode, device_target=mf_config.context.device_target,
                 jit_config={"jit_level": "O0", "infer_boost": "on"})
 init()
-initialize_model_parallel(mf_config.parallel_config.model_parallel, order='tp')
 network = AutoModel.from_config(mf_config, download_checkpoint=False)
 network.set_train(False)
 network.phase = 'predict'
