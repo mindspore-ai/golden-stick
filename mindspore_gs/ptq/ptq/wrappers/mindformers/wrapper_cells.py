@@ -24,6 +24,7 @@ from mindspore.common.initializer import initializer
 from mindspore.nn import Cell
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
+from mindspore.communication.comm_func import all_reduce
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindformers.modules.layers import Linear
@@ -49,25 +50,17 @@ from mindspore_gs.ptq.convert_utils import (
 
 class MinFromTensorParallelRegion(nn.Cell):
     "Get argmin from tensor-parallel region"
-    def __init__(self):
-        super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group())
-
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
-        output, _ = self.all_reduce(output_parallel)
+        output, _ = all_reduce(output_parallel, op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group())
         return output, _
 
 
 class MaxFromTensorParallelRegion(nn.Cell):
     "Get argmax from tensor-parallel region"
-    def __init__(self):
-        super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group())
-
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
-        output, _ = self.all_reduce(output_parallel)
+        output, _ = all_reduce(output_parallel, op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group())
         return output, _
 
 
@@ -319,8 +312,7 @@ class QuantLinearCell(WrapperLinearCell):
                            axis=1 if self.layer.transpose_b else 0).astype(np.int32)
         if new_bias_need_allreduce:
             t_new_bias = Tensor(new_bias)
-            reduce_sum = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)
-            t_new_bias, _ = reduce_sum(t_new_bias)
+            t_new_bias, _ = all_reduce(t_new_bias, op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)
             new_bias = t_new_bias.asnumpy()
         return new_bias
 
