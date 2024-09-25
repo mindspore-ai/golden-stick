@@ -340,7 +340,6 @@ def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
     assert return_code == 0
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack'])
