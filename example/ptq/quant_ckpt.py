@@ -150,6 +150,28 @@ def quant_net(net, network_helper, ptq, ds):
     return net
 
 
+def ckpt_name(uargs_):
+    """ckpt_name"""
+    if uargs_.approach != 'ptq':
+        return uargs_.approach
+    name = "ptq"
+    if uargs_.outliers_suppression == OutliersSuppressionType.SMOOTH:
+        name += "_smooth"
+    else:
+        name += "_no_smooth"
+    if uargs_.act_quant_dtype == msdtype.int8:
+        name += "_a8"
+    else:
+        name += "_a16"
+    if uargs_.weight_quant_dtype == msdtype.int8:
+        name += "w8"
+    else:
+        name += "w16"
+    if uargs_.kvcache_quant_dtype == msdtype.int8:
+        name += "c8"
+    return name
+
+
 if __name__ == "__main__":
     uargs = get_args()
     algo = create_ptq(uargs)
@@ -174,7 +196,7 @@ if __name__ == "__main__":
         rank_id = get_rank()
     except RuntimeError:
         rank_id = 0
-    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{uargs.approach}_ckpt")
+    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(uargs)}_ckpt")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),

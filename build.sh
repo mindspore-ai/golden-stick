@@ -32,6 +32,8 @@ if [ ! -d "${BASEPATH}/output" ]; then
     exit 1
 fi
 
+rm -rf "mindspore_gs.egg-info"
+
 cd ${BASEPATH}/output || exit
 for package in mindspore_gs*whl
 do

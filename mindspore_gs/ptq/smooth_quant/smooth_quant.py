@@ -163,7 +163,9 @@ class SmoothQuant(CompAlgo):
         if self._is_deploy:
             return network
         total_count = datasets.get_dataset_size()
-        os.environ['NETWORK_PHASE'] = "actobs"
+        if hasattr(network, "_set_network_phase"):
+            # pylint: disable=protected-access
+            network._set_network_phase("actobs")
         network.phase = "prefill_actobs"
         data_count = 1
         tokenizer = network_helper.create_tokenizer()
@@ -179,14 +181,18 @@ class SmoothQuant(CompAlgo):
         network_to_next_phase = ToNextPhase()
         network_to_next_phase.process(network)
         network.update_parameters_name()
-        os.environ['NETWORK_PHASE'] = "weightobs"
+        if hasattr(network, "_set_network_phase"):
+            # pylint: disable=protected-access
+            network._set_network_phase("weightobs")
         network.phase = "prefill_weightobs"
         bs = network_helper.get_spec('batch_size')
         network_helper.generate(network, np.ones([bs, 1], dtype=np.int32), max_new_tokens=1)
         # act quant observer
         network_to_next_phase.process(network)
         network.update_parameters_name()
-        os.environ['NETWORK_PHASE'] = "quant"
+        if hasattr(network, "_set_network_phase"):
+            # pylint: disable=protected-access
+            network._set_network_phase("quant")
         network.phase = "prefill_quant"
         data_count = 1
         for _, ds_item in enumerate(datasets.create_dict_iterator()):
