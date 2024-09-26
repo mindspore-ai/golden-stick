@@ -24,7 +24,6 @@ from mindspore import save_checkpoint, set_context
 from mindspore import GRAPH_MODE, PYNATIVE_MODE, dtype
 from mindspore.dataset import GeneratorDataset
 from mindspore.communication.management import init
-from mindformers.experimental.parallel_core.pynative.parallel_state import destroy_model_parallel
 from mindformers import AutoModel
 from mindformers.trainer.utils import transform_and_load_checkpoint
 
@@ -127,7 +126,6 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
 
     set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
     init()
-    destroy_model_parallel()
     network = AutoModel.from_config(config, download_checkpoint=False)
     network.set_train(False)
     network.phase = 'predict'
@@ -186,7 +184,6 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     config = helper.mf_config
 
     set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
-    destroy_model_parallel()
     network = AutoModel.from_config(config, download_checkpoint=False)
     network.set_train(False)
     network.phase = 'predict'
