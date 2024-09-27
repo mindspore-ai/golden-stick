@@ -150,11 +150,11 @@ def quant_net(net, network_helper, ptq, ds):
     return net
 
 
-def ckpt_name(uargs_):
+def ckpt_name(model_name_, uargs_):
     """ckpt_name"""
     if uargs_.approach != 'ptq':
-        return uargs_.approach
-    name = "ptq"
+        return f"{model_name_}_{uargs_.approach}"
+    name = f"{model_name_}_ptq"
     if uargs_.outliers_suppression == OutliersSuppressionType.SMOOTH:
         name += "_smooth"
     else:
@@ -175,13 +175,14 @@ def ckpt_name(uargs_):
 if __name__ == "__main__":
     uargs = get_args()
     algo = create_ptq(uargs)
-    msconfig = MindFormerConfig(uargs.config_path)
-    if msconfig.model.arch.type == "LlamaForCausalLM":
+    mfconfig = MindFormerConfig(uargs.config_path)
+    model_name = mfconfig.trainer.model_name
+    if mfconfig.model.arch.type == "LlamaForCausalLM":
         helper = MFLlama2Helper(uargs.config_path)
-    elif msconfig.model.arch.type == "ParallelLlamaForCausalLM":
+    elif mfconfig.model.arch.type == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(uargs.config_path)
     else:
-        err_msg = f"Unsupported network arch: {msconfig.model.arch}, please check model.arch in yaml config, " \
+        err_msg = f"Unsupported network arch: {mfconfig.model.arch}, please check model.arch in yaml config, " \
                   f"only support LlamaForCausalLM and ParallelLlamaForCausalLM now"
         raise ValueError(err_msg)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
@@ -196,7 +197,7 @@ if __name__ == "__main__":
         rank_id = get_rank()
     except RuntimeError:
         rank_id = 0
-    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(uargs)}_ckpt")
+    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(model_name, uargs)}_ckpt")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),
