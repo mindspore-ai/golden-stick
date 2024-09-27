@@ -18,6 +18,7 @@ import argparse
 import time
 import numpy as np
 from mindformers.core.metric import EmF1Metric
+from mindformers import MindFormerConfig
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_squad_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
@@ -69,7 +70,6 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
-    parser.add_argument('--network', '-n', type=str, required=True)
     args = parser.parse_args()
     logger.info(f"evaluate args: {args}")
     return args
@@ -79,10 +79,15 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     logger.info('Creating network...')
-    if uargs.network == "LlamaForCausalLM":
-        helper = MFLlama2Helper(uargs.config_path)
-    elif uargs.network == "ParallelLlamaForCausalLM":
-        helper = MFParallelLlama2Helper(uargs.config_path)
+    config = MindFormerConfig(uargs.config_path)
+    if config.model.arch.type == "LlamaForCausalLM":
+        helper = MFLlama2Helper(config)
+    elif config.model.arch.type == "ParallelLlamaForCausalLM":
+        helper = MFParallelLlama2Helper(config)
+    else:
+        err_msg = f"Unsupported network arch: {config.model.arch}, please check model.arch in yaml config, " \
+                  f"only support LlamaForCausalLM and ParallelLlamaForCausalLM now"
+        raise ValueError(err_msg)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     evaluate(network, uargs.dataset_path, helper)
