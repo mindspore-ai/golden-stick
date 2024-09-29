@@ -23,7 +23,6 @@ from mindspore.ops.operations._inner_ops import Dequant
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
-from mindspore.communication.comm_func import all_reduce
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
@@ -354,7 +353,7 @@ def convert_to_dequant_bmm(input_qparams, weight_qparams, weight_quant, offset=N
                            axis=1 if transpose_b else 0).astype(np.int32)
         if new_bias_need_allreduce:
             t_new_bias = Tensor(new_bias)
-            t_new_bias, _ = all_reduce(t_new_bias, op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)
+            t_new_bias = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(t_new_bias)
             new_bias = t_new_bias.asnumpy()
         return new_bias
 
