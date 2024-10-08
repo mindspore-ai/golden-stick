@@ -36,9 +36,11 @@ def add_rmsnorm_quant_fusion_test(approach):
     tokenizer_path = os.path.join(cur_dir, "../../data/llama2-tokenizer.model")
     if approach == "smooth-quant":
         w8a8_config_path = "../../data/test_llama2/predict_llama2_13b_fp16_910b_1p_common_config.yaml"
+        w8a8_config_path = os.path.join(cur_dir, w8a8_config_path)
         helper = MFLlama2Helper(w8a8_config_path)
     elif approach == "ptq":
         w8a8_config_path = "../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml"
+        w8a8_config_path = os.path.join(cur_dir, w8a8_config_path)
         helper = MFParallelLlama2Helper(w8a8_config_path)
 
     device_id = int(os.environ.get('DEVICE_ID', '0'))
