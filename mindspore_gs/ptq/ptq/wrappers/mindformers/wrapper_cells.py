@@ -14,7 +14,6 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 import abc
-import copy
 import numpy as np
 
 from mindspore import nn, Parameter, Tensor, dtype
@@ -42,10 +41,6 @@ from mindspore_gs.quantization.quant_utils import (
     convert_fp32_to_int64
 )
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
-from mindspore_gs.ptq.convert_utils import (
-    convert_to_quant_for_deploy,
-    convert_to_antiquant_for_deploy
-)
 
 
 class MinFromTensorParallelRegion(nn.Cell):
@@ -107,7 +102,7 @@ class SmoothLinearCell(WrapperLinearCell):
 
     @staticmethod
     def is_enable(cfg: InnerPTQConfig):
-        return cfg.mode == PTQMode.QUANTIZE and cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
+        return cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
 
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
@@ -115,12 +110,16 @@ class SmoothLinearCell(WrapperLinearCell):
             raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
                              f"but {linear_name} type is {type(linear)}.")
 
-        if self.net_helper.get_spec("qkv_concat") is False:
+        if self.cfg.mode == PTQMode.QUANTIZE and self.net_helper.get_spec("qkv_concat") is False:
             logger.info(f"qkv_concat is False, set smooth_to_pre_layer to False.")
             self.cfg.smooth_to_pre_layer = False
 
         self.x_obs_max = msops.max
         self.x_obs_min = msops.min
+        if isinstance(self.layer, Linear):
+            self.compute_type = self.layer.dtype
+        else:
+            self.compute_type = self.layer.compute_dtype
         if isinstance(self.layer, (Linear, RowParallelLinear)):
             self.w_obs_max = msops.max
             self.w_obs_min = msops.min
@@ -230,7 +229,7 @@ class SmoothLinearCell(WrapperLinearCell):
                 self.mul_scale = Parameter(initializer('ones', (ic_,), dtype=compute_dtype_), name="mul_scale")
 
             def construct(self, x, weight):
-                x = msops.mul(x, self.mul_scale)
+                x = msops.div(x, self.mul_scale)
                 return self.mm(x, weight)
 
         self._layer.matmul = SmoothMatmul(self._layer.matmul, ic, compute_dtype)
@@ -249,17 +248,16 @@ class SmoothLinearCell(WrapperLinearCell):
         self._apply_smooth(smooth_scale)
 
     def process(self):
-        if self.cfg.mode == PTQMode.QUANTIZE:
-            super(SmoothLinearCell, self).process()
-            self.smooth(self.cfg.algo_args.get('alpha', 0.5))
-            return
-        if not self.cfg.smooth_to_pre_layer:
-            ic = self._layer.weight.shape[1] if self._layer.transpose_b else self._layer.weight.shape[1]
-            self._apply_act_smooth_by_insert_op_for_deploy(ic, self._layer.dtype)
-
+        super(SmoothLinearCell, self).process()
+        self.smooth(self.cfg.algo_args.get('alpha', 0.5))
 
     def deploy(self):
         logger.info("Take back Linear from SmoothQuantLinearCell.")
+        if self.cfg.mode == PTQMode.QUANTIZE or self.cfg.smooth_to_pre_layer or \
+            (self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8):
+            return self.layer
+        ic = self._layer.weight.shape[1] if self._layer.transpose_b else self._layer.weight.shape[1]
+        self._apply_act_smooth_by_insert_op_for_deploy(ic, self.compute_type)
         return self.layer
 
 
@@ -268,7 +266,7 @@ class QuantLinearCell(WrapperLinearCell):
 
     @staticmethod
     def is_enable(cfg: InnerPTQConfig):
-        return cfg.mode == PTQMode.QUANTIZE and cfg.weight_quant_dtype == dtype.int8
+        return cfg.weight_quant_dtype == dtype.int8
 
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
@@ -312,10 +310,19 @@ class QuantLinearCell(WrapperLinearCell):
             self.compute_type = self.layer.dtype
         else:
             self.compute_type = self.layer.compute_dtype
-        self.input_scale = None
-        self.input_zp = None
+        self.input_scale = Parameter(initializer('ones', (self.ic), dtype.float16), name="input_scale")
+        self.input_zp = Parameter(initializer('zeros', (self.ic), dtype.int8), name="input_zp")
+        self.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
+        self.w_scale = np.array([1] * self.oc)
+        self.x_scale = np.array(1.0)
+        self.w_zp = np.array([0] * self.oc)
+
         self.a16w8 = self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
         self.a8w8 = self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
+        self.bias = None
+        if self.a8w8:
+            self.bias_name = self.layer.bias.name if self.layer.has_bias else linear.weight.name + "_bias"
+            self.bias = Parameter(initializer("ones", (self.oc), self.compute_type), name=self.bias_name)
 
     def _fused_bias(self, quant_weight, act_offset, new_bias_need_allreduce=False):
         """compute fused bias"""
@@ -332,6 +339,20 @@ class QuantLinearCell(WrapperLinearCell):
     #pylint: disable=protected-access
     def quant_weight(self):
         """quant weight"""
+        if not self.a16w8 and not self.a8w8:
+            return
+        self.quantizer_w_max = self.w_quant_max(self.layer.weight, self.weight_quantizer_min_max_axis,
+                                                keepdims=True)[0]
+        self.quantizer_w_min = self.w_quant_min(self.layer.weight, self.weight_quantizer_min_max_axis,
+                                                keepdims=True)[0]
+        w_scale, w_zp = cal_quantization_params(self.quantizer_w_min.asnumpy(), self.quantizer_w_max.asnumpy(),
+                                                self.weight_quant_min, self.weight_quant_max,
+                                                symmetric=self._weight_symmetric)
+        weight = quant_tensor_data(self.layer.weight, w_scale.squeeze(), w_zp.squeeze(),
+                                   self.weight_quant_min, self.weight_quant_max, self.weight_quantizer_axis)
+        self.weight.set_data(Tensor(weight.asnumpy(), dtype=dtype.int8))
+        self.w_scale = w_scale
+        self.w_zp = w_zp
         if self.a8w8:
             self.quantizer_x_max = self.x_quant_max(self.cat_samples)[0]
             self.quantizer_x_min = self.x_quant_min(self.cat_samples)[0]
@@ -339,17 +360,7 @@ class QuantLinearCell(WrapperLinearCell):
                                                     self.act_quant_min,
                                                     self.act_quant_max,
                                                     symmetric=self._act_symmetric)
-        if self.a16w8 or self.a8w8:
-            self.quantizer_w_max = self.w_quant_max(self.layer.weight, self.weight_quantizer_min_max_axis,
-                                                    keepdims=True)[0]
-            self.quantizer_w_min = self.w_quant_min(self.layer.weight, self.weight_quantizer_min_max_axis,
-                                                    keepdims=True)[0]
-            w_scale, w_zp = cal_quantization_params(self.quantizer_w_min.asnumpy(), self.quantizer_w_max.asnumpy(),
-                                                    self.weight_quant_min, self.weight_quant_max,
-                                                    symmetric=self._weight_symmetric)
-            weight = quant_tensor_data(self.layer.weight, w_scale.squeeze(), w_zp.squeeze(),
-                                       self.weight_quant_min, self.weight_quant_max, self.weight_quantizer_axis)
-        if self.a8w8:
+            self.x_scale = x_scale
             dequant_scale = np.squeeze(w_scale * x_scale).astype(np.float32)
             bias = None
             if isinstance(self.layer, RowParallelLinear):
@@ -360,27 +371,19 @@ class QuantLinearCell(WrapperLinearCell):
             bias = Tensor(bias, dtype=self.compute_type) if bias is not None else None
             if self.layer.has_bias:
                 bias = Tensor((bias.asnumpy() + self.layer.bias.asnumpy()), dtype=self.compute_type)
-                bias_name = self.layer.bias.name
-            else:
-                bias_name = self.layer.weight.name + "_bias"
-                self.layer.bias_add = msops.Add()
-            self.layer.has_bias = True
-            self.layer.bias = Parameter(bias.astype(self.compute_type), name=bias_name)
+            self.bias.set_data(bias.astype(self.compute_type))
             # FIXME hangangqiang, decouple with smooth
             if self.cfg.outliers_suppression == OutliersSuppressionType.SMOOTH and not self.cfg.smooth_to_pre_layer:
                 smooth_scale = self.layer.matmul.mm.mul_scale.asnumpy()
             else:
                 smooth_scale = None
-            qmm = AllQuantMatmul(x_scale, x_zp, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b,
-                                 smooth_scale=smooth_scale)
-            self.input_scale = copy.deepcopy(qmm.input_scale)
-            self.input_zp = copy.deepcopy(qmm.input_zp)
-        if self.a16w8:
-            qmm = WeightQuantMatmul(w_scale, w_zp, in_channels=self.ic, transpose_b=self.layer.transpose_b)
-        if self.a8w8 or self.a16w8:
-            self.layer.weight = Parameter(weight.astype(dtype.int8), name=self.layer.weight.name)
-            self.layer.matmul = qmm
-
+            if smooth_scale is not None:
+                input_scale = (x_scale * smooth_scale).astype(np.float16)
+            else:
+                input_scale = np.array([x_scale] * self.ic).astype(np.float16)
+            self.input_scale.set_data(Tensor(input_scale, dtype=dtype.float16))
+            input_zp = np.array([x_zp] * len(input_scale)).astype(np.int8)
+            self.input_zp.set_data(Tensor(input_zp, dtype=dtype.int8))
     def process(self):
         super(QuantLinearCell, self).process()
         self.quant_weight()
@@ -388,7 +391,8 @@ class QuantLinearCell(WrapperLinearCell):
         self.cat_samples = None
 
     def deploy(self):
-        return self
+        return DeployLinearCell(self.layer, self.cfg, self.weight, self.bias, self.w_scale, self.w_zp,
+                                self.x_scale, self.input_zp, self.input_scale)
 
     def add_hook(self):
         def hook_fn(_, inps):
@@ -400,58 +404,36 @@ class QuantLinearCell(WrapperLinearCell):
             self._layer.matmul.register_forward_pre_hook(hook_fn)
 
 
-class DeployLinearCell(WrapperLinearCell):
+class DeployLinearCell(Cell):
     """DeployLinearCell"""
 
-    @staticmethod
-    def is_enable(cfg: InnerPTQConfig):
-        return cfg.mode == PTQMode.DEPLOY and cfg.weight_quant_dtype == dtype.int8
-
-    def __init__(self, linear_name, linear, cfg, network_helper=None):
-        super().__init__(linear_name, linear, cfg, network_helper)
-        if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
-            raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
-                             f"but {linear_name} type is {type(linear)}.")
+    def __init__(self, linear, cfg, weight, bias, w_scale, w_zp, x_scale, input_zp, input_scale):
+        super().__init__()
+        self._layer = linear
         self.cfg = cfg
-        rank = len(linear.weight.shape)
-        ic_axis = rank - 1 if linear.matmul.transpose_b else rank - 2
-        self.weight_quantizer_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
-        self.ic = linear.weight.shape[ic_axis]
-        self.oc = linear.weight.shape[self.weight_quantizer_axis]
-        if isinstance(self.layer, Linear):
-            self.compute_type = self.layer.dtype
-        else:
-            self.compute_type = self.layer.compute_dtype
-        self.layer.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
-        w_scale = np.array([1] * self.oc)
-        w_zp = np.array([0] * self.oc)
-        self.input_scale = None
-        self.input_zp = None
         self.quant = QuantV2()
-        if self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
-            if linear.has_bias:
-                self.layer.bias = Parameter(initializer("ones", linear.bias.shape, linear.bias.dtype),
-                                            name=linear.bias.name)
-            else:
+        self.a8w8 = self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
+        self.a16w8 = self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
+        if self.a8w8:
+            if linear.has_bias is False:
                 self.layer.has_bias = True
-                bias_shape = [linear.weight.shape[0] if linear.transpose_b else linear.weight.shape[1]]
-                bias_name = linear.weight.name + "_bias"
-                self.layer.bias = Parameter(initializer("ones", bias_shape, self.compute_type), name=bias_name)
                 self.layer.bias_add = msops.Add()
-            x_scale = np.array(1.0)
-            self.input_scale = Parameter(initializer("ones", [self.ic], dtype.float16), name="input_scale")
-            self.input_zp = Parameter(initializer("ones", [self.ic], dtype.int8), name="input_zp")
-            qmm = AllQuantMatmulDeploy(x_scale, w_scale, in_channels=self.ic, transpose_b=self.layer.transpose_b)
-        elif self.cfg.act_quant_dtype != dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8:
-            qmm = WeightQuantMatmul(w_scale, w_zp, in_channels=self.ic, transpose_b=self.layer.transpose_b)
+            self.layer.bias = bias
+            self.input_scale = input_scale
+            self.input_zp = input_zp
+            qmm = AllQuantMatmulDeploy(x_scale, w_scale, transpose_b=self.layer.transpose_b)
+        elif self.a16w8:
+            qmm = WeightQuantMatmul(w_scale, w_zp, transpose_b=self.layer.transpose_b)
+        self.layer.weight = weight
         self.layer.matmul = qmm
         self.is_rowparallel = (isinstance(self.layer, RowParallelLinear))
         self.is_colparallel = (isinstance(self.layer, ColumnParallelLinear))
         self.is_linear = isinstance(self.layer, Linear)
-        self.a8w8 = self.cfg.act_quant_dtype == dtype.int8 and self.cfg.weight_quant_dtype == dtype.int8
 
-    def deploy(self):
-        return self
+    @property
+    def layer(self):
+        """layer"""
+        return self._layer
 
     def linear_forward(self, x):
         """Forward process, x should be a tensor"""
@@ -597,56 +579,18 @@ class DeployLinearCell(WrapperLinearCell):
         return state_dict
 
 
-class AllQuantMatmul(Cell):
-    """quant act and weight"""
-
-    def __init__(self, input_scale, input_zp, weight_scale, in_channels=None, out_channels=None, offset=None,
-                 transpose_a=False, transpose_b=False, dst_dtype=dtype.float16, smooth_scale=None):
-        super().__init__()
-        self.transpose_b = transpose_b
-        self.offset = offset
-        self.ic = in_channels
-        self.oc = out_channels
-        dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
-        scale_i64 = NumpyQuantOps.trans_fp32_to_i64(np.squeeze(dequant_scale))
-        self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64))
-        if smooth_scale is not None:
-            input_scale = (input_scale * smooth_scale).astype(np.float16)
-        else:
-            input_scale = np.array([input_scale] * in_channels).astype(np.float16)
-        self.input_scale = Parameter(Tensor(input_scale, dtype=dtype.float16))
-        input_zp = np.array([input_zp] * len(input_scale)).astype(np.int8)
-        self.input_zp = Parameter(Tensor(input_zp, dtype=dtype.int8))
-
-        self.quant = QuantV2()
-        self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
-        if offset is None:
-            self.offset = None
-        else:
-            self.offset = Parameter(Tensor(offset, dtype=dtype.float32))
-
-    def construct(self, x, quant_weight):
-        # x: fp16 quant_weight: int8
-        qx = self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
-        qx = msops.reshape(qx, (-1, self.ic))
-        return self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, None)
-
-
 class WeightQuantMatmul(Cell):
     """quant batch matmul"""
 
-    def __init__(self, t_scale, t_zp, in_channels=None, transpose_a=False, transpose_b=False,
-                 dst_type=dtype.float16):
+    def __init__(self, t_scale, t_zp, transpose_a=False, transpose_b=False, dst_type=dtype.float16):
         super().__init__()
         self.dst_dtype = dst_type
-        self.ic = in_channels
         self.t_scale = Parameter(Tensor(np.squeeze(t_scale), dtype=self.dst_dtype), name="t_scale")
         self.t_zp_neg = Parameter(Tensor(np.squeeze(t_zp) * -1, dtype=self.dst_dtype), name="t_zp_neg")
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b)
 
     def construct(self, x, weight):
         """forward for antiquant bmm cell"""
-        x = msops.reshape(x, (-1, self.ic))
         output = self.weight_qbmm(x, weight, self.t_scale, self.t_zp_neg, None, None, None)
         return output.astype(self.dst_dtype)
 
@@ -654,13 +598,11 @@ class WeightQuantMatmul(Cell):
 class AllQuantMatmulDeploy(Cell):
     """quant weight"""
 
-    def __init__(self, input_scale, weight_scale, in_channels=None, out_channels=None, offset=None,
+    def __init__(self, input_scale, weight_scale, offset=None,
                  transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
         super().__init__()
         self.transpose_b = transpose_b
         self.offset = offset
-        self.ic = in_channels
-        self.oc = out_channels
         dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
         scale_i64 = NumpyQuantOps.trans_fp32_to_i64(np.squeeze(dequant_scale))
         self.dequant_scale = Parameter(Tensor(scale_i64, dtype=dtype.int64), name='dequant_scale')
@@ -680,10 +622,10 @@ class QuantPageAttentionMgrCell(WrapperCell):
 
     @staticmethod
     def is_enable(cfg: InnerPTQConfig):
-        return cfg.mode == PTQMode.QUANTIZE and cfg.kvcache_quant_dtype == dtype.int8
+        return cfg.kvcache_quant_dtype == dtype.int8
 
-    def __init__(self, linear_name, linear, cfg, network_helper):
-        super().__init__(linear_name, linear, cfg, network_helper)
+    def __init__(self, linear_name, layer, cfg, network_helper):
+        super().__init__(linear_name, layer, cfg, network_helper)
         self.key_samples = []
         self.value_samples = []
         self.quantizer_key_max = None
@@ -691,7 +633,16 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.quantizer_value_max = None
         self.quantizer_value_min = None
         self.kvcache_symmetric = cfg.kvcache_symmetric
-        self.enable_deploy_fusion = cfg.enable_deploy_fusion
+        n = layer.n_kv_heads
+        d = layer.head_dim
+        ic = n * d
+        self.key_t_scale = Parameter(initializer('ones', (ic), dtype.float16), name="key_t_scale")
+        self.key_t_zp = Parameter(initializer('ones', (ic), dtype.float16), name="key_t_zp")
+        self.value_t_scale = Parameter(initializer('ones', (ic), dtype.float16), name="value_t_scale")
+        self.value_t_zp = Parameter(initializer('ones', (ic), dtype.float16), name="value_t_zp")
+        self.key_value_t_scale = Parameter(initializer('ones', (2, ic), dtype.int64), name="key_value_t_scale")
+        self.key_value_t_zp = Parameter(initializer('ones', (2, ic), dtype.int32), name="key_value_t_zp")
+
         self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
                                                                            signed=True,
                                                                            narrow_range=cfg.kvcache_narrow_range)
@@ -701,30 +652,47 @@ class QuantPageAttentionMgrCell(WrapperCell):
         key_cat_samples = msops.cat(tuple(self.key_samples), axis=0)
         self.quantizer_key_max = msops.max(key_cat_samples, 0)[0]
         self.quantizer_key_min = msops.min(key_cat_samples, 0)[0]
-        key_scale, key_zp = cal_quantization_params(self.quantizer_key_min.asnumpy(), self.quantizer_key_max.asnumpy(),
-                                                    self.kvcache_quant_min,
-                                                    self.kvcache_quant_max,
-                                                    symmetric=self.kvcache_symmetric)
-        value_cat_samples = msops.cat(tuple(self.value_samples), axis=0)
-        self.quantizer_value_max = msops.max(value_cat_samples, 0)[0]
-        self.quantizer_value_min = msops.min(value_cat_samples, 0)[0]
-        value_scale, value_zp = cal_quantization_params(self.quantizer_value_min.asnumpy(),
-                                                        self.quantizer_value_max.asnumpy(),
+        key_t_scale, key_t_zp = cal_quantization_params(self.quantizer_key_min.asnumpy(),
+                                                        self.quantizer_key_max.asnumpy(),
                                                         self.kvcache_quant_min,
                                                         self.kvcache_quant_max,
                                                         symmetric=self.kvcache_symmetric)
-        self.layer.key_cache = Parameter(initializer('ones', self.layer.key_cache.shape, dtype.int8),
-                                         name=self.layer.key_cache.name, requires_grad=False)
-        self.layer.value_cache = Parameter(initializer('ones', self.layer.value_cache.shape, dtype.int8),
-                                           name=self.layer.value_cache.name, requires_grad=False)
-        self._layer = QuantPageAttentionMgrDeployCell(self.layer, value_scale, value_zp, key_scale, key_zp,
-                                                      self.enable_deploy_fusion)
+        value_cat_samples = msops.cat(tuple(self.value_samples), axis=0)
+        self.quantizer_value_max = msops.max(value_cat_samples, 0)[0]
+        self.quantizer_value_min = msops.min(value_cat_samples, 0)[0]
+        value_t_scale, value_t_zp = cal_quantization_params(self.quantizer_value_min.asnumpy(),
+                                                            self.quantizer_value_max.asnumpy(),
+                                                            self.kvcache_quant_min,
+                                                            self.kvcache_quant_max,
+                                                            symmetric=self.kvcache_symmetric)
+        key_t_scale = np.squeeze(key_t_scale).astype(np.float16)
+        key_t_zp = np.squeeze(key_t_zp).astype(np.float16)
+        value_t_scale = np.squeeze(value_t_scale).astype(np.float16)
+        value_t_zp = np.squeeze(value_t_zp).astype(np.float16)
+        self.key_t_scale.set_data(Tensor(key_t_scale, dtype=dtype.float16))
+        self.key_t_zp.set_data(Tensor(key_t_zp, dtype=dtype.float16))
+        self.value_t_scale.set_data(Tensor(value_t_scale, dtype=dtype.float16))
+        self.value_t_zp.set_data(Tensor(value_t_zp, dtype=dtype.float16))
+
+        t_scale_len = self.key_t_scale.shape[0]
+        key_t_scale = convert_fp32_to_int64(key_t_scale.astype(np.float32))
+        value_t_scale = convert_fp32_to_int64(value_t_scale.astype(np.float32))
+        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
+                                            value_t_scale.reshape((1, t_scale_len))))
+
+        t_zp_len = self.value_t_zp.shape[0]
+        key_t_zp = (key_t_zp*-1).astype(np.int32)
+        value_t_zp = (value_t_zp*-1).astype(np.int32)
+        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
+
+        self.key_value_t_scale.set_data(Tensor(key_value_t_scale, dtype=dtype.int64))
+        self.key_value_t_zp.set_data(Tensor(key_value_t_zp, dtype=dtype.int32))
         self.key_samples.clear()
         self.value_samples.clear()
 
     def deploy(self):
-        logger.info("Take back Linear from SmoothQuantLinearCell.")
-        return self.layer
+        return DeployPageAttentionMgrCell(self.layer, self.value_t_scale, self.value_t_zp, self.key_t_scale,
+                                          self.key_t_zp, self.key_value_t_scale, self.key_value_t_zp, self.cfg)
 
     def add_hook(self):
         pass
@@ -751,46 +719,37 @@ class QuantPageAttentionMgrCell(WrapperCell):
                                                      block_tables, batch_valid_length, alibi_tensor)
 
 
-class QuantPageAttentionMgrDeployCell(Cell):
-    """QuantPageAttentionMgrDeployCell"""
+class DeployPageAttentionMgrCell(Cell):
+    """DeployPageAttentionMgrCell"""
 
     def __init__(self, kvcache: PagedAttentionMgr, value_t_scale, value_t_zp, key_t_scale, key_t_zp,
-                 enable_deploy_fusion):
+                 key_value_t_scale, key_value_t_zp, cfg: InnerPTQConfig):
         super().__init__()
         self.layer = kvcache
-        self.enable_deploy_fusion = enable_deploy_fusion
-        key_t_scale = np.squeeze(key_t_scale).astype(np.float16)
-        key_t_zp = np.squeeze(key_t_zp).astype(np.float16)
-        value_t_scale = np.squeeze(value_t_scale).astype(np.float16)
-        value_t_zp = np.squeeze(value_t_zp).astype(np.float16)
-        self._key_input_quantizer = QuantCellV2(Tensor(key_t_scale, dtype=dtype.float16),
-                                                Tensor(np.array(key_t_zp).astype(np.int8), dtype=dtype.int8))
-        self._value_input_quantizer = QuantCellV2(Tensor(value_t_scale, dtype=dtype.float16),
-                                                  Tensor(np.array(value_t_zp).astype(np.int8), dtype=dtype.int8))
+        self.enable_deploy_fusion = cfg.enable_deploy_fusion
+        self._key_input_quantizer = QuantCellV2(Tensor(key_t_scale.asnumpy(), dtype=dtype.float16),
+                                                Tensor(key_t_zp.asnumpy().astype(np.int8), dtype=dtype.int8))
+        self._value_input_quantizer = QuantCellV2(Tensor(value_t_scale.asnumpy(), dtype=dtype.float16),
+                                                  Tensor(value_t_zp.asnumpy().astype(np.int8), dtype=dtype.int8))
         dst_type = self.layer.key_cache.dtype
         n = kvcache.n_kv_heads
         d = kvcache.head_dim
         self._key_output_quantizer = AntiQuantCell(n, d, dst_type)
         self._value_output_quantizer = AntiQuantCell(n, d, dst_type)
-        key_t_zp = np.array(key_t_zp*-1).astype(np.float16)
-        value_t_zp = np.array(value_t_zp*-1).astype(np.float16)
-        self.key_t_zp = Parameter(Tensor(key_t_zp, dtype=dtype.float16), name="key_t_zp")
-        self.value_t_zp = Parameter(Tensor(value_t_zp, dtype=dtype.float16), name="value_t_zp")
-        self.key_t_scale = Parameter(Tensor(key_t_scale, dtype=dtype.float16), name="key_t_scale")
-        self.value_t_scale = Parameter(Tensor(value_t_scale, dtype=dtype.float16), name="value_t_scale")
+        if cfg.mode == PTQMode.QUANTIZE or not self.enable_deploy_fusion:
+            self.key_t_zp = key_t_zp
+            self.value_t_zp = value_t_zp
+            self.key_t_scale = key_t_scale
+            self.value_t_scale = value_t_scale
+        if cfg.mode == PTQMode.QUANTIZE or self.enable_deploy_fusion:
+            self.key_value_t_scale = key_value_t_scale
+            self.key_value_t_zp = key_value_t_zp
 
-        t_scale_len = key_t_scale.shape[0]
-        key_t_scale = convert_fp32_to_int64(key_t_scale.astype(np.float32))
-        value_t_scale = convert_fp32_to_int64(value_t_scale.astype(np.float32))
-        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
-                                            value_t_scale.reshape((1, t_scale_len))))
-        self.key_value_t_scale = Parameter(Tensor(key_value_t_scale, dtype=dtype.int64), name="key_value_t_scale")
-
-        t_zp_len = value_t_zp.shape[0]
-        key_t_zp = key_t_zp.astype(np.int32)
-        value_t_zp = value_t_zp.astype(np.int32)
-        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
-        self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.int32), name="key_value_t_zp")
+        self.layer.key_cache = Parameter(initializer('ones', self.layer.key_cache.shape, dtype.int8),
+                                         name=self.layer.key_cache.name, requires_grad=False)
+        self.layer.value_cache = Parameter(initializer('ones', self.layer.value_cache.shape, dtype.int8),
+                                           name=self.layer.value_cache.name, requires_grad=False)
+        self.tensor_parallel_group_size = get_tensor_model_parallel_world_size()
 
     def construct(self, key, value, slot_mapping):
         """The forward compute of KVCache for Paged Attention."""
@@ -819,109 +778,31 @@ class QuantPageAttentionMgrDeployCell(Cell):
                                                      block_tables, batch_valid_length, self.key_value_t_scale,
                                                      self.key_value_t_zp, alibi_tensor)
 
-
-class DeployPageAttentionMgrCell(WrapperCell):
-    """DeployPageAttentionMgrCell"""
-
-    @staticmethod
-    def is_enable(cfg: InnerPTQConfig):
-        return cfg.mode == PTQMode.DEPLOY and cfg.kvcache_quant_dtype == dtype.int8
-
-    def __init__(self, linear_name, linear, cfg, network_helper=None):
-        super().__init__(linear_name, linear, cfg, network_helper)
-        if not isinstance(linear, PagedAttentionMgr):
-            raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
-                             f"but {linear_name} type is {type(linear)}.")
-        self.cfg = cfg
-        self.enable_deploy_fusion = cfg.enable_deploy_fusion
-
-    def add_hook(self):
-        pass
-
-    def remove_hook(self):
-        pass
-
-    def deploy(self):
-        if self.enable_deploy_fusion:
-            return PagedAttentionDeployFusion(self.layer)
-        return PagedAttentionDeploy(self.layer)
-
-
-class PagedAttentionDeployBase(Cell):
-    """PagedAttention deploy base class"""
-
-    def __init__(self, kvcache: PagedAttentionMgr):
-        super().__init__()
-        self._converted = True
-        self.layer = kvcache
-        # PagedAttentionMgr's shape is BSH currently.
-        n = kvcache.n_kv_heads
-        d = kvcache.head_dim
-        ic = n * d
-        self._key_input_quantizer = convert_to_quant_for_deploy(ic)
-        self._value_input_quantizer = convert_to_quant_for_deploy(ic)
-        self._weight_quantizer = None
-
-        self.key_t_scale = Parameter(initializer('ones', [ic], dtype.float16), name="key_t_scale", requires_grad=False)
-        self.value_t_scale = Parameter(initializer('ones', [ic], dtype.float16), name="value_t_scale",
-                                       requires_grad=False)
-        self.key_t_zp = Parameter(initializer('ones', [ic], dtype.float16), name="key_t_zp", requires_grad=False)
-        self.value_t_zp = Parameter(initializer('ones', [ic], dtype.float16), name="value_t_zp", requires_grad=False)
-
-        dst_type = self.layer.key_cache.dtype
-        self._key_output_quantizer = convert_to_antiquant_for_deploy(n, d, None, dst_type)
-        self._value_output_quantizer = convert_to_antiquant_for_deploy(n, d, None, dst_type)
-        self.layer.key_cache = Parameter(initializer('ones', self.layer.key_cache.shape, dtype.int8),
-                                         name=self.layer.key_cache.name, requires_grad=False)
-        self.layer.value_cache = Parameter(initializer('ones', self.layer.value_cache.shape, dtype.int8),
-                                           name=self.layer.value_cache.name, requires_grad=False)
-        self.tensor_parallel_group_size = get_tensor_model_parallel_world_size()
-
-    def weight_quantizer(self):
-        return self._weight_quantizer
-
-    def core_construct(self, *args):
-        pass
-
-    # pylint: disable=W0221
-    def construct(self, key, value, slot_mapping):
-        """
-        Defines the computation of PagedAttentionQuant to be performed.
-
-        Returns:
-            Tensor, returns the computed result.
-        """
-        key = self._key_input_quantizer(key)
-        value = self._value_input_quantizer(value)
-        return self.layer.reshape_and_cache(key, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
-
-    @abc.abstractmethod
-    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
-        """The forward compute of Paged Attention."""
-        return NotImplementedError
-
-    @abc.abstractmethod
-    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
-        """The forward compute of KVCache for Paged Attention with alibi tensor."""
-        return NotImplementedError
-
     def sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
-        key_t_scale_shard = (self.tensor_parallel_group_size,)
-        key_t_zp_shard = (self.tensor_parallel_group_size,)
-
-        value_t_scale_shard = (self.tensor_parallel_group_size,)
-        value_t_zp_shard = (self.tensor_parallel_group_size,)
-
         state_dict = {}
-        state_dict[self.key_t_scale.name] = {'shape': self.key_t_scale.shape,
-                                             'shard': key_t_scale_shard}
-        state_dict[self.key_t_zp.name] = {'shape': self.key_t_zp.shape,
-                                          'shard': key_t_zp_shard}
-        state_dict[self.value_t_scale.name] = {'shape': self.value_t_scale.shape,
-                                               'shard': value_t_scale_shard}
-        state_dict[self.value_t_zp.name] = {'shape': self.value_t_zp.shape,
-                                            'shard': value_t_zp_shard}
+        if self.enable_deploy_fusion:
+            key_value_t_scale_shard = (1, self.tensor_parallel_group_size)
+            key_value_t_zp_shard = (1, self.tensor_parallel_group_size)
+            state_dict[self.key_value_t_scale.name] = {'shape': self.key_value_t_scale.shape,
+                                                       'shard': key_value_t_scale_shard}
+            state_dict[self.key_value_t_zp.name] = {'shape': self.key_value_t_zp.shape,
+                                                    'shard': key_value_t_zp_shard}
+        else:
+            key_t_scale_shard = (self.tensor_parallel_group_size,)
+            key_t_zp_shard = (self.tensor_parallel_group_size,)
+
+            value_t_scale_shard = (self.tensor_parallel_group_size,)
+            value_t_zp_shard = (self.tensor_parallel_group_size,)
+
+            state_dict[self.key_t_scale.name] = {'shape': self.key_t_scale.shape,
+                                                 'shard': key_t_scale_shard}
+            state_dict[self.key_t_zp.name] = {'shape': self.key_t_zp.shape,
+                                              'shard': key_t_zp_shard}
+            state_dict[self.value_t_scale.name] = {'shape': self.value_t_scale.shape,
+                                                   'shard': value_t_scale_shard}
+            state_dict[self.value_t_zp.name] = {'shape': self.value_t_zp.shape,
+                                                'shard': value_t_zp_shard}
         state_dict = self.sharded_input_quantizer_state_dict(state_dict)
         return state_dict
 
@@ -941,60 +822,4 @@ class PagedAttentionDeployBase(Cell):
                                                                 'shard': value_input_quantizer_t_scale_shard}
         state_dict[self._value_input_quantizer.t_zp.name] = {'shape': self._value_input_quantizer.t_zp.shape,
                                                              'shard': value_input_quantizer_t_zp_shard}
-        return state_dict
-
-
-class PagedAttentionDeploy(PagedAttentionDeployBase):
-    """PagedAttention deploy with no fuison"""
-
-    # pylint: disable=W0613
-    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
-        """The forward compute of Paged Attention."""
-        kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
-        vcache = self._value_output_quantizer(self.layer.value_cache, self.value_t_zp, self.value_t_scale)
-        return self.layer.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
-
-    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
-        """The forward compute of KVCache for Paged Attention with alibi tensor."""
-        kcache = self._key_output_quantizer(self.layer.key_cache, self.key_t_zp, self.key_t_scale)
-        vcache = self._value_output_quantizer(self.layer.value_cache, self.value_t_zp, self.value_t_scale)
-        return self.layer.paged_attention_with_alibi(query, kcache, vcache, block_tables, batch_valid_length,
-                                                     alibi_tensor)
-
-
-class PagedAttentionDeployFusion(PagedAttentionDeployBase):
-    """PagedAttention deploy with fuison ops."""
-
-    def __init__(self, kvcache: PagedAttentionMgr):
-        super(PagedAttentionDeployFusion, self).__init__(kvcache)
-        self.key_value_t_zp = Parameter(Tensor(np.zeros((2, self.key_t_zp.shape[0])), dtype=dtype.int32),
-                                        name="key_value_t_zp")
-        self.key_value_t_scale = Parameter(Tensor(np.zeros((2, self.value_t_scale.shape[0])), dtype=dtype.int64),
-                                           name="key_value_t_scale")
-
-    # pylint: disable=W0613
-    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
-        """The forward compute of Paged Attention."""
-        kcache = self.layer.key_cache
-        vcache = self.layer.value_cache
-        return self.layer.paged_attention(query, kcache, vcache, block_tables, batch_valid_length,
-                                          self.key_value_t_scale, self.key_value_t_zp)
-
-    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
-        """The forward compute of KVCache for Paged Attention with alibi tensor."""
-        return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
-                                                     block_tables, batch_valid_length, self.key_value_t_scale,
-                                                     self.key_value_t_zp, alibi_tensor)
-
-    def sharded_state_dict(self):
-        """provide the sharded state dict based on the config"""
-        key_value_t_scale_shard = (1, self.tensor_parallel_group_size)
-        key_value_t_zp_shard = (1, self.tensor_parallel_group_size)
-
-        state_dict = {}
-        state_dict[self.key_value_t_scale.name] = {'shape': self.key_value_t_scale.shape,
-                                                   'shard': key_value_t_scale_shard}
-        state_dict[self.key_value_t_zp.name] = {'shape': self.key_value_t_zp.shape,
-                                                'shard': key_value_t_zp_shard}
-        state_dict = self.sharded_input_quantizer_state_dict(state_dict)
         return state_dict

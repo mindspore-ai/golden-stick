@@ -291,16 +291,16 @@ class PagedAttentionQuant(PTQCell):
                                                name="key_value_t_scale")
 
             key_t_zp = copy.deepcopy(self._key_input_quantizer.t_zp)
-            key_t_zp_np = np.array(key_t_zp.asnumpy()*-1).astype(np.float16)
+            key_t_zp_np = key_t_zp.asnumpy().astype(np.float16)
             self.key_t_zp = Parameter(Tensor(key_t_zp_np, dtype=dtype.float16), name=key_t_zp.name)
 
             value_t_zp = copy.deepcopy(self._value_input_quantizer.t_zp)
-            value_t_zp_np = np.array(value_t_zp.asnumpy()*-1).astype(np.float16)
+            value_t_zp_np = value_t_zp.asnumpy().astype(np.float16)
             self.value_t_zp = Parameter(Tensor(value_t_zp_np, dtype=dtype.float16), name=value_t_zp.name)
 
             t_zp_len = value_t_zp_np.shape[0]
-            key_t_zp_np = key_t_zp_np.astype(np.int32)
-            value_t_zp_np = value_t_zp_np.astype(np.int32)
+            key_t_zp_np = (key_t_zp_np*-1).astype(np.int32)
+            value_t_zp_np = (value_t_zp_np*-1).astype(np.int32)
             key_value_t_zp = np.concatenate((key_t_zp_np.reshape((1, t_zp_len)), value_t_zp_np.reshape((1, t_zp_len))))
             self.key_value_t_zp = Parameter(Tensor(key_value_t_zp, dtype=dtype.int32), name="key_value_t_zp")
 
