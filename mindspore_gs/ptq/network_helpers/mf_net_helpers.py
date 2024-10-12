@@ -22,7 +22,6 @@ from collections import OrderedDict
 import numpy as np
 import mindspore as ms
 from mindspore import dtype as mstype
-from mindspore.communication.management import init
 from mindspore import Tensor, Model, nn
 
 from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
@@ -77,15 +76,9 @@ class MFNetworkHelper(NetworkHelper):
         network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
         network.set_train(False)
         network.phase = 'predict'
-        model = Model(network)
         ckpt_path = self.mf_config.load_checkpoint
         if ckpt_path:
-            input_ids = np.ones(shape=[self.get_spec('batch_size'), self.get_spec('seq_length')], dtype=np.int32)
-            infer_data = network.prepare_inputs_for_predict_layout(input_ids)
-            if self.mf_config.use_parallel:
-                network.phase = 'infer_predict_layout'
-                model.infer_predict_layout(*infer_data)
-            transform_and_load_checkpoint(self.mf_config, model, network, infer_data, do_predict=True)
+            self._load_ckpt(network)
         ms.ms_memory_recycle()
         network.phase = 'predict'
         return network
@@ -151,6 +144,9 @@ class MFNetworkHelper(NetworkHelper):
                                    top_p=top_p, top_k=top_k)
 
     def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
+        raise NotImplementedError
+
+    def _load_ckpt(self, network):
         raise NotImplementedError
 
 
@@ -312,6 +308,16 @@ class MFLlama2Helper(MFNetworkHelper):
                 MFLlama2Helper._ffn_analysis(info)
         return info
 
+    def _load_ckpt(self, network):
+        """_load_ckpt"""
+        model = Model(network)
+        input_ids = np.ones(shape=[self.get_spec('batch_size'), self.get_spec('seq_length')], dtype=np.int32)
+        infer_data = network.prepare_inputs_for_predict_layout(input_ids)
+        if self.mf_config.use_parallel:
+            network.phase = 'infer_predict_layout'
+            model.infer_predict_layout(*infer_data)
+        transform_and_load_checkpoint(self.mf_config, model, network, infer_data, do_predict=True)
+
     def analysis_decoder_groups(self, network):
         """
         Analyze decoder groups information of network.
@@ -413,23 +419,9 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         >>> decoder_layers = helper.get_decoder_layers(network)
         >>> helper.analysis_decoder_groups(network)
     """
-    def create_network(self):
-        """
-        Create network of type ParallelLlamaForCasualLM.
-
-        Returns:
-            Network of type ParallelLlamaForCasualLM.
-        """
-        ms.set_context(mode=self.mf_config.context.mode, device_target=self.mf_config.context.device_target,
-                       jit_config={"jit_level": "O0", "infer_boost": "on"})
-        init()
-        network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
-        network.set_train(False)
-        network.phase = 'predict'
-        ckpt_path = self.mf_config.load_checkpoint
-        if ckpt_path:
-            transform_and_load_checkpoint(self.mf_config, None, network, None)
-        return network
+    def _load_ckpt(self, network):
+        """_load_ckpt"""
+        transform_and_load_checkpoint(self.mf_config, None, network, None)
 
     @staticmethod
     def _ffn_analysis(decoder_info: DecoderGroupInfo):
