@@ -2,6 +2,40 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 0.6.0 Release Notes
+
+### Major Features and Improvements
+
+* The `RoundToNearest` supports Mindformers' KVCache int8 quantization now, i.e. `PagedAttentionMgr` class, mainly for Llama2 networks.
+* Added Post-Training Quantization algorithm named `PTQ` which supports SmoothQuant, A16W8, KVCacheInt8 and their combinations, such as A16W8 combined with KVCacheInt8, SmoothQuant combined with KVCacheInt8, etc., and the corresponding algorithm capabilities can be obtained by configuring PTQConfig. The algorithm is mainly supports ParallelLlama2 network from the MindFormers community.
+
+### API Change
+
+* `PTQConfig` adds the following three parameters:
+    * `act_quant_dtype`: The data type is mindspore.dtype. The default value is None. The options and meanings are as follows:
+
+        |  act_quant_dtype  | mindspore.dtype.int8  | None(default)  |
+        |  ----  | ----  | ----  |
+        | meanings  | quantize input to int8 | does not quantize input |
+    * `weight_quant_dtype`: The data type is mindspore.dtype. The default value is mindspore.dtype.int8. The options and meanings are as follows:
+
+        |  weight_quant_dtype  | mindspore.dtype.int8(default)  | None  |
+        |  ----  | ----  | ----  |
+        | meanings  | quantize weights to int8 | does not quantize weights |
+    * `kvcache_quant_dtype`: The data type is mindspore.dtype. The default value is None. The options and meanings are as follows:
+
+        |  kvcache_quant_dtype  | mindspore.dtype.int8  | None（default）  |
+        |  ----  | ----  | ----  |
+        | meanings  | quantize kvcache to int8 | does not quantize kvcache |
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+ccsszz, yyyyrf, hangangqiang
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 0.5.0 Release Notes
 
 ### Major Features and Improvements
