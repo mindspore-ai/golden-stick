@@ -17,7 +17,7 @@
 import time
 
 #pylint: disable=C0111
-__version__ = '0.6.0'
+__version__ = '1.0.0'
 
 
 def mindspore_version_check():
