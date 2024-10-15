@@ -27,6 +27,11 @@
         |  kvcache_quant_dtype  | mindspore.dtype.int8  | None（default）  |
         |  ----  | ----  | ----  |
         | meanings  | quantize kvcache to int8 | does not quantize kvcache |
+    * `outliers_suppression`: The data type is OutliersSuppressionType. The default value is OutliersSuppressionType.NONE. The options and meanings are as follows:
+
+        |  outliers_suppression  | OutliersSuppressionType.SMOOTH  | OutliersSuppressionType.NONE（default）  |
+        |  ----  | ----  | ----  |
+        | meanings  | employ smooth approach to suppress outliers in activation and weight | does not suppress outliers |
 
 ### Contributors
 
