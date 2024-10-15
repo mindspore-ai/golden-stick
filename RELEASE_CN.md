@@ -27,6 +27,11 @@
         |  kvcache_quant_dtype  | mindspore.dtype.int8  | None（默认）  |
         |  ----  | ----  | ----  |
         | 含义  | 将kvcache量化成int8 | 不进行kvcache量化 |
+    * `outliers_suppression`：OutliersSuppressionType类型，默认为OutliersSuppressionType.NONE，可选输入及含义如下：
+
+        |  outliers_suppression  | OutliersSuppressionType.SMOOTH  | OutliersSuppressionType.NONE（默认）  |
+        |  ----  | ----  | ----  |
+        | 含义  | 使用smooth方法对权重和激活进行异常值抑制 | 不进行异常值抑制 |
 
 ### 贡献者
 
