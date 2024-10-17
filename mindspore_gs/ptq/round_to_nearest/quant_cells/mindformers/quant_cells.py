@@ -23,6 +23,7 @@ from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
 from research.telechat.telechat_layer import TelechatLinear
+from research.telechat2.telechat_layer import TelechatLinear as TelechatLinear2
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 
 from mindspore_gs.common.gs_enum import BackendTarget
@@ -223,7 +224,6 @@ class LinearDeploy(PTQCell):
         return output
 
 
-
 class TeleLinearQuant(PTQCell):
     """Linear layer wrapper with min max"""
 
@@ -266,60 +266,48 @@ class TeleLinearQuant(PTQCell):
     def core_construct(self, *args):
         pass
 
-    def convert(self, backend: str = BackendTarget.NONE, is_deploy=False):
-        if backend == BackendTarget.NONE:
-            super(TeleLinearQuant, self).convert(backend)
-            if self._weight_quantizer:
-                self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
+    def convert(self, backend=BackendTarget.NONE, is_deploy=False):
+        weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
+                      self._policy.get_config().weight_quant_dtype == dtype.int8 and \
+                      self._policy.get_config().act_quant_dtype is None
+        all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
+                    isinstance(self._input_quantizer, LinearFakeQuantizer)
+        if not all_quant and not weight_only:
+            logger.info(f"LinearQuant {self} is not quanted.")
             return
-        if backend == BackendTarget.ASCEND:
-            weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
-                        self._weight_quantizer.get_attr("weight_only_quant", False)
-            all_quant = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
-                        isinstance(self._input_quantizer, LinearFakeQuantizer)
-            if not all_quant and not weight_only:
-                logger.info(f"LinearQuant {self} is not quanted.")
-                return
 
-            super(TeleLinearQuant, self).convert(backend)
-            # quant weight to int8
-            self._weight_quantizer = self._weight_quantizer.convert_to_fakequantparam()
-            weight_quantizer: P.FakeQuantParam = self._weight_quantizer.fq
-            weight = self._linear.cast(self._linear.weight, self._cast_dtype)
-            quant_min, quant_max = get_quant_min_max(
-                weight_quantizer.attrs[LinearFakeQuantizer.attr_key_num_bits],
-                weight_quantizer.attrs[LinearFakeQuantizer.attr_key_symmetric],
-                weight_quantizer.attrs[LinearFakeQuantizer.attr_key_narrow_range])
-            scale = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_scale]
-            zp = weight_quantizer.attrs[P.FakeQuantParam.attr_key_linear_quant_zero_point]
-            weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
-                                             quant_min, quant_max, self._weight_axis, dtype.int8)
-            np_weight_quant = weight_quant.asnumpy()
-            del weight_quant
-            self._linear.weight = Parameter(Tensor(np_weight_quant, dtype=dtype.int8),
-                                            name=self._linear.weight.name)
-            if not all_quant:
-                self._input_quantizer = None
-                self._output_quantizer = None
-                self._weight_quantizer = convert_to_fusion_antiquant(
-                    self._weight_quantizer, transpose_weight=self._linear.transpose_b,
-                    dst_dtype=self._cast_dtype, strategy=
-                    self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
-                                                False, is_transpose=self._linear.transpose_b)
-                )
-                self._quant_deployed = True
-            else:
-                self._output_quantizer = convert_to_dequant(self._input_quantizer, self._weight_quantizer)
-                self._input_quantizer = convert_to_quant(self._input_quantizer)
-                self._quant_deployed = True
-                raise RuntimeError(f'current version not support all quantization, only for weight quantization')
-
-    def calibrate(self):
-        """calibrate for weight quant"""
-        start = time.time()
-        self._weight_quantizer(self._linear.weight)
-        logger.info(
-            f"Calibrated weight of Linear Cell: {self._linear.weight.name}, time cost: {time.time() - start} s.")
+        super(TeleLinearQuant, self).convert(backend)
+        # quant weight to int8
+        weight_qparams = self._weight_quantizer.quant_params()
+        weight = self._linear.cast(self._linear.weight, self._cast_dtype)
+        quant_min, quant_max = get_quant_min_max(
+            weight_qparams.get(LinearFakeQuantizer.attr_key_num_bits),
+            weight_qparams.get(LinearFakeQuantizer.attr_key_symmetric),
+            weight_qparams.get(LinearFakeQuantizer.attr_key_narrow_range))
+        scale = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_scale)
+        zp = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_zero_point)
+        weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
+                                         quant_min, quant_max, self._weight_axis, dtype.int8)
+        np_weight_quant = weight_quant.asnumpy()
+        del weight_quant
+        self._linear.weight = Parameter(Tensor(np_weight_quant, dtype=dtype.int8),
+                                        name=self._linear.weight.name)
+        if not all_quant:
+            self._input_quantizer = None
+            self._output_quantizer = None
+            self._weight_quantizer = convert_to_fusion_antiquant(
+                weight_qparams, transpose_weight=self._linear.transpose_b,
+                dst_dtype=self._cast_dtype, strategy=
+                self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
+                                            False, is_transpose=self._linear.transpose_b)
+            )
+            self._quant_deployed = True
+        else:
+            input_qparams = self._input_quantizer.quant_params()
+            self._output_quantizer = convert_to_dequant(input_qparams, weight_qparams)
+            self._input_quantizer = convert_to_quant(input_qparams)
+            self._quant_deployed = True
+            raise RuntimeError(f'current version not support all quantization, only for weight quantization')
 
     # pylint: disable=W0221
     def construct(self, x):
@@ -353,11 +341,75 @@ class TeleLinearQuant(PTQCell):
         return output
 
 
+class TeleLinearQuant2(TeleLinearQuant):
+    """Linear layer wrapper with min max"""
+
+    def __init__(self, linear: TelechatLinear2, policy: PTQLayerPolicy):
+        super(TeleLinearQuant2, self).__init__(linear, policy)
+        self._linear = linear
+        rank = len(linear.weight.shape)
+        self._weight_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
+        input_fq_args = {}
+        weight_perchannel_args = PerChannelArgs(self._linear.out_channels, self._weight_axis, rank)
+        weight_fq_args = {}
+        self._act_strategy = None
+        self._weight_strategy = None
+        if "in_strategy" in self._linear.matmul.get_attr_dict():
+            self._act_strategy = self._linear.matmul.in_strategy[0]
+            self._weight_strategy = self._linear.matmul.in_strategy[1]
+            input_fq_args["strategy"] = (self._linear.matmul.in_strategy[0],)
+            weight_fq_args["strategy"] = (self._weight_strategy,)
+        self._input_quantizer = self._policy.get_input_quantizer(input_index=0, **input_fq_args)
+        self._output_quantizer = None
+        self._weight_quantizer = self._policy.get_weight_quantizer(self._linear.weight.name, weight_perchannel_args,
+                                                                   **weight_fq_args)
+
+        prex = ""
+        for _, param in linear.parameters_and_names():
+            prex = param.name.rsplit(".", 1)[0]
+        if self._input_quantizer:
+            self._input_quantizer.float_min.data.name = prex + "_input_float_min"
+            self._input_quantizer.float_max.data.name = prex + "_input_float_max"
+        self._weight_quantizer.float_min.data.name = prex + "_weight_float_min"
+        self._weight_quantizer.float_max.data.name = prex + "_weight_float_max"
+
+        has_dtype = hasattr(self._linear, "dtype")
+        self._cast_dtype = self._linear.dtype if has_dtype else self._linear.weight.dtype
+        self._quant_deployed = False
+
+    # pylint: disable=W0221
+    def construct(self, x):
+        """
+        Defines the computation of LinearWithMinMax to be performed.
+
+        Returns:
+            Tensor, returns the computed result.
+        """
+        out_shape = self._linear.shape(x)[:-1] + (self._linear.out_channels,)
+        x = self._linear.reshape(x, (-1, self._linear.in_channels))
+        if self._linear.expert_flag:
+            x = self._linear.reshape(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
+        ori_dtype = F.dtype(x)
+        weight = self._linear.cast(self._linear.weight, self._linear.dtype)
+        x = self._linear.cast(x, self._linear.dtype)
+        weight = self._weight_quantizer(weight)
+        x = self._linear.matmul(x, weight)
+        if self._linear.has_bias:
+            x = self._linear.bias_add(x, self._linear.cast(self._linear.bias, self._linear.dtype))
+        if self._linear.activation_flag:
+            x = self._linear.activation(x)
+        x = F.cast(x, ori_dtype)
+        output = self._linear.reshape(x, out_shape)
+        output = self._linear.dropout(output)
+        return output
+    
+
 class TeleLinearDeploy(PTQCell):
     """Linear layer wrapper with min max"""
 
     def __init__(self, linear: TelechatLinear, policy: PTQLayerPolicy):
         super(TeleLinearDeploy, self).__init__(linear, policy)
+        self._converted = True
         if not isinstance(linear, Linear):
             raise ValueError(f'only Linear cell is supported, but got {type(linear)}')
         self._linear = linear
@@ -389,9 +441,6 @@ class TeleLinearDeploy(PTQCell):
     def core_construct(self, *args):
         pass
 
-    def calibrate(self):
-        raise ValueError("Inner error, should not invoke LinearDeploy.calibrate().")
-
     # pylint: disable=W0221
     def construct(self, x):
         """
@@ -412,6 +461,62 @@ class TeleLinearDeploy(PTQCell):
 
         x = self._linear.cast(x, self._cast_dtype)
         x = self._weight_quantizer(x, self._linear.weight)
+        if self._linear.has_bias:
+            x = self._linear.bias_add(x, self._linear.cast(self._linear.bias, self._linear.dtype))
+        if self._linear.activation_flag:
+            x = self._linear.activation(x)
+        x = F.cast(x, ori_dtype)
+        output = self._linear.reshape(x, out_shape)
+        output = self._linear.dropout(output)
+        return output
+
+
+class TeleLinearDeploy2(TeleLinearDeploy):
+    """Linear layer wrapper with min max"""
+
+    def __init__(self, linear: TelechatLinear2, policy: PTQLayerPolicy):
+        super(TeleLinearDeploy2, self).__init__(linear, policy)
+        self._converted = True
+        if not isinstance(linear, Linear):
+            raise ValueError(f'only Linear cell is supported, but got {type(linear)}')
+        self._linear = linear
+
+        rank = len(linear.weight.shape)
+        self._weight_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
+        has_dtype = hasattr(self._linear, "dtype")
+        self._cast_dtype = self._linear.dtype if has_dtype else self._linear.weight.dtype
+        self._act_strategy = None
+        self._weight_strategy = None
+        if "in_strategy" in self._linear.matmul.get_attr_dict():
+            self._act_strategy = self._linear.matmul.in_strategy[0]
+            self._weight_strategy = self._linear.matmul.in_strategy[1]
+        self._linear.weight = Parameter(initializer('ones', self._linear.weight.shape, dtype.int8),
+                                        name=self._linear.weight.name)
+        self._weight_quantizer = convert_to_fusion_antiquant_for_deploy(
+            axis=self._weight_axis, output_channel=self._linear.out_channels,
+            data_rank=len(self._linear.weight.shape),
+            is_per_channel=True,
+            transpose_weight=self._linear.transpose_b,
+            dst_dtype=self._cast_dtype,
+            strategy=self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
+                                                 False, is_transpose=self._linear.transpose_b)
+            )
+    
+    def construct(self, x):
+        """
+        Defines the computation of LinearWithMinMax to be performed.
+
+        Returns:
+            Tensor, returns the computed result.
+        """
+        out_shape = self._linear.shape(x)[:-1] + (self._linear.out_channels,)
+        x = self._linear.reshape(x, (-1, self._linear.in_channels))
+        if self._linear.expert_flag:
+            x = self._linear.reshape(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
+        ori_dtype = F.dtype(x)
+        weight = self._linear.cast(self._linear.weight, self._linear.dtype)
+        x = self._linear.cast(x, self._linear.dtype)
+        x = self._weight_quantizer(x, weight)
         if self._linear.has_bias:
             x = self._linear.bias_add(x, self._linear.cast(self._linear.bias, self._linear.dtype))
         if self._linear.activation_flag:

@@ -19,23 +19,24 @@ import time
 
 import mindspore as ms
 from mindspore.communication import get_rank
-from research.telechat.telechat import TelechatForCausalLM
+
 from mindspore_gs.ptq import PTQMode, PTQConfig
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.network_helpers.tel_net_helpers import TELHelper
-
+from mindspore_gs.ptq.network_helpers.tel_net_helpers import TELHelper2
 
 def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
+    parser.add_argument('--network', '-n', type=str, required=True)
     args = parser.parse_args()
     print(f"-------------------------------------------------quant args: {args}", flush=True)
     return args
 
 
-def quant_network(net: TelechatForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, **kwargs):
+def quant_network(net, net_helper, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, **kwargs):
     """Quant llama2 model to w8a16 with RTN algorithm."""
     start_time = time.time()
     if mode == PTQMode.QUANTIZE:
@@ -49,8 +50,7 @@ def quant_network(net: TelechatForCausalLM, mode=PTQMode.QUANTIZE, backend=Backe
     mfconfig = kwargs.get("mfconfig", None)
     if not mfconfig:
         raise ValueError("Please provide mfconfig for calibrating.")
-    network_helper = TELHelper(mfconfig)
-    net = ptq.apply(net, network_helper)
+    net = ptq.apply(net, net_helper)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
     net.phase = "quant_convert"
@@ -60,28 +60,25 @@ def quant_network(net: TelechatForCausalLM, mode=PTQMode.QUANTIZE, backend=Backe
 
 
 if __name__ == "__main__":
-    start = time.time()
     uargs = get_args()
     print('------------------------- Creating network...', flush=True)
-    helper = TELHelper(uargs.config_path)
+    start = time.time()
+    if uargs.network == "telechat":
+        network_helper = TELHelper(uargs.config_path)
+    elif uargs.network == "telechat2":
+        network_helper = TELHelper2(uargs.config_path)
+    network = network_helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     print('------------------------- Quantize-ing network...', flush=True)
-
-    logger.info('Creating network...')
-    start = time.time()
-    network = helper.create_network()
-    logger.info(f'Create Network cost time is {time.time() - start} s.')
-    network = quant_network(network, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+    network = quant_network(network, network_helper, mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
     logger.info(f'Quant Network cost time is {time.time() - start} s.')
     print('------------------------- Saving checkpoint...', flush=True)
-    start = time.time()
-    logger.info('Saving checkpoint...')
     start = time.time()
     try:
         rank_id = get_rank()
     except RuntimeError:
         rank_id = 0
-    save_ckpt_path = os.path.join(helper.mf_config.output_dir, "w8a16_ckpt")
+    save_ckpt_path = os.path.join(network_helper.mf_config.output_dir, "w8a16_ckpt")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),

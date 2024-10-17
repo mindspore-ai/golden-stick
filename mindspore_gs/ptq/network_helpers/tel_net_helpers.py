@@ -29,11 +29,13 @@ from mindformers.tools.register.config import MindFormerConfig
 from mindformers.models.modeling_utils import PreTrainedModel
 from research.telechat.telechat import TelechatForCausalLM
 from research.telechat.telechat_tokenizer import TelechatTokenizer
-from research.telechat.telechat_config import TelechatConfig
+from research.telechat2.telechat import TelechatForCausalLM as TelechatForCausalLM2
+from research.telechat2.telechat_tokenizer import TelechatTokenizer as TelechatTokenizer2
 from mindformers.trainer.utils import transform_and_load_checkpoint
-from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
+from mindformers import MindFormerConfig, build_context, build_parallel_config
 from research.telechat.telechat_tokenizer import TelechatTokenizer
 from mindspore_gs.common.utils import value_check
+from mindspore_gs.common import logger
 from .network_helper import NetworkHelper
 
 
@@ -200,3 +202,35 @@ class TELHelper(TELNetworkHelper):
     def get_pre_layer(self, linear_name: str):
         pass
 
+
+class TELHelper2(TELHelper):
+    """
+    Network helper for network from MindFormers.
+
+    Args:
+        config (Union[str, MindFormerConfig]): MindFormerConfig or path of config file for network.
+
+    Raises:
+        TypeError: If input `config` is not an instance of `MindFormerConfig` neither a str.
+        ValueError: If input `config` is not a valid file path when input `config` is a str.
+    """
+    def create_network(self):
+        """
+        Create network of type LlamaForCasualLM.
+
+        Returns:
+            Network of type LlamaForCasualLM.
+        """
+        build_context(self.mf_config)
+        network = TelechatForCausalLM2(self.mf_config.model.model_config)
+        network.set_train(False)
+        network.phase = 'predict'
+        ckpt_path = self.mf_config.load_checkpoint
+        if ckpt_path:
+            self._load_ckpt(network)
+        ms.ms_memory_recycle()
+        return network
+    
+    def create_tokenizer(self, **kwargs):
+        """create_tokenizer."""
+        return TelechatTokenizer2(vocab_file=self.get_spec('vocab_file'))
