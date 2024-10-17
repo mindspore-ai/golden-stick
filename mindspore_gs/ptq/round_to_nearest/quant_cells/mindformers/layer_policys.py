@@ -70,7 +70,7 @@ class TeleLinearLayerPolicy(RTNLayerPolicy):
     def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
         super().__init__(weight_names, act_names, config)
         self.set_input_number(1)
-        if config.weight_only:
+        if config.act_quant_dtype is None:
             self.set_input_not_insert_fq()
             self.set_output_not_insert_fq()
         self.is_deploy = config.mode == PTQMode.DEPLOY
@@ -90,7 +90,7 @@ class TeleLinearLayerPolicy2(RTNLayerPolicy):
     def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
         super().__init__(weight_names, act_names, config)
         self.set_input_number(1)
-        if config.weight_only:
+        if config.act_quant_dtype is None:
             self.set_input_not_insert_fq()
             self.set_output_not_insert_fq()
         self.is_deploy = config.mode == PTQMode.DEPLOY

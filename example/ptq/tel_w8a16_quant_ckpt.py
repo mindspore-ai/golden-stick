@@ -47,9 +47,6 @@ def quant_network(net, net_helper, mode=PTQMode.QUANTIZE, backend=BackendTarget.
     ptq = RTN(config=cfg)
     logger.info(f'Create PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
-    mfconfig = kwargs.get("mfconfig", None)
-    if not mfconfig:
-        raise ValueError("Please provide mfconfig for calibrating.")
     net = ptq.apply(net, net_helper)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
@@ -81,7 +78,7 @@ if __name__ == "__main__":
     save_ckpt_path = os.path.join(network_helper.mf_config.output_dir, "w8a16_ckpt")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
-    ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),
+    ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, "w8a16.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
     print(f'------------------------- Checkpoint saved to {save_path}...', flush=True)

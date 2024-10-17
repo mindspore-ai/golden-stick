@@ -31,6 +31,8 @@ from research.telechat.telechat import TelechatForCausalLM
 from research.telechat.telechat_tokenizer import TelechatTokenizer
 from research.telechat2.telechat import TelechatForCausalLM as TelechatForCausalLM2
 from research.telechat2.telechat_tokenizer import TelechatTokenizer as TelechatTokenizer2
+from research.telechat.telechat_config import TelechatConfig
+from research.telechat2.telechat_config import TelechatConfig as TelechatConfig2
 from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers import MindFormerConfig, build_context, build_parallel_config
 from research.telechat.telechat_tokenizer import TelechatTokenizer
@@ -68,7 +70,8 @@ class TELNetworkHelper(NetworkHelper):
             Network of type LlamaForCasualLM.
         """
         build_context(self.mf_config)
-        network = TelechatForCausalLM(self.mf_config.model.model_config)
+        model_config = TelechatConfig(**self.mf_config.model.model_config)
+        network = TelechatForCausalLM(model_config)
         network.set_train(False)
         network.phase = 'predict'
         ckpt_path = self.mf_config.load_checkpoint
@@ -222,7 +225,8 @@ class TELHelper2(TELHelper):
             Network of type LlamaForCasualLM.
         """
         build_context(self.mf_config)
-        network = TelechatForCausalLM2(self.mf_config.model.model_config)
+        model_config = TelechatConfig2(**self.mf_config.model.model_config)
+        network = TelechatForCausalLM2(model_config)
         network.set_train(False)
         network.phase = 'predict'
         ckpt_path = self.mf_config.load_checkpoint

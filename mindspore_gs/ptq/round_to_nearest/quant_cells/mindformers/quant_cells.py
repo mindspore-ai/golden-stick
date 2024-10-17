@@ -514,9 +514,8 @@ class TeleLinearDeploy2(TeleLinearDeploy):
         if self._linear.expert_flag:
             x = self._linear.reshape(x, (self._linear.outer_batch, self._linear.expert_num, -1, self._linear.in_channels))
         ori_dtype = F.dtype(x)
-        weight = self._linear.cast(self._linear.weight, self._linear.dtype)
         x = self._linear.cast(x, self._linear.dtype)
-        x = self._weight_quantizer(x, weight)
+        x = self._weight_quantizer(x, self._linear.weight)
         if self._linear.has_bias:
             x = self._linear.bias_add(x, self._linear.cast(self._linear.bias, self._linear.dtype))
         if self._linear.activation_flag:
