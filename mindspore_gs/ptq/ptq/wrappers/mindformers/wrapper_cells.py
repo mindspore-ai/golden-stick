@@ -32,7 +32,8 @@ from mindformers.experimental.infer.core.layers import ColumnParallelLinear, Row
 from mindformers.experimental.parallel_core.pynative.parallel_state import (
     get_tensor_model_parallel_group, get_tensor_model_parallel_world_size)
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType, QuantType
+from mindspore_gs.ptq.ptq_config import (
+    InnerPTQConfig, PTQMode, OutliersSuppressionType, QuantType, DeviceType, OpsPriority)
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import LayerType, NetworkHelper
@@ -326,7 +327,7 @@ class QuantLinearCell(WrapperLinearCell):
     def is_enable(cfg: InnerPTQConfig):
         return cfg.weight_quant_dtype == dtype.int8
 
-    def __init__(self, linear_name, linear, cfg, network_helper):
+    def __init__(self, linear_name, linear, cfg: InnerPTQConfig, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
         if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
             raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
@@ -368,20 +369,43 @@ class QuantLinearCell(WrapperLinearCell):
             self.compute_type = self.layer.dtype
         else:
             self.compute_type = self.layer.compute_dtype
+        self.quant_type = self.cfg.act_weight_quant_type
+        if self.quant_type is QuantType.UNDEFINED:
+            raise ValueError("config quant type is undefined in QuantLinearCell, config is {cfg}.")
+        self.input_scale = None
+        self.input_zp = None
+        self.weight = None
+        self.smooth_scale = None
+        self.w_scale = None
+        self.x_scale = None
+        self.w_zp = None
+        self.bias = None
+        self.bias_name = None
+        if (cfg.device_type, cfg.ops_priority) not in QuantLinearCell.param_init_map:
+            raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in QuantLinearCell.param_init_map.")
+        QuantLinearCell.param_init_map[(cfg.device_type, cfg.ops_priority)](self)
+
+    def _param_init(self):
+        """_param_init"""
         self.input_scale = Parameter(initializer('ones', (self.ic), dtype.float16), name="input_scale")
         self.input_zp = Parameter(initializer('zeros', (self.ic), dtype.int8), name="input_zp")
-        self.weight = Parameter(initializer("ones", linear.weight.shape, dtype.int8), name=linear.weight.name)
+        self.weight = Parameter(initializer("ones", self.layer.weight.shape, dtype.int8), name=self.layer.weight.name)
         self.smooth_scale = Parameter(initializer('ones', (self.ic), dtype=self.compute_type))
         self.w_scale = Parameter(initializer('ones', (self.oc), dtype=self.compute_type))
         self.x_scale = Parameter(initializer('ones', (1,), dtype=self.compute_type))
         self.w_zp = Parameter(initializer('ones', (self.oc), dtype=dtype.int32))
-        self.quant_type = cfg.act_weight_quant_type
-        if self.quant_type is QuantType.UNDEFINED:
-            raise ValueError("config quant type is undefined in QuantLinearCell, config is {cfg}.")
-        self.bias = None
         if self.quant_type is QuantType.A8W8:
-            self.bias_name = self.layer.bias.name if self.layer.has_bias else linear.weight.name + "_bias"
+            self.bias_name = self.layer.bias.name if self.layer.has_bias else self.layer.weight.name + "_bias"
             self.bias = Parameter(initializer("ones", (self.oc), self.compute_type), name=self.bias_name)
+
+    param_init_map = {
+        (DeviceType.ASCEND910B, OpsPriority.ACLNN): _param_init,
+        (DeviceType.ASCEND910B, OpsPriority.INTERNAL): _param_init,
+        (DeviceType.ASCEND910B, OpsPriority.ASD): _param_init,
+        (DeviceType.ASCEND310, OpsPriority.ACLNN): _param_init,
+        (DeviceType.ASCEND310, OpsPriority.INTERNAL): _param_init,
+        (DeviceType.ASCEND310, OpsPriority.ASD): _param_init,
+    }
 
     def _fused_bias(self, quant_weight, act_offset, new_bias_need_allreduce=False):
         """compute fused bias"""
@@ -395,13 +419,8 @@ class QuantLinearCell(WrapperLinearCell):
             new_bias = t_new_bias.asnumpy()
         return new_bias
 
-    #pylint: disable=protected-access
-    def quant_weight(self):
-        """quant weight"""
-        self.quantizer_w_max = self.w_quant_max(self.layer.weight, self.weight_quantizer_min_max_axis,
-                                                keepdims=True)[0]
-        self.quantizer_w_min = self.w_quant_min(self.layer.weight, self.weight_quantizer_min_max_axis,
-                                                keepdims=True)[0]
+    def _param_compute(self):
+        """param compute"""
         w_scale, w_zp = cal_quantization_params(self.quantizer_w_min.asnumpy(), self.quantizer_w_max.asnumpy(),
                                                 self.weight_quant_min, self.weight_quant_max,
                                                 symmetric=self._weight_symmetric)
@@ -443,6 +462,28 @@ class QuantLinearCell(WrapperLinearCell):
             self.input_zp.set_data(Tensor(input_zp, dtype=dtype.int8))
         if need_insert_ops_for_smooth(self.cfg) or need_smooth_params_for_a8w8_dynamic(self.cfg):
             self.smooth_scale.set_data(Tensor(self.layer.matmul.mm.smooth_scale.asnumpy(), dtype=self.compute_type))
+
+    param_compute_map = {
+        (DeviceType.ASCEND910B, OpsPriority.ACLNN): _param_compute,
+        (DeviceType.ASCEND910B, OpsPriority.INTERNAL): _param_compute,
+        (DeviceType.ASCEND910B, OpsPriority.ASD): _param_compute,
+        (DeviceType.ASCEND310, OpsPriority.ACLNN): _param_compute,
+        (DeviceType.ASCEND310, OpsPriority.INTERNAL): _param_compute,
+        (DeviceType.ASCEND310, OpsPriority.ASD): _param_compute,
+    }
+
+    #pylint: disable=protected-access
+    def quant_weight(self):
+        """quant weight"""
+        self.quantizer_w_max = self.w_quant_max(self.layer.weight, self.weight_quantizer_min_max_axis,
+                                                keepdims=True)[0]
+        self.quantizer_w_min = self.w_quant_min(self.layer.weight, self.weight_quantizer_min_max_axis,
+                                                keepdims=True)[0]
+        if (self.cfg.device_type, self.cfg.ops_priority) not in QuantLinearCell.param_compute_map:
+            raise ValueError("key ({self.cfg.device_type}, {self.cfg.ops_priority}) is \
+                                    not in QuantLinearCell.param_compute_map.")
+        QuantLinearCell.param_compute_map[(self.cfg.device_type, self.cfg.ops_priority)](self)
+
 
     def process(self):
         super(QuantLinearCell, self).process()
@@ -766,31 +807,65 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.kvcache_symmetric = cfg.kvcache_symmetric
         n = layer.n_kv_heads
         d = layer.head_dim
-        ic = n * d
-        self.k_scale_no_fusion = Parameter(initializer('ones', (ic), dtype.float16))
-        self.k_zp_no_fusion = Parameter(initializer('ones', (ic), dtype.float16))
-        self.v_scale_no_fusion = Parameter(initializer('ones', (ic), dtype.float16))
-        self.v_zp_no_fusion = Parameter(initializer('ones', (ic), dtype.float16))
-        self.k_v_scale_fusion = Parameter(initializer('ones', (2, ic), dtype.int64))
-        self.k_v_zp_fusion = Parameter(initializer('ones', (2, ic), dtype.int32))
+        self.ic = n * d
+        self.k_scale_no_fusion = None
+        self.k_zp_no_fusion = None
+        self.v_scale_no_fusion = None
+        self.v_zp_no_fusion = None
+        self.k_v_scale_fusion = None
+        self.k_v_zp_fusion = None
 
         self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
                                                                            signed=True,
                                                                            narrow_range=cfg.kvcache_narrow_range)
+        if (cfg.device_type, cfg.ops_priority) not in QuantPageAttentionMgrCell.param_init_map:
+            raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in \
+                             QuantPageAttentionMgrCell.param_init_map.")
+        QuantPageAttentionMgrCell.param_init_map[(cfg.device_type, cfg.ops_priority)](self)
+
+    def _param_init_asd(self):
+        """_param_init_asd"""
+        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.k_v_scale_fusion = Parameter(initializer('ones', (2, self.ic), dtype.int64))
+        self.k_v_zp_fusion = Parameter(initializer('ones', (2, self.ic), dtype.int32))
+
+    def _param_init_internal(self):
+        """_param_init_internal"""
+        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.k_v_scale_fusion = Parameter(initializer('ones', (2, self.ic), dtype.float16))
+        self.k_v_zp_fusion = Parameter(initializer('ones', (2, self.ic), dtype.float16))
+
+    param_init_map = {
+        (DeviceType.ASCEND910B, OpsPriority.ACLNN): _param_init_asd,
+        (DeviceType.ASCEND910B, OpsPriority.INTERNAL): _param_init_internal,
+        (DeviceType.ASCEND910B, OpsPriority.ASD): _param_init_asd,
+        (DeviceType.ASCEND310, OpsPriority.ACLNN): _param_init_asd,
+        (DeviceType.ASCEND310, OpsPriority.INTERNAL): _param_init_internal,
+        (DeviceType.ASCEND310, OpsPriority.ASD): _param_init_asd,
+    }
+
     def process(self):
         if not self.key_samples or not self.value_samples:
             raise RuntimeError("Please catch ReshapeAndCache inputs before quantization.")
         key_cat_samples = msops.cat(tuple(self.key_samples), axis=0)
         self.quantizer_key_max = msops.max(key_cat_samples, 0)[0]
         self.quantizer_key_min = msops.min(key_cat_samples, 0)[0]
+
+        value_cat_samples = msops.cat(tuple(self.value_samples), axis=0)
+        self.quantizer_value_max = msops.max(value_cat_samples, 0)[0]
+        self.quantizer_value_min = msops.min(value_cat_samples, 0)[0]
+
         key_t_scale, key_t_zp = cal_quantization_params(self.quantizer_key_min.asnumpy(),
                                                         self.quantizer_key_max.asnumpy(),
                                                         self.kvcache_quant_min,
                                                         self.kvcache_quant_max,
                                                         symmetric=self.kvcache_symmetric)
-        value_cat_samples = msops.cat(tuple(self.value_samples), axis=0)
-        self.quantizer_value_max = msops.max(value_cat_samples, 0)[0]
-        self.quantizer_value_min = msops.min(value_cat_samples, 0)[0]
         value_t_scale, value_t_zp = cal_quantization_params(self.quantizer_value_min.asnumpy(),
                                                             self.quantizer_value_max.asnumpy(),
                                                             self.kvcache_quant_min,
@@ -804,7 +879,18 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.k_zp_no_fusion.set_data(Tensor(key_t_zp, dtype=dtype.float16))
         self.v_scale_no_fusion.set_data(Tensor(value_t_scale, dtype=dtype.float16))
         self.v_zp_no_fusion.set_data(Tensor(value_t_zp, dtype=dtype.float16))
+        if (self.cfg.device_type, self.cfg.ops_priority) not in QuantPageAttentionMgrCell.param_compute_map:
+            raise ValueError("key ({self.cfg.device_type}, {self.cfg.ops_priority}) is \
+                                    not in QuantPageAttentionMgrCell.param_compute_map.")
+        QuantPageAttentionMgrCell.param_compute_map[(self.cfg.device_type,
+                                                     self.cfg.ops_priority)](self, key_t_scale, value_t_scale,
+                                                                             key_t_zp, value_t_zp)
 
+        self.key_samples.clear()
+        self.value_samples.clear()
+
+    def _param_compute_asd(self, key_t_scale, value_t_scale, key_t_zp, value_t_zp):
+        """_param_compute_asd"""
         t_scale_len = self.k_scale_no_fusion.shape[0]
         key_t_scale = convert_fp32_to_int64(key_t_scale.astype(np.float32))
         value_t_scale = convert_fp32_to_int64(value_t_scale.astype(np.float32))
@@ -818,8 +904,27 @@ class QuantPageAttentionMgrCell(WrapperCell):
 
         self.k_v_scale_fusion.set_data(Tensor(key_value_t_scale, dtype=dtype.int64))
         self.k_v_zp_fusion.set_data(Tensor(key_value_t_zp, dtype=dtype.int32))
-        self.key_samples.clear()
-        self.value_samples.clear()
+
+    def _param_compute_internal(self, key_t_scale, value_t_scale, key_t_zp, value_t_zp):
+        """_param_compute_internal"""
+        t_scale_len = self.k_scale_no_fusion.shape[0]
+        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
+                                            value_t_scale.reshape((1, t_scale_len))))
+        t_zp_len = self.v_zp_no_fusion.shape[0]
+        key_t_zp = key_t_zp*-1
+        value_t_zp = value_t_zp*-1
+        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
+        self.k_v_scale_fusion.set_data(Tensor(key_value_t_scale, dtype=dtype.float16))
+        self.k_v_zp_fusion.set_data(Tensor(key_value_t_zp, dtype=dtype.float16))
+
+    param_compute_map = {
+        (DeviceType.ASCEND910B, OpsPriority.ACLNN): _param_compute_asd,
+        (DeviceType.ASCEND910B, OpsPriority.INTERNAL): _param_compute_internal,
+        (DeviceType.ASCEND910B, OpsPriority.ASD): _param_compute_asd,
+        (DeviceType.ASCEND310, OpsPriority.ACLNN): _param_compute_asd,
+        (DeviceType.ASCEND310, OpsPriority.INTERNAL): _param_compute_internal,
+        (DeviceType.ASCEND310, OpsPriority.ASD): _param_compute_asd,
+    }
 
     def deploy(self):
         return DeployPageAttentionMgrCell(self.layer, self.v_scale_no_fusion, self.v_zp_no_fusion,

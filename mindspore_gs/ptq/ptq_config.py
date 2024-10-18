@@ -94,6 +94,23 @@ def get_quant_type(cfg):
     return QuantType.UNDEFINED
 
 
+class DeviceType(Enum):
+    """
+    device type
+    """
+    ASCEND910B = 'ascend_910B'
+    ASCEND310 = 'ascend_310'
+
+
+class OpsPriority(Enum):
+    """
+    ops use priority
+    """
+    ACLNN = 'aclnn'
+    INTERNAL = 'internal'
+    ASD = 'asd'
+
+
 @algo_cfg_register.register(PTQApproach.OMNI_QUANT)
 @dataclass
 class OmniQuantConfig:
@@ -278,6 +295,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     smooth_to_pre_layer: bool = True
     fallback_blacklist: dict = field(default_factory=dict)
     act_weight_quant_type: QuantType = field(default=QuantType.UNDEFINED)
+    device_type: DeviceType = field(default=DeviceType.ASCEND910B)
+    ops_priority: OpsPriority = field(default=OpsPriority.ASD)
 
     def __post_init__(self):
         value_check('act_per_channel', self.act_per_channel, bool)
@@ -317,6 +336,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
         parsed_dict['act_weight_quant_type'] = self.act_weight_quant_type.name
+        parsed_dict['device_type'] = self.device_type.name
+        parsed_dict['ops_priority'] = self.ops_priority.name
         parsed_dict['opname_blacklist'] = self.opname_blacklist
         parsed_dict['kvcache_quant_dtype'] = str(self.kvcache_quant_dtype)
         parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
@@ -340,6 +361,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('approach', PTQApproach),
             ('outliers_suppression', OutliersSuppressionType),
             ('act_weight_quant_type', QuantType),
+            ('device_type', DeviceType),
+            ('ops_priority', OpsPriority),
             ('kvcache_quant_dtype', MSDTypeLoader()),
             ('weight_quant_dtype', MSDTypeLoader()),
             ('act_quant_dtype', MSDTypeLoader())
