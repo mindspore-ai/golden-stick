@@ -21,7 +21,7 @@ from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.processor import Processor, transform_network_inplace
-from mindspore_gs.ptq.ptq_config import LayerQuantizeAlgo, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import LayerQuantizeAlgo, OutliersSuppressionType, get_quant_type
 from mindspore_gs.common import logger
 from .wrapper_cell import WrapperCell
 
@@ -37,6 +37,7 @@ class Algorithm:
             new_config.act_quant_dtype = None
             new_config.kvcache_quant_dtype = None
             new_config.outliers_suppression = OutliersSuppressionType.NONE
+            new_config.act_weight_quant_type = get_quant_type(new_config)
         else:
             raise ValueError("Only support fallback layer quantization algorithm to A16w8 Now.")
         return new_config

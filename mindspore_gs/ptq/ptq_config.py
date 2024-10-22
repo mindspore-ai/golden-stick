@@ -71,6 +71,29 @@ class LayerQuantizeAlgo(Enum):
     A8W8 = 'a8w8'
 
 
+class QuantType(Enum):
+    """
+    quant type of weight and act
+    """
+    A8W8 = 'a8w8'
+    A8W8_DYNAMIC = 'a8w8_dynamic'
+    A16W8 = 'a16w8'
+    UNDEFINED = 'undefined'
+
+
+def get_quant_type(cfg):
+    '''get_quant_type'''
+    if cfg.act_quant_dtype != msdtype.int8 and cfg.weight_quant_dtype == msdtype.int8:
+        return QuantType.A16W8
+    if cfg.act_quant_dtype == msdtype.int8 and cfg.weight_quant_dtype == msdtype.int8 \
+                        and cfg.act_dynamic_quant is True:
+        return QuantType.A8W8_DYNAMIC
+    if cfg.act_quant_dtype == msdtype.int8 and cfg.weight_quant_dtype == msdtype.int8 \
+                        and cfg.act_dynamic_quant is False:
+        return QuantType.A8W8
+    return QuantType.UNDEFINED
+
+
 @algo_cfg_register.register(PTQApproach.OMNI_QUANT)
 @dataclass
 class OmniQuantConfig:
@@ -165,6 +188,7 @@ class PTQConfig:
     weight_quant_dtype: msdtype = msdtype.int8
     kvcache_quant_dtype: msdtype = None
     act_quant_dtype: msdtype = None
+    act_dynamic_quant: bool = False
     outliers_suppression: OutliersSuppressionType = OutliersSuppressionType.NONE
 
     def __post_init__(self):
@@ -178,6 +202,16 @@ class PTQConfig:
             raise ValueError(f'self.kvcache_quant_dtype: {self.kvcache_quant_dtype} is not mindspore.dtype.int8 or None.')
         if self.act_quant_dtype != msdtype.int8 and self.act_quant_dtype is not None:
             raise ValueError(f'self.act_quant_dtype: {self.act_quant_dtype} is not mindspore.dtype.int8 or None.')
+        value_check('act_dynamic_quant', self.act_dynamic_quant, bool)
+        if self.act_dynamic_quant is None:
+            raise ValueError(f'self.act_dynamic_quant: {self.act_dynamic_quant} is None, must be True or False.')
+        if self.act_dynamic_quant is True and (self.weight_quant_dtype != msdtype.int8 or
+                                               self.act_quant_dtype != msdtype.int8
+                                               or self.outliers_suppression != OutliersSuppressionType.SMOOTH):
+            raise ValueError(f'self.act_dynamic_quant is True, self.weight_quant_dtype: {self.weight_quant_dtype} \
+                             and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8, and \
+                             self.outliers_suppression: {self.outliers_suppression} \
+                             must be OutliersSuppressionType.SMOOTH.')
         value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
         if not isinstance(self.algo_args, dict) and not is_dataclass(self.algo_args):
             raise ValueError(f"algo_args's type should be dict or dataclass, but now is {type(self.algo_args)}")
@@ -243,6 +277,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     kvcache_calibrate_max_new_tokens: int = 10
     smooth_to_pre_layer: bool = True
     fallback_blacklist: dict = field(default_factory=dict)
+    act_weight_quant_type: QuantType = field(default=QuantType.UNDEFINED)
 
     def __post_init__(self):
         value_check('act_per_channel', self.act_per_channel, bool)
@@ -269,6 +304,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             raise ValueError("There should be no repetition between opname_blacklist and fallback_a16w8_blacklist,"
                              f"now opname_blacklist={self.opname_blacklist},"
                              f"fallback_a16w8_blacklist={self.fallback_blacklist}")
+        self.act_weight_quant_type = get_quant_type(self)
         if not self.algo_args:
             args_config = algo_cfg_register[self.approach]
             if args_config is not None and is_dataclass(args_config):
@@ -280,6 +316,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['backend'] = self.backend.name
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
+        parsed_dict['act_weight_quant_type'] = self.act_weight_quant_type.name
         parsed_dict['opname_blacklist'] = self.opname_blacklist
         parsed_dict['kvcache_quant_dtype'] = str(self.kvcache_quant_dtype)
         parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
@@ -302,6 +339,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('backend', BackendTarget),
             ('approach', PTQApproach),
             ('outliers_suppression', OutliersSuppressionType),
+            ('act_weight_quant_type', QuantType),
             ('kvcache_quant_dtype', MSDTypeLoader()),
             ('weight_quant_dtype', MSDTypeLoader()),
             ('act_quant_dtype', MSDTypeLoader())
@@ -324,4 +362,5 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
                 inner_cfg.algo_args.update(val)
             else:
                 setattr(inner_cfg, key, val)
+        inner_cfg.act_weight_quant_type = get_quant_type(inner_cfg)
         return inner_cfg

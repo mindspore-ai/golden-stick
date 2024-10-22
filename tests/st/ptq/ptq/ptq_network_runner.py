@@ -101,6 +101,14 @@ def create_cfg(quant_algo_, mode):
                         act_quant_dtype=dtype.int8,
                         weight_quant_dtype=dtype.int8,
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
+    elif quant_algo_ == 'A8W8_Dynamic':
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["lm_head"],
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8,
+                        act_dynamic_quant=True,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_algo_}")
     return cfg
@@ -234,6 +242,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         elif quant_algo_ == 'C8':
             ret = np.allclose(qoutput[:, :5], foutput[:, :5], 0, 0)
+        elif quant_algo_ == 'A8W8_Dynamic':
+            ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
         else:
             assert False
         if not ret:
@@ -251,6 +261,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     elif quant_algo_ == "A8W8_FallBack":
         ret = np.allclose(qoutput[:, :13], foutput[:, :13], 0, 0)
+    elif quant_algo_ == "A8W8_Dynamic":
+        ret = np.allclose(qoutput[:, :58], foutput[:, :58], 0, 0)
     else:
         assert False
     if not ret:
