@@ -328,6 +328,67 @@ def test_linears_woq_predict_2stage(device, mode):
     assert relative_tolerance_acceptable(quant_output.asnumpy(), fp_output.asnumpy(), 0.1587)
 
 
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_linears_dynamic_quant_predict_2stage(device, mode):
+    """
+    Feature: RoundToNearestPTQ A16W8 algorithm.
+    Description: Apply A16W8 quant on LLama2 and convert to ascend backend.
+    Expectation: Execute successfully.
+    """
+
+    context.set_context(device_target=device, mode=mode)
+    def quant(inputs):
+        network = LinearsNet()
+        cur_dir, _ = os.path.split(os.path.abspath(__file__))
+        ckpt_path = os.path.join(cur_dir, "../../../data/test_ckpt/test_linears_woq_predict_2stage_fp32.ckpt")
+        mindspore.load_checkpoint(ckpt_path, network)
+        fp_outputs = network(*inputs)
+
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND)
+        ptq = RTN(config=cfg)
+        quant_network = ptq.apply(network)
+        fakeinput = np.ones((1, 5), dtype=np.float16)
+        quant_network(Tensor(fakeinput))
+        ascend_network = ptq.convert(quant_network)
+        mindspore.save_checkpoint(ascend_network.parameters_dict(), "test_linears_dynamic_quant_predict_2stage.ckpt",
+                                  choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
+        return fp_outputs
+
+    def infer(inputs):
+        network = LinearsNet()
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        ptq = RTN(config=cfg)
+        # pylint: disable=W0212
+        ptq._config.act_dynamic_quant = True
+        ptq._config.kvcache_dynamic_quant = True
+        ptq._config.act_quant_dtype = dtype.int8
+        ptq._config.kvcache_dynamic_quant = dtype.int8
+        quant_network = ptq.apply(network)
+        ascend_network = ptq.convert(quant_network)
+        mindspore.load_checkpoint("test_linears_dynamic_quant_predict_2stage.ckpt", ascend_network)
+        return ascend_network(*inputs)
+
+    os.environ['GRAPH_OP_RUN'] = "1"
+    arr = np.array([[-1.02, 2.03, 3.04, -4.54, 5.55], [6.78, 0.02, 0.005, 6.77, 3.22],
+                    [-4.44, -5.55, -6.66, -1.11, -2.22], [9.87, 8.45, 3.67, -2.22, 3.21],
+                    [0.12, 4.00, -0.94, -3.89, -1.29]], dtype=np.float16)
+    inputs = [Tensor(arr, dtype=dtype.float16)]
+    fp_output = quant(inputs)
+    quant_output = infer(inputs)
+
+    assert fp_output.shape == (5, 5)
+    assert fp_output.dtype == dtype.float16
+    assert quant_output.shape == (5, 5)
+    assert quant_output.dtype == dtype.float16
+    os.environ.pop('GRAPH_OP_RUN')
+    context.set_context(device_target="CPU", mode=mode)
+    assert relative_tolerance_acceptable(quant_output.asnumpy(), fp_output.asnumpy(), 0.062)
+
+
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])
