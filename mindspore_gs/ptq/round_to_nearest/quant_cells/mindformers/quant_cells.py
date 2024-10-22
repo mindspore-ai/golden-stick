@@ -18,6 +18,7 @@ import abc
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
+from mindspore import ops
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
@@ -32,7 +33,7 @@ from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
 from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.ptq.convert_utils import (
     convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
-    convert_to_fusion_antiquant_for_deploy, convert_to_quant_for_deploy,
+    convert_to_fusion_antiquant_for_deploy, convert_to_quant_for_deploy, convert_to_dynamic_quant_for_deploy,
     convert_to_antiquant_for_deploy
 )
 
@@ -111,8 +112,7 @@ class LinearQuant(PTQCell):
             self._weight_quantizer = convert_to_fusion_antiquant(
                 weight_qparams, transpose_weight=self._linear.transpose_b,
                 dst_dtype=self._cast_dtype, strategy=
-                self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
-                                            False, is_transpose=self._linear.transpose_b)
+                self.wqbmm_strategy(self._act_strategy, self._weight_strategy, is_transpose=self._linear.transpose_b)
             )
             self._quant_deployed = True
         else:
@@ -175,15 +175,31 @@ class LinearDeploy(PTQCell):
             self._weight_strategy = self._linear.matmul.in_strategy[1]
         self._linear.weight = Parameter(initializer('ones', self._linear.weight.shape, dtype.int8),
                                         name=self._linear.weight.name)
-        self._weight_quantizer = convert_to_fusion_antiquant_for_deploy(
-            axis=self._weight_axis, output_channel=self._linear.out_channels,
-            data_rank=len(self._linear.weight.shape),
-            is_per_channel=True,
-            transpose_weight=self._linear.transpose_b,
-            dst_dtype=self._cast_dtype,
-            strategy=self.antiquant_bmm_strategy(self._act_strategy, self._weight_strategy,
-                                                 False, is_transpose=self._linear.transpose_b)
-            )
+        self._input_quantizer = None
+        self._output_quantizer = None
+        # self._linear.out_channels maybe not equal w_out
+        w_out = self._linear.weight.shape[0] if self._linear.transpose_b else self._linear.weight.shape[1]
+        w_in = self._linear.weight.shape[1] if self._linear.transpose_b else self._linear.weight.shape[0]
+        if self._policy.get_config().act_dynamic_quant is True:
+            self._weight_quantizer = convert_to_dynamic_quant_for_deploy(
+                w_out=w_out,
+                w_in=w_in,
+                is_per_channel=True,
+                transpose_weight=self._linear.transpose_b,
+                dst_dtype=self._cast_dtype,
+                strategy=self.dynamic_bmm_strategy(self._act_strategy, self._weight_strategy,
+                                                   is_transpose=self._linear.transpose_b)
+                )
+        else:
+            self._weight_quantizer = convert_to_fusion_antiquant_for_deploy(
+                axis=self._weight_axis, output_channel=self._linear.out_channels,
+                data_rank=len(self._linear.weight.shape),
+                is_per_channel=True,
+                transpose_weight=self._linear.transpose_b,
+                dst_dtype=self._cast_dtype,
+                strategy=self.wqbmm_strategy(self._act_strategy, self._weight_strategy,
+                                             is_transpose=self._linear.transpose_b)
+                )
 
     def weight_quantizer(self):
         return self._weight_quantizer
@@ -361,6 +377,8 @@ class PagedAttentionDeployBase(PTQCell):
         self._key_input_quantizer = convert_to_quant_for_deploy(ic, self._key_in_strategy)
         self._value_input_quantizer = convert_to_quant_for_deploy(ic, self._value_in_strategy)
         self._weight_quantizer = None
+        self._input_quantizer = None
+        self._output_quantizer = None
 
         self.key_t_scale = copy.deepcopy(self._key_input_quantizer.t_scale)
         self.value_t_scale = copy.deepcopy(self._value_input_quantizer.t_scale)
@@ -442,3 +460,53 @@ class PagedAttentionDeployFusion(PagedAttentionDeployBase):
         vcache = self._kvcache.value_cache
         return self._kvcache.paged_attention(query, kcache, vcache, block_tables, batch_valid_length,
                                              self.key_value_t_scale, self.key_value_t_zp)
+
+
+class DynamicQuantPagedAttentionDeploy(PTQCell):
+    """PagedAttention deploy base class"""
+
+    def __init__(self, kvcache: PagedAttentionMgr, policy: PTQLayerPolicy):
+        super(DynamicQuantPagedAttentionDeploy, self).__init__(kvcache, policy)
+        self._kvcache = kvcache
+        self._converted = True
+        self._weight_quantizer = None
+        self._input_quantizer = None
+        self._output_quantizer = None
+        self.paged_attention = ops.auto_generate.PagedAttention(self._kvcache.n_heads,
+                                                                self._kvcache.scale_value,
+                                                                self._kvcache.n_kv_heads,
+                                                                "PERTOKEN")
+        self.paged_attention_with_alibi = ops.auto_generate.PagedAttentionMask(self._kvcache.n_heads,
+                                                                               self._kvcache.scale_value,
+                                                                               self._kvcache.n_kv_heads,
+                                                                               "PERTOKEN")
+        if "in_strategy" in kvcache.paged_attention.get_attr_dict():
+            pa_strategy = kvcache.paged_attention.in_strategy
+            self.paged_attention.shard(pa_strategy)
+
+        if "in_strategy" in kvcache.paged_attention_with_alibi.get_attr_dict():
+            pa_strategy = kvcache.paged_attention_with_alibi.in_strategy
+            self.paged_attention_with_alibi.shard(pa_strategy)
+
+    def weight_quantizer(self):
+        return None
+
+    def core_construct(self, *args):
+        pass
+
+    # pylint: disable=W0221
+    def construct(self, key, value, slot_mapping):
+        """The forward compute of KVCache for Paged Attention."""
+        return self._kvcache.reshape_and_cache(key, value, self._kvcache.key_cache, self._kvcache.value_cache,
+                                               slot_mapping)
+
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
+        """The forward compute of Paged Attention."""
+        return self.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache,
+                                    block_tables, batch_valid_length)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        return self.paged_attention_with_alibi(query, self._kvcache.key_cache, self._kvcache.value_cache,
+                                               block_tables, batch_valid_length, None, None, alibi_tensor)
