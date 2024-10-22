@@ -59,6 +59,7 @@ def get_args():
                                                                              "Available: True, False")
 
     args = parser.parse_args()
+    args.act_quant_granularity = QuantGranularity.quant_granularity_formatter(args.act_quant_granularity)
 
     if args.approach == 'rtn-a16w8':
         logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
@@ -91,14 +92,12 @@ def get_args():
         def dtype_formatter(name: str):
             if name == 'int8':
                 return msdtype.int8
+            if name == 'int4':
+                return msdtype.qint4x2
             return None
-        if args.weight_quant_dtype == 'int4':
-            args.weight_quant_dtype = msdtype.qint4x2
-        else:
-            args.weight_quant_dtype = msdtype.int8
+        args.weight_quant_dtype = dtype_formatter(args.weight_quant_dtype)
         args.act_quant_dtype = dtype_formatter(args.act_quant_dtype)
         args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
-        args.act_quant_granularity = QuantGranularity.quant_granularity_formatter(args.act_quant_granularity)
         args.outliers_suppression = OutliersSuppressionType.SMOOTH if args.outliers_suppression == 'smooth' \
             else OutliersSuppressionType.NONE
         args.precision_recovery = PrecisionRecovery.GPTQ if args.precision_recovery == 'gptq' \

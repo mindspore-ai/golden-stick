@@ -13,12 +13,11 @@
 # limitations under the License.
 # ============================================================================
 """ptq wrapper cells for mindformers."""
-from enum import Enum
 
 import math
 import numpy as np
 
-from mindspore import Parameter, Tensor, dtype
+from mindspore import Parameter, dtype, Tensor
 from mindspore import ops as msops
 from mindspore.ops import operations as P
 from mindspore.ops.auto_generate import DynamicQuantExt, KVCacheScatterUpdate
@@ -28,29 +27,12 @@ from mindspore.nn import Cell
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_world_size
 
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
-from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, QuantGranularity
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
-from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from mindspore_gs.ptq.basic_quant_func import get_quant_min_max, cal_quantization_params, convert_fp32_to_int64
-
-
-class DeviceType(Enum):
-    """
-    device type
-    """
-    ASCEND910B = 'ascend_910B'
-    ASCEND310 = 'ascend_310'
-
-
-class OpsPriority(Enum):
-    """
-    ops use priority
-    """
-    ACLNN = 'aclnn'
-    INTERNAL = 'internal'
-    ASD = 'asd'
+from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
+from mindspore_gs.ptq.ptq.hal import C8PagedAttentionCell, QuantV2Cell, QuantParam
+from mindspore_gs.ptq.basic_quant_func import quant_tensor
 
 
 class QuantPageAttentionMgrCell(WrapperCell):
@@ -60,8 +42,8 @@ class QuantPageAttentionMgrCell(WrapperCell):
     def reg_self():
         class KVCacheInt8(Checker):
             def check(self, config: InnerPTQConfig):
-                return config.kvcache_quant_dtype == dtype.int8 and config.kvcache_quant_granularity != \
-                        QuantGranularity.PER_TOKEN
+                return config.kvcache_quant_dtype == dtype.int8 and config.kvcache_quant_granularity == \
+                        QuantGranularity.PER_CHANNEL
 
         Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
 
@@ -69,136 +51,41 @@ class QuantPageAttentionMgrCell(WrapperCell):
         super().__init__(linear_name, layer, cfg, network_helper)
         self.key_samples = []
         self.value_samples = []
-        self.quantizer_key_max = None
-        self.quantizer_key_min = None
-        self.quantizer_value_max = None
-        self.quantizer_value_min = None
-        self.kvcache_symmetric = cfg.kvcache_symmetric
         n = layer.n_kv_heads
         d = layer.head_dim
         self.ic = n * d
-        self.k_scale_no_fusion = None
-        self.k_zp_no_fusion = None
-        self.v_scale_no_fusion = None
-        self.v_zp_no_fusion = None
-        self.k_v_scale_fusion = None
-        self.k_v_zp_fusion = None
-        self.compute_type = layer.key_cache.dtype
-        self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
-                                                                           signed=True,
-                                                                           narrow_range=cfg.kvcache_narrow_range)
-        param_init_func = QuantPageAttentionMgrCell.param_init_map.get((DeviceType.ASCEND910B, OpsPriority.ASD))
-        if param_init_func is None:
-            raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in \
-                            QuantPageAttentionMgrCell.param_init_map.")
-        param_init_func(self)
-
-    def _param_init_asd(self):
-        """_param_init_asd"""
-        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.k_v_scale_fusion = Parameter(initializer('ones', (2, self.ic), dtype.int64))
-        self.k_v_zp_fusion = Parameter(initializer('ones', (2, self.ic), dtype.int32))
-
-    def _param_init_internal(self):
-        """_param_init_internal"""
-        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
-        self.k_v_scale_fusion = Parameter(initializer('ones', (2, self.ic), dtype.float16))
-        self.k_v_zp_fusion = Parameter(initializer('ones', (2, self.ic), dtype.float16))
-
-    param_init_map = {
-        (DeviceType.ASCEND910B, OpsPriority.ACLNN): _param_init_asd,
-        (DeviceType.ASCEND910B, OpsPriority.INTERNAL): _param_init_internal,
-        (DeviceType.ASCEND910B, OpsPriority.ASD): _param_init_asd,
-        (DeviceType.ASCEND310, OpsPriority.ACLNN): _param_init_asd,
-        (DeviceType.ASCEND310, OpsPriority.INTERNAL): _param_init_internal,
-        (DeviceType.ASCEND310, OpsPriority.ASD): _param_init_asd,
-    }
+        self.compute_dtype = self.layer.key_cache.dtype
+        self.key_t_zp = Parameter(initializer('zeros', (self.ic,), dtype=dtype.float64))
+        self.key_t_scale = Parameter(initializer('zeros', (self.ic,), dtype=dtype.float64))
+        self.value_t_zp = Parameter(initializer('zeros', (self.ic,), dtype=dtype.float64))
+        self.value_t_scale = Parameter(initializer('zeros', (self.ic,), dtype=dtype.float64))
 
     def process(self):
         if not self.key_samples or not self.value_samples:
             raise RuntimeError("Please catch ReshapeAndCache inputs before quantization.")
+
         key_cat_samples = msops.cat(tuple(self.key_samples), axis=0)
-        self.quantizer_key_max = msops.max(key_cat_samples, 0)[0]
-        self.quantizer_key_min = msops.min(key_cat_samples, 0)[0]
-
         value_cat_samples = msops.cat(tuple(self.value_samples), axis=0)
-        self.quantizer_value_max = msops.max(value_cat_samples, 0)[0]
-        self.quantizer_value_min = msops.min(value_cat_samples, 0)[0]
 
-        key_t_scale, key_t_zp = cal_quantization_params(self.quantizer_key_min.asnumpy(),
-                                                        self.quantizer_key_max.asnumpy(),
-                                                        self.kvcache_quant_min,
-                                                        self.kvcache_quant_max,
-                                                        symmetric=self.kvcache_symmetric)
-        value_t_scale, value_t_zp = cal_quantization_params(self.quantizer_value_min.asnumpy(),
-                                                            self.quantizer_value_max.asnumpy(),
-                                                            self.kvcache_quant_min,
-                                                            self.kvcache_quant_max,
-                                                            symmetric=self.kvcache_symmetric)
-        key_t_scale = np.squeeze(key_t_scale).astype(np.float64)
-        key_t_zp = np.squeeze(key_t_zp).astype(np.float64)
-        value_t_scale = np.squeeze(value_t_scale).astype(np.float64)
-        value_t_zp = np.squeeze(value_t_zp).astype(np.float64)
-        self.k_scale_no_fusion.set_data(Tensor(key_t_scale, dtype=self.compute_type))
-        self.k_zp_no_fusion.set_data(Tensor(key_t_zp, dtype=self.compute_type))
-        self.v_scale_no_fusion.set_data(Tensor(value_t_scale, dtype=self.compute_type))
-        self.v_zp_no_fusion.set_data(Tensor(value_t_zp, dtype=self.compute_type))
-        param_compute_func = QuantPageAttentionMgrCell.param_compute_map[(DeviceType.ASCEND910B, OpsPriority.ASD)]
-        if param_compute_func is None:
-            raise ValueError("key ({self.cfg.device_type}, {self.cfg.ops_priority}) is \
-                                    not in QuantPageAttentionMgrCell.param_compute_map.")
-        param_compute_func(self, key_t_scale, value_t_scale, key_t_zp, value_t_zp)
+        key_t_scale, key_t_zp, _ = quant_tensor(key_cat_samples, msops.min, msops.max,
+                                                self.cfg.kvcache_narrow_range, self.cfg.kvcache_symmetric,
+                                                self.cfg.kvcache_quant_dtype, 1)
+        value_t_scale, value_t_zp, _ = quant_tensor(value_cat_samples, msops.min, msops.max,
+                                                    self.cfg.kvcache_narrow_range, self.cfg.kvcache_symmetric,
+                                                    self.cfg.kvcache_quant_dtype, 1)
+
+        self.key_t_scale.set_data(Tensor(np.squeeze(key_t_scale)))
+        self.key_t_zp.set_data(Tensor(np.squeeze(key_t_zp)))
+        self.value_t_scale.set_data(Tensor(np.squeeze(value_t_scale)))
+        self.value_t_zp.set_data(Tensor(np.squeeze(value_t_zp)))
 
         self.key_samples.clear()
         self.value_samples.clear()
 
-    def _param_compute_asd(self, key_t_scale, value_t_scale, key_t_zp, value_t_zp):
-        """_param_compute_asd"""
-        t_scale_len = self.k_scale_no_fusion.shape[0]
-        key_t_scale = convert_fp32_to_int64(key_t_scale.astype(np.float32))
-        value_t_scale = convert_fp32_to_int64(value_t_scale.astype(np.float32))
-        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
-                                            value_t_scale.reshape((1, t_scale_len))))
-
-        t_zp_len = self.v_zp_no_fusion.shape[0]
-        key_t_zp = (key_t_zp*-1).astype(np.int32)
-        value_t_zp = (value_t_zp*-1).astype(np.int32)
-        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
-
-        self.k_v_scale_fusion.set_data(Tensor(key_value_t_scale, dtype=dtype.int64))
-        self.k_v_zp_fusion.set_data(Tensor(key_value_t_zp, dtype=dtype.int32))
-
-    def _param_compute_internal(self, key_t_scale, value_t_scale, key_t_zp, value_t_zp):
-        """_param_compute_internal"""
-        t_scale_len = self.k_scale_no_fusion.shape[0]
-        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
-                                            value_t_scale.reshape((1, t_scale_len))))
-        t_zp_len = self.v_zp_no_fusion.shape[0]
-        key_t_zp = key_t_zp*-1
-        value_t_zp = value_t_zp*-1
-        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
-        self.k_v_scale_fusion.set_data(Tensor(key_value_t_scale, dtype=dtype.float16))
-        self.k_v_zp_fusion.set_data(Tensor(key_value_t_zp, dtype=dtype.float16))
-
-    param_compute_map = {
-        (DeviceType.ASCEND910B, OpsPriority.ACLNN): _param_compute_asd,
-        (DeviceType.ASCEND910B, OpsPriority.INTERNAL): _param_compute_internal,
-        (DeviceType.ASCEND910B, OpsPriority.ASD): _param_compute_asd,
-        (DeviceType.ASCEND310, OpsPriority.ACLNN): _param_compute_asd,
-        (DeviceType.ASCEND310, OpsPriority.INTERNAL): _param_compute_internal,
-        (DeviceType.ASCEND310, OpsPriority.ASD): _param_compute_asd,
-    }
-
     def deploy(self):
-        return DeployPageAttentionMgrCell(self.layer, self.v_scale_no_fusion, self.v_zp_no_fusion,
-                                          self.k_scale_no_fusion, self.k_zp_no_fusion, self.k_v_scale_fusion,
-                                          self.k_v_zp_fusion, self.cfg)
+        return DeployPageAttentionMgrCell(self._layer_name, self.layer, self.cfg,
+                                          QuantParam(self.key_t_scale, self.key_t_zp),
+                                          QuantParam(self.value_t_scale, self.value_t_zp))
 
     def add_hook(self):
         pass
@@ -228,28 +115,17 @@ class QuantPageAttentionMgrCell(WrapperCell):
 class DeployPageAttentionMgrCell(Cell):
     """DeployPageAttentionMgrCell"""
 
-    def __init__(self, kvcache: PagedAttentionMgr, v_scale_no_fusion, v_zp_no_fusion, k_scale_no_fusion, k_zp_no_fusion,
-                 k_v_scale_fusion, k_v_zp_fusion, cfg: InnerPTQConfig):
+    def __init__(self, layer_name, kvcache: PagedAttentionMgr, cfg: InnerPTQConfig, k_qparam: QuantParam,
+                 v_qparam: QuantParam):
         super().__init__()
         self.layer = kvcache
-        self.enable_deploy_fusion = cfg.enable_deploy_fusion
-        self._key_input_quantizer = QuantCellV2(Tensor(k_scale_no_fusion.asnumpy(), dtype=k_scale_no_fusion.dtype),
-                                                Tensor(k_zp_no_fusion.asnumpy().astype(np.int8), dtype=dtype.int8))
-        self._value_input_quantizer = QuantCellV2(Tensor(v_scale_no_fusion.asnumpy(), dtype=v_scale_no_fusion.dtype),
-                                                  Tensor(v_zp_no_fusion.asnumpy().astype(np.int8), dtype=dtype.int8))
         dst_type = self.layer.key_cache.dtype
         n = kvcache.n_kv_heads
         d = kvcache.head_dim
-        self._key_output_quantizer = AntiQuantCell(n, d, dst_type)
-        self._value_output_quantizer = AntiQuantCell(n, d, dst_type)
-        if cfg.mode == PTQMode.QUANTIZE or not self.enable_deploy_fusion:
-            self.k_zp_no_fusion = k_zp_no_fusion
-            self.v_zp_no_fusion = v_zp_no_fusion
-            self.k_scale_no_fusion = k_scale_no_fusion
-            self.v_scale_no_fusion = v_scale_no_fusion
-        if cfg.mode == PTQMode.QUANTIZE or self.enable_deploy_fusion:
-            self.k_v_scale_fusion = k_v_scale_fusion
-            self.k_v_zp_fusion = k_v_zp_fusion
+        self.enable_deploy_fusion = cfg.enable_deploy_fusion
+        self.quant_pa = C8PagedAttentionCell(layer_name, cfg, dst_type, n, d, k_qparam, v_qparam)
+        self._key_input_quantizer = QuantV2Cell.create(layer_name, dst_type, cfg, k_qparam)
+        self._value_input_quantizer = QuantV2Cell.create(layer_name, dst_type, cfg, v_qparam)
 
         self.layer.key_cache = Parameter(initializer('ones', self.layer.key_cache.shape, dtype.int8),
                                          name=self.layer.key_cache.name, requires_grad=False)
@@ -267,68 +143,19 @@ class DeployPageAttentionMgrCell(Cell):
     # pylint: disable=W0613
     def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
-        if not self.enable_deploy_fusion:
-            kcache = self._key_output_quantizer(self.layer.key_cache, self.k_zp_no_fusion, self.k_scale_no_fusion)
-            vcache = self._value_output_quantizer(self.layer.value_cache, self.v_zp_no_fusion, self.v_scale_no_fusion)
-            return self.layer.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
-        return self.layer.paged_attention(query, self.layer.key_cache, self.layer.value_cache, block_tables,
-                                          batch_valid_length, self.k_v_scale_fusion, self.k_v_zp_fusion)
+        return self.quant_pa.paged_attn(self.layer, query, batch_valid_length, block_tables)
 
     def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
         """The forward compute of Paged Attention."""
-        if not self.enable_deploy_fusion:
-            kcache = self._key_output_quantizer(self.layer.key_cache, self.k_zp_no_fusion, self.k_scale_no_fusion)
-            vcache = self._value_output_quantizer(self.layer.value_cache, self.v_zp_no_fusion, self.v_scale_no_fusion)
-            return self.layer.paged_attention_with_alibi(query, kcache, vcache, block_tables, batch_valid_length,
-                                                         alibi_tensor)
-        return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
-                                                     block_tables, batch_valid_length, self.k_v_scale_fusion,
-                                                     self.k_v_zp_fusion, alibi_tensor)
+        return self.quant_pa.paged_attn_with_alibi(self.layer, query, batch_valid_length, block_tables, alibi_tensor)
 
     def sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
-        state_dict = {}
-        if self.enable_deploy_fusion:
-            key_value_t_scale_shard = (1, self.tensor_parallel_group_size)
-            key_value_t_zp_shard = (1, self.tensor_parallel_group_size)
-            state_dict[self.k_v_scale_fusion.name] = {'shape': self.k_v_scale_fusion.shape,
-                                                      'shard': key_value_t_scale_shard}
-            state_dict[self.k_v_zp_fusion.name] = {'shape': self.k_v_zp_fusion.shape,
-                                                   'shard': key_value_t_zp_shard}
-        else:
-            key_t_scale_shard = (self.tensor_parallel_group_size,)
-            key_t_zp_shard = (self.tensor_parallel_group_size,)
-
-            value_t_scale_shard = (self.tensor_parallel_group_size,)
-            value_t_zp_shard = (self.tensor_parallel_group_size,)
-
-            state_dict[self.k_scale_no_fusion.name] = {'shape': self.k_scale_no_fusion.shape,
-                                                       'shard': key_t_scale_shard}
-            state_dict[self.k_zp_no_fusion.name] = {'shape': self.k_zp_no_fusion.shape,
-                                                    'shard': key_t_zp_shard}
-            state_dict[self.v_scale_no_fusion.name] = {'shape': self.v_scale_no_fusion.shape,
-                                                       'shard': value_t_scale_shard}
-            state_dict[self.v_zp_no_fusion.name] = {'shape': self.v_zp_no_fusion.shape,
-                                                    'shard': value_t_zp_shard}
-        state_dict = self.sharded_input_quantizer_state_dict(state_dict)
-        return state_dict
-
-    def sharded_input_quantizer_state_dict(self, state_dict):
-        """provide the sharded state dict based on the config"""
-
-        key_input_quantizer_t_scale_shard = (self.tensor_parallel_group_size,)
-        key_input_quantizer_t_zp_shard = (self.tensor_parallel_group_size,)
-        value_input_quantizer_t_scale_shard = (self.tensor_parallel_group_size,)
-        value_input_quantizer_t_zp_shard = (self.tensor_parallel_group_size,)
-
-        state_dict[self._key_input_quantizer.t_scale.name] = {'shape': self._key_input_quantizer.t_scale.shape,
-                                                              'shard': key_input_quantizer_t_scale_shard}
-        state_dict[self._key_input_quantizer.t_zp.name] = {'shape': self._key_input_quantizer.t_zp.shape,
-                                                           'shard': key_input_quantizer_t_zp_shard}
-        state_dict[self._value_input_quantizer.t_scale.name] = {'shape': self._value_input_quantizer.t_scale.shape,
-                                                                'shard': value_input_quantizer_t_scale_shard}
-        state_dict[self._value_input_quantizer.t_zp.name] = {'shape': self._value_input_quantizer.t_zp.shape,
-                                                             'shard': value_input_quantizer_t_zp_shard}
+        state_dict = self.quant_pa.param_shard_state(self.tensor_parallel_group_size)
+        key_input_state_dict = self._key_input_quantizer.param_shard_state(self.tensor_parallel_group_size)
+        state_dict = state_dict.update(key_input_state_dict)
+        value_input_state_dict = self._value_input_quantizer.param_shard_state(self.tensor_parallel_group_size)
+        state_dict = state_dict.update(value_input_state_dict)
         return state_dict
 
 

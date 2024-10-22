@@ -31,12 +31,15 @@ from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQMode
-from mindspore_gs.ptq.basic_quant_func import np_int4data_pack_to_int8
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.convert_utils import AntiQuantCell
+from mindspore_gs.ptq.basic_quant_func import np_int4data_pack_to_int8, convert_fp32_to_int64
 
 
 class KernelType(enum.Enum):
     ASD = 0
     ACLNN = 1
+    INTERNAL = 2
 
 
 @dataclasses.dataclass
@@ -618,3 +621,141 @@ class AllQuantMatmul(QuantUnitCell):
         if self.offset:
             shard_state[self.offset.name] = {'shape': self.offset.shape, 'shard': q_shard}
         return shard_state
+
+
+class C8PagedAttentionCell(QuantUnitCell):
+    """C8PagedAttentionMgrCell"""
+    def __init__(self, layer_name, cfg: InnerPTQConfig, compute_type, n, d, k_qparam: QuantParam,
+                 v_qparam: QuantParam):
+        super().__init__(layer_name)
+        ic = k_qparam.scale.shape[0]
+        is_deploy = cfg.mode == PTQMode.DEPLOY
+        self.enable_deploy_fusion = cfg.enable_deploy_fusion
+        if is_deploy:
+            if self.enable_deploy_fusion:
+                self.k_v_scale_fusion = Parameter(initializer('ones', (2, ic), dtype=dtype.int64))
+                self.k_v_zp_fusion = Parameter(initializer('ones', (2, ic), dtype=dtype.int32))
+            else:
+                self.k_scale_no_fusion = Parameter(initializer('ones', (ic), compute_type))
+                self.k_zp_no_fusion = Parameter(initializer('ones', (ic), compute_type))
+                self.v_scale_no_fusion = Parameter(initializer('ones', (ic), compute_type))
+                self.v_zp_no_fusion = Parameter(initializer('ones', (ic), compute_type))
+        else:
+            self.k_scale_no_fusion = Parameter(Tensor(k_qparam.scale.asnumpy(), dtype=compute_type))
+            self.k_zp_no_fusion = Parameter(Tensor(k_qparam.zero_point.asnumpy(), dtype=compute_type))
+            self.v_scale_no_fusion = Parameter(Tensor(v_qparam.scale.asnumpy(), dtype=compute_type))
+            self.v_zp_no_fusion = Parameter(Tensor(v_qparam.zero_point.asnumpy(), dtype=compute_type))
+            self.k_v_scale_fusion, self.k_v_zp_fusion = self._fusion_params_compute(k_qparam.scale.asnumpy(),
+                                                                                    k_qparam.zero_point.asnumpy(),
+                                                                                    v_qparam.scale.asnumpy(),
+                                                                                    v_qparam.zero_point.asnumpy())
+        self._key_output_anti_quant = AntiQuantCell(n, d, compute_type)
+        self._value_output_anti_quant = AntiQuantCell(n, d, compute_type)
+        self.quant = QuantV2()
+
+    def _fusion_params_compute(self, key_t_scale, key_t_zp, value_t_scale, value_t_zp):
+        """_param_compute_asd"""
+        t_scale_len = key_t_scale.shape[0]
+        key_t_scale = convert_fp32_to_int64(key_t_scale.astype(np.float32))
+        value_t_scale = convert_fp32_to_int64(value_t_scale.astype(np.float32))
+        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
+                                            value_t_scale.reshape((1, t_scale_len))))
+
+        t_zp_len = value_t_scale.shape[0]
+        key_t_zp = (key_t_zp*-1).astype(np.int32)
+        value_t_zp = (value_t_zp*-1).astype(np.int32)
+        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
+
+        k_v_scale_fusion = Parameter((Tensor(key_value_t_scale, dtype=dtype.int64)))
+        k_v_zp_fusion = Parameter((Tensor(key_value_t_zp, dtype=dtype.int32)))
+        return k_v_scale_fusion, k_v_zp_fusion
+
+    # pylint: disable=W0613
+    def paged_attn(self, pa_mgr, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
+        """The forward compute of Paged Attention."""
+        if not self.enable_deploy_fusion:
+            kcache = self._key_output_anti_quant(pa_mgr.key_cache, self.k_zp_no_fusion, self.k_scale_no_fusion)
+            vcache = self._value_output_anti_quant(pa_mgr.value_cache, self.v_zp_no_fusion, self.v_scale_no_fusion)
+            return pa_mgr.paged_attention(query, kcache, vcache, block_tables, batch_valid_length)
+        return pa_mgr.paged_attention(query, pa_mgr.key_cache, pa_mgr.value_cache, block_tables,
+                                      batch_valid_length, self.k_v_scale_fusion, self.k_v_zp_fusion)
+
+    def paged_attn_with_alibi(self, pa_mgr, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of Paged Attention."""
+        if not self.enable_deploy_fusion:
+            kcache = self._key_output_anti_quant(pa_mgr.key_cache, self.k_zp_no_fusion, self.k_scale_no_fusion)
+            vcache = self._value_output_anti_quant(pa_mgr.value_cache, self.v_zp_no_fusion, self.v_scale_no_fusion)
+            return pa_mgr.paged_attention_with_alibi(query, kcache, vcache, block_tables, batch_valid_length,
+                                                     alibi_tensor)
+        return pa_mgr.paged_attention_with_alibi(query, pa_mgr.key_cache, pa_mgr.value_cache, block_tables,
+                                                 batch_valid_length, self.k_v_scale_fusion,
+                                                 self.k_v_zp_fusion, alibi_tensor)
+
+    # pylint: disable=arguments-differ
+    # pylint: disable=W0613
+    def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        state_dict = {}
+        if self.enable_deploy_fusion:
+            key_value_t_scale_shard = (1, tensor_parallel_num)
+            key_value_t_zp_shard = (1, tensor_parallel_num)
+            state_dict[self.k_v_scale_fusion.name] = {'shape': self.k_v_scale_fusion.shape,
+                                                      'shard': key_value_t_scale_shard}
+            state_dict[self.k_v_zp_fusion.name] = {'shape': self.k_v_zp_fusion.shape,
+                                                   'shard': key_value_t_zp_shard}
+        else:
+            key_t_scale_shard = (tensor_parallel_num,)
+            key_t_zp_shard = (tensor_parallel_num,)
+
+            value_t_scale_shard = (tensor_parallel_num,)
+            value_t_zp_shard = (tensor_parallel_num,)
+
+            state_dict[self.k_scale_no_fusion.name] = {'shape': self.k_scale_no_fusion.shape,
+                                                       'shard': key_t_scale_shard}
+            state_dict[self.k_zp_no_fusion.name] = {'shape': self.k_zp_no_fusion.shape,
+                                                    'shard': key_t_zp_shard}
+            state_dict[self.v_scale_no_fusion.name] = {'shape': self.v_scale_no_fusion.shape,
+                                                       'shard': value_t_scale_shard}
+            state_dict[self.v_zp_no_fusion.name] = {'shape': self.v_zp_no_fusion.shape,
+                                                    'shard': value_t_zp_shard}
+        return state_dict
+
+
+class QuantV2Cell(QuantUnitCell):
+    """QuantCellV2, warp Quant to support serialize and deserialize use QuantV2."""
+    def __init__(self, layer_name, is_deploy, t_scale: Tensor, t_zp: Tensor):
+        super().__init__(layer_name)
+        self._is_perchannel: bool = t_scale.shape != (1,)
+        if is_deploy:
+            self.t_scale = Parameter(initializer('ones', t_scale.shape, t_scale.dtype))
+            self.t_zp = Parameter(initializer('zeros', t_zp.shape, t_zp.dtype))
+        else:
+            self.t_scale = Parameter(t_scale)
+            self.t_zp = Parameter(t_zp)
+        self.quant = QuantV2()
+
+    def construct(self, x):
+        """construct network forward"""
+        return self.quant(x, self.t_scale, self.t_zp, False, "ROUND", dtype.int8)
+
+    @staticmethod
+    def create(layer_name, dst_type, cfg: InnerPTQConfig, qparam: QuantParam):
+        '''create'''
+        is_deploy = cfg.mode == PTQMode.DEPLOY
+        ops_priority = KernelType.INTERNAL
+        t_scale = qparam.scale.asnumpy()
+        t_zp = qparam.zero_point.asnumpy()
+        if ops_priority == KernelType.ACLNN:
+            return QuantV2Cell(layer_name, is_deploy, Tensor(t_scale, dtype=dst_type),
+                               Tensor(t_zp, dtype=dst_type))
+        return QuantV2Cell(layer_name, is_deploy, Tensor(t_scale, dtype=dst_type),
+                           Tensor(t_zp.astype(np.int8), dtype=dtype.int8))
+
+    # pylint: disable=arguments-differ
+    # pylint: disable=W0613
+    def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        state_dict = {}
+        t_scale_shard = (tensor_parallel_num,)
+        t_zp_shard = (tensor_parallel_num,)
+        state_dict[self.t_scale.name] = {'shape': self.t_scale.shape, 'shard': t_scale_shard}
+        state_dict[self.t_zp.name] = {'shape': self.t_zp.shape, 'shard': t_zp_shard}
+        return state_dict
