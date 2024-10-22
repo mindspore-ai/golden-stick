@@ -33,9 +33,9 @@ class WikiText2Dataset(GeneratorDataset):
         self.tokenizer = tokenizer
         self.pad_token_id = tokenizer.pad_token_id
         self.need_pad = need_pad
-        if hasattr(self.tokenizer, 'add_bos_token'):
+        if hasattr(self.tokenizer, 'add_bos_token') and self.tokenizer.bos_token is not None:
             self.tokenizer.add_bos_token = True
-        if hasattr(self.tokenizer, 'add_eos_token'):
+        if hasattr(self.tokenizer, 'add_eos_token') and self.tokenizer.eos_token is not None:
             self.tokenizer.add_eos_token = True
         self.content = []
         self._load(n_samples)
