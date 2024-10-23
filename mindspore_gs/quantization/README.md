@@ -28,6 +28,8 @@ Currently, there are two types of quantization solutions in the industry: **quan
 
 (2) **Post-training quantization** is easy to use. Only a small amount of calibration data is required. It is applicable to scenarios that require high usability and lack of training resources.
 
+This section mainly contains some **quantization aware training** algorithms, **post-training quantization** can refer to [post-training quantization chapter](../ptq/README.md)
+
 ## Examples
 
 - [SimQAT algorithm](./simulated_quantization/README.md): A basic quantization aware algorithm based on the fake quantization technology

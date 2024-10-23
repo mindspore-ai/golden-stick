@@ -1,4 +1,4 @@
-# 量化感知训练算法概述
+# 训练后量化算法概述
 
 [View English](./README.md)
 
@@ -28,10 +28,10 @@
 
 2）**训练后量化**简单易用，只需少量校准数据，适用于追求高易用性和缺乏训练资源的场景。
 
-本章节主要包含一些**量化感知训练**算法，**训练后量化**可以参考[训练后量化章节](../ptq/README_CN.md)
+本章节主要包含一些**训练后量化**算法，**量化感知训练**可以参考[量化感知训练6章节](../quantization/README_CN.md)
 
 ## 示例
 
-- [SimQAT算法示例](./simulated_quantization/README_CN.md)：一种基础的基于伪量化技术的量化感知训练
-- [SLB量化算法示例](./slb/README_CN.md)：一种非线性的低比特量化感知训练
+- [PTQ算法示例](./ptq/README_CN.md)：基于MindSpore动态图能力构建的后量化算法，支持权重量化，全量化，KVCache量化，
+- [RTN算法示例](./round_to_nearest/README_CN.md)：基于MinMax的基础后量化算法，仅支持8bit权重量化和8bit KVCache量化。
 

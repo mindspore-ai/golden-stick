@@ -2,7 +2,7 @@
 
 [View English](./README.md)
 
-## PTQ算法简介
+## PTQ算法介绍
 
 ### 设计初衷
 
@@ -22,7 +22,7 @@
 - 量化Cell是针对特定的非量化网络层，封装得到的量化网络层，用于实现对特定网络层的量化。量化网络层通过注册方式引入，实现了不同网络框架之间的解耦，比如金箍棒和MindFormers解耦。
 - 量化工具函数是一些基础的工具函数，如量化参数的计算，矩阵的量化等。
 
-### 支持范围
+### 使用限制
 
 表1：PTQ算法规格
 
@@ -33,6 +33,114 @@
 | 运行模式支持 | 量化checkpoint阶段仅支持PyNative模式，量化推理阶段不限定模式，建议GraphMode获得更好的性能 |
 
 > 当前PTQ算法依赖于完整的DecoderLayer做网络拓扑分析，所以不支持任意基于MindFormers的Linear层构造的网络，我们计划在后续版本改进这一点，以提升PTQ算法的网络泛化能力。
+
+### 算法支持
+
+训练后量化算法有很多种分类维度，比如静态量化和动态量化；权重量化、激活量化和KVCache量化；MinMax量化、MSE量化、KL散度量化和直方图量化；还有各种量化的优化技术，从最简单的四舍五入量化，到SmoothQuant量化，GPTQ量化，AWQ量化等。
+
+本小节从业界常见的量化算法范式来介绍PTQ算法的能力，在此之前先给出其他分类维度上的一些限制：
+
+- 仅支持MinMax量化。
+- 仅支持静态量化，其中激活量化只支持per-tensor量化，权重量化只支持per-channel量化。
+- 受限于硬件和算子支持，对于全量化，激活不支持per-channel的量化，权重不支持带zero point的量化。
+- 硬件支持带zero point的权重量化，但当前PTQ算法没有开放这方面能力，仅支持不带zero point的权重量化。
+- PTQ算法做了分层设计，当前底层量化算子仅对MindFormers的一些Layer做了支持，因为PTQ算法仅支持对[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/layers.py#L363)做权重量化和激活量化，对[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26)做KVCache量化。如果用户需要量化不基于MindFormers的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。
+
+#### RoundToNearest算法
+
+RoundToNearest算法是一类较朴素的后量化算法，其取整方式使用了Round to nearest，即四舍五入的方式，故名RoundToNearest。该算法能力和金箍棒独立的[RoundToNearest](../round_to_nearest/README_CN.ipynb)算法能力类似，后续金箍棒会停止对RoundToNearest算法的演进，使用PTQ算法来支持RoundToNearest算法能力。
+
+##### 1）量化过程
+
+![](images/zh_cn/round_to_nearest.png)
+
+量化算法的主要逻辑是根据浮点数据如权重的最大最小值和整型数据的最大最小值，根据计算公式计算量化参数：
+
+$$scale = \frac{X_{{float}_{max}} - {X_{float}}_{min}} {X_{{int}_{max}} - {X_{int}}_{min}}$$
+
+$$offset = round(X_{{int}_{max}} - \frac{X_{{float}_{max}}} {scale})$$
+
+其中scale是缩放因子，offset是平移因子，两者统称为量化参数。获得量化参数后就可以对权重做量化：
+
+$$x_{int} = clamp(round(x_{float} \div scale) + offset; 0, 2^b-1)$$
+
+其中涉及round操作，即四舍五入操作，这是RoundToNearest算法的含义，也是该量化算法的一部分误差来源。
+
+##### 2）权重量化
+
+将上述量化过程应用于网络中的权重矩阵，将其转换为8bit整型进行存储。在部署时加载8bit权重后，对其进行反量化，其过程的数学表达如下：
+
+$$X_{float} = (X_{int} - offset) \times scale$$
+
+将权重反量化为浮点后，网络的推理过程就和一般的浮点网络推理过程无异。权重量化并不能带来计算量的减少，相反反量化会带来额外的计算量，所以通常将反量化的操作和后续的浮点计算过程进行融合，可以有效降低部署阶段的显存开销，同时可以缓解大语言模型增量推理阶段的Memory Bound，这两者都可以提升大语言模型部署时的吞吐量。
+
+PTQ当前仅支持8bit的权重量化能力，可以通过如下配置项使能：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  kvcache_quant_dtype=None,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+##### 3）KVCache量化
+
+将上述量化过程应用于大语言模型推理过程中产生的KVCache上，将计算得到的KVCache量化后进行存储，然后在Attention计算前将KVCache进行反量化，从而缓解KVCache的显存占用，以支持更大batch size或者更长序列的大语言模型生成。需要注意的是，KVCache是推理时产生的，所以针对KVCache的量化需要少量数据集进行校准，根据数据集
+
+PTQ当前仅支持8bit的KVCache量化能力，可以通过如下配置项使能：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+#### SmoothQuant算法
+
+研究发现，不同于CNN和小型的transformer网络，当大语言模型参数量超过6.8B时，网络的激活中出现“systematic outliers with large magnitude”，由于浮点的分布很广且不均匀，导致难以量化。
+
+![](images/zh_cn/smooth_quant.png)
+
+SmoothQuant算法通过数学等价变换，将激活上的异常值转移一部分到权重上，从而将难以量化的激活和极易量化的权重转化为较易量化的激活和较易量化的权重，实现量化精度的提升。
+
+可以通过如下配置项使能PTQ的SmoothQuant能力：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+```
+
+#### 组合量化
+
+得益于分层解耦框架设计，PTQ算法可以方便的将不同的算法能力组合在一起：
+
+- 8bit权重量化组合8bit KVCache量化：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+- SmoothQuant量化组合8bit KVCache量化：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+后续我们还将基于此支持层间混合精度量化，根据不同层对于量化的敏感程度，应用8bit权重量化、8bit全量化或者4bit权重量化等。
 
 ## 示例
 
@@ -158,57 +266,15 @@ ds = get_datasets('squad1.1', ds_path, "train", bs_, seq_, max_decode_length, to
 
 PTQ算法支持基础的round to nearest方法实现的a16w8权重量化和c8（kvcache int8）算法，也支持smooth-quant方法实现的a8w8算法，同时也支持a16w8权重量化算法和c8算法组合量化算法，smooth-quant和c8组合量化算法。
 
-我们可以根据PTQConfig配置来启用不同的量化能力，PTQConfig的含义可以参考其[API文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.PTQConfig.html#mindspore_gs.ptq.PTQConfig)，这里我们展示这几种算法的配置样例：
+我们可以根据PTQConfig配置来启用不同的量化能力，PTQConfig的含义可以参考其[API文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.PTQConfig.html#mindspore_gs.ptq.PTQConfig)，这里我们以SmoothQuant为例：
 
-- a16w8权重量化
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-    ```python
-    from mindspore import dtype as msdtype
-    from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-    ```
-
-- smooth-quant量化
-
-    ```python
-    from mindspore import dtype as msdtype
-    from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
-    ```
-
-- kvcache int8量化
-
-    ```python
-    from mindspore import dtype as msdtype
-    from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-    ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-    ```
-
-- a16w8权重量化组合kvcache int8量化：
-
-    ```python
-    from mindspore import dtype as msdtype
-    from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-    ```
-
-- smooth-quant量化组合kvcache int8量化：
-
-    ```python
-    from mindspore import dtype as msdtype
-    from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
-    ```
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
+                    outliers_suppression=OutliersSuppressionType.SMOOTH)
+```
 
 有了PTQConfig以后，接下来构造PTQ算法了，代码如下：
 
