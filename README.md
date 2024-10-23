@@ -83,7 +83,7 @@ Take [Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quant
 | :---------------------: | :-----------------------------------------------------------------: |
 | API         | [API doc](https://www.mindspore.cn/golden_stick/docs/en/master) |
 | AutoCompress   | TBD |
-| Post-Training Quantization   | [PTQ](mindspore_gs/ptq/ptq/README.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README.md) |
+| [Post-Training Quantization](mindspore_gs/ptq/README_CN.md) | [PTQ](mindspore_gs/ptq/ptq/README_CN.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README.md) |
 | [Quant-Aware Quantization](mindspore_gs/quantization/README.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README.md) [SLB](mindspore_gs/quantization/slb/README.md) |
 | [Pruner](mindspore_gs/pruner/README.md) | [SCOP](mindspore_gs/pruner/scop/README.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
 | Others | [Ghost](mindspore_gs/ghost/README.md)  |
