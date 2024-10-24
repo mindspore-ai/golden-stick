@@ -25,7 +25,6 @@ from mindformers.modules import Linear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
-from mindspore_gs.ptq.network_helpers.network_helper import LayerInfo
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from tests.st.test_utils import get_available_port
 
@@ -75,12 +74,6 @@ class SimpleNetworkHelper(NetworkHelper):
 
     def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
         raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
-
-    def analysis_decoder_groups(self, network):
-        pass
-
-    def get_pre_layer(self, linear_name):
-        return None
 
 
 def create_foo_ds(repeat=1):
@@ -205,26 +198,6 @@ def test_context_mode_error():
     network = helper.create_network()
     with pytest.raises(ValueError, match="Quantization phase only support PYNATIVE MODE."):
         ptq.apply(network, helper)
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_layer_info_error():
-    """
-    Feature: test LayerInfo class.
-    Description: Feed invalid param to LayerInfo to raise type error.
-    Expectation: Except ValueError.
-    """
-    set_context(device_target="CPU")
-    with pytest.raises(TypeError):
-        _ = LayerInfo(name=1)
-
-    with pytest.raises(TypeError):
-        _ = LayerInfo(layer="1")
-
-    with pytest.raises(TypeError):
-        _ = LayerInfo(type_="1")
 
 
 def quant_simplenet():

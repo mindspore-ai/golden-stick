@@ -81,19 +81,6 @@ class QuantType(Enum):
     UNDEFINED = 'undefined'
 
 
-def get_quant_type(cfg):
-    '''get_quant_type'''
-    if cfg.act_quant_dtype != msdtype.int8 and cfg.weight_quant_dtype == msdtype.int8:
-        return QuantType.A16W8
-    if cfg.act_quant_dtype == msdtype.int8 and cfg.weight_quant_dtype == msdtype.int8 \
-                        and cfg.act_dynamic_quant is True:
-        return QuantType.A8W8_DYNAMIC
-    if cfg.act_quant_dtype == msdtype.int8 and cfg.weight_quant_dtype == msdtype.int8 \
-                        and cfg.act_dynamic_quant is False:
-        return QuantType.A8W8
-    return QuantType.UNDEFINED
-
-
 class DeviceType(Enum):
     """
     device type
@@ -281,11 +268,10 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     kvcache_narrow_range: bool = False
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
-    smooth_to_pre_layer: bool = True
+    smooth_to_pre_layer: bool = False
     fallback_blacklist: dict = field(default_factory=dict)
     act_dynamic_quant: bool = False
     kvcache_dynamic_quant: bool = False
-    act_weight_quant_type: QuantType = field(default=QuantType.UNDEFINED)
     device_type: DeviceType = field(default=DeviceType.ASCEND910B)
     ops_priority: OpsPriority = field(default=OpsPriority.ASD)
 
@@ -321,7 +307,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             raise ValueError("There should be no repetition between opname_blacklist and fallback_a16w8_blacklist,"
                              f"now opname_blacklist={self.opname_blacklist},"
                              f"fallback_a16w8_blacklist={self.fallback_blacklist}")
-        self.act_weight_quant_type = get_quant_type(self)
         if not self.algo_args:
             args_config = algo_cfg_register[self.approach]
             if args_config is not None and is_dataclass(args_config):
@@ -337,13 +322,23 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
             raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
 
+    def act_weight_quant_type(self):
+        if self.act_quant_dtype != msdtype.int8 and self.weight_quant_dtype == msdtype.int8:
+            return QuantType.A16W8
+        if self.act_quant_dtype == msdtype.int8 and self.weight_quant_dtype == msdtype.int8 \
+                and self.act_dynamic_quant is True:
+            return QuantType.A8W8_DYNAMIC
+        if self.act_quant_dtype == msdtype.int8 and self.weight_quant_dtype == msdtype.int8 \
+                and self.act_dynamic_quant is False:
+            return QuantType.A8W8
+        return QuantType.UNDEFINED
+
     def _parse_dict(self):
         """ parse data class to readable dicts"""
         parsed_dict = self.__dict__
         parsed_dict['backend'] = self.backend.name
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
-        parsed_dict['act_weight_quant_type'] = self.act_weight_quant_type.name
         parsed_dict['device_type'] = self.device_type.name
         parsed_dict['ops_priority'] = self.ops_priority.name
         parsed_dict['opname_blacklist'] = self.opname_blacklist
@@ -368,7 +363,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('backend', BackendTarget),
             ('approach', PTQApproach),
             ('outliers_suppression', OutliersSuppressionType),
-            ('act_weight_quant_type', QuantType),
             ('device_type', DeviceType),
             ('ops_priority', OpsPriority),
             ('kvcache_quant_dtype', MSDTypeLoader()),
@@ -393,5 +387,4 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
                 inner_cfg.algo_args.update(val)
             else:
                 setattr(inner_cfg, key, val)
-        inner_cfg.act_weight_quant_type = get_quant_type(inner_cfg)
         return inner_cfg

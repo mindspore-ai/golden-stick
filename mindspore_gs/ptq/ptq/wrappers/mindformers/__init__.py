@@ -19,9 +19,8 @@ from mindformers.experimental.infer.core.layers import ColumnParallelLinear, Row
 from mindformers.modules import PagedAttentionMgr
 from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
-from .wrapper_cells import (
-    SmoothLinearCell, QuantLinearCell, QuantPageAttentionMgrCell,
-)
+from .smooth_wrappers import SmoothLinearCell
+from .quant_wrappers import QuantLinearCell, QuantPageAttentionMgrCell
 
 LinearSmoother.reg_linear_map(Linear, SmoothLinearCell)
 LinearSmoother.reg_linear_map(ColumnParallelLinear, SmoothLinearCell)

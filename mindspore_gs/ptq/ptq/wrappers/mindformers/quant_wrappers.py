@@ -13,11 +13,10 @@
 # limitations under the License.
 # ============================================================================
 """ptq wrapper cells for mindformers."""
-import abc
-from types import MethodType
+
 import numpy as np
 
-from mindspore import nn, Parameter, Tensor, dtype
+from mindspore import Parameter, Tensor, dtype
 from mindspore import ops as msops
 from mindspore.ops import functional as F
 from mindspore.common.initializer import initializer
@@ -26,54 +25,29 @@ from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt
+
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-from mindformers.experimental.parallel_core.pynative.parallel_state import (
-    get_tensor_model_parallel_group, get_tensor_model_parallel_world_size)
-from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import (
-    InnerPTQConfig, PTQMode, OutliersSuppressionType, QuantType, DeviceType, OpsPriority)
+from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_world_size
+
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType, QuantType, DeviceType, \
+    OpsPriority
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
-from mindspore_gs.ptq.network_helpers import LayerType, NetworkHelper
 from mindspore_gs.quantization.quant_utils import (
     get_quant_min_max, cal_quantization_params,
     quant_tensor_data,
     convert_fp32_to_int64
 )
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
-
-
-class MinFromTensorParallelRegion(nn.Cell):
-    "Get argmin from tensor-parallel region"
-    def __init__(self):
-        super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group())
-
-    def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
-        output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
-        output = self.all_reduce(output_parallel)
-        return output, _
-
-
-class MaxFromTensorParallelRegion(nn.Cell):
-    "Get argmax from tensor-parallel region"
-    def __init__(self):
-        super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group())
-
-    def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
-        output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
-        output = self.all_reduce(output_parallel)
-        return output, _
+from .parallel_minmax import MaxFromTensorParallelRegion, MinFromTensorParallelRegion
+from .linear_wrapper import WrapperLinearCell
 
 
 def need_insert_ops_for_smooth(cfg):
-    '''need_insert_ops_for_smooth'''
+    """need_insert_ops_for_smooth"""
     if cfg.outliers_suppression == OutliersSuppressionType.NONE:
-        return False
-    if cfg.smooth_to_pre_layer:
         return False
     # when set no smooth_to_pre_layer, w8a8 fusion the smooth_scale with quantv2 ops and
     # w8a8_dynamic use smooth_scale in dynamic_quant ops, not need insert ops
@@ -83,241 +57,9 @@ def need_insert_ops_for_smooth(cfg):
 
 
 def need_smooth_params_for_a8w8_dynamic(cfg):
-    '''need_smooth_params_for_a8w8_dynamic'''
-    return cfg.act_weight_quant_type == QuantType.A8W8_DYNAMIC and cfg.outliers_suppression == \
-        OutliersSuppressionType.SMOOTH and not cfg.smooth_to_pre_layer
-
-
-class WrapperLinearCell(WrapperCell, abc.ABC):
-    """WrapperCell"""
-
-    class MatmulCell(Cell):
-        def __init__(self, matmul):
-            super().__init__()
-            self.mm = matmul
-
-        def construct(self, *args, **kwargs):
-            return self.mm(*args, **kwargs)
-
-    def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
-        super().__init__(layer_name, layer, cfg, network_helper)
-        if self.cfg.mode == PTQMode.QUANTIZE:
-            self._layer.matmul = WrapperLinearCell.MatmulCell(self._layer.matmul)
-
-    def add_hook(self):
-        def hook_fn(_, inps):
-            x = inps[0]
-            self.samples.append(msops.squeeze(x))
-        self._layer.matmul.register_forward_pre_hook(hook_fn)
-
-    def remove_hook(self):
-        self._layer.matmul = WrapperLinearCell.MatmulCell(self._layer.matmul.mm)
-
-    @abc.abstractmethod
-    def deploy(self):
-        raise NotImplementedError
-
-
-class SmoothLinearCell(WrapperLinearCell):
-    """SmoothLinearCell"""
-
-    @staticmethod
-    def is_enable(cfg: InnerPTQConfig):
-        return cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
-
-    def __init__(self, linear_name, linear, cfg, network_helper):
-        super().__init__(linear_name, linear, cfg, network_helper)
-        if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
-            raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
-                             f"but {linear_name} type is {type(linear)}.")
-
-        if self.cfg.mode == PTQMode.QUANTIZE and self.net_helper.get_spec("qkv_concat") is False:
-            logger.info(f"qkv_concat is False, set smooth_to_pre_layer to False.")
-            self.cfg.smooth_to_pre_layer = False
-
-        self.x_obs_max = msops.max
-        self.x_obs_min = msops.min
-        self.is_rowparallel = (isinstance(self.layer, RowParallelLinear))
-        self.is_colparallel = (isinstance(self.layer, ColumnParallelLinear))
-        if isinstance(self.layer, Linear):
-            self.compute_type = self.layer.dtype
-        else:
-            self.compute_type = self.layer.compute_dtype
-        if isinstance(self.layer, (Linear, RowParallelLinear)):
-            self.w_obs_max = msops.max
-            self.w_obs_min = msops.min
-        elif isinstance(self.layer, ColumnParallelLinear):
-            self.w_obs_max = MaxFromTensorParallelRegion()
-            self.w_obs_min = MinFromTensorParallelRegion()
-
-    def _calc_smooth_scale(self, alpha):
-        """_calc_smooth_scale"""
-        act_max = msops.maximum(msops.abs(self.x_obs_max(self.cat_samples, 0)[0]),
-                                msops.abs(self.x_obs_min(self.cat_samples, 0)[0]))
-        input_max_pow = msops.pow(act_max, alpha)
-        weight_smooth_minmax_axis = -2 if self.layer.transpose_b else -1
-        weight_max = msops.maximum(msops.abs(self.w_obs_max(self.layer.weight, weight_smooth_minmax_axis)[0]),
-                                   msops.abs(self.w_obs_min(self.layer.weight, weight_smooth_minmax_axis)[0]))
-        weight_max_pow = msops.pow(weight_max, 1 - alpha)
-        smooth_scale = msops.div(input_max_pow, weight_max_pow).clamp(1e-5)
-        # set 0 or nan to 1.0 to avoid quantization error
-        smooth_scale[input_max_pow == 0] = 1.0
-        smooth_scale[weight_max_pow == 0] = 1.0
-        return smooth_scale
-
-    def _apply_weight_smooth(self, smooth_scale: Tensor):
-        """_apply_weight_smooth"""
-        # weight * scale
-        weight_scale = msops.expand_dims(smooth_scale, 0)
-        if not self._layer.transpose_b:
-            weight_scale = weight_scale.transpose()
-        orin_dtype = self._layer.weight.dtype
-        weight = msops.mul(self._layer.weight, weight_scale)
-        weight = self._layer.cast(weight, orin_dtype)
-        msops.assign(self._layer.weight, weight)
-
-    def _apply_act_smooth_to_pre_layer(self, smooth_scale: Tensor):
-        """_apply_act_smooth_to_pre_layer"""
-        pre_layer = self.net_helper.get_pre_layer(self._layer_name)
-        # pre-weight / scale
-        if not pre_layer:
-            raise ValueError("Not support inserting mul in x for smooth now, please enable qkv_concat and "
-                             "ffn_concat.")
-        if pre_layer.type_ == LayerType.NORM_LAYER:
-            orin_dtype = pre_layer.layer.weight.dtype
-            norm_weight = msops.div(pre_layer.layer.weight, smooth_scale)
-            norm_weight = msops.cast(norm_weight, orin_dtype)
-            msops.assign(pre_layer.layer.weight, norm_weight)
-        if pre_layer.type_ == LayerType.LINEAR_LAYER:
-            if isinstance(pre_layer.layer, (Linear, ColumnParallelLinear, RowParallelLinear)):
-                linear: Linear = pre_layer.layer
-            elif isinstance(pre_layer.layer, SmoothLinearCell):
-                sqlinear: SmoothLinearCell = pre_layer.layer
-                linear: Linear = sqlinear.linear
-            else:
-                raise RuntimeError(f"Got unexpected linear layer, name: {pre_layer.name} {pre_layer.layer}.")
-            if linear.transpose_b:
-                # oc * ic
-                pre_scale = msops.expand_dims(smooth_scale, 1)
-            else:
-                # ic * oc
-                pre_scale = msops.expand_dims(smooth_scale, 0)
-            orin_dtype = linear.weight.dtype
-            weight = msops.div(linear.weight, pre_scale)
-            weight = msops.cast(weight, orin_dtype)
-            msops.assign(linear.weight, weight)
-        if pre_layer.type_ == LayerType.CONCAT_LINEAR_LAYER:
-            if isinstance(pre_layer.layer, (Linear, ColumnParallelLinear, RowParallelLinear)):
-                linear: Linear = pre_layer.layer
-            elif isinstance(pre_layer.layer, SmoothLinearCell):
-                sqlinear: SmoothLinearCell = pre_layer.layer
-                linear: Linear = sqlinear.linear
-            else:
-                raise RuntimeError(f"Got unexpected linear layer, name: {pre_layer.name} {pre_layer.layer}.")
-            if linear.transpose_b:
-                # oc * ic
-                oc = linear.weight.shape[0]
-                pre_scale = msops.pad(smooth_scale, [oc - smooth_scale.shape[0], 0], value=1)
-                pre_scale = msops.expand_dims(pre_scale, 1)
-            else:
-                # ic * oc
-                oc = linear.weight.shape[1]
-                pre_scale = msops.pad(smooth_scale, [oc - smooth_scale.shape[0], 0], value=1)
-                pre_scale = msops.expand_dims(pre_scale, 0)
-            orin_dtype = linear.weight.dtype
-            weight = msops.div(linear.weight, pre_scale)
-            weight = msops.cast(weight, orin_dtype)
-            msops.assign(linear.weight, weight)
-
-    def _apply_act_smooth_by_insert_op(self, smooth_scale: Tensor):
-        """_apply_act_smooth_by_insert_op"""
-        class SmoothMatmul(Cell):
-            def __init__(self, mm, smooth_scale_):
-                super().__init__()
-                self.mm = mm
-                self.smooth_scale = Parameter(msops.div(1, smooth_scale_))
-
-            def construct(self, x, weight):
-                x = msops.mul(x, self.smooth_scale)
-                return self.mm(x, weight)
-
-        self._layer.matmul = SmoothMatmul(self._layer.matmul, smooth_scale)
-
-    def _apply_act_smooth_by_insert_op_for_deploy(self, ic, compute_dtype):
-        """_apply_act_smooth_by_insert_op_for_deploy"""
-        class SmoothMatmul(Cell):
-            def __init__(self, mm, ic_, compute_dtype_):
-                super().__init__()
-                self.mm = mm
-                self.smooth_scale = Parameter(initializer('ones', (ic_,), dtype=compute_dtype_))
-
-            def construct(self, x, weight):
-                x = msops.mul(x, self.smooth_scale)
-                return self.mm(x, weight)
-
-        self._layer.matmul = SmoothMatmul(self._layer.matmul, ic, compute_dtype)
-
-    def _apply_smooth(self, smooth_scale):
-        """_apply_smooth"""
-        if self.cfg.smooth_to_pre_layer:
-            self._apply_act_smooth_to_pre_layer(smooth_scale)
-        else:
-            self._apply_act_smooth_by_insert_op(smooth_scale)
-        self._apply_weight_smooth(smooth_scale)
-
-    def smooth(self, alpha=0.5):
-        """smooth"""
-        smooth_scale = self._calc_smooth_scale(alpha)
-        self._apply_smooth(smooth_scale)
-
-    def process(self):
-        super(SmoothLinearCell, self).process()
-        self.smooth(self.cfg.algo_args.get('alpha', 0.5))
-
-    def deploy(self):
-        logger.info("Take back Linear from SmoothQuantLinearCell.")
-        if self.cfg.mode == PTQMode.QUANTIZE or not need_insert_ops_for_smooth(self.cfg):
-            return self.layer
-        logger.info("insert ops for smooth quant.")
-        ic = self._layer.weight.shape[1] if self._layer.transpose_b else self._layer.weight.shape[1]
-        self._apply_act_smooth_by_insert_op_for_deploy(ic, self.compute_type)
-        if self.is_colparallel:
-            self.layer.sharded_state_dict = MethodType(SmoothLinearCell.col_sharded_state_dict, self.layer)
-        if self.is_rowparallel:
-            self.layer.sharded_state_dict = MethodType(SmoothLinearCell.row_sharded_state_dict, self.layer)
-        return self.layer
-
-    @staticmethod
-    #pylint: disable=W0211
-    def col_sharded_state_dict(self):
-        """provide the sharded state dict based on the config"""
-        w_shard = (self.tensor_parallel_group_size, 1) if self.transpose_b else (1, self.tensor_parallel_group_size)
-        state_dict = {}
-        state_dict[self.weight.name] = {'shape': self.weight.shape,
-                                        'shard': w_shard}
-        if self.has_bias:
-            state_dict[self.bias.name] = {'shape': self.bias.shape,
-                                          'shard': (self.tensor_parallel_group_size,)}
-        smooth_scale_shard = (1,)
-        state_dict[self.matmul.smooth_scale.name] = {'shape': self.matmul.smooth_scale.shape,
-                                                     'shard': smooth_scale_shard}
-        return state_dict
-
-    @staticmethod
-    #pylint: disable=W0211
-    def row_sharded_state_dict(self):
-        """provide the sharded state dict based on the config"""
-        w_shard = (1, self.tensor_parallel_group_size) if self.transpose_b else (self.tensor_parallel_group_size, 1)
-        state_dict = {}
-        state_dict[self.weight.name] = {'shape': self.weight.shape,
-                                        'shard': w_shard}
-        if self.has_bias:
-            state_dict[self.bias.name] = {'shape': self.bias.shape,
-                                          'shard': (1,)}
-        smooth_scale_shard = (self.tensor_parallel_group_size,)
-        state_dict[self.matmul.smooth_scale.name] = {'shape': self.matmul.smooth_scale.shape,
-                                                     'shard': smooth_scale_shard}
-        return state_dict
+    """need_smooth_params_for_a8w8_dynamic"""
+    qtype = cfg.act_weight_quant_type()
+    return qtype == QuantType.A8W8_DYNAMIC and cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
 
 
 class QuantLinearCell(WrapperLinearCell):
@@ -329,7 +71,10 @@ class QuantLinearCell(WrapperLinearCell):
 
     def __init__(self, linear_name, linear, cfg: InnerPTQConfig, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
-        if not isinstance(linear, (Linear, ColumnParallelLinear, RowParallelLinear)):
+        self.is_rowparallel = isinstance(self.layer, RowParallelLinear)
+        self.is_colparallel = isinstance(self.layer, ColumnParallelLinear)
+        self.is_linear = isinstance(self.layer, Linear)
+        if not self.is_rowparallel and not self.is_colparallel and not self.is_linear:
             raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
                              f"but {linear_name} type is {type(linear)}.")
         self.post_clip_ratio = cfg.algo_args.get("post_clip_ratio", 1.0)
@@ -343,33 +88,30 @@ class QuantLinearCell(WrapperLinearCell):
         self._weight_symmetric = cfg.weight_symmetric
         self._act_symmetric = cfg.act_symmetric
         if cfg.weight_quant_dtype == dtype.int8:
-            self.weight_quant_min, self.weight_quant_max = get_quant_min_max(num_bits=8,
-                                                                             signed=True,
+            self.weight_quant_min, self.weight_quant_max = get_quant_min_max(num_bits=8, signed=True,
                                                                              narrow_range=cfg.weight_narrow_range)
         if cfg.act_quant_dtype == dtype.int8:
-            self.act_quant_min, self.act_quant_max = get_quant_min_max(num_bits=8,
-                                                                       signed=True,
+            self.act_quant_min, self.act_quant_max = get_quant_min_max(num_bits=8, signed=True,
                                                                        narrow_range=cfg.act_narrow_range)
+
+        self.compute_type = self.layer.dtype if self.is_linear else self.layer.compute_dtype
 
         self.quantizer_x_max = None
         self.quantizer_x_min = None
         self.quantizer_w_max = None
         self.quantizer_w_min = None
-        if isinstance(self.layer, (Linear, ColumnParallelLinear)):
-            self.x_quant_max = msops.max
-            self.x_quant_min = msops.min
-            self.w_quant_max = msops.max
-            self.w_quant_min = msops.min
-        elif isinstance(self.layer, RowParallelLinear):
+        if self.is_rowparallel:
             self.x_quant_max = MaxFromTensorParallelRegion()
             self.x_quant_min = MinFromTensorParallelRegion()
             self.w_quant_max = MaxFromTensorParallelRegion()
             self.w_quant_min = MinFromTensorParallelRegion()
-        if isinstance(self.layer, Linear):
-            self.compute_type = self.layer.dtype
         else:
-            self.compute_type = self.layer.compute_dtype
-        self.quant_type = self.cfg.act_weight_quant_type
+            self.x_quant_max = msops.max
+            self.x_quant_min = msops.min
+            self.w_quant_max = msops.max
+            self.w_quant_min = msops.min
+
+        self.quant_type = self.cfg.act_weight_quant_type()
         if self.quant_type is QuantType.UNDEFINED:
             raise ValueError("config quant type is undefined in QuantLinearCell, config is {cfg}.")
         self.input_scale = None
@@ -451,7 +193,7 @@ class QuantLinearCell(WrapperLinearCell):
             self.bias.set_data(bias.astype(self.compute_type))
             # FIXME hangangqiang, decouple with smooth
             if self.cfg.outliers_suppression == OutliersSuppressionType.SMOOTH and not self.cfg.smooth_to_pre_layer:
-                smooth_scale = 1.0 / self.layer.matmul.mm.smooth_scale.asnumpy()
+                smooth_scale = 1.0 / self.layer.matmul.smooth_scale.asnumpy()
             else:
                 smooth_scale = None
             if smooth_scale is not None:
@@ -462,7 +204,7 @@ class QuantLinearCell(WrapperLinearCell):
             input_zp = np.array([x_zp] * len(input_scale)).astype(np.int8)
             self.input_zp.set_data(Tensor(input_zp, dtype=dtype.int8))
         if need_insert_ops_for_smooth(self.cfg) or need_smooth_params_for_a8w8_dynamic(self.cfg):
-            self.smooth_scale.set_data(Tensor(self.layer.matmul.mm.smooth_scale.asnumpy(), dtype=self.compute_type))
+            self.smooth_scale.set_data(Tensor(self.layer.matmul.smooth_scale.asnumpy(), dtype=self.compute_type))
 
     param_compute_map = {
         (DeviceType.ASCEND910B, OpsPriority.ACLNN): _param_compute,
@@ -473,7 +215,7 @@ class QuantLinearCell(WrapperLinearCell):
         (DeviceType.ASCEND310, OpsPriority.ASD): _param_compute,
     }
 
-    #pylint: disable=protected-access
+    # pylint: disable=protected-access
     def quant_weight(self):
         """quant weight"""
         self.quantizer_w_max = self.w_quant_max(self.layer.weight, self.weight_quantizer_min_max_axis,
@@ -496,15 +238,6 @@ class QuantLinearCell(WrapperLinearCell):
         return DeployLinearCell(self.layer, self.cfg, self.weight, self.bias, self.w_scale, self.w_zp,
                                 self.x_scale, self.input_zp, self.input_scale, self.smooth_scale)
 
-    def add_hook(self):
-        def hook_fn(_, inps):
-            x = inps[0]
-            self.samples.append(msops.squeeze(x))
-        if self.cfg.outliers_suppression == OutliersSuppressionType.SMOOTH and not self.cfg.smooth_to_pre_layer:
-            self._layer.matmul.mm.mm.register_forward_pre_hook(hook_fn)
-        else:
-            self._layer.matmul.register_forward_pre_hook(hook_fn)
-
 
 class DeployLinearCell(Cell):
     """DeployLinearCell"""
@@ -514,7 +247,7 @@ class DeployLinearCell(Cell):
         self._layer = linear
         self.cfg = cfg
         self.quant = QuantV2()
-        self.quant_type = cfg.act_weight_quant_type
+        self.quant_type = cfg.act_weight_quant_type()
         if self.quant_type is QuantType.UNDEFINED:
             raise ValueError("config quant type is undefined in DeployLinearCell, config is {cfg}.")
         is_deploy = cfg.mode == PTQMode.DEPLOY

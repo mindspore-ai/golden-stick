@@ -27,7 +27,7 @@ from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.round_to_nearest.quant_cells.mindformers.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
-from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, get_quant_type
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindformers.modules import Linear
 
@@ -374,7 +374,6 @@ def test_linears_dynamic_quant_predict_2stage(device, mode):
         ptq._config.kvcache_dynamic_quant = True
         ptq._config.act_quant_dtype = dtype.int8
         ptq._config.kvcache_dynamic_quant = dtype.int8
-        ptq._config.act_weight_quant_type = get_quant_type(ptq._config)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network)
         mindspore.load_checkpoint("test_linears_dynamic_quant_predict_2stage.ckpt", ascend_network)

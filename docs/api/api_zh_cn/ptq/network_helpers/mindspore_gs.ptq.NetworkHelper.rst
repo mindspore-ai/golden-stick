@@ -59,7 +59,7 @@ mindspore_gs.ptq.NetworkHelper
 
         参数：
             - **linear_name** (str) - linear层名称。
-        
+
         返回：
             一个字典，表示获取到的前一层layer的信息，包含了layer名称、layer和类型。
 

@@ -12,60 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""ptq wrapper cell base class."""
-
+"""mindformers linear wrapper cell."""
 import abc
-from mindspore.nn import Cell
+from typing import Optional
+
 from mindspore import ops as msops
+from mindspore.common.hook_handle import HookHandle
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
+from mindspore_gs.ptq.ptq.quant_cell_units import MatmulCellForHook
 
 
-class WrapperCell(abc.ABC, Cell):
+class WrapperLinearCell(WrapperCell, abc.ABC):
     """WrapperCell"""
-
-    @staticmethod
-    def is_enable(cfg: InnerPTQConfig):
-        raise NotImplementedError
-
     def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
-        super().__init__()
-        self.cfg = cfg
-        self._layer_name = layer_name
-        self._layer = layer
-        self.net_helper = network_helper
-        self.samples = []
-        self.cat_samples = None
-
-    @property
-    def layer(self):
-        """layer"""
-        return self._layer
-
-    @property
-    def layer_name(self):
-        """layer_name"""
-        return self._layer_name
-
-    def process(self):
-        if not self.samples:
-            raise RuntimeError(f"Please catch matmul inputs before quantization.")
-        self.cat_samples = msops.cat(tuple(self.samples), axis=0)
-        self.samples.clear()
+        super().__init__(layer_name, layer, cfg, network_helper)
+        self.hook_handle: Optional[HookHandle] = None
 
     def add_hook(self):
-        """add_hook"""
-        raise NotImplementedError
+        def hook_fn(_, inps):
+            x = inps[0]
+            self.samples.append(msops.squeeze(x))
+        # mindspore can only hook cell.
+        if isinstance(self._layer.matmul, msops.Primitive):
+            self._layer.matmul = MatmulCellForHook(self._layer.matmul)
+        self.hook_handle = self._layer.matmul.register_forward_pre_hook(hook_fn)
 
     def remove_hook(self):
-        """remove_hook"""
-        raise NotImplementedError
+        if self.hook_handle:
+            self.hook_handle.remove()
+        # mindspore not support replace a cell with primitive, so MatmulCellForHook can not be removed here.
 
     @abc.abstractmethod
     def deploy(self):
         """deploy"""
         raise NotImplementedError
-
-    def construct(self, x, *args, **kwargs):
-        """construct"""
-        return self._layer(x, *args, **kwargs)

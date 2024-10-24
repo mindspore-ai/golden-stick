@@ -14,4 +14,4 @@
 # ============================================================================
 """Network helpers."""
 
-from .network_helper import NetworkHelper, DecoderGroupInfo, LayerInfo, LayerType
+from .network_helper import NetworkHelper
