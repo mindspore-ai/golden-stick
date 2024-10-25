@@ -14,7 +14,6 @@
 # ============================================================================
 """Quant llama2 7b to w8a16, please set use_past=False."""
 
-import os
 import argparse
 import time
 from mindformers.core.metric import PerplexityMetric
@@ -60,14 +59,13 @@ if __name__ == "__main__":
     start = time.time()
     uargs = get_args()
     logger.info('Creating network...')
-    if "RUN_MODE" in os.environ:
-        os.environ.pop("RUN_MODE")
     config = MindFormerConfig(uargs.config_path)
+    config.run_mode = 'eval'
     config.model.model_config.use_past = False
     if config.model.arch.type == "LlamaForCausalLM":
-        helper = MFLlama2Helper(uargs.config_path)
+        helper = MFLlama2Helper(config)
     elif config.model.arch.type == "ParallelLlamaForCausalLM":
-        helper = MFParallelLlama2Helper(uargs.config_path)
+        helper = MFParallelLlama2Helper(config)
     else:
         err_msg = f"Unsupported network arch: {config.model.arch}, please check model.arch in yaml config, " \
                   f"only support LlamaForCausalLM and ParallelLlamaForCausalLM now"
