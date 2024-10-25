@@ -43,7 +43,19 @@ class PTQCell(QuantCell):
         return anti_strategy
 
     @staticmethod
-    def antiquant_bmm_strategy(act_strategy, weight_strategy, has_bias=False, has_offset=True, is_transpose=False):
+    def qbmm_strategy(act_strategy, weight_strategy, is_transpose=False):
+        """parallel strategy for antiquant bmm"""
+        if act_strategy is None or weight_strategy is None:
+            return None
+        if is_transpose:
+            scale_strategy = (weight_strategy[0],)
+        else:
+            scale_strategy = (weight_strategy[1],)
+        return act_strategy, weight_strategy, scale_strategy
+
+
+    @staticmethod
+    def wqbmm_strategy(act_strategy, weight_strategy, is_transpose=False):
         """parallel strategy for antiquant bmm"""
         if act_strategy is None or weight_strategy is None:
             return None
@@ -52,11 +64,16 @@ class PTQCell(QuantCell):
         else:
             scale_strategy = (weight_strategy[1],)
         offset_strategy = scale_strategy
-        if not has_bias:
-            if has_offset:
-                return act_strategy, weight_strategy, scale_strategy, offset_strategy
-            return act_strategy, weight_strategy, scale_strategy
-        bias_strategy = scale_strategy
-        if has_offset:
-            return act_strategy, weight_strategy, scale_strategy, offset_strategy, bias_strategy
-        return act_strategy, weight_strategy, scale_strategy, bias_strategy
+        return act_strategy, weight_strategy, scale_strategy, offset_strategy
+
+    @staticmethod
+    def dynamic_bmm_strategy(act_strategy, weight_strategy, is_transpose=False):
+        '''dynamic_bmm_strategy'''
+        if act_strategy is None or weight_strategy is None:
+            return None
+        if is_transpose:
+            scale_strategy = (weight_strategy[0],)
+        else:
+            scale_strategy = (weight_strategy[1],)
+        pertoken_strategy = (act_strategy[0],)
+        return act_strategy, weight_strategy, scale_strategy, pertoken_strategy

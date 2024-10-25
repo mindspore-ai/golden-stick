@@ -381,9 +381,10 @@ class QuantLinearCell(WrapperLinearCell):
         self.w_zp = None
         self.bias = None
         self.bias_name = None
-        if (cfg.device_type, cfg.ops_priority) not in QuantLinearCell.param_init_map:
+        param_init_func = QuantLinearCell.param_init_map.get((cfg.device_type, cfg.ops_priority))
+        if param_init_func is None:
             raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in QuantLinearCell.param_init_map.")
-        QuantLinearCell.param_init_map[(cfg.device_type, cfg.ops_priority)](self)
+        param_init_func(self)
 
     def _param_init(self):
         """_param_init"""
@@ -479,11 +480,11 @@ class QuantLinearCell(WrapperLinearCell):
                                                 keepdims=True)[0]
         self.quantizer_w_min = self.w_quant_min(self.layer.weight, self.weight_quantizer_min_max_axis,
                                                 keepdims=True)[0]
-        if (self.cfg.device_type, self.cfg.ops_priority) not in QuantLinearCell.param_compute_map:
+        param_compute_func = QuantLinearCell.param_compute_map.get((self.cfg.device_type, self.cfg.ops_priority))
+        if param_compute_func is None:
             raise ValueError("key ({self.cfg.device_type}, {self.cfg.ops_priority}) is \
                                     not in QuantLinearCell.param_compute_map.")
-        QuantLinearCell.param_compute_map[(self.cfg.device_type, self.cfg.ops_priority)](self)
-
+        param_compute_func(self)
 
     def process(self):
         super(QuantLinearCell, self).process()
@@ -818,10 +819,11 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
                                                                            signed=True,
                                                                            narrow_range=cfg.kvcache_narrow_range)
-        if (cfg.device_type, cfg.ops_priority) not in QuantPageAttentionMgrCell.param_init_map:
+        param_init_func = QuantPageAttentionMgrCell.param_init_map.get((cfg.device_type, cfg.ops_priority))
+        if param_init_func is None:
             raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in \
                              QuantPageAttentionMgrCell.param_init_map.")
-        QuantPageAttentionMgrCell.param_init_map[(cfg.device_type, cfg.ops_priority)](self)
+        param_init_func(self)
 
     def _param_init_asd(self):
         """_param_init_asd"""
@@ -879,12 +881,11 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.k_zp_no_fusion.set_data(Tensor(key_t_zp, dtype=dtype.float16))
         self.v_scale_no_fusion.set_data(Tensor(value_t_scale, dtype=dtype.float16))
         self.v_zp_no_fusion.set_data(Tensor(value_t_zp, dtype=dtype.float16))
-        if (self.cfg.device_type, self.cfg.ops_priority) not in QuantPageAttentionMgrCell.param_compute_map:
+        param_compute_func = QuantPageAttentionMgrCell.param_compute_map[(self.cfg.device_type, self.cfg.ops_priority)]
+        if param_compute_func is None:
             raise ValueError("key ({self.cfg.device_type}, {self.cfg.ops_priority}) is \
                                     not in QuantPageAttentionMgrCell.param_compute_map.")
-        QuantPageAttentionMgrCell.param_compute_map[(self.cfg.device_type,
-                                                     self.cfg.ops_priority)](self, key_t_scale, value_t_scale,
-                                                                             key_t_zp, value_t_zp)
+        param_compute_func(self, key_t_scale, value_t_scale, key_t_zp, value_t_zp)
 
         self.key_samples.clear()
         self.value_samples.clear()

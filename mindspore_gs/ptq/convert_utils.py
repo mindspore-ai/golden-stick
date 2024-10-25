@@ -23,7 +23,8 @@ from mindspore.ops.operations._inner_ops import Dequant
 from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
-from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
+from mindspore.common.initializer import initializer
+from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt
 from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 
@@ -271,6 +272,40 @@ class AntiquantBMMCell(Cell):
         self.weight_qbmm.shard(strategy)
 
 
+class DynamicQuantCell(Cell):
+    """fused anti quant cell."""
+    def __init__(self, weight_scale_shape, smooth_scale_shape, out_dtype=dtype.float16, has_smooth: bool = False,
+                 transpose_x: bool = False, transpose_weight: bool = False):
+        super().__init__()
+        self.qbmm = QuantBatchMatmul(transpose_x1=transpose_x, transpose_x2=transpose_weight, dtype=out_dtype)
+        self.dynamic_quant = DynamicQuantExt()
+        self.trans_w = transpose_weight
+        self.has_smooth = has_smooth
+        if has_smooth:
+            self.smooth_scale = Parameter(initializer('ones', smooth_scale_shape, out_dtype))
+        else:
+            self.smooth_scale = None
+        if out_dtype == dtype.float16:
+            # qbmm scale not support dtype.float16
+            self.weight_scale = Parameter(initializer('ones', weight_scale_shape, dtype.float32))
+        else:
+            self.weight_scale = Parameter(initializer('ones', weight_scale_shape, out_dtype))
+
+    def construct(self, x, weight):
+        """forward for antiquant bmm cell"""
+        qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
+        return self.qbmm(qx, weight, self.weight_scale, None, None, x_scale)
+
+    def shard(self, strategy):
+        """shard strategy for antiquant bmm"""
+        act_strategy = strategy[0]
+        if self.has_smooth:
+            self.dynamic_quant.shard((act_strategy, (act_strategy[1],),))
+        else:
+            self.dynamic_quant.shard((act_strategy,))
+        self.qbmm.shard(strategy)
+
+
 def convert_to_fusion_antiquant(weight_qparams, transpose_weight=False, transpose_x=False, strategy=None,
                                 dst_dtype=None) -> AntiquantBMMCell:
     """Convert FakeQuantParamCell to AntiQuantCell."""
@@ -317,6 +352,28 @@ def convert_to_fusion_antiquant_for_deploy(axis, output_channel, data_rank, is_p
     if strategy is not None:
         anti_quant.shard(strategy)
     return anti_quant
+
+
+def convert_to_dynamic_quant_for_deploy(w_out, w_in, is_per_channel,
+                                        transpose_weight=False, transpose_x=False, strategy=None,
+                                        dst_dtype=None) -> AntiquantBMMCell:
+    """convert_to_dynamic_quant_for_deploy."""
+    if not dst_dtype:
+        if context.get_context("device_target") == "Ascend":
+            dst_dtype = dtype.float16
+        else:
+            dst_dtype = dtype.float32
+    if is_per_channel:
+        weight_scale_shape = w_out
+        smooth_scale_shape = w_in
+    else:
+        weight_scale_shape = 1
+        smooth_scale_shape = 1
+    dynamic_quant = DynamicQuantCell(weight_scale_shape, smooth_scale_shape, out_dtype=dst_dtype,
+                                     transpose_x=transpose_x, transpose_weight=transpose_weight)
+    if strategy is not None:
+        dynamic_quant.shard(strategy)
+    return dynamic_quant
 
 
 class DequantBMMCell(Cell):
