@@ -20,7 +20,7 @@ from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
-from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, Checker
 from mindspore_gs.ptq.processor import Processor
 
 
@@ -36,11 +36,25 @@ class Quantizer(Algorithm):
         self._config = config
 
     @staticmethod
-    def reg_layer_map(layer_type, quant_layer_type):
+    def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
         if not issubclass(quant_layer_type, WrapperCell):
             raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {quant_layer_type}.")
-        Quantizer.layer_map[layer_type] = quant_layer_type
+        if not Quantizer.layer_map.get(layer_type):
+            Quantizer.layer_map[layer_type] = [(checker, quant_layer_type)]
+        else:
+            Quantizer.layer_map[layer_type].append((checker, quant_layer_type))
+
+    @staticmethod
+    def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+        wrappers = Quantizer.layer_map.get(layer_type)
+        if not wrappers:
+            return None
+        for checker_wrapper in wrappers:
+            if not checker_wrapper[0].check(config):
+                continue
+            return checker_wrapper[1]
+        return None
 
     def load_mindformers_plugin(self):
         # pylint: disable=unused-import
@@ -54,31 +68,27 @@ class Quantizer(Algorithm):
                 self._inner_config = inner_config
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                if isinstance(cell, tuple(Quantizer.layer_map.values())):
-                    return cell, True
-                if not isinstance(cell, tuple(Quantizer.layer_map.keys())):
-                    return cell, False
                 for opname in self._inner_config.opname_blacklist:
                     if opname in cell_name:
                         logger.info(f"{cell_name} is in blacklist, keep not being quant.")
                         return cell, True
-                wrapper_cell_type = Quantizer.layer_map[type(cell)]
+
+                op_config = self._inner_config
+                for fallback_name in self._inner_config.fallback_blacklist.keys():
+                    if fallback_name in cell_name:
+                        fallback_algo = self._inner_config.fallback_blacklist.get(fallback_name)
+                        logger.info(f"fallback {cell_name} to {fallback_algo}.")
+                        # pylint: disable=W0212
+                        op_config = Quantizer._get_fallback_config(fallback_algo, op_config)
+                        break
+
+                wrapper_cell_type = Quantizer.get_wrapper_layer(type(cell), op_config)
+                if not wrapper_cell_type:
+                    return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                if not wrapper_cell_type.is_enable(self._inner_config):
-                    return cell, False
                 nonlocal changed
-                for exclude_name in self._inner_config.fallback_blacklist.keys():
-                    if exclude_name in cell_name:
-                        # pylint: disable=W0212
-                        inner_config = Quantizer._get_fallback_config(
-                            self._inner_config.fallback_blacklist.get(exclude_name),
-                            self._inner_config)
-                        wrapper_cell = wrapper_cell_type(cell_name, cell, inner_config, network_helper)
-                        logger.info(f"fallback: replacing {cell_name} with quant cell({type(wrapper_cell)}).")
-                        changed = True
-                        return wrapper_cell, True
                 wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with quant cell {wrapper_cell_type}.")
                 changed = True

@@ -268,7 +268,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     kvcache_narrow_range: bool = False
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
-    smooth_to_pre_layer: bool = False
     fallback_blacklist: dict = field(default_factory=dict)
     act_dynamic_quant: bool = False
     kvcache_dynamic_quant: bool = False
@@ -286,7 +285,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('weight_narrow_range', self.weight_narrow_range, bool)
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         value_check('kvcache_calibrate_max_new_tokens', self.kvcache_calibrate_max_new_tokens, int)
-        value_check('smooth_to_pre_layer', self.smooth_to_pre_layer, bool)
         value_check('fallback_blacklist', self.fallback_blacklist, dict)
         value_check('act_dynamic_quant', self.act_dynamic_quant, bool)
         if self.act_dynamic_quant is True and (self.weight_quant_dtype != msdtype.int8 or

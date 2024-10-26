@@ -94,7 +94,7 @@ class Logger:
         self.logger.findCaller = _find_real_caller
         if not self.logger.hasHandlers():
             console = logging.StreamHandler(sys.stdout)
-            console.setLevel(level=logging.INFO)
+            console.setLevel(level=logging.WARN)
             format_str = '[%(levelname)s] %(name)s(%(process)s):%(asctime)s [%(filepath)s:%(lineno)d %(funcname)s] - ' \
                          '%(message)s'
             console.setFormatter(GSLogFormatter(format_str))

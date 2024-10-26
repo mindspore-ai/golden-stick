@@ -16,13 +16,15 @@
 
 from types import MethodType
 
-from mindspore import Tensor, dtype
+from mindspore import Tensor
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType
-from mindspore_gs.ptq.ptq.quant_cell_units import SmoothMatmul, SmoothMatmulForDeploy, create_matmul_wrapper
+from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy
+from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother
+from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import MaxFromTensorParallelRegion, MinFromTensorParallelRegion
 from .linear_wrapper import WrapperLinearCell
 
@@ -31,20 +33,27 @@ def need_insert_mul_for_smooth_when_deploy(cfg):
     """need_insert_ops_for_smooth"""
     if cfg.outliers_suppression == OutliersSuppressionType.NONE:
         return False
-    # w8a8 fusion the smooth_scale with quantv2 ops
-    if cfg.act_quant_dtype == dtype.int8:
-        return False
-    # w8a8_dynamic use smooth_scale in dynamic_quant ops
-    if cfg.weight_quant_dtype == dtype.int8:
-        return False
+    # # w8a8 fusion the smooth_scale with quantv2 ops
+    # if cfg.act_quant_dtype == dtype.int8:
+    #     return False
+    # # w8a8_dynamic use smooth_scale in dynamic_quant ops
+    # if cfg.weight_quant_dtype == dtype.int8:
+    #     return False
     return True
 
 
 class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
+
     @staticmethod
-    def is_enable(cfg: InnerPTQConfig):
-        return cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
+    def reg_self():
+        class SmoothChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.outliers_suppression == OutliersSuppressionType.SMOOTH
+
+        LinearSmoother.reg_layer_map(Linear, SmoothLinearCell, SmoothChecker())
+        LinearSmoother.reg_layer_map(ColumnParallelLinear, SmoothLinearCell, SmoothChecker())
+        LinearSmoother.reg_layer_map(RowParallelLinear, SmoothLinearCell, SmoothChecker())
 
     def __init__(self, linear_name, linear, cfg, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
@@ -94,7 +103,7 @@ class SmoothLinearCell(WrapperLinearCell):
 
     def _apply_act_smooth(self, smooth_scale: Tensor):
         """_apply_act_smooth"""
-        self._layer.matmul = create_matmul_wrapper(self._layer.matmul, SmoothMatmul, smooth_scale=smooth_scale)
+        self._layer.matmul = SmoothMatmul.create(self._layer.matmul, smooth_scale=smooth_scale)
 
     def _apply_smooth(self, smooth_scale):
         """_apply_smooth"""
@@ -108,13 +117,11 @@ class SmoothLinearCell(WrapperLinearCell):
 
     def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
         """_apply_act_smooth_by_insert_op_for_deploy"""
-        self._layer.matmul = create_matmul_wrapper(self._layer.matmul, SmoothMatmulForDeploy, ic=ic,
-                                                   compute_dtype=compute_dtype)
+        self._layer.matmul = SmoothMatmulForDeploy.create(self._layer.matmul, ic=ic, compute_dtype=compute_dtype)
 
     def deploy(self):
         """deploy"""
-        logger.info("Take back Linear from SmoothQuantLinearCell.")
-        if self.cfg.mode == PTQMode.QUANTIZE or not need_insert_mul_for_smooth_when_deploy(self.cfg):
+        if self.cfg.mode == PTQMode.QUANTIZE or self.cfg.outliers_suppression == OutliersSuppressionType.NONE:
             return self.layer
         logger.info("insert ops for smooth quant.")
         ic = self._layer.weight.shape[1] if self._layer.transpose_b else self._layer.weight.shape[1]
@@ -126,7 +133,7 @@ class SmoothLinearCell(WrapperLinearCell):
         return self.layer
 
     @staticmethod
-    #pylint: disable=W0211
+    # pylint: disable=W0211
     def col_sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
         w_shard = (self.tensor_parallel_group_size, 1) if self.transpose_b else (1, self.tensor_parallel_group_size)

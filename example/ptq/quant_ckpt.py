@@ -85,6 +85,7 @@ def get_args():
         args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
         args.outliers_suppression = OutliersSuppressionType.SMOOTH if args.outliers_suppression == 'smooth' \
             else OutliersSuppressionType.NONE
+        args.opname_blacklist = args.opname_blacklist if args.opname_blacklist else []
     else:
         raise ValueError(f"Unsupported approach: {args.approach}")
 

@@ -79,14 +79,70 @@ Take [Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quant
 
 ### Compression Algorithm
 
-| type |                             link                                  |
-| :---------------------: | :-----------------------------------------------------------------: |
-| API         | [API doc](https://www.mindspore.cn/golden_stick/docs/en/master) |
-| AutoCompress   | TBD |
-| [Post-Training Quantization](mindspore_gs/ptq/README_CN.md) | [PTQ](mindspore_gs/ptq/ptq/README_CN.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README.md) |
-| [Quant-Aware Quantization](mindspore_gs/quantization/README.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README.md) [SLB](mindspore_gs/quantization/slb/README.md) |
-| [Pruner](mindspore_gs/pruner/README.md) | [SCOP](mindspore_gs/pruner/scop/README.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
-| Others | [Ghost](mindspore_gs/ghost/README.md)  |
+<table text-align="center" width="95%">
+  <thead>
+  <tr>
+    <th colspan="8"><div align="center">Overview</div></th>
+  </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="2" align="center"><div>Architecture</div></td>
+      <td colspan="2" align="center"><div>Workflow</div></td>
+      <td colspan="2" align="center"><a href="https://www.mindspore.cn/golden_stick/docs/en/master">APIs</a></td>
+      <td colspan="2" align="center"><a href="example/">examples</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><div align="center">AutoCompress(TBD)</div></th>
+    </tr>
+  </thead>
+  <thead>
+    <tr>
+      <th colspan="8"><a href="mindspore_gs/ptq/README_CN.md"><div align="center">Post-Training Quantization</div></a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="4" align="center"><a href="mindspore_gs/ptq/ptq/README.md">PTQ</a></td>
+      <td colspan="4" align="center"><a href="mindspore_gs/ptq/round_to_nearest/README.md">RoundToNearest</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><a href="mindspore_gs/quantization/README.md"><div align="center">Quant-Aware Quantization</div></a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="4" align="center"><a href="mindspore_gs/quantization/simulated_quantization/README.md">SimQAT</a></td>
+      <td colspan="4" align="center"><a href="mindspore_gs/quantization/slb/README.md">SLB</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><a href="mindspore_gs/pruner/README.md"><div align="center">Pruner</div></a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="2" align="center"><a href="mindspore_gs/pruner/scop/README.md">SCOP</a></td>
+      <td colspan="3" align="center"><a href="mindspore_gs/pruner/uni_pruning/README.md">uni_pruning(demo)</a></td>
+      <td colspan="3" align="center"><a href="mindspore_gs/pruner/heads/lrp/README.md">LRP(demo)</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><div align="center">Others</div></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="8" align="center"><a href="mindspore_gs/ghost/README.md">Ghost</a></td>
+    </tr>
+  </tbody>  
+</table>
 
 ### Model Deployment
 
