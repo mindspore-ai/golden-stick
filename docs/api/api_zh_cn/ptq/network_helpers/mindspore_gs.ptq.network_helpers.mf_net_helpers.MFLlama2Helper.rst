@@ -11,13 +11,6 @@ mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     异常：
         - **TypeError** - `config` 数据类型不是 `MindFormerConfig`。
 
-    .. py:method:: analysis_decoder_groups(network)
-
-        分析网络中decoder组的信息。
-
-        参数：
-            - **network** (Cell) - 要分析decoder组信息的网络。
-
     .. py:method:: assemble_inputs(input_ids: np.ndarray, **kwargs)
 
         根据输入的numpy格式的tokens，编译网络推理所需的输入。
@@ -28,13 +21,3 @@ mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
 
         返回：
             一个 `mindspore.Tensor` 的列表，表示用于网络推理的输入。
-
-    .. py:method:: get_pre_layer(linear_name: str)
-
-        通过当前linear层的名称，获取前一层的信息。
-
-        参数：
-            - **linear_name** (str) - linear层名称。
-        
-        返回：
-            一个字典，表示获取到的前一层layer的信息，包含了layer名称、layer和类型。

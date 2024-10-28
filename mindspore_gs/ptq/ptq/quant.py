@@ -205,8 +205,6 @@ class PTQ(CompAlgo):
                     "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
         start_time = time.time()
         logger.info("Analysis network structure.")
-        network_helper.analysis_decoder_groups(network)
-        logger.info(f"analysis_decoder_groups time cost {time.time() - start_time}")
         start_time = time.time()
         logger.info(f"Catching inputs for first decoder layer with {datasets.get_dataset_size()} datasets samples.")
         catcher, network = self._get_first_layer_input(network, network_helper, datasets)

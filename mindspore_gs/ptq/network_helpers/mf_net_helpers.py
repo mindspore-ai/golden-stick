@@ -22,25 +22,14 @@ from collections import OrderedDict
 import numpy as np
 import mindspore as ms
 from mindspore import dtype as mstype
-from mindspore import Tensor, Model, nn
+from mindspore import Tensor, Model
 
 from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
 from mindformers.models.modeling_utils import PreTrainedModel
 from mindformers.models.build_tokenizer import build_tokenizer
 from mindformers.trainer.utils import transform_and_load_checkpoint
-from mindformers.modules import Linear
-from mindformers.models.llama import LlamaForCausalLM
-from mindformers.models.llama.llama_transformer import LLamaDecodeLayer, LLamaAttention
-from mindformers.models.llama.llama_layer import LlamaFeedForward, LlamaRMSNorm
-from mindformers.experimental.infer.models.llama.llama import ParallelLlamaForCausalLM
-from mindformers.experimental.infer.core.transformer import (ParallelTransformerLayer,
-                                                             ParallelAttention,
-                                                             ParallelMLP)
-from mindformers.experimental.infer.core.norm import RMSNorm
-from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common.utils import value_check
-from mindspore_gs.ptq.processor import Processor
-from .network_helper import NetworkHelper, DecoderGroupInfo, LayerInfo, LayerType
+from .network_helper import NetworkHelper
 
 
 class MFNetworkHelper(NetworkHelper):
@@ -82,12 +71,6 @@ class MFNetworkHelper(NetworkHelper):
         ms.ms_memory_recycle()
         network.phase = 'predict'
         return network
-
-    def analysis_decoder_groups(self, network):
-        raise NotImplementedError
-
-    def get_pre_layer(self, linear_name):
-        raise NotImplementedError
 
     def get_spec(self, name: str):
         """
@@ -228,86 +211,6 @@ class MFLlama2Helper(MFNetworkHelper):
         block_tables, slot_mapping = MFLlama2Helper._get_pa_inputs(bs, seq, block_size, shape[1])
         return t_input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping
 
-    @staticmethod
-    def _ffn_analysis(decoder_info: DecoderGroupInfo):
-        """_ffn_analysis"""
-        ffn_info: LayerInfo = decoder_info.ffn
-        ffn: LlamaFeedForward = ffn_info.layer
-        decoder_info.ffn_concat = ffn.ffn_concat
-        for name, cell in ffn.name_cells().items():
-            full_cell_name = f"{ffn_info.name}.{name}"
-            if ffn.ffn_concat:
-                if isinstance(cell, Linear):
-                    if "gate_hidden" in name:
-                        decoder_info.gate_hidden_mm = LayerInfo(full_cell_name, cell, LayerType.CONCAT_LINEAR_LAYER)
-                        continue
-                    if "w2" in name:
-                        decoder_info.w2_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-            else:
-                if isinstance(cell, Linear):
-                    if "w1" in name:
-                        decoder_info.hidden_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "w3" in name:
-                        decoder_info.gate_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "w2" in name:
-                        decoder_info.w2_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-
-    @staticmethod
-    def _attention_analysis(decoder_info: DecoderGroupInfo):
-        """_attention_analysis"""
-        attention_info: LayerInfo = decoder_info.attention
-        attention: LLamaAttention = attention_info.layer
-        decoder_info.qkv_concat = attention.qkv_concat
-        for name, cell in attention.name_cells().items():
-            full_cell_name = f"{attention_info.name}.{name}"
-            if attention.qkv_concat:
-                if isinstance(cell, Linear):
-                    if "qkv" in name:
-                        decoder_info.qkv_mm = LayerInfo(full_cell_name, cell, LayerType.CONCAT_LINEAR_LAYER)
-                        continue
-                    if "wo" in name:
-                        decoder_info.o_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-            else:
-                if isinstance(cell, Linear):
-                    if "wq" in name:
-                        decoder_info.q_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "wk" in name:
-                        decoder_info.k_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "wv" in name:
-                        decoder_info.v_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "wo" in name:
-                        decoder_info.o_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-
-    @staticmethod
-    def _decoder_analysis(decoder_name: str, decoder: LLamaDecodeLayer) -> DecoderGroupInfo:
-        """_decoder_analysis"""
-        info: DecoderGroupInfo = DecoderGroupInfo(decoder_name, decoder)
-        for name, cell in decoder.name_cells().items():
-            full_cell_name = f"{decoder_name}.{name}"
-            if isinstance(cell, LlamaRMSNorm):
-                if "attention" in name:
-                    info.attention_norm = LayerInfo(full_cell_name, cell, LayerType.NORM_LAYER)
-                if "ffn" in name:
-                    info.ffn_norm = LayerInfo(full_cell_name, cell, LayerType.NORM_LAYER)
-                continue
-            if isinstance(cell, LLamaAttention):
-                info.attention = LayerInfo(full_cell_name, cell, LayerType.UNKNOWN)
-                MFLlama2Helper._attention_analysis(info)
-                continue
-            if isinstance(cell, LlamaFeedForward):
-                info.ffn = LayerInfo(full_cell_name, cell, LayerType.UNKNOWN)
-                MFLlama2Helper._ffn_analysis(info)
-        return info
-
     def _load_ckpt(self, network):
         """_load_ckpt"""
         model = Model(network)
@@ -317,86 +220,6 @@ class MFLlama2Helper(MFNetworkHelper):
             network.phase = 'infer_predict_layout'
             model.infer_predict_layout(*infer_data)
         transform_and_load_checkpoint(self.mf_config, model, network, infer_data, do_predict=True)
-
-    def analysis_decoder_groups(self, network):
-        """
-        Analyze decoder groups information of network.
-
-        Args:
-            network (Cell): network to analyze decoder groups information.
-        """
-
-        class Llama2Analyzer(Processor):
-            """A network iterator for applying algorithm on network."""
-            def __init__(self, process_fn):
-                self._fn = process_fn
-                self.infos: OrderedDict[str, nn.Cell] = OrderedDict()
-
-            def process_cell(self, cell_name: str, cell: nn.Cell):
-                if not isinstance(cell, nn.Cell):
-                    return cell, True
-                if isinstance(cell, LLamaDecodeLayer):
-                    self.infos[cell_name] = self._fn(cell_name, cell)
-                    return cell, True
-                return cell, False
-        value_check('network', network, LlamaForCausalLM)
-        self._decoder_infos.clear()
-        analyzer = Llama2Analyzer(MFLlama2Helper._decoder_analysis)
-        analyzer.process(network)
-        self._decoder_infos = analyzer.infos
-
-    @staticmethod
-    def _get_pre_layer_for_attn(linear_name, decoder_info):
-        """_get_pre_layer_for_attn"""
-        # attn.qkv
-        if decoder_info.qkv_concat:
-            if decoder_info.qkv_mm.name == linear_name:
-                return decoder_info.attention_norm
-        # attn.q attn.k attn.v
-        if (decoder_info.q_mm and linear_name == decoder_info.q_mm.name) or \
-           (decoder_info.k_mm and linear_name == decoder_info.k_mm.name) or \
-           (decoder_info.v_mm and linear_name == decoder_info.v_mm.name):
-            raise ValueError("outliers suppression not support qkv_concat=False now!")
-        # attn.o
-        if linear_name == decoder_info.o_mm.name:
-            return decoder_info.qkv_mm if decoder_info.qkv_concat else decoder_info.v_mm
-        return None
-
-    @staticmethod
-    def _get_pre_layer_for_ffn(linear_name, decoder_info):
-        """_get_pre_layer_for_ffn"""
-        # ffn.gate_hidden
-        if decoder_info.ffn_concat:
-            if decoder_info.gate_hidden_mm.name == linear_name:
-                return decoder_info.ffn_norm
-        # ffn.gate ffn.hidden
-        if (decoder_info.gate_mm and linear_name == decoder_info.gate_mm.name) or \
-           (decoder_info.hidden_mm and linear_name == decoder_info.hidden_mm.name):
-            raise ValueError("outliers suppression not support ffn_concat=False now!")
-        # ffn.w2
-        if linear_name == decoder_info.w2_mm.name:
-            return decoder_info.gate_hidden_mm if decoder_info.ffn_concat else decoder_info.gate_mm
-        return None
-
-    def get_pre_layer(self, linear_name: str):
-        """
-        Get pre layer information from current linear_name.
-
-        Args:
-            linear_name (str): linear layer name.
-
-        Returns:
-            A dict of pre layer information which include pre layer name, layer and type.
-        """
-        value_check('linear_name', linear_name, str)
-        splits = linear_name.split('.')
-        decoder_info: DecoderGroupInfo = self._decoder_infos.get(f'root.model.layers.{splits[3]}')
-        if not decoder_info:
-            raise RuntimeError(f"Can not find decoder layer for Linear {linear_name}.")
-        pre_layer = MFLlama2Helper._get_pre_layer_for_attn(linear_name, decoder_info)
-        if pre_layer:
-            return pre_layer
-        return MFLlama2Helper._get_pre_layer_for_ffn(linear_name, decoder_info)
 
 
 class MFParallelLlama2Helper(MFLlama2Helper):
@@ -416,116 +239,12 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
         >>> helper = MFParallelLlama2Helper(mfconfig)
         >>> network = helper.create_network()
-        >>> decoder_layers = helper.get_decoder_layers(network)
-        >>> helper.analysis_decoder_groups(network)
     """
+    def __init__(self, config: Union[str, MindFormerConfig] = None):
+        super().__init__(config)
+        # pylint: disable=unused-import
+        from mindformers.experimental.infer.models.llama import ParallelLlamaForCausalLM
+
     def _load_ckpt(self, network):
         """_load_ckpt"""
         transform_and_load_checkpoint(self.mf_config, None, network, None)
-
-    @staticmethod
-    def _ffn_analysis(decoder_info: DecoderGroupInfo):
-        """_ffn_analysis"""
-        ffn_info: LayerInfo = decoder_info.ffn
-        ffn: ParallelMLP = ffn_info.layer
-        decoder_info.ffn_concat = ffn.ffn_concat
-        for name, cell in ffn.name_cells().items():
-            full_cell_name = f"{ffn_info.name}.{name}"
-            if decoder_info.ffn_concat:
-                if isinstance(cell, (ColumnParallelLinear, RowParallelLinear)):
-                    if "gate_hidden" in name:
-                        decoder_info.gate_hidden_mm = LayerInfo(full_cell_name, cell, LayerType.CONCAT_LINEAR_LAYER)
-                        continue
-                    if "w2" in name:
-                        decoder_info.w2_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-            else:
-                if isinstance(cell, (ColumnParallelLinear, RowParallelLinear)):
-                    if "w1" in name:
-                        decoder_info.hidden_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "w3" in name:
-                        decoder_info.gate_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "w2" in name:
-                        decoder_info.w2_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-
-    @staticmethod
-    def _attention_analysis(decoder_info: DecoderGroupInfo):
-        """_attention_analysis"""
-        attention_info: LayerInfo = decoder_info.attention
-        attention: ParallelAttention = attention_info.layer
-        decoder_info.qkv_concat = attention.qkv_concat
-        for name, cell in attention.name_cells().items():
-            full_cell_name = f"{attention_info.name}.{name}"
-            if decoder_info.qkv_concat:
-                if isinstance(cell, (ColumnParallelLinear, RowParallelLinear)):
-                    if "qkv" in name:
-                        decoder_info.qkv_mm = LayerInfo(full_cell_name, cell, LayerType.CONCAT_LINEAR_LAYER)
-                        continue
-                    if "wo" in name:
-                        decoder_info.o_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-            else:
-                if isinstance(cell, (ColumnParallelLinear, RowParallelLinear)):
-                    if "wq" in name:
-                        decoder_info.q_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "wk" in name:
-                        decoder_info.k_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "wv" in name:
-                        decoder_info.v_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-                    if "wo" in name:
-                        decoder_info.o_mm = LayerInfo(full_cell_name, cell, LayerType.LINEAR_LAYER)
-                        continue
-
-    @staticmethod
-    def _decoder_analysis(decoder_name: str, decoder: ParallelTransformerLayer) -> DecoderGroupInfo:
-        """_decoder_analysis"""
-        info: DecoderGroupInfo = DecoderGroupInfo(decoder_name, decoder)
-        for name, cell in decoder.name_cells().items():
-            full_cell_name = f"{decoder_name}.{name}"
-            if isinstance(cell, RMSNorm):
-                if "attention" in name:
-                    info.attention_norm = LayerInfo(full_cell_name, cell, LayerType.NORM_LAYER)
-                if "ffn" in name:
-                    info.ffn_norm = LayerInfo(full_cell_name, cell, LayerType.NORM_LAYER)
-                continue
-            if isinstance(cell, ParallelAttention):
-                info.attention = LayerInfo(full_cell_name, cell, LayerType.UNKNOWN)
-                MFParallelLlama2Helper._attention_analysis(info)
-                continue
-            if isinstance(cell, ParallelMLP):
-                info.ffn = LayerInfo(full_cell_name, cell, LayerType.UNKNOWN)
-                MFParallelLlama2Helper._ffn_analysis(info)
-        return info
-
-    def analysis_decoder_groups(self, network):
-        """
-        Analyze decoder groups information of network.
-
-        Args:
-            network (ParallelLlamaForCausalLM): network to analyze decoder groups information.
-        """
-        class Llama2Analyzer(Processor):
-            """A network iterator for applying algorithm on network."""
-            def __init__(self, process_fn):
-                self._fn = process_fn
-                self.infos: OrderedDict[str, nn.Cell] = OrderedDict()
-
-            def process_cell(self, cell_name: str, cell: nn.Cell):
-                if not isinstance(cell, nn.Cell):
-                    return cell, True
-                if isinstance(cell, ParallelTransformerLayer):
-                    self.infos[cell_name] = self._fn(cell_name, cell)
-                    return cell, True
-                return cell, False
-
-        value_check('network', network, ParallelLlamaForCausalLM)
-        self._decoder_infos.clear()
-        analyzer = Llama2Analyzer(MFParallelLlama2Helper._decoder_analysis)
-        analyzer.process(network)
-        self._decoder_infos = analyzer.infos

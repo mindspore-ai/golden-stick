@@ -14,6 +14,7 @@
 # ============================================================================
 
 """Network helper base class."""
+import warnings
 from typing import Union, List
 
 import enum
@@ -69,27 +70,6 @@ class LayerInfo:
         value_check('name', self.name, str)
         value_check('layer', self.layer, Cell)
         value_check('type', self.type_, LayerType)
-
-
-class DecoderGroupInfo:
-    """DecoderGroupInfo."""
-    def __init__(self, name, decoder, **kwargs):
-        self.decoder: LayerInfo = LayerInfo(name, decoder)
-        self.qkv_concat: bool = kwargs.get("qkv_concat", False)
-        self.ffn_concat: bool = kwargs.get("ffn_concat", False)
-        self.attention_norm: LayerInfo = kwargs.get("attention_norm", None)
-        self.attention: LayerInfo = kwargs.get("attention", None)
-        self.qkv_mm: LayerInfo = kwargs.get("qkv_mm", None)
-        self.q_mm: LayerInfo = kwargs.get("q_mm", None)
-        self.k_mm: LayerInfo = kwargs.get("k_mm", None)
-        self.v_mm: LayerInfo = kwargs.get("v_mm", None)
-        self.o_mm: LayerInfo = kwargs.get("o_mm", None)
-        self.ffn_norm: LayerInfo = kwargs.get("ffn_norm", None)
-        self.ffn: LayerInfo = kwargs.get("ffn", None)
-        self.gate_hidden_mm: LayerInfo = kwargs.get("gate_hidden_mm", None)
-        self.gate_mm: LayerInfo = kwargs.get("gate_mm", None)
-        self.hidden_mm: LayerInfo = kwargs.get("hidden_mm", None)
-        self.w2_mm: LayerInfo = kwargs.get("w2_mm", None)
 
 
 class NetworkHelper:
@@ -215,6 +195,7 @@ class NetworkHelper:
         """
         raise NotImplementedError
 
+    # pylint: disable=unused-argument
     def analysis_decoder_groups(self, network):
         """
         Analyze decoder groups information of network.
@@ -234,8 +215,9 @@ class NetworkHelper:
             >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
             >>> helper.analysis_decoder_groups(network)
         """
-        raise NotImplementedError
+        warnings.warn("`analysis_decoder_groups` is no longer used and will be remove soon.", DeprecationWarning)
 
+    # pylint: disable=unused-argument
     def get_pre_layer(self, linear_name):
         """
         Get pre layer information from current linear_name.
@@ -259,4 +241,4 @@ class NetworkHelper:
             >>> helper.analysis_decoder_groups(network)
             >>> helper.get_pre_layer(linear_name)
         """
-        raise NotImplementedError
+        warnings.warn("`get_pre_layer` is no longer used and will be remove soon.", DeprecationWarning)

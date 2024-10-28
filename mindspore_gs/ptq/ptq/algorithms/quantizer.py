@@ -42,8 +42,7 @@ class Quantizer(Algorithm):
                                f"but got {quant_layer_type}.")
         Quantizer.layer_map[layer_type] = quant_layer_type
 
-    @staticmethod
-    def load_mindformers_plugin():
+    def load_mindformers_plugin(self):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 

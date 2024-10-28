@@ -69,12 +69,6 @@ def test_mf_llama_net_helper_inputs():
     with pytest.raises(TypeError, match="Type of input_ids should be "):
         helper.assemble_inputs(1)
 
-    with pytest.raises(TypeError):
-        helper.analysis_decoder_groups("1")
-
-    with pytest.raises(TypeError):
-        _ = helper.get_pre_layer(1)
-
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -104,9 +98,6 @@ def test_mf_llama_net_helper():
     helper.mf_config.model.model_config.block_size = 16
     network = helper.create_network()
     assert isinstance(network, LlamaForCausalLM)
-    helper.analysis_decoder_groups(network)
-    pre_layer = helper.get_pre_layer("root.model.layers.0")
-    assert pre_layer is None
 
     assert helper.get_spec('batch_size') == 1
     assert helper.get_spec('seq_length') == 1024
@@ -185,12 +176,6 @@ def test_mf_parallel_llama_net_helper_inputs():
     with pytest.raises(TypeError, match="Type of input_ids should be "):
         helper.assemble_inputs(1)
 
-    with pytest.raises(TypeError):
-        helper.analysis_decoder_groups("1")
-
-    with pytest.raises(TypeError):
-        _ = helper.get_pre_layer(1)
-
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -205,7 +190,7 @@ def test_mf_parallel_llama_net_helper_1p():
     cur_file = os.path.abspath(__file__)
     return_code = os.system(
         f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        "--master_port=10926 --join=True --log_dir=./test_mf_llama_helpers_1p_logs "
+        "--master_port=10927 --join=True --log_dir=./test_mf_llama_helpers_1p_logs "
         f"pytest {cur_file}::test_mf_parallel_llama_net_helper"
     )
     if return_code != 0:
@@ -241,10 +226,6 @@ def test_mf_parallel_llama_net_helper():
 
     network = helper.create_network()
     assert isinstance(network, ParallelLlamaForCausalLM)
-
-    helper.analysis_decoder_groups(network)
-    pre_layer = helper.get_pre_layer("root.model.layers.0")
-    assert pre_layer is None
 
     assert helper.get_spec('batch_size') == 1
     assert helper.get_spec('seq_length') == 1024

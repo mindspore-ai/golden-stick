@@ -42,8 +42,7 @@ class LinearSmoother(Algorithm):
                                f"but got {smooth_linear_type}.")
         LinearSmoother.linear_map[linear_type] = smooth_linear_type
 
-    @staticmethod
-    def load_mindformers_plugin():
+    def load_mindformers_plugin(self):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 

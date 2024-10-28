@@ -28,7 +28,7 @@ from mindformers import AutoModel
 from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, LayerQuantizeAlgo, get_quant_type
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, LayerQuantizeAlgo
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
@@ -159,7 +159,6 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     if quant_algo_ == "A8W8_Dynamic":
         # pylint: disable=W0212
         ptq._config.act_dynamic_quant = True
-        ptq._config.act_weight_quant_type = get_quant_type(ptq._config)
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_hello_ds(tokenizer, 1)
@@ -207,7 +206,6 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
         if quant_algo_ == "A8W8_Dynamic":
             # pylint: disable=W0212
             ptq._config.act_dynamic_quant = True
-            ptq._config.act_weight_quant_type = get_quant_type(ptq._config)
         # pylint: disable=W0212
         ptq._config.enable_deploy_fusion = False
         network = ptq.apply(network)

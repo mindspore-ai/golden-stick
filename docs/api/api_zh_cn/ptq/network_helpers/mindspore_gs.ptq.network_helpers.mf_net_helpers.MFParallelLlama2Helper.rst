@@ -11,13 +11,6 @@ mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
     异常：
         - **TypeError** - `config` 数据类型不是 `MindFormerConfig`。
 
-    .. py:method:: analysis_decoder_groups(network)
-
-        分析网络中decoder组的信息。
-
-        参数：
-            - **network** (ParallelLlamaForCausalLM) - 要分析decoder组信息的网络。
-
     .. py:method:: create_network()
 
         创建ParallelLlamaForCasualLM网络。
