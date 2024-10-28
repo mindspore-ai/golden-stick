@@ -552,11 +552,12 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
                                                                            signed=True,
                                                                            narrow_range=cfg.kvcache_narrow_range)
-        param_init_func = QuantPageAttentionMgrCell.param_init_map.get((cfg.device_type, cfg.ops_priority))
-        if param_init_func is None:
-            raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in \
-                             QuantPageAttentionMgrCell.param_init_map.")
-        param_init_func(self)
+        if not self.cfg.kvcache_dynamic_quant:
+            param_init_func = QuantPageAttentionMgrCell.param_init_map.get((cfg.device_type, cfg.ops_priority))
+            if param_init_func is None:
+                raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in \
+                                QuantPageAttentionMgrCell.param_init_map.")
+            param_init_func(self)
 
     def _param_init_asd(self):
         """_param_init_asd"""
@@ -586,6 +587,8 @@ class QuantPageAttentionMgrCell(WrapperCell):
     }
 
     def process(self):
+        if self.cfg.kvcache_dynamic_quant:
+            return
         if not self.key_samples or not self.value_samples:
             raise RuntimeError("Please catch ReshapeAndCache inputs before quantization.")
         key_cat_samples = msops.cat(tuple(self.key_samples), axis=0)
@@ -661,6 +664,8 @@ class QuantPageAttentionMgrCell(WrapperCell):
     }
 
     def deploy(self):
+        if self.cfg.kvcache_dynamic_quant:
+            return DeployDynamicQuantPagedAttentionCell(self.layer)
         return DeployPageAttentionMgrCell(self.layer, self.v_scale_no_fusion, self.v_zp_no_fusion,
                                           self.k_scale_no_fusion, self.k_zp_no_fusion, self.k_v_scale_fusion,
                                           self.k_v_zp_fusion, self.cfg)
@@ -794,3 +799,43 @@ class DeployPageAttentionMgrCell(Cell):
         state_dict[self._value_input_quantizer.t_zp.name] = {'shape': self._value_input_quantizer.t_zp.shape,
                                                              'shard': value_input_quantizer_t_zp_shard}
         return state_dict
+
+
+class DeployDynamicQuantPagedAttentionCell(Cell):
+    """DeployDynamicQuantPagedAttentionCell"""
+
+    def __init__(self, kvcache: PagedAttentionMgr):
+        super().__init__()
+        self._kvcache = kvcache
+        self.paged_attention = msops.auto_generate.PagedAttention(self._kvcache.n_heads,
+                                                                  self._kvcache.scale_value,
+                                                                  self._kvcache.n_kv_heads,
+                                                                  "PERTOKEN")
+        self.paged_attention_with_alibi = msops.auto_generate.PagedAttentionMask(self._kvcache.n_heads,
+                                                                                 self._kvcache.scale_value,
+                                                                                 self._kvcache.n_kv_heads,
+                                                                                 "PERTOKEN")
+        if "in_strategy" in kvcache.paged_attention.get_attr_dict():
+            pa_strategy = kvcache.paged_attention.in_strategy
+            self.paged_attention.shard(pa_strategy)
+
+        if "in_strategy" in kvcache.paged_attention_with_alibi.get_attr_dict():
+            pa_strategy = kvcache.paged_attention_with_alibi.in_strategy
+            self.paged_attention_with_alibi.shard(pa_strategy)
+
+    # pylint: disable=W0221
+    def construct(self, key, value, slot_mapping):
+        """The forward compute of KVCache for Paged Attention."""
+        return self._kvcache.reshape_and_cache(key, value, self._kvcache.key_cache, self._kvcache.value_cache,
+                                               slot_mapping)
+
+    # pylint: disable=W0613
+    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
+        """The forward compute of Paged Attention."""
+        return self.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache,
+                                    block_tables, batch_valid_length)
+
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+        """The forward compute of KVCache for Paged Attention with alibi tensor."""
+        return self.paged_attention_with_alibi(query, self._kvcache.key_cache, self._kvcache.value_cache,
+                                               block_tables, batch_valid_length, None, None, alibi_tensor)

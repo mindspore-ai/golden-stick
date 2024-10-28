@@ -290,12 +290,9 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('fallback_blacklist', self.fallback_blacklist, dict)
         value_check('act_dynamic_quant', self.act_dynamic_quant, bool)
         if self.act_dynamic_quant is True and (self.weight_quant_dtype != msdtype.int8 or
-                                               self.act_quant_dtype != msdtype.int8
-                                               or self.outliers_suppression != OutliersSuppressionType.SMOOTH):
+                                               self.act_quant_dtype != msdtype.int8):
             raise ValueError(f'self.act_dynamic_quant is True, self.weight_quant_dtype: {self.weight_quant_dtype} \
-                             and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8, and \
-                             self.outliers_suppression: {self.outliers_suppression} \
-                             must be OutliersSuppressionType.SMOOTH.')
+                             and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
         value_check('kvcache_dynamic_quant', self.kvcache_dynamic_quant, bool)
         if self.kvcache_dynamic_quant is True and self.kvcache_quant_dtype != msdtype.int8:
             raise ValueError(f'self.kvcache_dynamic_quant is True, self.kvcache_quant_dtype: {self.kvcache_quant_dtype} \

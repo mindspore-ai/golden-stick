@@ -108,6 +108,12 @@ def create_cfg(quant_algo_, mode):
                         act_quant_dtype=dtype.int8,
                         weight_quant_dtype=dtype.int8,
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
+    elif quant_algo_ == 'C8_Dynamic':
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["lm_head"],
+                        weight_quant_dtype=None,
+                        kvcache_quant_dtype=dtype.int8)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_algo_}")
     return cfg
@@ -159,6 +165,9 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     if quant_algo_ == "A8W8_Dynamic":
         # pylint: disable=W0212
         ptq._config.act_dynamic_quant = True
+    if quant_algo_ == "C8_Dynamic":
+        # pylint: disable=W0212
+        ptq._config.kvcache_dynamic_quant = True
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_hello_ds(tokenizer, 1)
@@ -206,6 +215,9 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
         if quant_algo_ == "A8W8_Dynamic":
             # pylint: disable=W0212
             ptq._config.act_dynamic_quant = True
+        if quant_algo_ == "C8_Dynamic":
+            # pylint: disable=W0212
+            ptq._config.kvcache_dynamic_quant = True
         # pylint: disable=W0212
         ptq._config.enable_deploy_fusion = False
         network = ptq.apply(network)
@@ -249,6 +261,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput[:, :5], foutput[:, :5], 0, 0)
         elif quant_algo_ == 'A8W8_Dynamic':
             ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
+        elif quant_algo_ == "C8_Dynamic":
+            ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
         else:
             assert False
         if not ret:
@@ -268,6 +282,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         ret = np.allclose(qoutput[:, :13], foutput[:, :13], 0, 0)
     elif quant_algo_ == "A8W8_Dynamic":
         ret = np.allclose(qoutput[:, :58], foutput[:, :58], 0, 0)
+    elif quant_algo_ == "C8_Dynamic":
+        ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
     else:
         assert False
     if not ret:
