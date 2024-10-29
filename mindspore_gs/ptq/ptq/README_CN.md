@@ -231,7 +231,7 @@ workspace
 
 4. 修改model.arch.type字段为ParallelLlamaForCausalLM。
 
-5. 修改use_parallel为True, parallel.parallel_mode为3，parallel_config.data_parallel为1。
+5. 修改use_parallel为True, parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。
 
 修改完成后，可以使用金箍棒提供的MFParallelLlama2Helper方便地通过配置文件构造网络并加载checkpoint，代码如下：
 
