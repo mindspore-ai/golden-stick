@@ -123,7 +123,7 @@ workspace
 
 4. 修改model.arch.type字段为ParallelLlamaForCausalLM。
 
-5. 修改use_parallel为True, parallel.parallel_mode为3，parallel_config.data_parallel为1。
+5. 修改use_parallel为True, parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。
 
 需要注意的是MindFormers的ParallelLlamaForCausalLM 7B网络即便在单卡上，也必须使用msrun才能成功运行。msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/r2.4.0/model_train/parallel/msrun_launcher.html)，下面是一个简单的样例命令：
 
