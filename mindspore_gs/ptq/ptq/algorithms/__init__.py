@@ -14,5 +14,6 @@
 # ============================================================================
 """algorithms"""
 
-from .anti_outliers import LinearSmoother
+from .anti_outliers import LinearSmoother, LinearAWQSmoother
+from .clipper import LinearClipper
 from .quantizer import Quantizer

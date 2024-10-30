@@ -69,10 +69,10 @@ class QuantPageAttentionMgrCell(WrapperCell):
 
         key_t_scale, key_t_zp, _ = quant_tensor(key_cat_samples, msops.min, msops.max,
                                                 self.cfg.kvcache_narrow_range, self.cfg.kvcache_symmetric,
-                                                self.cfg.kvcache_quant_dtype, 1)
+                                                False, 0, self.cfg.kvcache_quant_dtype, 1, False)
         value_t_scale, value_t_zp, _ = quant_tensor(value_cat_samples, msops.min, msops.max,
                                                     self.cfg.kvcache_narrow_range, self.cfg.kvcache_symmetric,
-                                                    self.cfg.kvcache_quant_dtype, 1)
+                                                    False, 0, self.cfg.kvcache_quant_dtype, 1, False)
 
         self.key_t_scale.set_data(Tensor(np.squeeze(key_t_scale)))
         self.key_t_zp.set_data(Tensor(np.squeeze(key_t_zp)))

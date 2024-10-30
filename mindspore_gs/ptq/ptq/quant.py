@@ -26,12 +26,15 @@ from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import offload_network, value_check
 from mindspore_gs.ptq.processor import transform_network_inplace
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import (
+    PTQConfig, InnerPTQConfig,
+    PTQApproach, PTQMode,
+    OutliersSuppressionType)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.processor import Processor
 from .algorithm import Algorithm
-from .algorithms import LinearSmoother, Quantizer
+from .algorithms import LinearSmoother, LinearAWQSmoother, LinearClipper, Quantizer
 
 
 class InputCatcher(Cell):
@@ -126,6 +129,12 @@ class PTQ(CompAlgo):
         if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
             logger.info("Adding LinearSmoother to pipeline.")
             self.pipeline.append(LinearSmoother(self._config))
+        if self._config.outliers_suppression == OutliersSuppressionType.AWQ:
+            logger.info("Adding LinearAWQSmoother to pipeline.")
+            self.pipeline.append(LinearAWQSmoother(self._config))
+        if self._config.algo_args.get("weight_clip_ratio"):
+            logger.info("Adding LinearCliper to pipeline.")
+            self.pipeline.append(LinearClipper(self._config))
         if self._config.act_quant_dtype in act_support_dtype or \
             self._config.weight_quant_dtype in weight_support_dtype or \
                 self._config.kvcache_quant_dtype in kvcache_support_dtype:
@@ -248,7 +257,10 @@ class PTQ(CompAlgo):
             layer_name, layer = self.decoder_layers[i]
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             for processor in self.pipeline:
-                processor.replace(layer_name, layer, network_helper)
+                if isinstance(processor, LinearAWQSmoother):
+                    processor.replace(layer_name, layer, network_helper, cur_args, cur_kwargs)
+                else:
+                    processor.replace(layer_name, layer, network_helper)
 
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()

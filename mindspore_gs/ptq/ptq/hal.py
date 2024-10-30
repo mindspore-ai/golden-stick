@@ -436,6 +436,21 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
     @staticmethod
     def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
                dst_dtype=dtype.float16):
+        """create"""
+        trans_b = linear.transpose_b
+        rank = len(q_weight.shape)
+        ic_idx, oc_idx = (rank - 1, rank - 2) if trans_b else (rank - 2, rank - 1)
+        ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
+        if is_deploy:
+            weight_shape = (ic, oc // 2)
+            q_weight = Parameter(Tensor(np.ones(weight_shape), w_qparam.quant_dtype), name=linear.weight.name)
+        else:
+            q_weight = q_weight.asnumpy().T if trans_b else q_weight.asnumpy()
+            q_weight_pack = np_int4data_pack_to_int8(q_weight)
+            logger.debug(f"WeightQuantInt4Matmul: pack q_weight of Layer({layer_name}) is "
+                         f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
+            q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
+
         if isinstance(linear.matmul, msops.MatMul):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
                                                             dst_dtype)
@@ -450,18 +465,7 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
                                                                          transpose_a, transpose_b, dst_dtype)
         else:
             raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
-        trans_b = linear.transpose_b
-        rank = len(q_weight.shape)
-        ic_idx, oc_idx = (rank - 1, rank - 2) if trans_b else (rank - 2, rank - 1)
-        ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
-        if is_deploy:
-            weight_shape = (ic, oc // 2)
-            q_weight = Parameter(Tensor(np.ones(weight_shape), w_qparam.quant_dtype), name=linear.weight.name)
-        else:
-            weight = np_int4data_pack_to_int8(q_weight.asnumpy().T)
-            q_weight = Parameter(Tensor(weight, w_qparam.quant_dtype), name=linear.weight.name)
         return wqbmm, q_weight
-
 
 class AllQuantMatmul(QuantUnitCell):
     """all quant mm"""

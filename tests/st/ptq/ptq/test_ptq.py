@@ -24,7 +24,8 @@ from mindspore.dataset import GeneratorDataset
 from mindformers.modules import Linear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, PrecisionRecovery, GPTQQuantConfig
+from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
+                              PrecisionRecovery, GPTQQuantConfig, AWQConfig)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from tests.st.test_utils import get_available_port
 
@@ -186,6 +187,31 @@ def test_ptq_config_error():
 
 
 @pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
+def test_awq_config_error():
+    """
+    Feature: simulated AWQConfig __post_init__ function.
+    Description: Feed invalid value of AWQConfig to __post_init__ function.
+    Expectation: Except ValueError.
+    """
+    with pytest.raises(TypeError):
+        _ = AWQConfig(duo_scaling=1)
+    with pytest.raises(TypeError):
+        _ = AWQConfig(smooth_alpha="1")
+    with pytest.raises(TypeError):
+        _ = AWQConfig(weight_clip_ratio="1")
+    with pytest.raises(ValueError):
+        _ = AWQConfig(smooth_alpha=-0.5)
+    with pytest.raises(ValueError):
+        _ = AWQConfig(weight_clip_ratio=-0.5)
+    with pytest.raises(ValueError):
+        _ = AWQConfig(smooth_alpha=[-1, 0.1, 0.5])
+    with pytest.raises(ValueError):
+        _ = AWQConfig(weight_clip_ratio=[0.1, 0.5, 10])
+
+
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_context_mode_error():
@@ -297,9 +323,9 @@ def test_ptq_simplenet(non_decoder):
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_Dynamic', 'A16W4_GPTQ'])
-def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
+@pytest.mark.env_single
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8'])
+def test_ptq_llama2_predict_2stage_1p_run_part1(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with one cards.
     Description: apply OQ on llama2 and check accuracy.
@@ -328,8 +354,69 @@ def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack', 'A16W4_GPTQ'])
-def test_ptq_llama2_predict_2stage_2p_run(quant_algo):
+@pytest.mark.parametrize("quant_algo", ['C8', 'A8W8_Dynamic', 'A16W4_GPTQ', 'A16W4_AWQ'])
+def test_ptq_llama2_predict_2stage_1p_run_part2(quant_algo):
+    """
+    Feature: test omni quant adjust parameter in two stages with one cards.
+    Description: apply OQ on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    return_code = os.system(
+        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_llama2_1p_logs "
+        f"python {run_file} -m 1 -a {quant_algo}"
+    )
+    if return_code != 0:
+        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    assert return_code == 0
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8'])
+def test_ptq_llama2_predict_2stage_2p_run_part1(quant_algo):
+    """
+    Feature: test omni quant adjust parameter in two stages with two cards.
+    Description: apply OQ on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    return_code = os.system(
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_llama2_2p_logs "
+        f"python {run_file} -m 2 -a {quant_algo}"
+    )
+    if return_code != 0:
+        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    assert return_code == 0
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+@pytest.mark.parametrize("quant_algo", ['C8', 'A8W8_FallBack', 'A16W4_GPTQ', 'A16W4_AWQ'])
+def test_ptq_llama2_predict_2stage_2p_run_part2(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply OQ on llama2 and check accuracy.

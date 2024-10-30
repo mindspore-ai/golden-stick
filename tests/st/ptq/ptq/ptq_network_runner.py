@@ -28,8 +28,10 @@ from mindformers import AutoModel
 from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, LayerQuantizeAlgo, \
-                                         PrecisionRecovery, GPTQQuantConfig, QuantGranularity
+from mindspore_gs.ptq.ptq_config import (PTQConfig, PTQMode,
+                                         OutliersSuppressionType, LayerQuantizeAlgo,
+                                         PrecisionRecovery, GPTQQuantConfig,
+                                         QuantGranularity, AWQConfig)
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
@@ -81,8 +83,17 @@ def create_cfg(quant_algo_, mode):
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["w2", "lm_head"],
-                        weight_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.qint4x2,
                         precision_recovery=PrecisionRecovery.GPTQ,
+                        algo_args=algorithm_config)
+    elif quant_algo_ == 'A16W4_AWQ':
+        algorithm_config = AWQConfig()
+        # FIXME yrf:add per_group when use 1decoder
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        outliers_suppression=OutliersSuppressionType.AWQ,
+                        weight_quant_dtype=dtype.qint4x2,
                         algo_args=algorithm_config)
     elif quant_algo_ == 'C8':
         cfg = PTQConfig(mode=mode,
@@ -173,6 +184,9 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     if quant_algo_ == "A8W8_FallBack":
         # pylint: disable=W0212
         ptq._config.fallback_blacklist = {'w2': LayerQuantizeAlgo.A16W8}
+    if quant_algo_ == "A16W4_AWQ":
+        # pylint: disable=W0212
+        ptq._config.weight_symmetric = False
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_hello_ds(tokenizer, 1)
@@ -203,6 +217,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
+
     device_id = int(os.environ.get('DEVICE_ID', '0'))
     helper.mf_config.context.device_id = device_id
     config = helper.mf_config
@@ -254,6 +269,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput, foutput, 0, 0)
         elif quant_algo_ == 'A16W4_GPTQ':
             ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
+        elif quant_algo_ == 'A16W4_AWQ':
+            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         elif quant_algo_ == 'A16W8C8':
             ret = np.allclose(qoutput[:, :5], foutput[:, :5], 0, 0)
         elif quant_algo_ == 'A8W8C8':
@@ -272,6 +289,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
     elif quant_algo_ == 'A16W8':
         ret = np.allclose(qoutput, foutput, 0, 0)
     elif quant_algo_ == 'A16W4_GPTQ':
+        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+    elif quant_algo_ == 'A16W4_AWQ':
         ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
     elif quant_algo_ == 'A16W8C8':
         ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)

@@ -24,15 +24,15 @@ from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, Checker
 
 
-class LinearSmoother(Algorithm):
-    """smoother for linear"""
+class LinearClipper(Algorithm):
+    """clip got lienar"""
 
     linear_map = {}
 
     def __init__(self, config=None):
         super().__init__()
         if not isinstance(config, InnerPTQConfig):
-            raise TypeError(f'Shall init LinearSmoother with InnerPTQConfig, bug got {type(config)}')
+            raise TypeError(f'Shall init LinearClipper with InnerPTQConfig, bug got {type(config)}')
         self._config = config
 
     @staticmethod
@@ -40,14 +40,14 @@ class LinearSmoother(Algorithm):
         if not issubclass(quant_layer_type, WrapperCell):
             raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {quant_layer_type}.")
-        if not LinearSmoother.linear_map.get(layer_type):
-            LinearSmoother.linear_map[layer_type] = [(checker, quant_layer_type)]
+        if not LinearClipper.linear_map.get(layer_type):
+            LinearClipper.linear_map[layer_type] = [(checker, quant_layer_type)]
         else:
-            LinearSmoother.linear_map[layer_type].append((checker, quant_layer_type))
+            LinearClipper.linear_map[layer_type].append((checker, quant_layer_type))
 
     @staticmethod
     def get_wrapper_layer(layer_type, config: InnerPTQConfig):
-        wrappers = LinearSmoother.linear_map.get(layer_type)
+        wrappers = LinearClipper.linear_map.get(layer_type)
         if not wrappers:
             return None
         for checker_wrapper in wrappers:
@@ -61,18 +61,17 @@ class LinearSmoother(Algorithm):
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
     def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
-        """infer_and_cache"""
         class Replacer(Processor):
             """Replacer"""
             def __init__(self, inner_config):
                 self._inner_config = inner_config
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                for opname in smooth_skip_layer:
+                for opname in clip_skip_layer:
                     if opname in cell_name:
                         logger.info(f"{cell_name} is in blacklist, keep not being supperssed.")
                         return cell, True
-                wrapper_cell_type = LinearSmoother.get_wrapper_layer(type(cell), self._inner_config)
+                wrapper_cell_type = LinearClipper.get_wrapper_layer(type(cell), self._inner_config)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
@@ -85,52 +84,10 @@ class LinearSmoother(Algorithm):
                 return wrapper_cell, True
 
         changed = False
-        smooth_skip_layer = []
-        smooth_skip_layer.extend(self._config.opname_blacklist)
-        smooth_skip_layer.extend(self._config.fallback_blacklist.keys())
+        clip_skip_layer = ["wq", "wk", "w_qkv"]
+        clip_skip_layer.extend(self._config.opname_blacklist)
         Replacer(self._config).process(decoder_layer, decoder_layer_name)
         if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and opname_blacklist" \
-                       f"({self._config.opname_blacklist})."
-            logger.warning(warn_str)
-
-
-class LinearAWQSmoother(LinearSmoother):
-    """LinearAWQSmoother"""
-
-    # pylint: disable=arguments-differ
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None,
-                args=None, kwargs=None):
-        """infer_and_cache"""
-        class Replacer(Processor):
-            """Replacer"""
-            def __init__(self, inner_config):
-                self._inner_config = inner_config
-
-            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                for opname in smooth_skip_layer:
-                    if opname in cell_name:
-                        logger.info(f"{cell_name} is in blacklist, keep not being supperssed.")
-                        return cell, True
-                wrapper_cell_type = LinearSmoother.get_wrapper_layer(type(cell), self._inner_config)
-                if not wrapper_cell_type:
-                    return cell, False
-                if not issubclass(wrapper_cell_type, WrapperCell):
-                    raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
-                                       f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper,
-                                                 decoder_layer=decoder_layer, args=args, kwargs=kwargs)
-                logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
-                return wrapper_cell, True
-
-        changed = False
-        smooth_skip_layer = []
-        smooth_skip_layer.extend(self._config.opname_blacklist)
-        smooth_skip_layer.extend(self._config.fallback_blacklist.keys())
-        Replacer(self._config).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and opname_blacklist" \
+            warn_str = f"No layer found in network is suitable to clip, please check network and opname_blacklist" \
                        f"({self._config.opname_blacklist})."
             logger.warning(warn_str)

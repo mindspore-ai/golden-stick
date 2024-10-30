@@ -28,7 +28,7 @@ from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.ptq.ptq.hal import QuantParam, WeightQuantMatmul, WeightQuantInt4Matmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from .parallel_minmax import get_quant_min_max_op
+from .parallel_minmax import get_min_max_op
 from .linear_wrapper import WrapperLinearCell, LinearInferCell
 
 
@@ -61,8 +61,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
                              f"but {linear_name} type is {type(linear)}.")
         if self.cfg.act_per_channel:
             raise ValueError("only per-tensor activation quantization now.")
-        if not self.cfg.weight_per_channel:
-            raise ValueError("only per-channel weight quantization now.")
+
         rank = len(linear.weight.shape)
         ic_axis = rank - 1 if linear.transpose_b else rank - 2
         self.weight_quantizer_axis = rank - 2 if linear.transpose_b else rank - 1
@@ -73,11 +72,14 @@ class WeightQuantLinearCell(WrapperLinearCell):
             self.layer.compute_dtype
 
         is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
-        self.w_quant_max, self.w_quant_min = get_quant_min_max_op(cfg.tp_size, is_rowparallel)
+        if cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
+            self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, False)
+        else:
+            self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, is_rowparallel)
 
         self.q_weight = Parameter(initializer("ones", self.layer.weight.shape, dtype.int8), name=self.layer.weight.name)
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
-            if self.ic % self.cfg.group_size != 0:
+            if self.ic % (self.cfg.group_size * cfg.tp_size) != 0:
                 raise ValueError(f"input channel {self.ic} can not divide group_size {self.cfg.group_size}.")
             scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
         else:
@@ -90,7 +92,9 @@ class WeightQuantLinearCell(WrapperLinearCell):
         # quant weight
         w_scale, w_zp, q_weight = quant_tensor(self.layer.weight, self.w_quant_min, self.w_quant_max,
                                                self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
-                                               self.cfg.weight_quant_dtype, self.weight_quantizer_axis)
+                                               self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
+                                               self.cfg.group_size, self.cfg.weight_quant_dtype,
+                                               self.weight_quantizer_axis)
         self.q_weight.set_data(Tensor(q_weight.asnumpy(), dtype=dtype.int8))
         self.w_scale.set_data(Tensor(np.squeeze(w_scale), dtype=dtype.float64))
         self.w_zp.set_data(Tensor(np.squeeze(w_zp), dtype=dtype.float64))

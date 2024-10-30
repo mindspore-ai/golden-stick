@@ -14,6 +14,7 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 
+import copy
 from types import MethodType
 
 from mindspore import Tensor
@@ -21,11 +22,18 @@ from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import (
+    InnerPTQConfig, PTQMode,
+    OutliersSuppressionType,
+    QuantGranularity)
 from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy
-from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother
+from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother, LinearAWQSmoother
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from .parallel_minmax import get_smooth_x_obs_min_max_op, get_smooth_w_obs_min_max_op
+from mindspore_gs.ptq.basic_quant_func import quant_tensor
+from .parallel_minmax import (
+    get_smooth_x_obs_min_max_op,
+    get_w_sum_op,
+    get_min_max_op)
 from .linear_wrapper import WrapperLinearCell
 
 
@@ -54,7 +62,7 @@ class SmoothLinearCell(WrapperLinearCell):
         self.compute_type = self.layer.dtype if self.is_linear else self.layer.compute_dtype
 
         self.x_obs_max, self.x_obs_min = get_smooth_x_obs_min_max_op()
-        self.w_obs_max, self.w_obs_min = get_smooth_w_obs_min_max_op(cfg.tp_size, self.is_colparallel)
+        self.w_obs_max, self.w_obs_min = get_min_max_op(cfg.tp_size, self.is_colparallel)
 
     def _calc_smooth_scale(self, alpha):
         """_calc_smooth_scale"""
@@ -148,3 +156,192 @@ class SmoothLinearCell(WrapperLinearCell):
             state_dict[self.bias.name] = {'shape': self.bias.shape,
                                           'shard': (1,)}
         return state_dict
+
+
+class AWQSmoothLinearCell(SmoothLinearCell):
+    """AWQLinearCell"""
+
+    @staticmethod
+    def reg_self():
+        class AWQSmoothChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.outliers_suppression == OutliersSuppressionType.AWQ
+
+        LinearAWQSmoother.reg_layer_map(Linear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAWQSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAWQSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+
+    def __init__(self, linear_name, linear, cfg, network_helper, decoder_layer, args, kwargs):
+        super().__init__(linear_name, linear, cfg, network_helper)
+
+        if cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
+            self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, False)
+        else:
+            self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, self.is_rowparallel)
+        self.w_sum = get_w_sum_op(cfg.tp_size, self.is_colparallel)
+        self.scale_max, self.scale_min = get_min_max_op(cfg.tp_size, self.is_rowparallel)
+
+        rank = len(linear.weight.shape)
+        self.ic_axis = rank - 1 if linear.transpose_b else rank - 2
+        self.oc_axis = rank - 2 if linear.transpose_b else rank - 1
+        self.oc = linear.weight.shape[self.oc_axis]
+        self.fp16_weight = copy.deepcopy(self._layer.weight)
+
+        self.decoder = decoder_layer
+        self.forward_module = None
+        self.args = args
+        self.kwargs = kwargs
+
+        self.w_mean = None
+        self.x_mean = None
+
+    def _get_mean_weight(self, weight, axis):
+        """_get_mean_weight"""
+        need_comm = self.cfg.tp_size is not None and self.cfg.tp_size > 1
+        if need_comm and not self.is_linear:
+            w_sum = self.w_sum(weight, axis)
+            if self.is_colparallel:
+                w_mean = w_sum / (self.oc * 2)
+            elif self.is_rowparallel:
+                w_mean = w_sum / self.oc
+            else:
+                raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported.")
+        else:
+            w_mean = msops.mean(weight, axis=axis)
+        return w_mean
+
+    def _get_statistic_data(self):
+        """_get_statistic_data"""
+
+        # compute mean of normalised weights
+        org_shape = self._layer.weight.shape
+        if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
+            # group in input channel
+            dst_shape = (-1, self.cfg.group_size) if self._layer.transpose_b else (self.cfg.group_size, -1)
+            weight = self._layer.weight.reshape(dst_shape)
+        else:
+            weight = self._layer.weight
+        w_max = msops.max(msops.abs(weight), self.ic_axis, keepdims=True)[0] + 1e-6
+        w_scale = msops.abs(weight) / w_max
+        w_scale = w_scale.reshape(org_shape)
+        self.w_mean = self._get_mean_weight(w_scale, self.oc_axis)
+        logger.debug(f"AWQSmoothLinearCell: w_mean of Layer({self._layer_name}) is {{{self.w_mean.shape}, "
+                     f"{self.w_mean.dtype}, {self.w_mean.asnumpy()}}}")
+        # compute mean of activation
+        self.x_mean = msops.mean(msops.abs(self.cat_samples), axis=0)
+        logger.debug(f"AWQSmoothLinearCell: x_mean of Layer({self._layer_name}) is {{{self.x_mean.shape}, "
+                     f"{self.x_mean.dtype}, {self.x_mean.asnumpy()}}}")
+
+    def _calc_smooth_scale(self, alpha):
+        """_calc_smooth_scale"""
+        if self.cfg.algo_args.get("duo_scaling"):
+            x_pow = msops.pow(self.x_mean, alpha)
+            w_pow = msops.pow(self.w_mean, 1 - alpha) + 1e-4
+            smooth_scale = (x_pow / w_pow).clamp(min=1e-4)
+        else:
+            smooth_scale = msops.pow(self.x_mean, alpha).clamp(1e-4).reshape(-1)
+
+        minmax_norm = msops.sqrt(self.scale_max(smooth_scale)[0] * self.scale_min(smooth_scale)[0])
+        smooth_scale = smooth_scale / minmax_norm
+        smooth_scale[self.x_mean == 0] = 1
+        smooth_scale[self.w_mean == 0] = 1
+        logger.debug(f"AWQSmoothLinearCell: search scale alpha {alpha}, smooth scale of Layer({self._layer_name}) "
+                     f"is {{{smooth_scale.shape}, {smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
+        return smooth_scale
+
+    def _search_best_scale(self, alpha):
+        """search best scale"""
+        best_scale = self._compute_best_scale(alpha)
+        # pylint: disable=protected-access
+        self.fp16_weight._offload()
+        return best_scale
+
+    def _compute_best_scale(self, alpha):
+        """compute best scale"""
+        history = []
+        best_ratio = -1
+        best_scale = 0
+        best_error = float("inf")
+
+        group_size = self.cfg.group_size if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP \
+              else self._layer.weight.shape[self.ic_axis]
+
+        fp16_output = self._module_forward()
+
+        for ratio in alpha:
+            scales = self._calc_smooth_scale(ratio)
+            self._apply_weight_smooth(scales)
+            _, _, pesudo_weight = quant_tensor(self._layer.weight.data,
+                                               self.w_quant_min,
+                                               self.w_quant_max,
+                                               self.cfg.weight_narrow_range,
+                                               self.cfg.weight_symmetric,
+                                               True,
+                                               group_size,
+                                               self.cfg.weight_quant_dtype,
+                                               self.oc_axis,
+                                               True,
+                                               True)
+            logger.debug(f"AWQSmoothLinearCell: search scale alpha {ratio}, pesudo weight of Layer({self._layer_name}) "
+                         f"is {{{pesudo_weight.shape}, {pesudo_weight.dtype}, {pesudo_weight.asnumpy()}}}")
+            weight_scales = msops.expand_dims(scales, 0)
+            if not self._layer.transpose_b:
+                weight_scales = weight_scales.transpose()
+            self._layer.weight.set_data(msops.div(pesudo_weight, weight_scales))
+            pseudo_output = self._module_forward()
+            self._layer.weight.set_data(Tensor(self.fp16_weight.asnumpy(), dtype=self.compute_type))
+
+            loss = msops.mse_loss(fp16_output, pseudo_output, reduction='mean')
+            logger.debug(f"AWQSmoothLinearCell: search scale alpha {ratio}, scale loss of Layer({self._layer_name}) "
+                         f"is {{{loss.shape}, {loss.dtype}, {loss}}}")
+            history.append(loss)
+            if loss < best_error:
+                best_error = loss
+                best_ratio = ratio
+                best_scale = scales
+        logger.debug(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
+                     f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+        if best_ratio == -1:
+            raise ValueError(f"best_ratio=-1 is not correct, please check history  of loss: {history}.")
+        return best_scale
+
+    def _attn_forward(self, samples):
+        outputs = []
+        for i, sample in enumerate(samples):
+            output = self.forward_module(sample.expand_dims(0), self.kwargs[i]["batch_valid_length"],
+                                         self.kwargs[i]["block_tables"], self.kwargs[i]["slot_mapping"],
+                                         self.args[i][1], self.args[i][2], self.kwargs[i]["prefix_keys_values"])
+            outputs.append(output.squeeze())
+        return msops.cat(tuple(outputs), axis=0)
+
+    def _module_forward(self):
+        if "w_qkv" in self._layer_name:
+            self.forward_module = self.decoder.attention
+            return self._attn_forward(self.samples)
+        if "w_gate_hidden" in self._layer_name:
+            self.forward_module = self.decoder.feed_forward
+        else:
+            self.forward_module = self._layer
+        return self.forward_module(self.cat_samples)
+
+    def smooth(self):
+        """smooth"""
+        self._get_statistic_data()
+        smooth_alpha = self.cfg.algo_args.get('smooth_alpha', 0.5)
+        if isinstance(smooth_alpha, list):
+            smooth_scale = self._search_best_scale(smooth_alpha)
+        elif isinstance(smooth_alpha, float):
+            smooth_scale = self._calc_smooth_scale(smooth_alpha)
+        else:
+            raise ValueError(f"AWQConfig smooth alpha only support list or float type, but got {type(smooth_alpha)}")
+        self._apply_smooth(smooth_scale)
+
+    def process(self):
+        if not self.samples:
+            raise RuntimeError("Please catch matmul inputs before quantization.")
+        self.cat_samples = msops.cat(tuple(self.samples), axis=0)
+        self.smooth()
+        # pylint: disable=protected-access
+        self.layer.weight._offload()
+        self.cat_samples = None
+        self.samples.clear()

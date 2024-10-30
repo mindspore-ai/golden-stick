@@ -103,6 +103,16 @@ def test_ptq_config_construct():
         _ = PTQConfig(kvcache_quant_granularity=QuantGranularity.PER_TOKEN)
     with pytest.raises(ValueError):
         _ = PTQConfig(act_quant_granularity=QuantGranularity.PER_TOKEN)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(weight_quant_granularity=QuantGranularity.PER_TOKEN)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(weight_quant_granularity=QuantGranularity.PER_TENSOR)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(group_size=16)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=64)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=0)
     cfg = PTQConfig(mode=PTQMode.DEPLOY, kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
                     kvcache_quant_dtype=msdtype.int8)
     cfg = PTQConfig(mode=PTQMode.DEPLOY, act_quant_granularity=QuantGranularity.PER_TOKEN,
