@@ -38,10 +38,13 @@ class QuantParam:
     """QuantParam"""
     scale: Parameter = None
     zero_point: Parameter = None
+    group_size: int = 0
+    quant_dtype: dtype = None
 
     def __str__(self):
         return f"QuantParam{{scale:{{{self.scale.shape}, {self.scale.dtype}, {self.scale.asnumpy()}}}, " \
-               f"zero_point:{{{self.zero_point.shape}, {self.zero_point.dtype}, {self.zero_point.asnumpy()}}}}}"
+               f"zero_point:{{{self.zero_point.shape}, {self.zero_point.dtype}, {self.zero_point.asnumpy()}}}}}, " \
+               f"group_size: {self.group_size}, quant_dtype: {self.quant_dtype}"
 
     def __repr__(self):
         return self.__str__()
@@ -308,77 +311,73 @@ class DynamicQuantMatmul(QuantUnitCell):
 class WeightQuantMatmul(QuantUnitCell):
     """quant batch matmul"""
 
-    def __init__(self, layer_name, is_deploy, weight_scale: Parameter, weight_zp: Parameter, transpose_a=False,
-                 transpose_b=False, dst_type=dtype.float16, smooth_scale=None):
+    def __init__(self, layer_name, is_deploy, w_qparam: QuantParam, transpose_a=False, transpose_b=False,
+                 dst_type=dtype.float16, smooth_scale=None):
         super().__init__(layer_name)
         self.dst_dtype = dst_type
         if is_deploy:
-            self.t_scale = Parameter(initializer('ones', weight_scale.shape, self.dst_dtype), name="t_scale")
-            self.t_zp_neg = Parameter(initializer('zeros', weight_zp.shape, self.dst_dtype), name="t_zp_neg")
+            self.t_scale = Parameter(initializer('ones', w_qparam.scale.shape, self.dst_dtype), name="t_scale")
+            self.t_zp_neg = Parameter(initializer('zeros', w_qparam.zero_point.shape, self.dst_dtype), name="t_zp_neg")
         else:
-            self.t_scale = Parameter(Tensor(weight_scale.asnumpy(), dtype=self.dst_dtype), name="t_scale")
-            self.t_zp_neg = Parameter(Tensor(weight_zp.asnumpy() * -1, dtype=self.dst_dtype), name="t_zp_neg")
+            self.t_scale = Parameter(Tensor(w_qparam.scale.asnumpy(), dtype=self.dst_dtype), name="t_scale")
+            self.t_zp_neg = Parameter(Tensor(w_qparam.zero_point.asnumpy() * -1, dtype=self.dst_dtype), name="t_zp_neg")
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: weight_scale of Layer({layer_name}) is "
                          f"{{{self.t_scale.shape}, {self.t_scale.dtype}, {self.t_scale.asnumpy()}}}")
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: weight_zp of Layer({layer_name}) is "
                          f"{{{self.t_zp_neg.shape}, {self.t_zp_neg.dtype}, {self.t_zp_neg.asnumpy()}}}")
-        self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b)
+        self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
         self.has_smooth = smooth_scale is not None
         self.smooth_scale = smooth_scale
         if self.has_smooth:
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: smooth_scale of Layer({layer_name}) is "
                          f"{{{self.smooth_scale.shape}, {self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}")
 
-    @staticmethod
-    def _from_matmul_prim(layer_name, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
+    @classmethod
+    def _from_matmul_prim(cls, layer_name, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
                           dst_dtype=dtype.float16):
-        return WeightQuantMatmul(layer_name, is_deploy, w_qparam.scale, w_qparam.zero_point, transpose_a, transpose_b,
-                                 dst_dtype, None)
+        return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, None)
 
-    @staticmethod
-    def _from_matmul_cell(layer_name, src: MatmulCellForHook, w_qparam: QuantParam, is_deploy,
+    @classmethod
+    def _from_matmul_cell(cls, layer_name, src: MatmulCellForHook, w_qparam: QuantParam, is_deploy,
                           transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
         if not isinstance(src.mm, msops.MatMul):
             raise ValueError(
                 f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        return WeightQuantMatmul(layer_name, is_deploy, w_qparam.scale, w_qparam.zero_point, transpose_a, transpose_b,
-                                 dst_dtype, None)
+        return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, None)
 
-    @staticmethod
-    def _from_smooth_matmul(layer_name, src: SmoothMatmul, w_qparam: QuantParam, is_deploy,
+    @classmethod
+    def _from_smooth_matmul(cls, layer_name, src: SmoothMatmul, w_qparam: QuantParam, is_deploy,
                             transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
         if isinstance(src.mm, (msops.MatMul, MatmulCellForHook)):
-            return WeightQuantMatmul(layer_name, is_deploy, w_qparam.scale, w_qparam.zero_point, transpose_a,
-                                     transpose_b, dst_dtype, src.smooth_scale)
+            return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, src.smooth_scale)
         raise ValueError(
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
 
-    @staticmethod
-    def _from_smooth_matmul_for_deploy(layer_name, src: SmoothMatmulForDeploy, w_qparam: QuantParam, is_deploy,
+    @classmethod
+    def _from_smooth_matmul_for_deploy(cls, layer_name, src: SmoothMatmulForDeploy, w_qparam: QuantParam, is_deploy,
                                        transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
         if isinstance(src.mm, (msops.MatMul, MatmulCellForHook)):
-            return WeightQuantMatmul(layer_name, is_deploy, w_qparam.scale, w_qparam.zero_point, transpose_a,
-                                     transpose_b, dst_dtype, src.smooth_scale)
+            return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, src.smooth_scale)
         raise ValueError(
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
 
     @staticmethod
-    def create(layer_name, src, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
+    def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
                dst_dtype=dtype.float16):
         """create"""
-        if isinstance(src, msops.MatMul):
+        if isinstance(linear.matmul, msops.MatMul):
             return WeightQuantMatmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
                                                        dst_dtype)
-        if isinstance(src, MatmulCellForHook):
-            return WeightQuantMatmul._from_matmul_cell(layer_name, src, w_qparam, is_deploy, transpose_a, transpose_b,
-                                                       dst_dtype)
-        if isinstance(src, SmoothMatmul):
-            return WeightQuantMatmul._from_smooth_matmul(layer_name, src, w_qparam, is_deploy, transpose_a, transpose_b,
-                                                         dst_dtype)
-        if isinstance(src, SmoothMatmulForDeploy):
-            return WeightQuantMatmul._from_smooth_matmul_for_deploy(layer_name, src, w_qparam, is_deploy, transpose_a,
-                                                                    transpose_b, dst_dtype)
-        raise ValueError(f"Not support creating WeightQuantMatmul from {src}.")
+        if isinstance(linear.matmul, MatmulCellForHook):
+            return WeightQuantMatmul._from_matmul_cell(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
+                                                       transpose_b, dst_dtype)
+        if isinstance(linear.matmul, SmoothMatmul):
+            return WeightQuantMatmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
+                                                         transpose_b, dst_dtype)
+        if isinstance(linear.matmul, SmoothMatmulForDeploy):
+            return WeightQuantMatmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, w_qparam, is_deploy,
+                                                                    transpose_a, transpose_b, dst_dtype)
+        raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
 
     def construct(self, x, weight):
         """forward for WeightQuantMatmul cell"""
@@ -406,6 +405,43 @@ class WeightQuantMatmul(QuantUnitCell):
         if self.smooth_scale:
             shard_state[self.smooth_scale.name] = {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}
         return shard_state
+
+
+class WeightQuantInt4Matmul(WeightQuantMatmul):
+    """WeightQuantInt4Matmul"""
+
+    def __init__(self, layer_name, is_deploy, w_qparam: QuantParam, transpose_a=False, transpose_b=False,
+                 dst_type=dtype.float16, smooth_scale=None):
+        super().__init__(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_type, smooth_scale)
+        self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, False, w_qparam.group_size)
+
+    @staticmethod
+    def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
+               dst_dtype=dtype.float16):
+        if isinstance(linear.matmul, msops.MatMul):
+            wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
+                                                            dst_dtype)
+        elif isinstance(linear.matmul, MatmulCellForHook):
+            wqbmm = WeightQuantInt4Matmul._from_matmul_cell(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
+                                                            transpose_b, dst_dtype)
+        elif isinstance(linear.matmul, SmoothMatmul):
+            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy,
+                                                              transpose_a, transpose_b, dst_dtype)
+        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
+            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, w_qparam, is_deploy,
+                                                                         transpose_a, transpose_b, dst_dtype)
+        else:
+            raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
+        trans_b = linear.transpose_b
+        rank = len(q_weight.shape)
+        ic_idx, oc_idx = (rank - 1, rank - 2) if trans_b else (rank - 2, rank - 1)
+        ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
+        if is_deploy:
+            weight_shape = (ic, oc // 2)
+            q_weight = Parameter(Tensor(np.ones(weight_shape), w_qparam.quant_dtype), name=linear.weight.name)
+        else:
+            raise ValueError("not support W4 quantization now!")
+        return wqbmm, q_weight
 
 
 class AllQuantMatmul(QuantUnitCell):

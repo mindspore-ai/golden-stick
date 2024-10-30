@@ -50,7 +50,7 @@ class DynamicQuantLinearInferCell(LinearInferCell):
 
     def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
                  parallel_type: ParallelType):
-        super().__init__(linear, parallel_type, dtype.int8)
+        super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
         if not is_deploy:

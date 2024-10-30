@@ -16,7 +16,8 @@ mindspore_gs.ptq.PTQConfig
         - **outliers_suppression** (:class:`mindspore_gs.ptq.OutliersSuppressionType`) - 用于配置离群值抑制方法。OutliersSuppressionType.SMOOTH 表示使用 类似于SmoothQuant算法中的smooth方法来抑制离群值，OutliersSuppressionType.NONE 作为默认值表示不对异常值执行任何操作。
         - **act_quant_granularity** (:class:`mindspore_gs.ptq.QuantGranularity`) - 用于配置激活的量化粒度。目前激活只支持QuantGranularity.PER_TENSOR和QuantGranularity.PER_TOKEN。
         - **kvcache_quant_granularity** (:class:`mindspore_gs.ptq.QuantGranularity`) - 用于配置kvcache的量化粒度。目前kvcache只支持QuantGranularity.PER_CHANNEL和QuantGranularity.PER_TOKEN。
-    
+        - **weight_quant_granularity** (:class:`mindspore_gs.ptq.QuantGranularity`) - 用于配置weight的量化粒度。目前weight只支持QuantGranularity.PER_CHANNEL和QuantGranularity.PER_GROUP。
+        - **group_size** (int) - per_group量化时的group_size大小，建议使用64或128。
     异常：
         - **ValueError** - `mode` 输入不在 [PTQMode.QUANTIZE, PTQMode.DEPLOY] 中。
         - **ValueError** - `backend` 输入不在 [BackendTarget.NONE, BackendTarget.ASCEND] 中。
@@ -29,3 +30,7 @@ mindspore_gs.ptq.PTQConfig
         - **ValueError** - `kvcache_quant_granularity` 输入不在 [QuantGranularity.PER_CHANNEL, QuantGranularity.PER_TOKEN] 中。
         - **ValueError** - `act_quant_granularity` 是QuantGranularity.PER_TOKEN, 但weight_quant_dtype != msdtype.int8或act_quant_dtype != msdtype.int8。
         - **ValueError** - `kvcache_quant_granularity` 是QuantGranularity.PER_TOKEN, 但kvcache_quant_dtype != msdtype.int8。
+        - **ValueError** - `weight_quant_granularity` 输入不在[QuantGranularity.PER_CHANNEL, QuantGranularity.PER_GROUP]中。
+        - **ValueError** - `weight_quant_granularity` 是QuantGranularity.PER_GROUP，但 `group_size` 不在[64, 128]中。
+        - **ValueError** - `weight_quant_granularity` 不是QuantGranularity.PER_GROUP，但 `group_size` 不等于0。
+        - **TypeError** - `group_size` 不是Int类型。

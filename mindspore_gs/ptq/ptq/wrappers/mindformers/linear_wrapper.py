@@ -18,7 +18,6 @@ from typing import Optional
 
 from mindspore import ops as msops
 from mindspore.ops import functional as F
-from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 from mindspore.common.hook_handle import HookHandle
 from mindformers.modules.layers import Linear
@@ -69,19 +68,10 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
 class LinearInferCell(Cell):
     """DeployLinearCell"""
 
-    def __init__(self, linear: Linear, parallel_type: ParallelType, weight_dtype=None):
+    def __init__(self, linear: Linear, parallel_type: ParallelType):
         super().__init__()
         self._layer = linear
         self.parallel_type = parallel_type
-        if weight_dtype:
-            self.weight_dtype = weight_dtype
-        else:
-            if hasattr(self._layer, "dtype"):
-                self.weight_dtype = self._layer.dtype
-            elif hasattr(self._layer, "compute_dtype"):
-                self.weight_dtype = self._layer.compute_dtype
-            else:
-                self.weight_dtype = msdtype.float16
 
         self.has_act_quant = False
         self.quant_op: Optional[QuantWithSmooth] = None
@@ -107,15 +97,14 @@ class LinearInferCell(Cell):
                 x = self._layer.reshape(x, (self._layer.outer_batch, self._layer.expert_num, -1,
                                             self._layer.in_channels))
         ori_dtype = F.dtype(x)
-        weight = self.cast(self._layer.weight, self.weight_dtype)
         x = self._layer.cast(x, self._layer.dtype)
         if self.has_act_quant:
             x = self.quant_op(x)
         # apply gmm to the inference of moe structural models when use_past=True.
         if self._layer.use_gmm:
-            x = self._layer.matmul([x], [weight], None, None, None, None, None, group_list)[0]
+            x = self._layer.matmul([x], [self._layer.weight], None, None, None, None, None, group_list)[0]
         else:
-            x = self._layer.matmul(x, weight)
+            x = self._layer.matmul(x, self.layer.weight)
         if self._layer.has_bias:
             x = self._layer.bias_add(x, self._layer.cast(self._layer.bias, self._layer.dtype))
         if self._layer.activation_flag:
@@ -135,10 +124,8 @@ class LinearInferCell(Cell):
                              " weight should be passed to construct(), but got None.")
 
         origin_dtype = F.dtype(input_parallel)
-        if self._layer.skip_weight_param_allocation:
-            weight = self.cast(weight, self.weight_dtype)
-        else:
-            weight = self.cast(self._layer.weight, self.weight_dtype)
+        if not self._layer.skip_weight_param_allocation:
+            weight = self._layer.weight
         input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
 
         if self._layer.sequence_parallel:
@@ -175,13 +162,12 @@ class LinearInferCell(Cell):
             input_parallel = self._layer.scatter_to_mp_region(input_)
 
         origin_dtype = F.dtype(input_parallel)
-        weight = self.cast(self._layer.weight, self.weight_dtype)
         input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
         if self.has_act_quant:
             input_parallel = self.quant_op(input_parallel)
         output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size,)
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size_per_partition))
-        output_parallel = self._layer.matmul(input_parallel, weight)
+        output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
 
         if self._layer.sequence_parallel:
             output_parallel = output_parallel.swapaxes(0, 1).contiguous()
