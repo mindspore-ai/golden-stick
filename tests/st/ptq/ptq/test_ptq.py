@@ -286,7 +286,7 @@ def test_ptq_simplenet():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_Dynamic'])
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_Dynamic', 'C8_Dynamic'])
 def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with one cards.
@@ -316,7 +316,7 @@ def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack', 'A8W8_Dynamic'])
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack'])
 def test_ptq_llama2_predict_2stage_2p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
@@ -335,6 +335,37 @@ def test_ptq_llama2_predict_2stage_2p_run(quant_algo):
     )
     if return_code != 0:
         log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+    os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    assert return_code == 0
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+@pytest.mark.parametrize("quant_algo", ['A8W8_Dynamic', 'C8_Dynamic'])
+def test_ptq_dynamic_llama2_predict_2stage_2p_run(quant_algo):
+    """
+    Feature: test dynamic quant adjust parameter in two stages with two cards.
+    Description: apply ptq on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    os.environ['quant_algo'] = f"{quant_algo}"
+    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_network_runner.py")
+    port = get_available_port()
+    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
+    time.sleep(1.0)
+    return_code = os.system(
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_dynamic_{quant_algo}_predict_llama2_2p_logs "
+        f"python {run_file} -m 2 -a {quant_algo}"
+    )
+    if return_code != 0:
+        log_file = open(f"./test_ptq_dynamic_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
         for line in log_file:
             print(line, flush=True)
         log_file.close()

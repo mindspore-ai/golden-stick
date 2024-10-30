@@ -109,7 +109,7 @@ def test_mf_llama_net_helper():
     network(*inputs)
 
 
-# @pytest.mark.level0
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_mf_parallel_llama_net_helper_inputs_1p():
@@ -158,6 +158,8 @@ def test_mf_parallel_llama_net_helper_inputs():
     with pytest.raises(TypeError):
         helper.get_spec(1)
 
+    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    helper.mf_config.processor.tokenizer.vocab_file = tokenizer_path
     tokenizer = helper.create_tokenizer()
     assert isinstance(tokenizer, LlamaTokenizer)
     input_ids = tokenizer.encode('Hello', add_special_tokens=True)
