@@ -27,6 +27,7 @@ class WikiText2Dataset(GeneratorDataset):
     def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable, need_pad=True,
                  n_samples=-1, add_special_tokens=True):
         self.path = os.path.join(path)
+        self.data_type = os.path.basename(self.path).split('.')[-1]
         self.seq_len = seq_length
         self.max_new_tokens = max_new_tokens
         self.add_special_tokens = add_special_tokens
@@ -38,7 +39,10 @@ class WikiText2Dataset(GeneratorDataset):
         if hasattr(self.tokenizer, 'add_eos_token'):
             self.tokenizer.add_eos_token = True
         self.content = []
-        self._load(n_samples)
+        if self.data_type == "parquet":
+            self._load_parquet(n_samples)
+        else:
+            self._load(n_samples)
         self.iterator = None
         super().__init__(source=self, column_names=["input_ids"])
 
@@ -57,6 +61,23 @@ class WikiText2Dataset(GeneratorDataset):
                 content = np.array(chunk, dtype=np.int32)
                 if self.need_pad:
                     content = np.pad(content, (0, self.max_new_tokens), 'constant', constant_values=self.pad_token_id)
+                self.content.append(Tensor(content))
+                if 0 < n_samples <= len(self.content):
+                    break
+
+    def _load_parquet(self, n_samples=-1):
+        """_load_parquet"""
+        input_content = []
+        from datasets import load_dataset
+        self.data = load_dataset('parquet', data_files=self.path, split='train')
+        input_content += self.tokenizer("\n\n".join(self.data['text']),
+                                        add_special_tokens=self.add_special_tokens)['input_ids']
+        for chunk in WikiText2Dataset._chunks(input_content, self.seq_len - self.max_new_tokens):
+            if len(chunk) == self.seq_len - self.max_new_tokens:
+                content = np.array(chunk, dtype=np.int32)
+                if self.need_pad:
+                    content = np.pad(content, (0, self.max_new_tokens), 'constant',
+                                     constant_values=self.pad_token_id)
                 self.content.append(Tensor(content))
                 if 0 < n_samples <= len(self.content):
                     break
