@@ -25,7 +25,7 @@ from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, OutliersSuppres
 from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy
 from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from .parallel_minmax import MaxFromTensorParallelRegion, MinFromTensorParallelRegion
+from .parallel_minmax import get_smooth_x_obs_min_max_op, get_smooth_w_obs_min_max_op
 from .linear_wrapper import WrapperLinearCell
 
 
@@ -66,14 +66,8 @@ class SmoothLinearCell(WrapperLinearCell):
 
         self.compute_type = self.layer.dtype if self.is_linear else self.layer.compute_dtype
 
-        self.x_obs_max = msops.max
-        self.x_obs_min = msops.min
-        if self.is_colparallel:
-            self.w_obs_max = MaxFromTensorParallelRegion()
-            self.w_obs_min = MinFromTensorParallelRegion()
-        else:
-            self.w_obs_max = msops.max
-            self.w_obs_min = msops.min
+        self.x_obs_max, self.x_obs_min = get_smooth_x_obs_min_max_op()
+        self.w_obs_max, self.w_obs_min = get_smooth_w_obs_min_max_op(self.tensor_parallel, self.is_colparallel)
 
     def _calc_smooth_scale(self, alpha):
         """_calc_smooth_scale"""

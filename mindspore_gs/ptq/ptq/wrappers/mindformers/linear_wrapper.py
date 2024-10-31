@@ -22,6 +22,7 @@ from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 from mindspore.common.hook_handle import HookHandle
 from mindformers.modules.layers import Linear
+from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_world_size
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
@@ -33,6 +34,7 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
     def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
         super().__init__(layer_name, layer, cfg, network_helper)
         self.hook_handle: Optional[HookHandle] = None
+        self.tensor_parallel = get_tensor_model_parallel_world_size()
 
     def add_hook(self):
         def hook_fn(_, inps):

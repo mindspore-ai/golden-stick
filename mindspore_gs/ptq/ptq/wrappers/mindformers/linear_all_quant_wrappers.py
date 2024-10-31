@@ -27,7 +27,7 @@ from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from .parallel_minmax import MaxFromTensorParallelRegion, MinFromTensorParallelRegion
+from .parallel_minmax import get_quant_min_max_op
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
 
@@ -49,12 +49,8 @@ class AllQuantLinearCell(WeightQuantLinearCell):
     def __init__(self, linear_name, linear, cfg: InnerPTQConfig, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
 
-        if self.parallel_type == ParallelType.ROW_PARALLEL:
-            self.x_quant_max = MaxFromTensorParallelRegion()
-            self.x_quant_min = MinFromTensorParallelRegion()
-        else:
-            self.x_quant_max = msops.max
-            self.x_quant_min = msops.min
+        is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
+        self.x_quant_max, self.x_quant_min = get_quant_min_max_op(self.tensor_parallel, is_rowparallel)
 
         self.x_scale = Parameter(initializer('ones', (1,), dtype=dtype.float64))
         self.x_zp = Parameter(initializer('zeros', (1,), dtype=dtype.float64))
@@ -67,8 +63,8 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         x_scale, x_zp, _ = quant_tensor(self.cat_samples, self.x_quant_min, self.x_quant_max,
                                         self.cfg.act_narrow_range, self.cfg.act_symmetric,
                                         self.cfg.act_quant_dtype, -1, False)
-        self.x_scale.set_data(Tensor([x_scale], dtype=dtype.float64))
-        self.x_zp.set_data(Tensor([x_zp], dtype=dtype.float64))
+        self.x_scale.set_data(Tensor(x_scale, dtype=dtype.float64))
+        self.x_zp.set_data(Tensor(x_zp, dtype=dtype.float64))
 
     def deploy(self):
         return AllQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
