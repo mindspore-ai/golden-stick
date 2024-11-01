@@ -22,7 +22,6 @@ from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
 from mindformers import MindFormerConfig
 from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
-from mindspore_gs.ptq.ptq_config import get_quant_type
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
@@ -182,7 +181,6 @@ if __name__ == "__main__":
     algo = create_ptq(uargs)
     # pylint: disable=W0212
     algo._config.act_dynamic_quant = uargs.act_dynamic_quant
-    algo._config.act_weight_quant_type = get_quant_type(algo._config)
     mfconfig = MindFormerConfig(uargs.config_path)
     model_name = mfconfig.trainer.model_name
     if mfconfig.model.arch.type == "LlamaForCausalLM":
