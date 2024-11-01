@@ -123,7 +123,7 @@ Constructing the ParallelLlamaForCausalLM 7B network for the MindFormers bin fir
 
 4. Modify the model.arch.type field to ParallelLlamaForCausalLM.
 
-5. Modify use_parallel to True, parallel.parallel_mode to 3, and parallel_config.data_parallel to 1.
+5. Modify use_parallel to True, parallel.parallel_mode to 'STAND_ALONE', and parallel_config.data_parallel to 1, and parallel.full_batch to False.
 
 Once the modifications are complete, you can use the MFParallelLlama2Helper provided by Golden Stick to easily construct the network and load the checkpoint through the configuration file with the following code:
 
