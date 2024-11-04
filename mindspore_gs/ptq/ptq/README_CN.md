@@ -233,6 +233,14 @@ workspace
 
 5. 修改use_parallel为True, parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。
 
+需要注意的是MindFormers的ParallelLlamaForCausalLM 7B网络即便在单卡上，也必须使用msrun才能成功运行。msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/master/model_train/parallel/msrun_launcher.html)，下面是一个简单的样例命令：
+
+```bash
+msrun --worker_num=1 --local_worker_num=1 --master_port=12345 --log_dir=msrun_log --join=True --cluster_time_out=300 python sample.py
+```
+
+完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
+
 修改完成后，可以使用金箍棒提供的MFParallelLlama2Helper方便地通过配置文件构造网络并加载checkpoint，代码如下：
 
 ```python
@@ -305,8 +313,6 @@ print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
 ```
 
 成功运行后，量化后的checkpoint文件会保存在 `/path/to/workspace/a8w8c8.ckpt` 路径下。
-
-需要注意的是样例代码中对多卡做了简化，实际上ParallelLlamaForCausalLM 7B网络必须使用msrun来运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/master/model_train/parallel/msrun_launcher.html)，完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
 
 ### 步骤3. 模型部署
 
