@@ -20,7 +20,7 @@ from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.round_to_nearest.rtn_layer_policy import RTNLayerPolicy
 from .quant_cells import LinearQuant, LinearDeploy, PagedAttentionDeploy, PagedAttentionQuant, \
-    PagedAttentionDeployFusion
+    PagedAttentionDeployFusion, DynamicQuantPagedAttentionDeploy
 
 
 class LinearLayerPolicy(RTNLayerPolicy):
@@ -52,12 +52,15 @@ class PagedAttentionMgrPolicy(RTNLayerPolicy):
         self.set_input_number(3)
         self.is_deploy = config.mode == PTQMode.DEPLOY
         self.enable_deploy_fusion = config.enable_deploy_fusion
+        self.kvcache_dynamic_quant = config.kvcache_dynamic_quant
         logger.info(f"PagedAttentionMgr Quant conifg: {config}.")
 
     def wrap_cell(self, handler) -> Cell:
         if self._config.kvcache_quant_dtype is None:
             return None
         if self.is_deploy:
+            if self.kvcache_dynamic_quant:
+                return DynamicQuantPagedAttentionDeploy(handler, self)
             if self.enable_deploy_fusion:
                 return PagedAttentionDeployFusion(handler, self)
             return PagedAttentionDeploy(handler, self)

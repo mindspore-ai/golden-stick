@@ -459,11 +459,9 @@ class SQLinearWrapper(PTQCell):
                                                                   transpose_a=False,
                                                                   transpose_b=self._handler.transpose_b,
                                                                   new_bias_need_allreduce=new_bias_need_allreduce,
-                                                                  strategy=self.antiquant_bmm_strategy(
+                                                                  strategy=self.qbmm_strategy(
                                                                       act_strategy=self._act_strategy,
                                                                       weight_strategy=self._weight_strategy,
-                                                                      has_bias=False,
-                                                                      has_offset=False,
                                                                       is_transpose=self._handler.transpose_b))
             if self._handler.has_bias:
                 bias = Tensor((bias.asnumpy() + self._handler.bias.asnumpy()), self._handler.dtype)
@@ -558,10 +556,9 @@ class SQLinearDeploy(PTQCell):
                 self._handler.bias_add.shard(((self._act_strategy[0], weight_out_strategy[0]), weight_out_strategy))
         iq_strategy = (self._act_strategy,) if self._act_strategy else None
         self._input_quantizer = convert_to_smooth_quant_for_deploy(ic, strategy=iq_strategy)
-        oq_strategy = self.antiquant_bmm_strategy(act_strategy=self._act_strategy,
-                                                  weight_strategy=self._weight_strategy,
-                                                  has_bias=False,
-                                                  has_offset=False, is_transpose=linear.transpose_b)
+        oq_strategy = self.qbmm_strategy(act_strategy=self._act_strategy,
+                                         weight_strategy=self._weight_strategy,
+                                         is_transpose=linear.transpose_b)
         self._output_quantizer = convert_to_dequant_bmm_for_deploy(oc, dst_dtype=linear.dtype,
                                                                    transpose_b=linear.transpose_b,
                                                                    strategy=oq_strategy)

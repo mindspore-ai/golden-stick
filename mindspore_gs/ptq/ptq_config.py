@@ -242,6 +242,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
     smooth_to_pre_layer: bool = True
+    act_dynamic_quant: bool = False
+    kvcache_dynamic_quant: bool = False
     fallback_blacklist: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -257,14 +259,18 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('kvcache_calibrate_max_new_tokens', self.kvcache_calibrate_max_new_tokens, int)
         value_check('smooth_to_pre_layer', self.smooth_to_pre_layer, bool)
         value_check('fallback_blacklist', self.fallback_blacklist, dict)
+        value_check('act_dynamic_quant', self.act_dynamic_quant, bool)
+        if self.act_dynamic_quant is True and (self.weight_quant_dtype != msdtype.int8 or
+                                               self.act_quant_dtype != msdtype.int8):
+            raise ValueError(f'self.act_dynamic_quant is True, self.weight_quant_dtype: {self.weight_quant_dtype} \
+                             and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
+        value_check('kvcache_dynamic_quant', self.kvcache_dynamic_quant, bool)
+        if self.kvcache_dynamic_quant is True and self.kvcache_quant_dtype != msdtype.int8:
+            raise ValueError(f'self.kvcache_dynamic_quant is True, self.kvcache_quant_dtype: {self.kvcache_quant_dtype} \
+                             must be mindspore.dtype.int8.')
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
-        if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8:
-            raise ValueError(f"{self.approach} is not support act_quant_dtype == mindspore.dtype.int8.")
-        if self.approach is PTQApproach.RTN and self.weight_quant_dtype == msdtype.int8 and self.kvcache_quant_dtype == msdtype.int8:
-            raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, {self.approach} isn't supported.")
-        if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
-            raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
+        self._check_rtn()
         if list(set(self.fallback_blacklist.keys()) & set(self.opname_blacklist)):
             raise ValueError("There should be no repetition between opname_blacklist and fallback_a16w8_blacklist,"
                              f"now opname_blacklist={self.opname_blacklist},"
@@ -273,6 +279,16 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             args_config = algo_cfg_register[self.approach]
             if args_config is not None and is_dataclass(args_config):
                 self.algo_args.update(asdict(args_config()))
+
+    def _check_rtn(self):
+        if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8 and self.act_dynamic_quant is False:
+            raise ValueError(f"{self.approach} is not support act_quant_dtype == mindspore.dtype.int8 when act_dynamic_quant is False.")
+        if self.approach is PTQApproach.RTN and self.weight_quant_dtype == msdtype.int8 and self.kvcache_quant_dtype == msdtype.int8 \
+                        and self.kvcache_dynamic_quant is False:
+            raise ValueError(f"when self.kvcache_dynamic_quant is False, weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, \
+                             {self.approach} isn't supported.")
+        if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
+            raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
 
     def _parse_dict(self):
         """ parse data class to readable dicts"""

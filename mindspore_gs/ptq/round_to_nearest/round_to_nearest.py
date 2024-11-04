@@ -100,8 +100,10 @@ class RoundToNearest(CompAlgo):
 
     @staticmethod
     def _ptq_config_check(config):
-        if config.act_quant_dtype is not None or config.outliers_suppression != OutliersSuppressionType.NONE:
-            raise ValueError(f"RTN algorithm only support A16W8、C8、A16W8C8, please set the correct configuration."
+        if config.act_dynamic_quant is False and (config.act_quant_dtype is not None or
+                                                  config.outliers_suppression != OutliersSuppressionType.NONE):
+            raise ValueError(f"When config.act_dynamic_quant is False, "
+                             f"RTN algorithm only support A16W8、C8、A16W8C8, please set the correct configuration."
                              f"Now the configuration is act_quant_dtype={config.act_quant_dtype},"
                              f"weight_quant_dtype={config.weight_quant_dtype},"
                              f"kvcache_quant_dtype={config.kvcache_quant_dtype},"
