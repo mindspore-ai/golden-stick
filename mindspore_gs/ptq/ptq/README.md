@@ -125,6 +125,14 @@ Constructing the ParallelLlamaForCausalLM 7B network for the MindFormers bin fir
 
 5. Modify use_parallel to True, parallel.parallel_mode to 'STAND_ALONE', and parallel_config.data_parallel to 1, and parallel.full_batch to False.
 
+Note that the ParallelLlamaForCausalLM 7B network from MindFormers must use msrun to run even on a single card. the use of msrun can refer to [msrun instructions](https://www.mindspore.cn/docs/en/master/model_train/parallel/msrun_launcher.html), here is an example:
+
+```bash
+msrun --worker_num=1 --local_worker_num=1 --master_port=12345 --log_dir=msrun_log --join=True --cluster_time_out=300 python sample.py
+```
+
+the complete sample code can be found in [quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py).
+
 Once the modifications are complete, you can use the MFParallelLlama2Helper provided by Golden Stick to easily construct the network and load the checkpoint through the configuration file with the following code:
 
 ```python
@@ -239,8 +247,6 @@ print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
 ```
 
 After a successful run, the quantized checkpoint file is saved under the `/path/to/workspace/a8w8c8.ckpt` path.
-
-Note that the sample code is simplified for multi-card. In fact, ParallelLlamaForCausalLM 7B network must use msrun to run, the use of msrun can refer to [msrun instructions](https://www.mindspore.cn/docs/en/master/model_train/parallel/msrun_launcher.html), and the complete sample code can be found in [quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py).
 
 ### Step 3. Model Deployment
 
