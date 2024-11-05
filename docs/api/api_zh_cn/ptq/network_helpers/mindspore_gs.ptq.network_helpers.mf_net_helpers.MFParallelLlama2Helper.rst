@@ -17,10 +17,3 @@ mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
         参数：
             - **network** (ParallelLlamaForCausalLM) - 要分析decoder组信息的网络。
-
-    .. py:method:: create_network()
-
-        创建ParallelLlamaForCasualLM网络。
-
-        返回：
-            ParallelLlamaForCasualLM类型的网络。
