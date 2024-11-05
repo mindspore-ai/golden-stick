@@ -38,15 +38,15 @@ class SQuADDataset(GeneratorDataset):
         self.tokenizer = tokenizer
         self.need_pad = need_pad
         if mode in ("eval", "test"):
-            if hasattr(self.tokenizer, 'add_bos_token'):
+            if hasattr(self.tokenizer, 'add_bos_token') and self.tokenizer.bos_token is not None:
                 self.tokenizer.add_bos_token = True
             if hasattr(self.tokenizer, 'add_eos_token'):
                 self.tokenizer.add_eos_token = False
         else:
-            if hasattr(tokenizer, 'add_bos_token'):
-                tokenizer.add_bos_token = True
-            if hasattr(tokenizer, 'add_eos_token'):
-                tokenizer.add_eos_token = True
+            if hasattr(self.tokenizer, 'add_bos_token') and self.tokenizer.bos_token is not None:
+                self.tokenizer.add_bos_token = True
+            if hasattr(self.tokenizer, 'add_eos_token') and self.tokenizer.eos_token is not None:
+                self.tokenizer.add_eos_token = True
         self.input_ids = []
         self.labels = []
         self._load(n_samples)
