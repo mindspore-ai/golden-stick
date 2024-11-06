@@ -92,15 +92,30 @@ class Logger:
     def __init__(self):
         self.logger = logging.getLogger("GoldenStick")
         self.logger.findCaller = _find_real_caller
+        log_level = Logger._get_init_log_level()
         if not self.logger.hasHandlers():
             console = logging.StreamHandler(sys.stdout)
-            console.setLevel(level=logging.WARN)
+            console.setLevel(level=log_level)
             format_str = '[%(levelname)s] %(name)s(%(process)s):%(asctime)s [%(filepath)s:%(lineno)d %(funcname)s] - ' \
                          '%(message)s'
             console.setFormatter(GSLogFormatter(format_str))
             self.logger.addHandler(console)
-        self.logger.setLevel(logging.INFO)
+        self.logger.setLevel(log_level)
         self.logger.propagate = False
+
+    @staticmethod
+    def _get_init_log_level():
+        """_get_init_log_level"""
+        log_level_num = os.environ.get("GSLOG", 2)
+        if log_level_num == '0':
+            return logging.DEBUG
+        if log_level_num == '1':
+            return logging.INFO
+        if log_level_num == '2':
+            return logging.WARN
+        if log_level_num == '3':
+            return logging.ERROR
+        return logging.WARN
 
     def set_level(self, level):
         self.logger.setLevel(level)

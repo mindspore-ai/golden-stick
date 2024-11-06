@@ -79,10 +79,14 @@ class SmoothLinearCell(WrapperLinearCell):
         """_calc_smooth_scale"""
         act_max = msops.maximum(msops.abs(self.x_obs_max(self.cat_samples, 0)[0]),
                                 msops.abs(self.x_obs_min(self.cat_samples, 0)[0]))
+        logger.debug(f"SmoothLinearCell: act_max of Layer({self._layer_name}) is {{{act_max.shape}, {act_max.dtype}, "
+                     f"{act_max.asnumpy()}}}")
         input_max_pow = msops.pow(act_max, alpha)
         weight_smooth_minmax_axis = -2 if self.layer.transpose_b else -1
         weight_max = msops.maximum(msops.abs(self.w_obs_max(self.layer.weight, weight_smooth_minmax_axis)[0]),
                                    msops.abs(self.w_obs_min(self.layer.weight, weight_smooth_minmax_axis)[0]))
+        logger.debug(f"SmoothLinearCell: weight_max of Layer({self._layer_name}) is {{{weight_max.shape}, "
+                     f"{act_max.dtype}, {weight_max.asnumpy()}}}")
         weight_max_pow = msops.pow(weight_max, 1 - alpha)
         smooth_scale = msops.div(input_max_pow, weight_max_pow).clamp(1e-5)
         # set 0 or nan to 1.0 to avoid quantization error
@@ -100,10 +104,12 @@ class SmoothLinearCell(WrapperLinearCell):
         weight = msops.mul(self._layer.weight, weight_scale)
         weight = self._layer.cast(weight, orin_dtype)
         msops.assign(self._layer.weight, weight)
+        logger.debug(f"SmoothLinearCell: smoothed_weight of Layer({self._layer_name}) is {{{self._layer.weight.shape}, "
+                     f"{self._layer.weight.dtype}, {self._layer.weight.asnumpy()}}}")
 
     def _apply_act_smooth(self, smooth_scale: Tensor):
         """_apply_act_smooth"""
-        self._layer.matmul = SmoothMatmul.create(self._layer.matmul, smooth_scale=smooth_scale)
+        self._layer.matmul = SmoothMatmul.create(self._layer_name, self._layer.matmul, smooth_scale=smooth_scale)
 
     def _apply_smooth(self, smooth_scale):
         """_apply_smooth"""
@@ -113,11 +119,14 @@ class SmoothLinearCell(WrapperLinearCell):
     def process(self):
         super(SmoothLinearCell, self).process()
         smooth_scale = self._calc_smooth_scale(self.cfg.algo_args.get('alpha', 0.5))
+        logger.debug(f"SmoothLinearCell: smooth_scale of Layer({self._layer_name}) is {{{smooth_scale.shape}, "
+                     f"{smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
         self._apply_smooth(smooth_scale)
 
     def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
         """_apply_act_smooth_by_insert_op_for_deploy"""
-        self._layer.matmul = SmoothMatmulForDeploy.create(self._layer.matmul, ic=ic, compute_dtype=compute_dtype)
+        self._layer.matmul = SmoothMatmulForDeploy.create(self._layer_name, self._layer.matmul, ic=ic,
+                                                          compute_dtype=compute_dtype)
 
     def deploy(self):
         """deploy"""

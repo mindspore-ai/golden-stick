@@ -125,6 +125,31 @@ Constructing the ParallelLlamaForCausalLM 7B network for the MindFormers bin fir
 
 5. Modify use_parallel to True, parallel.parallel_mode to 'STAND_ALONE', and parallel_config.data_parallel to 1, and parallel.full_batch to False.
 
+In the modified yaml configuration file, the parallel-related configuration should look like this:
+
+```yaml
+use_parallel: True
+parallel:
+  parallel_mode: "STAND_ALONE"
+  gradients_mean: False
+  enable_alltoall: False
+  full_batch: False
+  search_mode: "sharding_propagation"
+  enable_parallel_optimizer: False
+  strategy_ckpt_save_file: "./ckpt_strategy.ckpt"
+  parallel_optimizer_config:
+    gradient_accumulation_shard: False
+    parallel_optimizer_threshold: 64
+parallel_config:
+  data_parallel: 1
+  model_parallel: 1
+  pipeline_stage: 1
+  use_seq_parallel: False
+  micro_batch_num: 16
+  vocab_emb_dp: True
+  gradient_aggregation_group: 4
+```
+
 Note that the ParallelLlamaForCausalLM 7B network from MindFormers must use msrun to run even on a single card. the use of msrun can refer to [msrun instructions](https://www.mindspore.cn/docs/en/master/model_train/parallel/msrun_launcher.html), here is an example:
 
 ```bash

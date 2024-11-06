@@ -71,33 +71,6 @@ class LayerQuantizeAlgo(Enum):
     A8W8 = 'a8w8'
 
 
-class QuantType(Enum):
-    """
-    quant type of weight and act
-    """
-    A8W8 = 'a8w8'
-    A8W8_DYNAMIC = 'a8w8_dynamic'
-    A16W8 = 'a16w8'
-    UNDEFINED = 'undefined'
-
-
-class DeviceType(Enum):
-    """
-    device type
-    """
-    ASCEND910B = 'ascend_910B'
-    ASCEND310 = 'ascend_310'
-
-
-class OpsPriority(Enum):
-    """
-    ops use priority
-    """
-    ACLNN = 'aclnn'
-    INTERNAL = 'internal'
-    ASD = 'asd'
-
-
 @algo_cfg_register.register(PTQApproach.OMNI_QUANT)
 @dataclass
 class OmniQuantConfig:
@@ -135,14 +108,6 @@ class SmoothQuantConfig:
 
     def __post_init__(self):
         value_check('alpha', self.alpha, float)
-
-
-@algo_cfg_register.register(PTQApproach.RTN)
-@dataclass
-class RTNConfig:
-    """
-    Config for round to nearest algorithms.
-    """
 
 
 @dataclass
@@ -271,8 +236,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     fallback_blacklist: dict = field(default_factory=dict)
     act_dynamic_quant: bool = False
     kvcache_dynamic_quant: bool = False
-    device_type: DeviceType = field(default=DeviceType.ASCEND910B)
-    ops_priority: OpsPriority = field(default=OpsPriority.ASD)
 
     def __post_init__(self):
         value_check('act_per_channel', self.act_per_channel, bool)
@@ -317,25 +280,12 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
             raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
 
-    def act_weight_quant_type(self):
-        if self.act_quant_dtype != msdtype.int8 and self.weight_quant_dtype == msdtype.int8:
-            return QuantType.A16W8
-        if self.act_quant_dtype == msdtype.int8 and self.weight_quant_dtype == msdtype.int8 \
-                and self.act_dynamic_quant is True:
-            return QuantType.A8W8_DYNAMIC
-        if self.act_quant_dtype == msdtype.int8 and self.weight_quant_dtype == msdtype.int8 \
-                and self.act_dynamic_quant is False:
-            return QuantType.A8W8
-        return QuantType.UNDEFINED
-
     def _parse_dict(self):
         """ parse data class to readable dicts"""
         parsed_dict = self.__dict__
         parsed_dict['backend'] = self.backend.name
         parsed_dict['mode'] = self.mode.name
         parsed_dict['approach'] = self.approach.name
-        parsed_dict['device_type'] = self.device_type.name
-        parsed_dict['ops_priority'] = self.ops_priority.name
         parsed_dict['opname_blacklist'] = self.opname_blacklist
         parsed_dict['kvcache_quant_dtype'] = str(self.kvcache_quant_dtype)
         parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
@@ -358,8 +308,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('backend', BackendTarget),
             ('approach', PTQApproach),
             ('outliers_suppression', OutliersSuppressionType),
-            ('device_type', DeviceType),
-            ('ops_priority', OpsPriority),
             ('kvcache_quant_dtype', MSDTypeLoader()),
             ('weight_quant_dtype', MSDTypeLoader()),
             ('act_quant_dtype', MSDTypeLoader())
