@@ -21,7 +21,7 @@ from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
-from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, Checker
 
 
 class LinearSmoother(Algorithm):
@@ -36,11 +36,25 @@ class LinearSmoother(Algorithm):
         self._config = config
 
     @staticmethod
-    def reg_linear_map(linear_type, smooth_linear_type):
-        if not issubclass(smooth_linear_type, WrapperCell):
-            raise RuntimeError(f"Smooth linear type should be a subclass of {id(WrapperCell)}, "
-                               f"but got {smooth_linear_type}.")
-        LinearSmoother.linear_map[linear_type] = smooth_linear_type
+    def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
+        if not issubclass(quant_layer_type, WrapperCell):
+            raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
+                               f"but got {quant_layer_type}.")
+        if not LinearSmoother.linear_map.get(layer_type):
+            LinearSmoother.linear_map[layer_type] = [(checker, quant_layer_type)]
+        else:
+            LinearSmoother.linear_map[layer_type].append((checker, quant_layer_type))
+
+    @staticmethod
+    def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+        wrappers = LinearSmoother.linear_map.get(layer_type)
+        if not wrappers:
+            return None
+        for checker_wrapper in wrappers:
+            if not checker_wrapper[0].check(config):
+                continue
+            return checker_wrapper[1]
+        return None
 
     def load_mindformers_plugin(self):
         # pylint: disable=unused-import
@@ -55,20 +69,16 @@ class LinearSmoother(Algorithm):
                 self._inner_config = inner_config
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                if isinstance(cell, tuple(LinearSmoother.linear_map.values())):
-                    return cell, True
-                if not isinstance(cell, tuple(LinearSmoother.linear_map.keys())):
-                    return cell, False
                 for opname in smooth_skip_layer:
                     if opname in cell_name:
                         logger.info(f"{cell_name} is in blacklist, keep not being smooth.")
                         return cell, True
-                wrapper_cell_type = LinearSmoother.linear_map[type(cell)]
+                wrapper_cell_type = LinearSmoother.get_wrapper_layer(type(cell), self._inner_config)
+                if not wrapper_cell_type:
+                    return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                if not wrapper_cell_type.is_enable(self._inner_config):
-                    return cell, False
                 wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with smooth cell {wrapper_cell_type}.")
                 nonlocal changed

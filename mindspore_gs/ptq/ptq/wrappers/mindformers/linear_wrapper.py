@@ -17,11 +17,17 @@ import abc
 from typing import Optional
 
 from mindspore import ops as msops
+from mindspore.ops import functional as F
+from mindspore import dtype as msdtype
+from mindspore.nn import Cell
+from mindspore import Parameter
+from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.common.hook_handle import HookHandle
+from mindformers.modules.layers import Linear
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.ptq.quant_cell_units import MatmulCellForHook
+from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
@@ -48,3 +54,168 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
     def deploy(self):
         """deploy"""
         raise NotImplementedError
+
+
+class LinearInferCell(Cell):
+    """DeployLinearCell"""
+
+    def __init__(self, linear: Linear, parallel_type: ParallelType, weight_dtype=None):
+        super().__init__()
+        self._layer = linear
+        self.parallel_type = parallel_type
+        if weight_dtype:
+            self.weight_dtype = weight_dtype
+        else:
+            if hasattr(self._layer, "dtype"):
+                self.weight_dtype = self._layer.dtype
+            elif hasattr(self._layer, "compute_dtype"):
+                self.weight_dtype = self._layer.compute_dtype
+            else:
+                self.weight_dtype = msdtype.float16
+
+        self.has_act_quant = False
+        self.quant_op = None
+        self.input_scale, self.input_zp = None, None
+
+    def _set_act_quant(self, input_scale: Parameter, input_zp: Parameter):
+        self.has_act_quant = True
+        self.quant_op = QuantV2()
+        self.input_scale, self.input_zp = input_scale, input_zp
+
+
+    @property
+    def layer(self):
+        """layer"""
+        return self._layer
+
+    def linear_forward(self, x, group_list=None):
+        """Forward process, x should be a tensor"""
+        out_shape = self._layer.shape(x)[:-1] + (self._layer.out_channels,)
+        x = self._layer.reshape(x, (-1, self._layer.in_channels))
+        if self._layer.expert_flag and not self._layer.use_gmm:
+            if self._layer.use_expert_group_size is True:
+                x = self._layer.reshape(x, (-1, self._layer.expert_num, self._layer.expert_group_size,
+                                            self._layer.in_channels))
+            else:
+                x = self._layer.reshape(x, (self._layer.outer_batch, self._layer.expert_num, -1,
+                                            self._layer.in_channels))
+        ori_dtype = F.dtype(x)
+        weight = self.cast(self._layer.weight, self.weight_dtype)
+        x = self._layer.cast(x, self._layer.dtype)
+        if self.has_act_quant:
+            x = self.quant_op(x, self.input_scale, self.input_zp, False, "ROUND", msdtype.int8)
+        # apply gmm to the inference of moe structural models when use_past=True.
+        if self._layer.use_gmm:
+            x = self._layer.matmul([x], [weight], None, None, None, None, None, group_list)[0]
+        else:
+            x = self._layer.matmul(x, weight)
+        if self._layer.has_bias:
+            x = self._layer.bias_add(x, self._layer.cast(self._layer.bias, self._layer.dtype))
+        if self._layer.activation_flag:
+            x = self._layer.activation(x)
+        x = F.cast(x, ori_dtype)
+        output = self._layer.reshape(x, out_shape)
+        return output
+
+    def col_linear_forward(self, input_parallel, weight=None):
+        """
+        Forward of ColumnParallelLinear.
+        Performs a linear transformation considering various parallel modes and data type conversions.
+        """
+
+        if weight is None and self._layer.skip_weight_param_allocation:
+            raise ValueError("For ColumnParallelLinear, when skip_weight_param_allocation=True,"
+                             " weight should be passed to construct(), but got None.")
+
+        origin_dtype = F.dtype(input_parallel)
+        if self._layer.skip_weight_param_allocation:
+            weight = self.cast(weight, self.weight_dtype)
+        else:
+            weight = self.cast(self._layer.weight, self.weight_dtype)
+        input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
+
+        if self._layer.sequence_parallel:
+            input_parallel = input_parallel.swapaxes(0, 1).contiguous()
+            input_parallel = self._layer.gather_from_sp_region(input_parallel)
+            input_parallel = input_parallel.swapaxes(0, 1).contiguous()
+        if self.has_act_quant:
+            input_parallel = self.quant_op(input_parallel, self.input_scale, self.input_zp, False, "ROUND",
+                                           msdtype.int8)
+        output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size_per_partition,)
+        input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size))
+        output_parallel = self._layer.matmul(input_parallel, weight)
+        if self._layer.has_bias:
+            output_parallel = self._layer.bias_add(
+                output_parallel, self._layer.cast(self._layer.bias, self._layer.compute_dtype)
+            )
+        output_parallel = self._layer.cast(output_parallel, origin_dtype)
+        output_parallel = self._layer.reshape(output_parallel, output_shape)
+
+        if self._layer.gather_output:
+            output = self._layer.gather_from_mp_region(output_parallel)
+        else:
+            output = output_parallel
+        return output
+
+    def row_linear_forward(self, input_):
+        """
+        Forward of RowParallelLinear.
+        Performs a linear transformation considering various parallel modes and data type conversions.
+        """
+
+        if self._layer.input_is_parallel:
+            input_parallel = input_
+        else:
+            input_parallel = self._layer.scatter_to_mp_region(input_)
+
+        origin_dtype = F.dtype(input_parallel)
+        weight = self.cast(self._layer.weight, self.weight_dtype)
+        input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
+        if self.has_act_quant:
+            input_parallel = self.quant_op(input_parallel, self.input_scale, self.input_zp, False, "ROUND",
+                                           msdtype.int8)
+        output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size,)
+        input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size_per_partition))
+        output_parallel = self._layer.matmul(input_parallel, weight)
+
+        if self._layer.sequence_parallel:
+            output_parallel = output_parallel.swapaxes(0, 1).contiguous()
+            output = self._layer.reduce_scatter_to_sp_region(output_parallel)
+            output = output.swapaxes(0, 1).contiguous()
+        else:
+            output = self._layer.reduce_from_mp_region(output_parallel)
+
+        if self._layer.has_bias:
+            output = self._layer.bias_add(output, self._layer.cast(self._layer.bias, self._layer.compute_dtype))
+        output = self._layer.cast(output, origin_dtype)
+        output = self._layer.reshape(output, output_shape)
+        return output
+
+    def construct(self, x):
+        """linear deploy construct"""
+        if self.parallel_type == ParallelType.NO_PARALLEL:
+            return self.linear_forward(x)
+        if self.parallel_type == ParallelType.COL_PARALLEL:
+            x = self.col_linear_forward(x)
+        if self.parallel_type == ParallelType.ROW_PARALLEL:
+            x = self.row_linear_forward(x)
+        return x
+
+    def sharded_state_dict(self):
+        """provide the sharded state dict based on the config"""
+        state_dict = {}
+        if self.parallel_type == ParallelType.COL_PARALLEL:
+            w_shard = (self.layer.tensor_parallel_group_size, 1) if self.layer.transpose_b \
+                  else (1, self.layer.tensor_parallel_group_size)
+            if self.layer.has_bias:
+                state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape,
+                                                    'shard': (self.layer.tensor_parallel_group_size,)}
+        elif self.parallel_type == ParallelType.ROW_PARALLEL:
+            w_shard = (1, self.layer.tensor_parallel_group_size) if self.layer.transpose_b \
+                  else (self.layer.tensor_parallel_group_size, 1)
+            if self.layer.has_bias:
+                state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape, 'shard': (1,)}
+        else:
+            return {}
+        state_dict[self.layer.weight.name] = {'shape': self.layer.weight.shape, 'shard': w_shard}
+        return state_dict

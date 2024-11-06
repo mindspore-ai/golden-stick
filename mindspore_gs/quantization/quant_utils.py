@@ -18,6 +18,7 @@ import numpy as np
 import mindspore as ms
 from mindspore.common.dtype import QuantDtype
 from mindspore import Tensor
+from mindspore import dtype as msdtype
 
 __all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max",
            "get_quant_dtype_num_bits"]
@@ -70,10 +71,39 @@ def cal_quantization_params(input_min,
         zp = np.round(zp_double).astype(np.int32)
     return scale, zp
 
+
+def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, quant_dtype=msdtype.int8, quant_axis=-1,
+                 if_quant_data: bool = True):
+    """quant_tensor"""
+    if quant_dtype != msdtype.int8:
+        raise ValueError(f"Only support quant to int8, but got {quant_dtype}")
+    num_bits = 8
+    signed = True
+    if quant_axis == -1:
+        float_max = max_op(tensor)[0]
+        float_min = min_op(tensor)[0]
+    else:
+        rank = len(tensor.shape)
+        if rank != 2:
+            raise ValueError(f"Only support rank of tensor being 2, but got {rank}")
+        minmax_axis = 1 if quant_axis == 0 else 0
+        float_max = max_op(tensor, minmax_axis, keepdims=True)[0]
+        float_min = min_op(tensor, minmax_axis, keepdims=True)[0]
+    quant_min, quant_max = get_quant_min_max(num_bits=num_bits, signed=signed, narrow_range=narrow_range)
+    scale, zp = cal_quantization_params(float_min.asnumpy(), float_max.asnumpy(), quant_min, quant_max,
+                                        symmetric=symmetric)
+    if if_quant_data:
+        qtensor = quant_tensor_data(tensor, scale.squeeze(), zp.squeeze(), quant_min, quant_max, quant_axis)
+    else:
+        qtensor = None
+    return scale, zp, qtensor
+
+
 def convert_fp32_to_int64(scale) -> np.ndarray:
-    '''convert_fp32_to_int64'''
+    """convert_fp32_to_int64"""
     new_scale = np.frombuffer(scale.tobytes(), dtype=np.uint32)
     return new_scale.astype(np.int64)
+
 
 def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
     """Calculate quantization params for minimum/maximum quantization integer"""

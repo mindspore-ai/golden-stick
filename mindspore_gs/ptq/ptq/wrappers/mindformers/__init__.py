@@ -14,19 +14,14 @@
 # ============================================================================
 """Wrapper cells for PTQ for MindFormers."""
 
-from mindformers import Linear
-from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-from mindformers.modules import PagedAttentionMgr
-from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother
-from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
-from .smooth_wrappers import SmoothLinearCell
-from .quant_wrappers import QuantLinearCell, QuantPageAttentionMgrCell
+from .linear_smooth_wrappers import SmoothLinearCell
+from .linear_weight_quant_wrappers import WeightQuantLinearCell
+from .linear_all_quant_wrappers import AllQuantLinearCell
+from .linear_dynamic_quant_wrappers import DynamicQuantLinearCell
+from .kvcache_quant_wrappers import QuantPageAttentionMgrCell
 
-LinearSmoother.reg_linear_map(Linear, SmoothLinearCell)
-LinearSmoother.reg_linear_map(ColumnParallelLinear, SmoothLinearCell)
-LinearSmoother.reg_linear_map(RowParallelLinear, SmoothLinearCell)
-
-Quantizer.reg_layer_map(Linear, QuantLinearCell)
-Quantizer.reg_layer_map(ColumnParallelLinear, QuantLinearCell)
-Quantizer.reg_layer_map(RowParallelLinear, QuantLinearCell)
-Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell)
+SmoothLinearCell.reg_self()
+WeightQuantLinearCell.reg_self()
+AllQuantLinearCell.reg_self()
+DynamicQuantLinearCell.reg_self()
+QuantPageAttentionMgrCell.reg_self()

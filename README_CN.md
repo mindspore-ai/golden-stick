@@ -79,14 +79,70 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 
 ### 压缩算法
 
-| 类型 |                             链接                                  |
-| :---------------------: | :-----------------------------------------------------------------: |
-| API         | [API文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master) |
-| 自动化压缩   | TBD |
-| [训练后量化](mindspore_gs/ptq/README_CN.md) | [PTQ](mindspore_gs/ptq/ptq/README_CN.md) [RoundToNearest](mindspore_gs/ptq/round_to_nearest/README_CN.ipynb) |
-| [量化感知训练](mindspore_gs/quantization/README_CN.md) | [SimQAT](mindspore_gs/quantization/simulated_quantization/README_CN.md) [SLB](mindspore_gs/quantization/slb/README_CN.md) |
-| [剪枝](mindspore_gs/pruner/README_CN.md) | [SCOP](mindspore_gs/pruner/scop/README_CN.md) [uni_pruning(demo)](mindspore_gs/pruner/uni_pruning/README.md) [LRP(demo)](mindspore_gs/pruner/heads/lrp/README.md)  |
-| 其他 | [Ghost](mindspore_gs/ghost/README_CN.md)  |
+<table text-align="center" width="95%">
+  <thead>
+  <tr>
+    <th colspan="8"><div align="center">概览</div></th>
+  </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="2" align="center"><div>架构</div></td>
+      <td colspan="2" align="center"><div>流程</div></td>
+      <td colspan="2" align="center"><a href="https://www.mindspore.cn/golden_stick/docs/zh-CN/master">APIs</a></td>
+      <td colspan="2" align="center"><a href="example/">样例</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><div align="center">自动化压缩(TBD)</div></th>
+    </tr>
+  </thead>
+  <thead>
+    <tr>
+      <th colspan="8"><a href="mindspore_gs/ptq/README_CN.md"><div align="center">训练后量化</div></a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="4" align="center"><a href="mindspore_gs/ptq/ptq/README_CN.md">PTQ</a></td>
+      <td colspan="4" align="center"><a href="mindspore_gs/ptq/round_to_nearest/README_CN.ipynb">RoundToNearest</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><a href="mindspore_gs/quantization/README_CN.md"><div align="center">量化感知训练</div></a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="4" align="center"><a href="mindspore_gs/quantization/simulated_quantization/README_CN.md">SimQAT</a></td>
+      <td colspan="4" align="center"><a href="mindspore_gs/quantization/slb/README_CN.md">SLB</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><a href="mindspore_gs/pruner/README_CN.md"><div align="center">剪枝</div></a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="2" align="center"><a href="mindspore_gs/pruner/scop/README_CN.md">SCOP</a></td>
+      <td colspan="3" align="center"><a href="mindspore_gs/pruner/uni_pruning/README.md">uni_pruning(demo)</a></td>
+      <td colspan="3" align="center"><a href="mindspore_gs/pruner/heads/lrp/README.md">LRP(demo)</a></td>
+    </tr>
+  </tbody>
+  <thead>
+    <tr>
+      <th colspan="8"><div align="center">其他</div></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="8" align="center"><a href="mindspore_gs/ghost/README_CN.md">Ghost</a></td>
+    </tr>
+  </tbody>  
+</table>
 
 ### 模型部署
 
