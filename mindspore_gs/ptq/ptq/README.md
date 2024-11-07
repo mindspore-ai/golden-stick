@@ -34,6 +34,114 @@ Table 1: PTQ algorithm specifications
 
 > The current PTQ algorithm relies on the complete DecoderLayer to do the network topology analysis, so it does not support any network constructed based on the Linear layer of MindFormers. We plan to improve this in the subsequent version to enhance the network generalization ability of the PTQ algorithm.
 
+### Algorithmic Support
+
+Post-training quantization algorithms have many kinds of classification dimensions, such as static quantization and dynamic quantization; weight quantization, activation quantization, and KVCache quantization; MinMax quantization, MSE quantization, KL scatter quantization, and histogram quantization; as well as a variety of quantization optimization techniques, ranging from the simplest rounding quantization to SmoothQuant quantization, GPTQ quantization, AWQ quantization, and so on.
+
+This subsection describes the capabilities of the PTQ algorithm in terms of common quantization algorithm paradigms in the industry, before giving some limitations on other categorization dimensions:
+
+- Only MinMax quantization is supported.
+- Only static quantization is supported, where activation quantization only supports per-tensor quantization and weight quantization only supports per-channel quantization.
+- Limited by hardware and operator support, for full quantization, activation does not support per-channel quantization and weights do not support quantization with zero point.
+- The hardware supports weight quantization with zero point, but the current PTQ algorithm does not open this capability and only supports weight quantization without zero point.
+- The PTQ algorithm has done a layered design, and the current underlying quantization operator only supports some Layers of MindFormers, because the PTQ algorithm only supports doing weight quantization and activation quantization for [Linear Layer of MindFormers](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/layers.py#L363 ) to do weight quantization and activation quantization, and for [MindFormers' PageAttention layer](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26 ) to do KVCache quantization. If the user needs to quantize the network that is not based on MindFormers, the user is required to provide the relevant quantization operator implementation, the current customization capability in this regard does not form a clear interface, will be provided in the future.
+
+#### RoundToNearest Algorithm
+
+RoundToNearest algorithm is a class of plainer post-quantization algorithms, which use Round to nearest, i.e. rounding, hence the name RoundToNearest. The algorithm capability is similar to the independent [RoundToNearest](../round_to_nearest/README.md) algorithm capability by Golden Stick, which will stop evolving the RoundToNearest algorithm and use the PTQ algorithm to support the RoundToNearest algorithm capability.
+
+##### 1. Quantization Process
+
+![](images/en/round_to_nearest.png)
+
+The main logic of the quantization algorithm is to calculate the quantization parameters based on floating point data such as the maximum and minimum values of weights and the maximum and minimum values of integer data according to the formula:
+
+$$scale = \frac{X_{{float}_{max}} - {X_{float}}_{min}} {X_{{int}_{max}} - {X_{int}}_{min}}$$
+
+$$offset = round(X_{{int}_{max}} - \frac{X_{{float}_{max}}} {scale})$$
+
+Where scale is the scaling factor and offset is the translation factor, both collectively known as quantization parameters. After obtaining the quantization parameters, the weights can be quantized:
+
+$$x_{int} = clamp(round(x_{float} \div scale) + offset; 0, 2^b-1)$$
+
+This involves the round operation, which is a rounding operation, which is the meaning of the RoundToNearest algorithm and is part of the source of error in this quantization algorithm.
+
+##### 2. Weight Quantization
+
+The above quantization process is applied to the weight matrix in the network by converting it to 8bit integer for storage. After loading the 8bit weights at deployment time, they are inversely quantized and the mathematical expression of the process is as follows:
+
+$$X_{float} = (X_{int} - offset) \times scale$$
+
+After inverse quantization of weights to floating point, the inference process of the network is no different from the general floating point network inference process. Weight quantization does not bring about a reduction in computation, on the contrary, inverse quantization will bring about additional computation, so the operation of inverse quantization is usually fused with the subsequent floating point computation process, which can effectively reduce the memory overhead in the deployment phase, and at the same time alleviate the Memory Bound in the incremental inference phase of the large language model, which both can improve the throughput of the large language model when deployed.
+
+PTQ currently supports only 8bit weight quantization capability, which can be enabled by the following configuration item:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  kvcache_quant_dtype=None,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+##### 3. KVCache Quantization
+
+Applying the above quantization process to the KVCache generated during the inference process of the large language model, the computed KVCache is quantized and stored, and then the KVCache is inversely quantized before the Attention computation, so as to alleviate the memory consumption of the KVCache in order to support the generation of the large language model with a larger batch size or a longer sequence. It should be noted that KVCache is generated during inference, so quantization against KVCache requires a small number of datasets for calibration.
+
+PTQ currently supports only 8bit KVCache quantization capability, which can be enabled by the following configuration item:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+#### SmoothQuant Algorithm
+
+It is found that, unlike CNNs and small transformer networks, when the number of parameters of the large language model exceeds 6.8B, "systematic outliers with large magnitude" appear in the activation of the network, which is difficult to quantify due to the wide and heterogeneous distribution of floating points.
+
+![](images/en/smooth_quant.png)
+
+The SmoothQuant algorithm transfers a portion of the outliers on the activations to the weights through a mathematically equivalent transformation, thus transforming the difficult-to-quantify activations and very easy-to-quantify weights into easy-to-quantify activations and easy-to-quantify weights, and realizing the improvement of quantization accuracy.
+
+You can enable the SmoothQuant capability of PTQ with the following configuration item:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+```
+
+#### Combination Quantification
+
+Thanks to the layered decoupling framework design, the PTQ algorithm can easily combine different algorithmic capabilities:
+
+- 8bit weight quantization combined with 8bit KVCache quantization:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+- SmoothQuant quantization combined with 8bit KVCache quantization:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+In the future, we will also support inter-layer mixed-precision quantization based on this, applying 8bit weight quantization, 8bit full quantization or 4bit weight quantization, etc. according to the sensitivity of different layers to quantization.
+
 ## Samples
 
 Like all algorithms of the Golden Stick, the application of the PTQ algorithm can be divided into two main phases: the quantization phase and the deployment phase.
