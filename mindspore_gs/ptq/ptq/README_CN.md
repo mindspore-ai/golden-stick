@@ -86,7 +86,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  
 
 ##### 3）KVCache量化
 
-将上述量化过程应用于大语言模型推理过程中产生的KVCache上，将计算得到的KVCache量化后进行存储，然后在Attention计算前将KVCache进行反量化，从而缓解KVCache的显存占用，以支持更大batch size或者更长序列的大语言模型生成。需要注意的是，KVCache是推理时产生的，所以针对KVCache的量化需要少量数据集进行校准，根据数据集
+将上述量化过程应用于大语言模型推理过程中产生的KVCache上，将计算得到的KVCache量化后进行存储，然后在Attention计算前将KVCache进行反量化，从而缓解KVCache的显存占用，以支持更大batch size或者更长序列的大语言模型生成。需要注意的是，KVCache是推理时产生的，所以针对KVCache的量化需要少量数据集进行校准。
 
 PTQ当前仅支持8bit的KVCache量化能力，可以通过如下配置项使能：
 
