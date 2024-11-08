@@ -10,10 +10,3 @@ mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
     异常：
         - **TypeError** - `config` 数据类型不是 `MindFormerConfig`。
-
-    .. py:method:: create_network()
-
-        创建ParallelLlamaForCasualLM网络。
-
-        返回：
-            ParallelLlamaForCasualLM类型的网络。
