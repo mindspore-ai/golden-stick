@@ -17,6 +17,7 @@
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 from mindspore import dtype
+from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
 from mindspore_gs.ptq.ptq.hal import QuantParam, DynamicQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
@@ -40,23 +41,28 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(RowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
 
     def deploy(self):
-        return DynamicQuantLinearInferCell(self.layer, self.cfg, self.q_weight, QuantParam(self.w_scale, self.w_zp),
-                                           self.compute_type, self.parallel_type)
+        return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
+                                           QuantParam(self.w_scale, self.w_zp), self.compute_type, self.parallel_type)
 
 
 class DynamicQuantLinearInferCell(LinearInferCell):
-    """DeployLinearCell"""
+    """DynamicQuantLinearInferCell"""
 
-    def __init__(self, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type, parallel_type: ParallelType):
+    def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
+                 parallel_type: ParallelType):
         super().__init__(linear, parallel_type, dtype.int8)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
-        qmm = DynamicQuantMatmul.create(linear.matmul, w_qparam, is_deploy, False, self.layer.transpose_b,
+        if not is_deploy:
+            logger.debug(f"DynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
+            logger.debug(f"DynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+        qmm = DynamicQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy, False, self.layer.transpose_b,
                                         compute_type)
         self.layer.matmul = qmm
         self.layer.weight = q_weight
 
-    def sharded_state_dict(self):
+    def sharded_state_dict(self, **kwargs):
         """provide the sharded state dict based on the config"""
         state_dict = super().sharded_state_dict()
         qmm_state_dict = self.layer.matmul.param_shard_state(self.layer.tensor_parallel_group_size)

@@ -233,6 +233,31 @@ workspace
 
 5. 修改use_parallel为True, parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。
 
+修改后的yaml配置文件中，并行相关的配置应该类似于这样：
+
+```yaml
+use_parallel: True
+parallel:
+  parallel_mode: "STAND_ALONE"
+  gradients_mean: False
+  enable_alltoall: False
+  full_batch: False
+  search_mode: "sharding_propagation"
+  enable_parallel_optimizer: False
+  strategy_ckpt_save_file: "./ckpt_strategy.ckpt"
+  parallel_optimizer_config:
+    gradient_accumulation_shard: False
+    parallel_optimizer_threshold: 64
+parallel_config:
+  data_parallel: 1
+  model_parallel: 1
+  pipeline_stage: 1
+  use_seq_parallel: False
+  micro_batch_num: 16
+  vocab_emb_dp: True
+  gradient_aggregation_group: 4
+```
+
 需要注意的是MindFormers的ParallelLlamaForCausalLM 7B网络即便在单卡上，也必须使用msrun才能成功运行。msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/master/model_train/parallel/msrun_launcher.html)，下面是一个简单的样例命令：
 
 ```bash

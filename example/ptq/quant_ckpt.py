@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Quant network."""
+import logging
 import os
 import argparse
 import time
@@ -47,6 +48,8 @@ def get_args():
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo.")
+    parser.add_argument('--debug_mode', '-e', type=bool, default=False, help="Enable debug info, default: False, "
+                                                                             "Available: True, False")
 
     args = parser.parse_args()
 
@@ -179,6 +182,8 @@ def ckpt_name(model_name_, uargs_):
 
 if __name__ == "__main__":
     uargs = get_args()
+    if uargs.debug_mode:
+        logger.set_level(logging.DEBUG)
     algo = create_ptq(uargs)
     # pylint: disable=W0212
     algo._config.act_dynamic_quant = uargs.act_dynamic_quant

@@ -20,14 +20,12 @@ from mindspore import ops as msops
 from mindspore.ops import functional as F
 from mindspore import dtype as msdtype
 from mindspore.nn import Cell
-from mindspore import Parameter
-from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.common.hook_handle import HookHandle
 from mindformers.modules.layers import Linear
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType
+from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType, QuantWithSmooth
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
@@ -42,7 +40,7 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
             self.samples.append(msops.squeeze(x))
         # mindspore can only hook cell.
         if isinstance(self._layer.matmul, msops.Primitive):
-            self._layer.matmul = MatmulCellForHook(self._layer.matmul)
+            self._layer.matmul = MatmulCellForHook(self._layer_name, self._layer.matmul)
         self.hook_handle = self._layer.matmul.register_forward_pre_hook(hook_fn)
 
     def remove_hook(self):
@@ -74,14 +72,11 @@ class LinearInferCell(Cell):
                 self.weight_dtype = msdtype.float16
 
         self.has_act_quant = False
-        self.quant_op = None
-        self.input_scale, self.input_zp = None, None
+        self.quant_op: Optional[QuantWithSmooth] = None
 
-    def _set_act_quant(self, input_scale: Parameter, input_zp: Parameter):
+    def _set_act_quant(self, quant_op: QuantWithSmooth):
         self.has_act_quant = True
-        self.quant_op = QuantV2()
-        self.input_scale, self.input_zp = input_scale, input_zp
-
+        self.quant_op = quant_op
 
     @property
     def layer(self):
@@ -103,7 +98,7 @@ class LinearInferCell(Cell):
         weight = self.cast(self._layer.weight, self.weight_dtype)
         x = self._layer.cast(x, self._layer.dtype)
         if self.has_act_quant:
-            x = self.quant_op(x, self.input_scale, self.input_zp, False, "ROUND", msdtype.int8)
+            x = self.quant_op(x)
         # apply gmm to the inference of moe structural models when use_past=True.
         if self._layer.use_gmm:
             x = self._layer.matmul([x], [weight], None, None, None, None, None, group_list)[0]
@@ -139,8 +134,7 @@ class LinearInferCell(Cell):
             input_parallel = self._layer.gather_from_sp_region(input_parallel)
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
         if self.has_act_quant:
-            input_parallel = self.quant_op(input_parallel, self.input_scale, self.input_zp, False, "ROUND",
-                                           msdtype.int8)
+            input_parallel = self.quant_op(input_parallel)
         output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size_per_partition,)
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size))
         output_parallel = self._layer.matmul(input_parallel, weight)
@@ -172,8 +166,7 @@ class LinearInferCell(Cell):
         weight = self.cast(self._layer.weight, self.weight_dtype)
         input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
         if self.has_act_quant:
-            input_parallel = self.quant_op(input_parallel, self.input_scale, self.input_zp, False, "ROUND",
-                                           msdtype.int8)
+            input_parallel = self.quant_op(input_parallel)
         output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size,)
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size_per_partition))
         output_parallel = self._layer.matmul(input_parallel, weight)
@@ -201,21 +194,24 @@ class LinearInferCell(Cell):
             x = self.row_linear_forward(x)
         return x
 
-    def sharded_state_dict(self):
+    def sharded_state_dict(self, **kwargs):
         """provide the sharded state dict based on the config"""
         state_dict = {}
+        tensor_parallel_num = self.layer.tensor_parallel_group_size
         if self.parallel_type == ParallelType.COL_PARALLEL:
-            w_shard = (self.layer.tensor_parallel_group_size, 1) if self.layer.transpose_b \
-                  else (1, self.layer.tensor_parallel_group_size)
+            w_shard = (tensor_parallel_num, 1) if self.layer.transpose_b else (1, tensor_parallel_num)
             if self.layer.has_bias:
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape,
-                                                    'shard': (self.layer.tensor_parallel_group_size,)}
+                                                    'shard': (tensor_parallel_num,)}
         elif self.parallel_type == ParallelType.ROW_PARALLEL:
-            w_shard = (1, self.layer.tensor_parallel_group_size) if self.layer.transpose_b \
-                  else (self.layer.tensor_parallel_group_size, 1)
+            w_shard = (1, tensor_parallel_num) if self.layer.transpose_b else (tensor_parallel_num, 1)
             if self.layer.has_bias:
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape, 'shard': (1,)}
         else:
             return {}
         state_dict[self.layer.weight.name] = {'shape': self.layer.weight.shape, 'shard': w_shard}
+        if self.quant_op:
+            state_dict.update(self.quant_op.param_shard_state(tensor_parallel_num, **kwargs))
+        if hasattr(self.layer.matmul, "param_shard_state"):
+            state_dict.update(self.layer.matmul.param_shard_state(tensor_parallel_num))
         return state_dict

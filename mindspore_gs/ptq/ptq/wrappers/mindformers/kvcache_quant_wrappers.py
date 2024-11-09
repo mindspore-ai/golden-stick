@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """ptq wrapper cells for mindformers."""
+from enum import Enum
 
 import numpy as np
 
@@ -24,12 +25,29 @@ from mindspore.nn import Cell
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_world_size
 
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, DeviceType, OpsPriority
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params, convert_fp32_to_int64
+
+
+class DeviceType(Enum):
+    """
+    device type
+    """
+    ASCEND910B = 'ascend_910B'
+    ASCEND310 = 'ascend_310'
+
+
+class OpsPriority(Enum):
+    """
+    ops use priority
+    """
+    ACLNN = 'aclnn'
+    INTERNAL = 'internal'
+    ASD = 'asd'
 
 
 class QuantPageAttentionMgrCell(WrapperCell):
@@ -61,12 +79,11 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.v_zp_no_fusion = None
         self.k_v_scale_fusion = None
         self.k_v_zp_fusion = None
-
         self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
                                                                            signed=True,
                                                                            narrow_range=cfg.kvcache_narrow_range)
         if not self.cfg.kvcache_dynamic_quant:
-            param_init_func = QuantPageAttentionMgrCell.param_init_map.get((cfg.device_type, cfg.ops_priority))
+            param_init_func = QuantPageAttentionMgrCell.param_init_map.get((DeviceType.ASCEND910B, OpsPriority.ASD))
             if param_init_func is None:
                 raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in \
                                 QuantPageAttentionMgrCell.param_init_map.")
@@ -130,7 +147,7 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.k_zp_no_fusion.set_data(Tensor(key_t_zp, dtype=dtype.float16))
         self.v_scale_no_fusion.set_data(Tensor(value_t_scale, dtype=dtype.float16))
         self.v_zp_no_fusion.set_data(Tensor(value_t_zp, dtype=dtype.float16))
-        param_compute_func = QuantPageAttentionMgrCell.param_compute_map[(self.cfg.device_type, self.cfg.ops_priority)]
+        param_compute_func = QuantPageAttentionMgrCell.param_compute_map[(DeviceType.ASCEND910B, OpsPriority.ASD)]
         if param_compute_func is None:
             raise ValueError("key ({self.cfg.device_type}, {self.cfg.ops_priority}) is \
                                     not in QuantPageAttentionMgrCell.param_compute_map.")
