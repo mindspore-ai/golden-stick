@@ -20,7 +20,7 @@ import pytest
 from mindspore import dtype as msdtype
 
 from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig, PTQApproach, PTQMode, \
-    OutliersSuppressionType
+                                        OutliersSuppressionType, QuantGranularity
 from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
@@ -183,7 +183,8 @@ def test_ptq_yaml_dump_and_load():
     cfg.kvcache_quant_dtype = msdtype.int8
     cfg.act_quant_dtype = msdtype.int8
     cfg.outliers_suppression = OutliersSuppressionType.SMOOTH
-    cfg.act_dynamic_quant = True
+    cfg.act_quant_granularity = QuantGranularity.PER_TOKEN
+    cfg.kvcache_quant_granularity = QuantGranularity.PER_TOKEN
     cfg.dump('my_cfg.yaml')
     new_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     new_cfg.load('my_cfg.yaml')
@@ -193,7 +194,8 @@ def test_ptq_yaml_dump_and_load():
     assert new_cfg.weight_quant_dtype is None
     assert new_cfg.act_quant_dtype is msdtype.int8
     assert new_cfg.outliers_suppression == OutliersSuppressionType.SMOOTH
-    assert new_cfg.act_dynamic_quant is True
+    assert new_cfg.act_quant_granularity == QuantGranularity.PER_TOKEN
+    assert new_cfg.kvcache_quant_granularity == QuantGranularity.PER_TOKEN
 
 
 @pytest.mark.level0

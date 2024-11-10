@@ -30,6 +30,7 @@ from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tenso
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
+from mindspore_gs.ptq.ptq_config import OutliersSuppressionType, QuantGranularity
 from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.ptq.convert_utils import (
     convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
@@ -180,11 +181,12 @@ class LinearDeploy(PTQCell):
         # self._linear.out_channels maybe not equal w_out
         w_out = self._linear.weight.shape[0] if self._linear.transpose_b else self._linear.weight.shape[1]
         w_in = self._linear.weight.shape[1] if self._linear.transpose_b else self._linear.weight.shape[0]
-        if self._policy.get_config().act_dynamic_quant is True:
+        if self._policy.get_config().act_quant_granularity is QuantGranularity.PER_TOKEN:
             self._weight_quantizer = convert_to_dynamic_quant_for_deploy(
                 w_out=w_out,
                 w_in=w_in,
                 is_per_channel=True,
+                has_smooth=self._policy.get_config().outliers_suppression != OutliersSuppressionType.NONE,
                 transpose_weight=self._linear.transpose_b,
                 dst_dtype=self._cast_dtype,
                 strategy=self.dynamic_bmm_strategy(self._act_strategy, self._weight_strategy,
@@ -192,7 +194,7 @@ class LinearDeploy(PTQCell):
                 )
         else:
             self._weight_quantizer = convert_to_fusion_antiquant_for_deploy(
-                axis=self._weight_axis, output_channel=self._linear.out_channels,
+                axis=self._weight_axis, output_channel=w_out,
                 data_rank=len(self._linear.weight.shape),
                 is_per_channel=True,
                 transpose_weight=self._linear.transpose_b,

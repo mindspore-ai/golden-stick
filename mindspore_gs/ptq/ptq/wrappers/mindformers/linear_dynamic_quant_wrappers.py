@@ -18,7 +18,7 @@ from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 from mindspore import dtype
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
 from mindspore_gs.ptq.ptq.hal import QuantParam, DynamicQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
@@ -34,7 +34,7 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         class DynamicA8W8Checker(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.weight_quant_dtype == dtype.int8 and config.act_quant_dtype == dtype.int8 and \
-                       config.act_dynamic_quant is True
+                       config.act_quant_granularity is QuantGranularity.PER_TOKEN
 
         Quantizer.reg_layer_map(Linear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())

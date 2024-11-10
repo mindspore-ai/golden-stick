@@ -110,6 +110,14 @@ class SmoothQuantConfig:
         value_check('alpha', self.alpha, float)
 
 
+class QuantGranularity(Enum):
+    """quant granularity."""
+    PER_TENSOR = 'per_tensor'
+    PER_CHANNEL = 'per_channel'
+    PER_TOKEN = 'per_token'
+    PER_GROUP = 'per_group'
+
+
 @dataclass
 class PTQConfig:
     """
@@ -133,7 +141,10 @@ class PTQConfig:
         outliers_suppression (:class:`mindspore_gs.ptq.OutliersSuppressionType`): Used to configure outliers suppression
             method before quantization. OutliersSuppressionType.SMOOTH indicates using smooth method from SmoothQuant
             to suppress outliers, and OutliersSuppressionType.NONE as default indicates doing nothing for outliers.
-
+        act_quant_granularity: (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of activation.
+            Currently only QuantGranularity.PER_TENSOR and QuantGranularity.PER_TOKEN are supported.
+        kvcache_quant_granularity: (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of kvcache.
+            Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_TOKEN are supported.
 
     Raises:
         ValueError: If `mode` is not PTQMode.QUANTIZE or PTQMode.DEPLOY.
@@ -143,6 +154,10 @@ class PTQConfig:
         ValueError: If `kvcache_quant_dtype` is not mindspore.dtype.int8 or None.
         ValueError: If `act_quant_dtype` is not mindspore.dtype.int8 or None.
         TypeError: If `outliers_suppression` is not a OutliersSuppressionType.
+        ValueError: If `act_quant_granularity` is not QuantGranularity.PER_TENSOR or QuantGranularity.PER_TOKEN.
+        ValueError: If `kvcache_quant_granularity` is not QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.
+        ValueError: If `act_quant_granularity` is QuantGranularity.PER_TOKEN but weight_quant_dtype != msdtype.int8 or act_quant_dtype != msdtype.int8.
+        ValueError: If `kvcache_quant_granularity` is QuantGranularity.PER_TOKEN but kvcache_quant_dtype != msdtype.int8.
 
     Examples:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -158,6 +173,8 @@ class PTQConfig:
     kvcache_quant_dtype: msdtype = None
     act_quant_dtype: msdtype = None
     outliers_suppression: OutliersSuppressionType = OutliersSuppressionType.NONE
+    act_quant_granularity: QuantGranularity = QuantGranularity.PER_TENSOR
+    kvcache_quant_granularity: QuantGranularity = QuantGranularity.PER_CHANNEL
 
     def __post_init__(self):
         if self.mode not in PTQMode.__members__.values():
@@ -170,12 +187,30 @@ class PTQConfig:
             raise ValueError(f'self.kvcache_quant_dtype: {self.kvcache_quant_dtype} is not mindspore.dtype.int8 or None.')
         if self.act_quant_dtype != msdtype.int8 and self.act_quant_dtype is not None:
             raise ValueError(f'self.act_quant_dtype: {self.act_quant_dtype} is not mindspore.dtype.int8 or None.')
+        self._check_quant_granularity()
         value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
         if not isinstance(self.algo_args, dict) and not is_dataclass(self.algo_args):
             raise ValueError(f"algo_args's type should be dict or dataclass, but now is {type(self.algo_args)}")
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
+
+    def _check_quant_granularity(self):
+        '''check_quant_granularity'''
+        if self.act_quant_granularity != QuantGranularity.PER_TENSOR and self.act_quant_granularity != \
+            QuantGranularity.PER_TOKEN:
+            raise ValueError(f'self.act_quant_granularity {self.act_quant_granularity} must be \
+                             QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.')
+        if self.kvcache_quant_granularity != QuantGranularity.PER_CHANNEL and self.kvcache_quant_granularity != \
+            QuantGranularity.PER_TOKEN:
+            raise ValueError(f'self.kvcache_quant_granularity {self.kvcache_quant_granularity} must be \
+                             QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.')
+        if (self.weight_quant_dtype != msdtype.int8 or self.act_quant_dtype != msdtype.int8) and \
+            self.act_quant_granularity is QuantGranularity.PER_TOKEN:
+            raise ValueError('when self.act_quant_granularity is QuantGranularity.PER_TOKEN, self.weight_quant_dtype: {self.weight_quant_dtype} \
+                             and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
+        if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
+            raise ValueError('when self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, self.kvcache_quant_dtype must be mindspore.dtype.int8.')
 
 
 class YamlLoader:
@@ -234,8 +269,6 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
     fallback_blacklist: dict = field(default_factory=dict)
-    act_dynamic_quant: bool = False
-    kvcache_dynamic_quant: bool = False
 
     def __post_init__(self):
         value_check('act_per_channel', self.act_per_channel, bool)
@@ -249,17 +282,9 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         value_check('kvcache_calibrate_max_new_tokens', self.kvcache_calibrate_max_new_tokens, int)
         value_check('fallback_blacklist', self.fallback_blacklist, dict)
-        value_check('act_dynamic_quant', self.act_dynamic_quant, bool)
-        if self.act_dynamic_quant is True and (self.weight_quant_dtype != msdtype.int8 or
-                                               self.act_quant_dtype != msdtype.int8):
-            raise ValueError(f'self.act_dynamic_quant is True, self.weight_quant_dtype: {self.weight_quant_dtype} \
-                             and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
-        value_check('kvcache_dynamic_quant', self.kvcache_dynamic_quant, bool)
-        if self.kvcache_dynamic_quant is True and self.kvcache_quant_dtype != msdtype.int8:
-            raise ValueError(f'self.kvcache_dynamic_quant is True, self.kvcache_quant_dtype: {self.kvcache_quant_dtype} \
-                             must be mindspore.dtype.int8.')
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
+        self._check_quant_granularity()
         self._check_rtn()
         if list(set(self.fallback_blacklist.keys()) & set(self.opname_blacklist)):
             raise ValueError("There should be no repetition between opname_blacklist and fallback_a16w8_blacklist,"
@@ -271,14 +296,24 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
                 self.algo_args.update(asdict(args_config()))
 
     def _check_rtn(self):
-        if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8 and self.act_dynamic_quant is False:
-            raise ValueError(f"{self.approach} is not support act_quant_dtype == mindspore.dtype.int8 when act_dynamic_quant is False.")
-        if self.approach is PTQApproach.RTN and self.weight_quant_dtype == msdtype.int8 and self.kvcache_quant_dtype == msdtype.int8 \
-                        and self.kvcache_dynamic_quant is False:
-            raise ValueError(f"when self.kvcache_dynamic_quant is False, weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, \
-                             {self.approach} isn't supported.")
+        if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8 and self.act_quant_granularity is not QuantGranularity.PER_TOKEN:
+            raise ValueError(f"{self.approach} is not support act_quant_dtype == mindspore.dtype.int8 when act_quant_granularity is not QuantGranularity.PER_TOKENNNNN.")
         if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
             raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
+        if self.approach is PTQApproach.RTN and self.weight_quant_dtype == msdtype.int8 and self.kvcache_quant_dtype == msdtype.int8 \
+                        and self.kvcache_quant_granularity is not QuantGranularity.PER_TOKEN:
+            raise ValueError(f"when self.kvcache_quant_granularity not QuantGranularity.PER_TOKEN, weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, \
+                             {self.approach} isn't supported.")
+
+    def _check_quant_granularity(self):
+        if self.approach is PTQApproach.RTN and (self.act_quant_granularity is QuantGranularity.PER_TOKEN or \
+                                                 self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN) and self.mode is PTQMode.QUANTIZE:
+            raise ValueError(f"self.mode is PTQMode.QUANTIZE, self.act_quant_granularity is QuantGranularity.PER_TOKEN or \
+                             self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, {self.approach} can't take effect.")
+        if (self.act_quant_granularity is QuantGranularity.PER_TOKEN or self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN) and \
+            self.approach is not PTQApproach.RTN and self.approach is not PTQApproach.PTQ:
+            raise ValueError(f"self.act_quant_granularity is QuantGranularity.PER_TOKEN or \
+                              self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, {self.approach} can't take effect.")
 
     def _parse_dict(self):
         """ parse data class to readable dicts"""
@@ -291,6 +326,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
         parsed_dict['act_quant_dtype'] = str(self.act_quant_dtype)
         parsed_dict['outliers_suppression'] = self.outliers_suppression.name
+        parsed_dict['act_quant_granularity'] = self.act_quant_granularity.name
+        parsed_dict['kvcache_quant_granularity'] = self.kvcache_quant_granularity.name
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
@@ -310,7 +347,9 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('outliers_suppression', OutliersSuppressionType),
             ('kvcache_quant_dtype', MSDTypeLoader()),
             ('weight_quant_dtype', MSDTypeLoader()),
-            ('act_quant_dtype', MSDTypeLoader())
+            ('act_quant_dtype', MSDTypeLoader()),
+            ('act_quant_granularity', QuantGranularity),
+            ('kvcache_quant_granularity', QuantGranularity),
         ]
         for item in unparse_list:
             update_dict(*item)

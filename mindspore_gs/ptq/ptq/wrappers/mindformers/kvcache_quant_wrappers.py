@@ -25,7 +25,7 @@ from mindspore.nn import Cell
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_world_size
 
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
 from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
@@ -82,7 +82,7 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
                                                                            signed=True,
                                                                            narrow_range=cfg.kvcache_narrow_range)
-        if not self.cfg.kvcache_dynamic_quant:
+        if self.cfg.kvcache_quant_granularity is not QuantGranularity.PER_TOKEN:
             param_init_func = QuantPageAttentionMgrCell.param_init_map.get((DeviceType.ASCEND910B, OpsPriority.ASD))
             if param_init_func is None:
                 raise ValueError("key ({cfg.device_type}, {cfg.ops_priority}) is not in \
@@ -117,7 +117,7 @@ class QuantPageAttentionMgrCell(WrapperCell):
     }
 
     def process(self):
-        if self.cfg.kvcache_dynamic_quant:
+        if self.cfg.kvcache_quant_granularity == QuantGranularity.PER_TOKEN:
             return
         if not self.key_samples or not self.value_samples:
             raise RuntimeError("Please catch ReshapeAndCache inputs before quantization.")
@@ -194,7 +194,7 @@ class QuantPageAttentionMgrCell(WrapperCell):
     }
 
     def deploy(self):
-        if self.cfg.kvcache_dynamic_quant:
+        if self.cfg.kvcache_quant_granularity == QuantGranularity.PER_TOKEN:
             return DeployDynamicQuantPagedAttentionCell(self.layer)
         return DeployPageAttentionMgrCell(self.layer, self.v_scale_no_fusion, self.v_zp_no_fusion,
                                           self.k_scale_no_fusion, self.k_zp_no_fusion, self.k_v_scale_fusion,

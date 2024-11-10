@@ -22,7 +22,7 @@ import mindspore as ms
 from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
 from mindformers import MindFormerConfig
-from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import PTQMode, PTQConfig, OutliersSuppressionType, QuantGranularity
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
@@ -44,7 +44,8 @@ def get_args():
     parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
-    parser.add_argument('--act_dynamic_quant', '-d', type=bool, default=False, help="Available: True, False")
+    parser.add_argument('--act_dynamic_quant', '-ad', type=bool, default=False, help="Available: True, False")
+    parser.add_argument('--kvcache_dynamic_quant', '-kd', type=bool, default=False, help="Available: True, False")
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo.")
@@ -103,6 +104,10 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=uargs_.weight_quant_dtype,
                     act_quant_dtype=uargs_.act_quant_dtype, kvcache_quant_dtype=uargs_.kvcache_quant_dtype,
                     outliers_suppression=uargs_.outliers_suppression, opname_blacklist=uargs_.opname_blacklist)
+    if uargs_.act_dynamic_quant is True:
+        cfg.act_quant_granularity = QuantGranularity.PER_TOKEN
+    if uargs_.kvcache_dynamic_quant is True:
+        cfg.kvcache_quant_granularity = QuantGranularity.PER_TOKEN
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
         ptq = RTN(config=cfg)
@@ -177,6 +182,8 @@ def ckpt_name(model_name_, uargs_):
         name += "c8"
     if uargs_.act_dynamic_quant is True:
         name += "_a8dyn"
+    if uargs_.kvcache_dynamic_quant is True:
+        name += "_c8dyn"
     return name
 
 
@@ -185,8 +192,6 @@ if __name__ == "__main__":
     if uargs.debug_mode:
         logger.set_level(logging.DEBUG)
     algo = create_ptq(uargs)
-    # pylint: disable=W0212
-    algo._config.act_dynamic_quant = uargs.act_dynamic_quant
     mfconfig = MindFormerConfig(uargs.config_path)
     model_name = mfconfig.trainer.model_name
     if mfconfig.model.arch.type == "LlamaForCausalLM":

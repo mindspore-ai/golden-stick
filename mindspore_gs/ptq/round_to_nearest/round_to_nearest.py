@@ -31,7 +31,7 @@ from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.ptq_config import (PTQConfig, InnerPTQConfig, PTQMode,
-                                         PTQApproach, BackendTarget, OutliersSuppressionType)
+                                         PTQApproach, BackendTarget, QuantGranularity, OutliersSuppressionType)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.common.utils import value_check
 from .rtn_net_policy import RTNNetPolicy
@@ -100,9 +100,9 @@ class RoundToNearest(CompAlgo):
 
     @staticmethod
     def _ptq_config_check(config):
-        if config.act_dynamic_quant is False and (config.act_quant_dtype is not None or
-                                                  config.outliers_suppression != OutliersSuppressionType.NONE):
-            raise ValueError(f"When config.act_dynamic_quant is False, "
+        if config.act_quant_granularity is not QuantGranularity.PER_TOKEN and \
+            (config.act_quant_dtype is not None or config.outliers_suppression != OutliersSuppressionType.NONE):
+            raise ValueError(f"When config.act_quant_granularity is not QuantGranularity.PER_TOKEN, "
                              f"RTN algorithm only support A16W8、C8、A16W8C8, please set the correct configuration."
                              f"Now the configuration is act_quant_dtype={config.act_quant_dtype},"
                              f"weight_quant_dtype={config.weight_quant_dtype},"
