@@ -61,14 +61,16 @@ def cal_quantization_params(input_min,
     if symmetric:
         input_max = np.maximum(np.abs(input_min), np.abs(input_max))
         input_min = -input_max
+    input_min = input_min.astype(np.float64)
+    input_max = input_max.astype(np.float64)
     scale = (input_max - input_min) / (quant_max - quant_min)
 
     # calculate zero point
     zp_double = quant_min - input_min / scale
     if symmetric:
-        zp = np.zeros_like(zp_double).astype(np.int32)
+        zp = np.zeros_like(zp_double).astype(np.float64)
     else:
-        zp = np.round(zp_double).astype(np.int32)
+        zp = np.round(zp_double).astype(np.float64)
     return scale, zp
 
 
@@ -93,7 +95,8 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, quant_
     scale, zp = cal_quantization_params(float_min.asnumpy(), float_max.asnumpy(), quant_min, quant_max,
                                         symmetric=symmetric)
     if if_quant_data:
-        qtensor = quant_tensor_data(tensor, scale.squeeze(), zp.squeeze(), quant_min, quant_max, quant_axis)
+        qtensor = quant_tensor_data(tensor, scale.squeeze(), zp.squeeze(), quant_min, quant_max, quant_axis,
+                                    quant_dtype)
     else:
         qtensor = None
     return scale, zp, qtensor

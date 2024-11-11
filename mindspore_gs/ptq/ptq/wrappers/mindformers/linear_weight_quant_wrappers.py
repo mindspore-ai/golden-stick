@@ -78,8 +78,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
             self.w_quant_min = msops.min
 
         self.q_weight = Parameter(initializer("ones", self.layer.weight.shape, dtype.int8), name=self.layer.weight.name)
-        self.w_scale = Parameter(initializer('ones', (self.oc,), dtype=self.compute_type))
-        self.w_zp = Parameter(initializer('ones', (self.oc,), dtype=dtype.int32))
+        self.w_scale = Parameter(initializer('ones', (self.oc,), dtype=dtype.float64))
+        self.w_zp = Parameter(initializer('ones', (self.oc,), dtype=dtype.float64))
 
     def quant(self):
         """quant"""
@@ -88,8 +88,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
                                                self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                                self.cfg.weight_quant_dtype, self.weight_quantizer_axis)
         self.q_weight.set_data(Tensor(q_weight.asnumpy(), dtype=dtype.int8))
-        self.w_scale.set_data(Tensor(np.squeeze(w_scale), dtype=self.compute_type))
-        self.w_zp.set_data(Tensor(np.squeeze(w_zp), dtype=dtype.int32))
+        self.w_scale.set_data(Tensor(np.squeeze(w_scale), dtype=dtype.float64))
+        self.w_zp.set_data(Tensor(np.squeeze(w_zp), dtype=dtype.float64))
 
     def process(self):
         super().process()
