@@ -27,7 +27,7 @@ from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.round_to_nearest.quant_cells.mindformers.quant_cells import LinearQuant
 from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
-from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, QuantGranularity
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindformers.modules import Linear
 
@@ -354,26 +354,16 @@ def test_linears_dynamic_quant_predict_2stage(device, mode):
         fakeinput = np.ones((1, 5), dtype=np.float16)
         quant_network(Tensor(fakeinput))
         ascend_network = ptq.convert(quant_network)
-        source_dict = ascend_network.parameters_dict()
-        target_dict = {}
-        for k, v in source_dict.items():
-            if k.endswith("scale"):
-                target_dict[k[:-5] + "weight_scale"] = Parameter(Tensor(v.asnumpy(), dtype=dtype.float32))
-            else:
-                target_dict[k] = v
-        mindspore.save_checkpoint(target_dict, "test_linears_dynamic_quant_predict_2stage.ckpt",
+        mindspore.save_checkpoint(ascend_network.parameters_dict(), "test_linears_dynamic_quant_predict_2stage.ckpt",
                                   choice_func=lambda x: "key_cache" not in x and "value_cache" not in x)
         return fp_outputs
 
     def infer(inputs):
         network = LinearsNet()
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, act_quant_dtype=dtype.int8,
+                        kvcache_quant_dtype=dtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        kvcache_quant_granularity=QuantGranularity.PER_TOKEN)
         ptq = RTN(config=cfg)
-        # pylint: disable=W0212
-        ptq._config.act_dynamic_quant = True
-        ptq._config.kvcache_dynamic_quant = True
-        ptq._config.act_quant_dtype = dtype.int8
-        ptq._config.kvcache_dynamic_quant = dtype.int8
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network)
         mindspore.load_checkpoint("test_linears_dynamic_quant_predict_2stage.ckpt", ascend_network)

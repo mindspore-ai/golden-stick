@@ -15,7 +15,7 @@
 """RTNLayerPolicy for mindformers layers."""
 
 from mindspore.nn import Cell
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, QuantGranularity
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.round_to_nearest.rtn_layer_policy import RTNLayerPolicy
@@ -52,7 +52,7 @@ class PagedAttentionMgrPolicy(RTNLayerPolicy):
         self.set_input_number(3)
         self.is_deploy = config.mode == PTQMode.DEPLOY
         self.enable_deploy_fusion = config.enable_deploy_fusion
-        self.kvcache_dynamic_quant = config.kvcache_dynamic_quant
+        self.kvcache_dynamic_quant = config.kvcache_quant_granularity == QuantGranularity.PER_TOKEN
         logger.info(f"PagedAttentionMgr Quant conifg: {config}.")
 
     def wrap_cell(self, handler) -> Cell:

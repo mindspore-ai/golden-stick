@@ -287,14 +287,14 @@ class DynamicQuantCell(Cell):
             self.smooth_scale = None
         if out_dtype == dtype.float16:
             # qbmm scale not support dtype.float16
-            self.weight_scale = Parameter(initializer('ones', weight_scale_shape, dtype.float32))
+            self.scale = Parameter(initializer('ones', weight_scale_shape, dtype.float32))
         else:
-            self.weight_scale = Parameter(initializer('ones', weight_scale_shape, out_dtype))
+            self.scale = Parameter(initializer('ones', weight_scale_shape, out_dtype))
 
     def construct(self, x, weight):
         """forward for antiquant bmm cell"""
         qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
-        return self.qbmm(qx, weight, self.weight_scale, None, None, x_scale)
+        return self.qbmm(qx, weight, self.scale, None, None, x_scale)
 
     def shard(self, strategy):
         """shard strategy for antiquant bmm"""
@@ -354,7 +354,7 @@ def convert_to_fusion_antiquant_for_deploy(axis, output_channel, data_rank, is_p
     return anti_quant
 
 
-def convert_to_dynamic_quant_for_deploy(w_out, w_in, is_per_channel,
+def convert_to_dynamic_quant_for_deploy(w_out, w_in, is_per_channel, has_smooth=False,
                                         transpose_weight=False, transpose_x=False, strategy=None,
                                         dst_dtype=None) -> AntiquantBMMCell:
     """convert_to_dynamic_quant_for_deploy."""
@@ -370,7 +370,8 @@ def convert_to_dynamic_quant_for_deploy(w_out, w_in, is_per_channel,
         weight_scale_shape = 1
         smooth_scale_shape = 1
     dynamic_quant = DynamicQuantCell(weight_scale_shape, smooth_scale_shape, out_dtype=dst_dtype,
-                                     transpose_x=transpose_x, transpose_weight=transpose_weight)
+                                     has_smooth=has_smooth, transpose_x=transpose_x,
+                                     transpose_weight=transpose_weight)
     if strategy is not None:
         dynamic_quant.shard(strategy)
     return dynamic_quant
