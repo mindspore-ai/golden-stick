@@ -56,8 +56,8 @@ class AllQuantLinearCell(WeightQuantLinearCell):
             self.x_quant_max = msops.max
             self.x_quant_min = msops.min
 
-        self.x_scale = Parameter(initializer('ones', (1,), dtype=self.compute_type))
-        self.x_zp = Parameter(initializer('zeros', (1,), dtype=self.compute_type))
+        self.x_scale = Parameter(initializer('ones', (1,), dtype=dtype.float64))
+        self.x_zp = Parameter(initializer('zeros', (1,), dtype=dtype.float64))
 
     def quant(self):
         """quant"""
@@ -67,8 +67,8 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         x_scale, x_zp, _ = quant_tensor(self.cat_samples, self.x_quant_min, self.x_quant_max,
                                         self.cfg.act_narrow_range, self.cfg.act_symmetric,
                                         self.cfg.act_quant_dtype, -1, False)
-        self.x_scale.set_data(Tensor([x_scale], dtype=self.compute_type))
-        self.x_zp.set_data(Tensor([x_zp], dtype=self.compute_type))
+        self.x_scale.set_data(Tensor([x_scale], dtype=dtype.float64))
+        self.x_zp.set_data(Tensor([x_zp], dtype=dtype.float64))
 
     def deploy(self):
         return AllQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
