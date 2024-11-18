@@ -91,6 +91,22 @@ def test_ptq_config_construct():
         _ = PTQConfig(algo_args="1")
     with pytest.raises(ValueError):
         _ = PTQConfig(algo_args=["1", 1])
+    with pytest.raises(ValueError):
+        _ = PTQConfig(act_quant_granularity=QuantGranularity.PER_GROUP)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(act_quant_granularity=QuantGranularity.PER_CHANNEL)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(kvcache_quant_granularity=QuantGranularity.PER_GROUP)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(kvcache_quant_granularity=QuantGranularity.PER_TENSOR)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(kvcache_quant_granularity=QuantGranularity.PER_TOKEN)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(act_quant_granularity=QuantGranularity.PER_TOKEN)
+    cfg = PTQConfig(mode=PTQMode.DEPLOY, kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+                    kvcache_quant_dtype=msdtype.int8)
+    cfg = PTQConfig(mode=PTQMode.DEPLOY, act_quant_granularity=QuantGranularity.PER_TOKEN,
+                    weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8)
 
 
 @pytest.mark.level0

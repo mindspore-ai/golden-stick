@@ -316,15 +316,15 @@ class WeightQuantMatmul(QuantUnitCell):
         super().__init__(layer_name)
         self.dst_dtype = dst_type
         if is_deploy:
-            self.t_scale = Parameter(initializer('ones', w_qparam.scale.shape, self.dst_dtype), name="t_scale")
-            self.t_zp_neg = Parameter(initializer('zeros', w_qparam.zero_point.shape, self.dst_dtype), name="t_zp_neg")
+            self.weight_scale = Parameter(initializer('ones', w_qparam.scale.shape, self.dst_dtype))
+            self.weight_zp = Parameter(initializer('zeros', w_qparam.zero_point.shape, self.dst_dtype))
         else:
-            self.t_scale = Parameter(Tensor(w_qparam.scale.asnumpy(), dtype=self.dst_dtype), name="t_scale")
-            self.t_zp_neg = Parameter(Tensor(w_qparam.zero_point.asnumpy() * -1, dtype=self.dst_dtype), name="t_zp_neg")
+            self.weight_scale = Parameter(Tensor(w_qparam.scale.asnumpy(), dtype=self.dst_dtype))
+            self.weight_zp = Parameter(Tensor(w_qparam.zero_point.asnumpy() * -1, dtype=self.dst_dtype))
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: weight_scale of Layer({layer_name}) is "
-                         f"{{{self.t_scale.shape}, {self.t_scale.dtype}, {self.t_scale.asnumpy()}}}")
+                         f"{{{self.weight_scale.shape}, {self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: weight_zp of Layer({layer_name}) is "
-                         f"{{{self.t_zp_neg.shape}, {self.t_zp_neg.dtype}, {self.t_zp_neg.asnumpy()}}}")
+                         f"{{{self.weight_zp.shape}, {self.weight_zp.dtype}, {self.weight_zp.asnumpy()}}}")
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
         self.has_smooth = smooth_scale is not None
         self.smooth_scale = smooth_scale
@@ -383,7 +383,7 @@ class WeightQuantMatmul(QuantUnitCell):
         """forward for WeightQuantMatmul cell"""
         if self.has_smooth:
             x = msops.mul(x, self.smooth_scale)
-        output = self.weight_qbmm(x, weight, self.t_scale, self.t_zp_neg, None, None, None)
+        output = self.weight_qbmm(x, weight, self.weight_scale, self.weight_zp, None, None, None)
         return output.astype(self.dst_dtype)
 
     # pylint: disable=arguments-differ
@@ -399,8 +399,8 @@ class WeightQuantMatmul(QuantUnitCell):
         else:
             return {}
         shard_state = {
-            self.t_scale.name: {'shape': self.t_scale.shape, 'shard': t_scale_shard},
-            self.t_zp.name: {'shape': self.t_zp.shape, 'shard': t_zp_shard},
+            self.weight_scale.name: {'shape': self.weight_scale.shape, 'shard': t_scale_shard},
+            self.weight_zp.name: {'shape': self.weight_zp.shape, 'shard': t_zp_shard},
         }
         if self.smooth_scale:
             shard_state[self.smooth_scale.name] = {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}

@@ -15,12 +15,14 @@
 """ptq quant cells."""
 import copy
 import abc
+import math
 import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
 from mindspore import ops
 from mindspore import Parameter, Tensor, dtype
-from mindspore.common.initializer import initializer
+from mindspore.common.initializer import initializer, Zero
+from mindspore.ops.auto_generate import DynamicQuantExt, KVCacheScatterUpdate
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 
@@ -330,7 +332,8 @@ class PagedAttentionQuant(PTQCell):
             raise ValueError("Only support convert PagedAttentionMgr to MS backend.")
 
     # pylint: disable=W0221
-    def construct(self, key, value, slot_mapping):
+    # pylint: disable=W0613
+    def construct(self, key, value, slot_mapping, batch_valid_length=None):
         """
         Defines the computation of PagedAttentionQuant to be performed.
 
@@ -406,7 +409,8 @@ class PagedAttentionDeployBase(PTQCell):
         pass
 
     # pylint: disable=W0221
-    def construct(self, key, value, slot_mapping):
+    # pylint: disable=W0613
+    def construct(self, key, value, slot_mapping, batch_valid_length=None):
         """
         Defines the computation of PagedAttentionQuant to be performed.
 
@@ -471,9 +475,23 @@ class DynamicQuantPagedAttentionDeploy(PTQCell):
         super(DynamicQuantPagedAttentionDeploy, self).__init__(kvcache, policy)
         self._kvcache = kvcache
         self._converted = True
+        n = kvcache.n_kv_heads
+        d = kvcache.head_dim
+        self.reshape = P.Reshape().add_prim_attr("skip_redistribution", True)
+        self.concat_scale = P.Concat(axis=0)
+        self.cast = P.Cast()
+        self.ori_shape = self._kvcache.key_cache.shape
+        block_num = self.ori_shape[0]
+        block_size = self.ori_shape[1]
+        max_seq_length = kvcache.seq_length
+        max_batch_size = math.floor(block_num * block_size / max_seq_length)
+        self.is_first_iteration = kvcache.is_first_iteration
+        self.max_seq_length = max_seq_length
+        self.max_batch_size = max_batch_size
         self._weight_quantizer = None
         self._input_quantizer = None
         self._output_quantizer = None
+        self.dynamic_quant = DynamicQuantExt()
         self.paged_attention = ops.auto_generate.PagedAttention(self._kvcache.n_heads,
                                                                 self._kvcache.scale_value,
                                                                 self._kvcache.n_kv_heads,
@@ -482,13 +500,44 @@ class DynamicQuantPagedAttentionDeploy(PTQCell):
                                                                                self._kvcache.scale_value,
                                                                                self._kvcache.n_kv_heads,
                                                                                "PERTOKEN")
+        self._kvcache.key_cache = Parameter(initializer('ones', self._kvcache.key_cache.shape, dtype.int8),
+                                            name=self._kvcache.key_cache.name, requires_grad=False)
+        self._kvcache.value_cache = Parameter(initializer('ones', self._kvcache.value_cache.shape, dtype.int8),
+                                              name=self._kvcache.value_cache.name, requires_grad=False)
+
+        self.key_scale = Parameter(initializer('ones', (max_batch_size, max_seq_length), dtype.float32),
+                                   requires_grad=False)
+        self.value_scale = Parameter(initializer('ones', (max_batch_size, max_seq_length), dtype.float32),
+                                     requires_grad=False)
+        self.scatter_scales = KVCacheScatterUpdate()
+        self.kv_offset = Tensor(shape=(2, max_batch_size, max_seq_length), dtype=dtype.float16, init=Zero())
+
+        key_out_strategy = None
+        key_in_stragegy = None
+        dp = None
+        if "in_strategy" in kvcache.reshape_and_cache.get_attr_dict():
+            key_in_stragegy = kvcache.reshape_and_cache.in_strategy[0]
+            key_out_strategy = kvcache.reshape_and_cache.in_strategy[2]
+            n = n * key_out_strategy[2]
+            dp = key_in_stragegy[0]
+        self.ic = n*d
+
         if "in_strategy" in kvcache.paged_attention.get_attr_dict():
             pa_strategy = kvcache.paged_attention.in_strategy
-            self.paged_attention.shard(pa_strategy)
+            antiquant_strategy = (1, 1, 1,)
+            self.paged_attention.shard((*pa_strategy, antiquant_strategy, antiquant_strategy))
+            self.dynamic_quant.shard((key_in_stragegy,))
+            self.scatter_scales.shard(((dp, 1), (dp,), (dp, 1),))
+            self.concat_scale.shard(((1, dp, 1), (1, dp, 1)))
 
         if "in_strategy" in kvcache.paged_attention_with_alibi.get_attr_dict():
             pa_strategy = kvcache.paged_attention_with_alibi.in_strategy
-            self.paged_attention_with_alibi.shard(pa_strategy)
+            antiquant_strategy = (1, 1, 1,)
+            self.paged_attention_with_alibi.shard((*pa_strategy[:-1], antiquant_strategy, antiquant_strategy,
+                                                   pa_strategy[-1]))
+            self.dynamic_quant.shard((key_in_stragegy,))
+            self.scatter_scales.shard(((dp, 1), (dp,), (dp, 1),))
+            self.concat_scale.shard(((1, dp, 1), (1, dp, 1)))
 
     def weight_quantizer(self):
         return None
@@ -497,18 +546,33 @@ class DynamicQuantPagedAttentionDeploy(PTQCell):
         pass
 
     # pylint: disable=W0221
-    def construct(self, key, value, slot_mapping):
+    def construct(self, key, value, slot_mapping, batch_valid_length):
         """The forward compute of KVCache for Paged Attention."""
-        return self._kvcache.reshape_and_cache(key, value, self._kvcache.key_cache, self._kvcache.value_cache,
+        if self.is_first_iteration:
+            batch_idx = batch_valid_length * 0
+        else:
+            batch_idx = batch_valid_length - 1
+
+        quant_k, k_scale = self.dynamic_quant(key, None)
+        quant_v, v_scale = self.dynamic_quant(value, None)
+        self.scatter_scales(self.key_scale, batch_idx, k_scale, -1, "update")
+        self.scatter_scales(self.value_scale, batch_idx, v_scale, -1, "update")
+        return self._kvcache.reshape_and_cache(quant_k, quant_v, self._kvcache.key_cache, self._kvcache.value_cache,
                                                slot_mapping)
 
     # pylint: disable=W0613
     def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
         """The forward compute of Paged Attention."""
-        return self.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache,
-                                    block_tables, batch_valid_length)
+        key_scale = self.reshape(self.key_scale, (1, self.max_batch_size, self.max_seq_length))
+        value_scale = self.reshape(self.value_scale, (1, self.max_batch_size, self.max_seq_length))
+        kv_scale = self.cast(self.concat_scale((key_scale, value_scale)), dtype.float16)
+        return self.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache, block_tables,
+                                    batch_valid_length, kv_scale, self.kv_offset)
 
     def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
         """The forward compute of KVCache for Paged Attention with alibi tensor."""
-        return self.paged_attention_with_alibi(query, self._kvcache.key_cache, self._kvcache.value_cache,
-                                               block_tables, batch_valid_length, None, None, alibi_tensor)
+        key_scale = self.reshape(self.key_scale, (1, self.max_batch_size, self.max_seq_length))
+        value_scale = self.reshape(self.value_scale, (1, self.max_batch_size, self.max_seq_length))
+        kv_scale = self.cast(self.concat_scale((key_scale, value_scale)), dtype.float16)
+        return self.paged_attention_with_alibi(query, self._kvcache.key_cache, self._kvcache.value_cache, block_tables,
+                                               batch_valid_length, kv_scale, self.kv_offset)
