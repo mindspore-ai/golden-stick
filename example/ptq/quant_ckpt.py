@@ -204,11 +204,12 @@ if __name__ == "__main__":
         raise ValueError(err_msg)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     start = time.time()
-    logger.info('Creating network...')
+    print('Creating network...', flush=True)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
+    print('Quanting network...', flush=True)
     network = quant_net(network, helper, algo, datasets)
-    logger.info('Saving checkpoint...')
+    print('Saving checkpoint...', flush=True)
     start = time.time()
     try:
         rank_id = get_rank()
@@ -220,4 +221,4 @@ if __name__ == "__main__":
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-    logger.info(f'Checkpoint saved to {save_path}...')
+    print(f'Checkpoint saved to {save_path}...', flush=True)

@@ -118,8 +118,8 @@ def test_input_catcher(device):
 
     net = SimpleNet()
     foo_input = Tensor(np.ones((1, 512), dtype=np.float16))
-    catcher = InputCatcher(net.decoder)
-    net.decoder = catcher
+    catcher = InputCatcher()
+    catcher.patch(net.decoder)
 
     try:
         net(foo_input)
@@ -200,7 +200,7 @@ def test_context_mode_error():
         ptq.apply(network, helper)
 
 
-def quant_simplenet():
+def quant_simplenet(non_decoder):
     """
     Feature: quant simplenet which including one linear.
     Description: quant simplenet with A8W8C8 PTQ algorithm.
@@ -224,7 +224,8 @@ def quant_simplenet():
     ptq = PTQ(config=cfg)
     # pylint: disable=w0212
     ptq._config.enable_deploy_fusion = False
-    ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
+    if non_decoder:
+        ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
     network = ptq.apply(network, net_helper, datasets=ds)
     network = ptq.convert(network)
     ms.save_checkpoint(network.parameters_dict(), os.path.join("./simplenet-quant.ckpt"),
@@ -232,7 +233,7 @@ def quant_simplenet():
                         "float_weight" not in x)
 
 
-def eval_simplenet():
+def eval_simplenet(non_decoder):
     """
     Feature: eval simplenet which including one linear.
     Description: eval the accuracy of quantized simplenet.
@@ -259,7 +260,8 @@ def eval_simplenet():
                     act_quant_dtype=dtype.int8,
                     weight_quant_dtype=dtype.int8)
     ptq = PTQ(config=cfg)
-    ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
+    if non_decoder:
+        ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
     network = ptq.apply(network, ds=ds)
     network = ptq.convert(network)
     param_dict = ms.load_checkpoint('./simplenet-quant.ckpt')
@@ -273,14 +275,15 @@ def eval_simplenet():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_ptq_simplenet():
+@pytest.mark.parametrize("non_decoder", [True, False])
+def test_ptq_simplenet(non_decoder):
     """
     Feature: quant and eval simplenet which including one linear.
     Description: quant net and eval the accuracy of quantized simplenet.
     Expectation: correct accuracy.
     """
-    quant_simplenet()
-    eval_simplenet()
+    quant_simplenet(non_decoder)
+    eval_simplenet(non_decoder)
 
 
 @pytest.mark.level0

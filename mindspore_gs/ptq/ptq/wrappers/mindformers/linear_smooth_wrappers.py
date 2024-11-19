@@ -29,19 +29,6 @@ from .parallel_minmax import get_smooth_x_obs_min_max_op, get_smooth_w_obs_min_m
 from .linear_wrapper import WrapperLinearCell
 
 
-def need_insert_mul_for_smooth_when_deploy(cfg):
-    """need_insert_ops_for_smooth"""
-    if cfg.outliers_suppression == OutliersSuppressionType.NONE:
-        return False
-    # # w8a8 fusion the smooth_scale with quantv2 ops
-    # if cfg.act_quant_dtype == dtype.int8:
-    #     return False
-    # # w8a8_dynamic use smooth_scale in dynamic_quant ops
-    # if cfg.weight_quant_dtype == dtype.int8:
-    #     return False
-    return True
-
-
 class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
 

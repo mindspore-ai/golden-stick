@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """PTQ algorithm."""
+from functools import partial
 from typing import List, Union, Tuple
 import time
 import os
@@ -36,13 +37,27 @@ from .algorithms import LinearSmoother, Quantizer
 class InputCatcher(Cell):
     """input catcher"""
 
-    def __init__(self, handler):
+    def __init__(self):
         super().__init__()
-        self.handler = handler
-        if hasattr(handler, "attention"):
-            self.attention = handler.attention
+        self.handler = None
         self.args = []
         self.kwargs = []
+        self.old_construct = None
+        self.patched = False
+
+    def patch(self, handler):
+        if self.patched:
+            raise RuntimeError("Only support patch one cell for one time. please invoke recover before invoking patch "
+                               "again.")
+        self.handler = handler
+        self.old_construct = handler.construct
+        self.handler.construct = partial(InputCatcher.construct, self)
+        self.patched = True
+
+    def recover(self):
+        if self.patched and self.handler and self.old_construct:
+            self.handler.construct = self.old_construct
+        self.patched = False
 
     def construct(self, *args, **kwargs):
         self.args.append(list(args))
@@ -70,9 +85,11 @@ class PTQ(CompAlgo):
         >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
         >>> from mindformers.tools.register.config import MindFormerConfig
         >>> from mindformers import LlamaForCausalLM, LlamaConfig
+        >>> from mindspore_gs.common.gs_enum import BackendTarget
         >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
         >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
         >>> helper = MFLlama2Helper(mfconfig)
+        >>> backend = BackendTarget.ASCEND
         >>> ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
                         weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
@@ -95,6 +112,7 @@ class PTQ(CompAlgo):
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
         self.pipeline: List[Algorithm] = []
+        self.decoder_layers: list[Cell] = []
         self.decoder_layer_types: list = []
         self._build_pipeline()
         self._load_mindformers_plugin()
@@ -144,7 +162,13 @@ class PTQ(CompAlgo):
 
         walker = NetworkWalker(tuple(self.decoder_layer_types))
         walker.process(network)
-        return walker.layers
+        if walker.layers:
+            self.decoder_layers = walker.layers
+            return
+        self.decoder_layers = [("root", network)]
+        logger.warning(
+            f"No decoder layer found in network. Visible decoder layer types: {self.decoder_layer_types}, "
+            "please modify PTQ.decoder_layer_types before invoking apply method. If not, PTQ will take lots of memory.")
 
     @staticmethod
     def _ptq_config_check(config):
@@ -184,10 +208,10 @@ class PTQ(CompAlgo):
             ValueError: If input `network_helper` is None when mode is `PTQMode.DEPLOY`.
             ValueError: If input datasets is None.
         """
+        self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
-            layers = self._get_decoder_layers(network)
-            for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ Deploy..."):
-                layer_name, layer = layers[i]
+            for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
+                layer_name, layer = self.decoder_layers[i]
                 for processor in self.pipeline:
                     processor.replace(layer_name, layer)
                     processor.deploy(layer_name, layer)
@@ -203,7 +227,6 @@ class PTQ(CompAlgo):
             raise ValueError("use_past need be true when doing kvcache quantize.")
         logger.info(f"Visible decoder layer types: {self.decoder_layer_types}. If decoder layer type of target network "
                     "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
-        start_time = time.time()
         logger.info("Analysis network structure.")
         start_time = time.time()
         logger.info(f"Catching inputs for first decoder layer with {datasets.get_dataset_size()} datasets samples.")
@@ -212,16 +235,10 @@ class PTQ(CompAlgo):
         all_kwargs = catcher.kwargs
         logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
         start_time = time.time()
-        layers = self._get_decoder_layers(network)
-        if not layers:
-            logger.warning(
-                f"No decoder layer found in network. Visible decoder layer types: {self.decoder_layer_types}, "
-                "please modify PTQ.decoder_layer_types before invoking apply method.")
-        else:
-            logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
-        for i in tqdm.tqdm(range(len(layers)), desc="Running PTQ..."):
+        logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
+        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ..."):
             logger.info(f"Quantize {i}th decoder layer.")
-            layer_name, layer = layers[i]
+            layer_name, layer = self.decoder_layers[i]
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             for processor in self.pipeline:
                 processor.replace(layer_name, layer, network_helper)
@@ -232,7 +249,9 @@ class PTQ(CompAlgo):
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook())
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):
-                    all_args[index][0] = layer(*args, **kwargs)
+                    output = layer(*args, **kwargs)
+                    if len(self.decoder_layers) > 1:
+                        all_args[index][0] = output
                     index += 1
 
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook())
@@ -251,19 +270,8 @@ class PTQ(CompAlgo):
 
     def _get_first_layer_input(self, network: Cell, network_helper: NetworkHelper = None, ds=None):
         """get first layer input"""
-        layers = self._get_decoder_layers(network)
-        catcher = InputCatcher(layers[0][1])
-
-        def replace_first_decoder(root: Cell, src: Cell, dst: Cell):
-            if root is None:
-                return
-            for name, cell in root.name_cells().items():
-                if cell is src:
-                    root.insert_child_to_cell(name, dst)
-                    return
-                replace_first_decoder(cell, src, dst)
-
-        replace_first_decoder(network, layers[0][1], catcher)
+        catcher = InputCatcher()
+        catcher.patch(self.decoder_layers[0][1])
         if not ds:
             raise ValueError("PTQ need dataset to calibrate, please provide dataset.")
         total_count = ds.get_dataset_size()
@@ -277,7 +285,7 @@ class PTQ(CompAlgo):
                 if hasattr(network, "block_mgr") and network.block_mgr:
                     network.block_mgr.clear_cache()
             data_count += 1
-        replace_first_decoder(network, catcher, catcher.handler)
+        catcher.recover()
         offload_network(network)
         return catcher, network
 
