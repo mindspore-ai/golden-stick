@@ -41,3 +41,27 @@ class MaxFromTensorParallelRegion(nn.Cell):
         output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
         output = self.all_reduce(output_parallel)
         return output, _
+
+
+def get_smooth_x_obs_min_max_op():
+    return msops.max, msops.min
+
+
+def get_smooth_w_obs_min_max_op(tensor_parallel, is_colparallel):
+    if tensor_parallel and is_colparallel:
+        w_obs_max = MaxFromTensorParallelRegion()
+        w_obs_min = MinFromTensorParallelRegion()
+    else:
+        w_obs_max = msops.max
+        w_obs_min = msops.min
+    return w_obs_max, w_obs_min
+
+
+def get_quant_min_max_op(tensor_parallel, is_rowparallel):
+    if tensor_parallel and is_rowparallel:
+        quant_max = MaxFromTensorParallelRegion()
+        quant_min = MinFromTensorParallelRegion()
+    else:
+        quant_max = msops.max
+        quant_min = msops.min
+    return quant_max, quant_min

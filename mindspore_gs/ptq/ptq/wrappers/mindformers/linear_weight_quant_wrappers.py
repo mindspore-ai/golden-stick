@@ -17,7 +17,6 @@
 import numpy as np
 
 from mindspore import Parameter, Tensor, dtype
-from mindspore import ops as msops
 from mindspore.common.initializer import initializer
 
 from mindformers.modules.layers import Linear
@@ -29,7 +28,7 @@ from mindspore_gs.quantization.quant_utils import quant_tensor
 from mindspore_gs.ptq.ptq.hal import QuantParam, WeightQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from .parallel_minmax import MaxFromTensorParallelRegion, MinFromTensorParallelRegion
+from .parallel_minmax import get_quant_min_max_op
 from .linear_wrapper import WrapperLinearCell, LinearInferCell
 
 
@@ -70,12 +69,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
         self.compute_type = self.layer.dtype if self.parallel_type == ParallelType.NO_PARALLEL else \
             self.layer.compute_dtype
 
-        if self.parallel_type == ParallelType.ROW_PARALLEL:
-            self.w_quant_max = MaxFromTensorParallelRegion()
-            self.w_quant_min = MinFromTensorParallelRegion()
-        else:
-            self.w_quant_max = msops.max
-            self.w_quant_min = msops.min
+        is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
+        self.w_quant_max, self.w_quant_min = get_quant_min_max_op(self.tensor_parallel, is_rowparallel)
 
         self.q_weight = Parameter(initializer("ones", self.layer.weight.shape, dtype.int8), name=self.layer.weight.name)
         self.w_scale = Parameter(initializer('ones', (self.oc,), dtype=dtype.float64))

@@ -82,8 +82,8 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, quant_
     num_bits = 8
     signed = True
     if quant_axis == -1:
-        float_max = max_op(tensor)[0]
-        float_min = min_op(tensor)[0]
+        float_max = max_op(tensor)[0].reshape(-1)
+        float_min = min_op(tensor)[0].reshape(-1)
     else:
         rank = len(tensor.shape)
         if rank != 2:
