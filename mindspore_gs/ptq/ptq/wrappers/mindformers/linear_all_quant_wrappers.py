@@ -77,7 +77,7 @@ class AllQuantLinearInferCell(LinearInferCell):
 
     def __init__(self, layer_name, linear: Linear, cfg: InnerPTQConfig, q_weight, x_qparam: QuantParam,
                  w_qparam: QuantParam, compute_type, parallel_type: ParallelType):
-        super().__init__(linear, parallel_type, dtype.int8)
+        super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
         quant, qmm, bias = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam,

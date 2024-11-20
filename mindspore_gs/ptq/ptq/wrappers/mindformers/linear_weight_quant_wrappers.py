@@ -23,9 +23,9 @@ from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
 from mindspore_gs.quantization.quant_utils import quant_tensor
-from mindspore_gs.ptq.ptq.hal import QuantParam, WeightQuantMatmul, ParallelType
+from mindspore_gs.ptq.ptq.hal import QuantParam, WeightQuantMatmul, WeightQuantInt4Matmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_quant_min_max_op
@@ -37,13 +37,14 @@ class WeightQuantLinearCell(WrapperLinearCell):
 
     @staticmethod
     def reg_self():
-        class A16W8Checker(Checker):
+        class A16WxChecker(Checker):
             def check(self, config: InnerPTQConfig):
-                return config.weight_quant_dtype == dtype.int8 and config.act_quant_dtype is None
+                support_dtype = [dtype.int8, dtype.qint4x2]
+                return config.weight_quant_dtype in support_dtype and config.act_quant_dtype is None
 
-        Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16W8Checker())
-        Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16W8Checker())
-        Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16W8Checker())
+        Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
 
     def __init__(self, linear_name, linear, cfg: InnerPTQConfig, network_helper):
         super().__init__(linear_name, linear, cfg, network_helper)
@@ -73,8 +74,14 @@ class WeightQuantLinearCell(WrapperLinearCell):
         self.w_quant_max, self.w_quant_min = get_quant_min_max_op(self.tensor_parallel, is_rowparallel)
 
         self.q_weight = Parameter(initializer("ones", self.layer.weight.shape, dtype.int8), name=self.layer.weight.name)
-        self.w_scale = Parameter(initializer('ones', (self.oc,), dtype=dtype.float64))
-        self.w_zp = Parameter(initializer('ones', (self.oc,), dtype=dtype.float64))
+        if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
+            if self.ic % self.cfg.group_size != 0:
+                raise ValueError(f"input channel {self.ic} can not divide group_size {self.cfg.group_size}.")
+            scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
+        else:
+            scale_zp_shape = (self.oc,)
+        self.w_scale = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
+        self.w_zp = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
 
     def quant(self):
         """quant"""
@@ -94,8 +101,9 @@ class WeightQuantLinearCell(WrapperLinearCell):
         self.cat_samples = None
 
     def deploy(self):
-        return WeightQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
-                                          QuantParam(self.w_scale, self.w_zp), self.compute_type, self.parallel_type)
+        w_qparam = QuantParam(self.w_scale, self.w_zp, self.cfg.group_size, self.cfg.weight_quant_dtype)
+        return WeightQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight, w_qparam,
+                                          self.compute_type, self.parallel_type)
 
 
 class WeightQuantLinearInferCell(LinearInferCell):
@@ -103,15 +111,21 @@ class WeightQuantLinearInferCell(LinearInferCell):
 
     def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
                  parallel_type: ParallelType):
-        super().__init__(linear, parallel_type, dtype.int8)
+        super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
         if not is_deploy:
             logger.debug(f"WeightQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"WeightQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-        qmm = WeightQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy, False, self.layer.transpose_b,
-                                       compute_type)
+        if w_qparam.quant_dtype == dtype.int8:
+            qmm = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                           self.layer.transpose_b, compute_type)
+        elif w_qparam.quant_dtype == dtype.qint4x2:
+            qmm, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                                         self.layer.transpose_b, compute_type)
+        else:
+            raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
         self.layer.matmul = qmm
         self.layer.weight = q_weight
 

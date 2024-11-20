@@ -145,6 +145,9 @@ class PTQConfig:
             Currently only QuantGranularity.PER_TENSOR and QuantGranularity.PER_TOKEN are supported.
         kvcache_quant_granularity: (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of kvcache.
             Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_TOKEN are supported.
+        weight_quant_granularity: (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of weight.
+            Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_GROUP are supported.
+        group_size (int): group_size of per_group quantization, suggest using 64 or 128.
 
     Raises:
         ValueError: If `mode` is not PTQMode.QUANTIZE or PTQMode.DEPLOY.
@@ -158,6 +161,10 @@ class PTQConfig:
         ValueError: If `kvcache_quant_granularity` is not QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.
         ValueError: If `act_quant_granularity` is QuantGranularity.PER_TOKEN but weight_quant_dtype != msdtype.int8 or act_quant_dtype != msdtype.int8.
         ValueError: If `kvcache_quant_granularity` is QuantGranularity.PER_TOKEN but kvcache_quant_dtype != msdtype.int8.
+        ValueError: If `weight_quant_granularity` is not QuantGranularity.PER_CHANNEL or QuantGranularity.PER_GROUP.
+        ValueError: If `weight_quant_granularity` is QuantGranularity.PER_GROUP but `group_size` is not in [64, 128].
+        ValueError: If `weight_quant_granularity` is not QuantGranularity.PER_GROUP but `group_size` != 0.
+        TypeError: If `group_size` is not Int.
 
     Examples:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -173,25 +180,31 @@ class PTQConfig:
     kvcache_quant_dtype: msdtype = None
     act_quant_dtype: msdtype = None
     outliers_suppression: OutliersSuppressionType = OutliersSuppressionType.NONE
-    act_quant_granularity: QuantGranularity = QuantGranularity.PER_TENSOR
+    weight_quant_granularity: QuantGranularity = QuantGranularity.PER_CHANNEL
     kvcache_quant_granularity: QuantGranularity = QuantGranularity.PER_CHANNEL
+    act_quant_granularity: QuantGranularity = QuantGranularity.PER_TENSOR
+    group_size: int = 0
 
     def __post_init__(self):
+        weight_support = [msdtype.int8, msdtype.qint4x2, None]
+        act_support = [msdtype.int8, None]
+        kvcache_support = [msdtype.int8, None]
         if self.mode not in PTQMode.__members__.values():
             raise ValueError(f'mode shall be in {PTQMode.__members__.values()}')
         if self.backend not in BackendTarget.__members__.values():
             raise ValueError(f'backend shall be in {BackendTarget.__members__.values()}')
-        if self.weight_quant_dtype != msdtype.int8 and self.weight_quant_dtype is not None:
-            raise ValueError(f'self.weight_quant_dtype: {self.weight_quant_dtype} is not mindspore.dtype.int8 or None.')
-        if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_dtype is not None:
-            raise ValueError(f'self.kvcache_quant_dtype: {self.kvcache_quant_dtype} is not mindspore.dtype.int8 or None.')
-        if self.act_quant_dtype != msdtype.int8 and self.act_quant_dtype is not None:
-            raise ValueError(f'self.act_quant_dtype: {self.act_quant_dtype} is not mindspore.dtype.int8 or None.')
-        self._check_quant_granularity()
+        if self.weight_quant_dtype not in weight_support:
+            raise ValueError(f'weight_quant_dtype support {weight_support}, but got {self.weight_quant_dtype}.')
+        if self.kvcache_quant_dtype not in kvcache_support:
+            raise ValueError(f'kvcache_quant_dtype support {kvcache_support}, but got {self.kvcache_quant_dtype}.')
+        if self.act_quant_dtype not in act_support:
+            raise ValueError(f'act_quant_dtype support {act_support}, but got {self.act_quant_dtype}.')
+        list_value_check('opname_blacklist', self.opname_blacklist, str)
         value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
+        self._check_quant_granularity()
+        value_check('group_size', self.group_size, int)
         if not isinstance(self.algo_args, dict) and not is_dataclass(self.algo_args):
             raise ValueError(f"algo_args's type should be dict or dataclass, but now is {type(self.algo_args)}")
-        list_value_check('opname_blacklist', self.opname_blacklist, str)
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
 
@@ -201,6 +214,10 @@ class PTQConfig:
             QuantGranularity.PER_TOKEN:
             raise ValueError(f'self.act_quant_granularity {self.act_quant_granularity} must be \
                              QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.')
+        if self.weight_quant_granularity != QuantGranularity.PER_CHANNEL and self.weight_quant_granularity != \
+            QuantGranularity.PER_GROUP:
+            raise ValueError(f'self.weight_quant_granularity {self.weight_quant_granularity} must be \
+                             QuantGranularity.PER_CHANNEL or QuantGranularity.PER_GROUP.')
         if self.kvcache_quant_granularity != QuantGranularity.PER_CHANNEL and self.kvcache_quant_granularity != \
             QuantGranularity.PER_TOKEN:
             raise ValueError(f'self.kvcache_quant_granularity {self.kvcache_quant_granularity} must be \
@@ -211,7 +228,10 @@ class PTQConfig:
                              and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
         if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
             raise ValueError('when self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, self.kvcache_quant_dtype must be mindspore.dtype.int8.')
-
+        if self.weight_quant_granularity != QuantGranularity.PER_GROUP and self.group_size != 0:
+            raise ValueError("group_size should equal to 0 when not to do pre_group quantize.")
+        if self.weight_quant_granularity == QuantGranularity.PER_GROUP and self.group_size not in [64, 128]:
+            raise ValueError("group_size should be in [64, 128] when doing pre_group quantize.")
 
 class YamlLoader:
     """Loader for some special item in yaml."""
@@ -225,6 +245,7 @@ class MSDTypeLoader(YamlLoader):
         self.dtype_dict = {
             "Bool": msdtype.bool_,
             "Int": msdtype.int_,
+            "Int4": msdtype.qint4x2,
             "Int8": msdtype.int8,
             "Int16": msdtype.int16,
             "Int32": msdtype.int32,
@@ -328,6 +349,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['outliers_suppression'] = self.outliers_suppression.name
         parsed_dict['act_quant_granularity'] = self.act_quant_granularity.name
         parsed_dict['kvcache_quant_granularity'] = self.kvcache_quant_granularity.name
+        parsed_dict['weight_quant_granularity'] = self.weight_quant_granularity.name
         return parsed_dict
 
     def _unparse_dict(self, data_dict):
@@ -350,6 +372,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('act_quant_dtype', MSDTypeLoader()),
             ('act_quant_granularity', QuantGranularity),
             ('kvcache_quant_granularity', QuantGranularity),
+            ('weight_quant_granularity', QuantGranularity),
         ]
         for item in unparse_list:
             update_dict(*item)

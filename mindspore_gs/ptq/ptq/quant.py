@@ -120,12 +120,15 @@ class PTQ(CompAlgo):
 
     def _build_pipeline(self):
         """build pipline"""
+        act_support_dtype = [dtype.int8]
+        weight_support_dtype = [dtype.int8, dtype.qint4x2]
+        kvcache_support_dtype = [dtype.int8]
         if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
             logger.info("Adding LinearSmoother to pipeline.")
             self.pipeline.append(LinearSmoother(self._config))
-        if self._config.act_quant_dtype == dtype.int8 or \
-            self._config.weight_quant_dtype == dtype.int8 or \
-                self._config.kvcache_quant_dtype == dtype.int8:
+        if self._config.act_quant_dtype in act_support_dtype or \
+            self._config.weight_quant_dtype in weight_support_dtype or \
+                self._config.kvcache_quant_dtype in kvcache_support_dtype:
             logger.info("Adding Quantizer to pipeline.")
             self.pipeline.append(Quantizer(self._config))
 
@@ -179,7 +182,7 @@ class PTQ(CompAlgo):
             logger.warning("When outliers_suppression is None, A8W8 algorithm accuracy is expected to decline.")
         if config.weight_quant_dtype is None and \
                 config.act_quant_dtype == dtype.int8:
-            raise ValueError("PTQ algorithm not support only quant activation.")
+            raise ValueError("PTQ algorithm do not support only quant activation.")
         if config.weight_quant_dtype is None and config.act_quant_dtype is None \
             and config.kvcache_quant_dtype is None and \
                 config.outliers_suppression == OutliersSuppressionType.NONE:
@@ -188,6 +191,10 @@ class PTQ(CompAlgo):
                            "act_quant_dtype=None,"
                            "kvcache_quant_dtype=None and"
                            "outliers_suppression=None")
+        if config.weight_quant_dtype == dtype.qint4x2 and (config.act_quant_dtype == dtype.int8 or \
+                                                           config.kvcache_quant_dtype == dtype.int8):
+            raise ValueError("PTQ algorithm only support quant weight in int4 alone."
+                             "Please not to use with a8 or c8 at the same time.")
 
     # pylint: disable=arguments-differ
     def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets=None, **kwargs) -> Cell:
