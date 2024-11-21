@@ -24,6 +24,15 @@ __all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", 
            "get_quant_dtype_num_bits"]
 
 
+def np_int4data_pack_to_int8(np_data):
+    np_data = np_data.astype(np.int8)
+    np_data &= 0x000F
+    np_data[::, 0::2] <<= 0
+    np_data[::, 1::2] <<= 4
+    np_int4_data = np_data[::, 0::2] | np_data[::, 1::2]
+    return np_int4_data
+
+
 def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
     if 0 <= quant_dtype.value() <= 15:
         return quant_dtype.value() + 1
@@ -75,11 +84,11 @@ def cal_quantization_params(input_min,
 
 
 def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, quant_dtype=msdtype.int8, quant_axis=-1,
-                 if_quant_data: bool = True):
+                 if_quant_data: bool = True, bits=8):
     """quant_tensor"""
-    if quant_dtype != msdtype.int8:
-        raise ValueError(f"Only support quant to int8, but got {quant_dtype}")
-    num_bits = 8
+    if quant_dtype not in (msdtype.int8, msdtype.qint4x2):
+        raise ValueError(f"Only support quant to int8 and int 4, but got {quant_dtype}")
+    num_bits = bits
     signed = True
     if quant_axis == -1:
         float_max = max_op(tensor)[0].reshape(-1)

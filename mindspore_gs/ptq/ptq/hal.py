@@ -31,7 +31,7 @@ from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQMode
-
+from mindspore_gs.quantization.quant_utils import np_int4data_pack_to_int8
 
 @dataclasses.dataclass
 class QuantParam:
@@ -440,7 +440,8 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
             weight_shape = (ic, oc // 2)
             q_weight = Parameter(Tensor(np.ones(weight_shape), w_qparam.quant_dtype), name=linear.weight.name)
         else:
-            raise ValueError("not support W4 quantization now!")
+            weight = np_int4data_pack_to_int8(q_weight.asnumpy().T)
+            q_weight = Parameter(Tensor(weight, w_qparam.quant_dtype), name=linear.weight.name)
         return wqbmm, q_weight
 
 

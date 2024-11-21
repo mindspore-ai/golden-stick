@@ -28,7 +28,8 @@ from mindformers import AutoModel
 from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, LayerQuantizeAlgo, QuantGranularity
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, LayerQuantizeAlgo, \
+                                         PrecisionRecovery, GPTQQuantConfig, QuantGranularity
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
@@ -75,6 +76,14 @@ def create_cfg(quant_algo_, mode):
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["lm_head"])
+    elif quant_algo_ == 'A16W4_GPTQ':
+        algorithm_config = GPTQQuantConfig(block_columns=32)
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        weight_quant_dtype=dtype.int8,
+                        precision_recovery=PrecisionRecovery.GPTQ,
+                        algo_args=algorithm_config)
     elif quant_algo_ == 'C8':
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
@@ -243,6 +252,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput[:, :69], foutput[:, :69], 0, 0)
         elif quant_algo_ == 'A16W8':
             ret = np.allclose(qoutput, foutput, 0, 0)
+        elif quant_algo_ == 'A16W4_GPTQ':
+            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         elif quant_algo_ == 'A16W8C8':
             ret = np.allclose(qoutput[:, :5], foutput[:, :5], 0, 0)
         elif quant_algo_ == 'A8W8C8':
@@ -260,6 +271,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     elif quant_algo_ == 'A16W8':
         ret = np.allclose(qoutput, foutput, 0, 0)
+    elif quant_algo_ == 'A16W4_GPTQ':
+        ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
     elif quant_algo_ == 'A16W8C8':
         ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
     elif quant_algo_ == 'A8W8C8':

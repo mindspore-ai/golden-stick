@@ -16,7 +16,9 @@
 MindSpore golden stick PTQ Algorithms.
 """
 
-from .ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity
+from .ptq_config import (PTQConfig, PTQMode, OutliersSuppressionType, PrecisionRecovery, GPTQQuantConfig,
+                         QuantGranularity)
+
 from .round_to_nearest import RoundToNearest
 from .ptq import PTQ
 from .network_helpers import NetworkHelper
