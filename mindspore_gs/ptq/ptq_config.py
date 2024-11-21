@@ -20,6 +20,7 @@ from typing import List, Union
 
 from mindspore import dtype as msdtype
 
+from mindspore_gs.common import logger
 from mindspore_gs.common.config import GSBaseConfig
 from mindspore_gs.common.utils import value_check, list_value_check
 from mindspore_gs.common.register import RegisterMachine
@@ -116,6 +117,19 @@ class QuantGranularity(Enum):
     PER_CHANNEL = 'per_channel'
     PER_TOKEN = 'per_token'
     PER_GROUP = 'per_group'
+
+    @staticmethod
+    def quant_granularity_formatter(name: str):
+        '''quant_granularity_formatter'''
+        if name == 'per-token':
+            return QuantGranularity.PER_TOKEN
+        if name == 'per-tensor':
+            return QuantGranularity.PER_TENSOR
+        if name == 'per_channel':
+            return QuantGranularity.PER_CHANNEL
+        if name == 'per_group':
+            return QuantGranularity.PER_GROUP
+        return None
 
 
 @dataclass
@@ -228,6 +242,8 @@ class PTQConfig:
                              and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
         if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
             raise ValueError('when self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, self.kvcache_quant_dtype must be mindspore.dtype.int8.')
+        if self.mode == PTQMode.QUANTIZE and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
+            logger.warning('self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, not need quantize for kvcache.')
         if self.weight_quant_granularity != QuantGranularity.PER_GROUP and self.group_size != 0:
             raise ValueError("group_size should equal to 0 when not to do pre_group quantize.")
         if self.weight_quant_granularity == QuantGranularity.PER_GROUP and self.group_size not in [64, 128]:
@@ -335,6 +351,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             self.approach is not PTQApproach.RTN and self.approach is not PTQApproach.PTQ:
             raise ValueError(f"self.act_quant_granularity is QuantGranularity.PER_TOKEN or \
                               self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, {self.approach} can't take effect.")
+        if self.act_quant_granularity is QuantGranularity.PER_TOKEN and self.weight_symmetric is False:
+            raise ValueError("when self.act_quant_granularity is QuantGranularity.PER_TOKEN, self.weight_symmetric must be True.")
 
     def _parse_dict(self):
         """ parse data class to readable dicts"""

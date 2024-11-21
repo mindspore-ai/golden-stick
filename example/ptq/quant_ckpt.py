@@ -44,7 +44,8 @@ def get_args():
     parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
-    parser.add_argument('--act_dynamic_quant', '-d', type=bool, default=False, help="Available: True, False")
+    parser.add_argument('--act_quant_granularity', '-ag', type=str, default='per-tensor',
+                        help="Available: 'per-token', 'per-tensor'")
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo.")
@@ -86,6 +87,7 @@ def get_args():
         args.weight_quant_dtype = dtype_formatter(args.weight_quant_dtype)
         args.act_quant_dtype = dtype_formatter(args.act_quant_dtype)
         args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
+        args.act_quant_granularity = QuantGranularity.quant_granularity_formatter(args.act_quant_granularity)
         args.outliers_suppression = OutliersSuppressionType.SMOOTH if args.outliers_suppression == 'smooth' \
             else OutliersSuppressionType.NONE
         args.opname_blacklist = args.opname_blacklist if args.opname_blacklist else []
@@ -102,9 +104,9 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     approach = uargs_.approach
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=uargs_.weight_quant_dtype,
                     act_quant_dtype=uargs_.act_quant_dtype, kvcache_quant_dtype=uargs_.kvcache_quant_dtype,
-                    outliers_suppression=uargs_.outliers_suppression, opname_blacklist=uargs_.opname_blacklist)
-    if uargs_.act_dynamic_quant is True:
-        cfg.act_quant_granularity = QuantGranularity.PER_TOKEN
+                    outliers_suppression=uargs_.outliers_suppression,
+                    act_quant_granularity=uargs_.act_quant_granularity,
+                    opname_blacklist=uargs_.opname_blacklist)
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
         ptq = RTN(config=cfg)
@@ -177,7 +179,7 @@ def ckpt_name(model_name_, uargs_):
         name += "w16"
     if uargs_.kvcache_quant_dtype == msdtype.int8:
         name += "c8"
-    if uargs_.act_dynamic_quant is True:
+    if uargs_.act_quant_granularity is QuantGranularity.PER_TOKEN:
         name += "_a8dyn"
     return name
 
