@@ -361,8 +361,7 @@ def test_linears_dynamic_quant_predict_2stage(device, mode):
     def infer(inputs):
         network = LinearsNet()
         cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, act_quant_dtype=dtype.int8,
-                        kvcache_quant_dtype=dtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
-                        kvcache_quant_granularity=QuantGranularity.PER_TOKEN)
+                        act_quant_granularity=QuantGranularity.PER_TOKEN)
         ptq = RTN(config=cfg)
         quant_network = ptq.apply(network)
         ascend_network = ptq.convert(quant_network)

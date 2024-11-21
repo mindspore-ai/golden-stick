@@ -44,8 +44,7 @@ def get_args():
     parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
-    parser.add_argument('--act_dynamic_quant', '-ad', type=bool, default=False, help="Available: True, False")
-    parser.add_argument('--kvcache_dynamic_quant', '-kd', type=bool, default=False, help="Available: True, False")
+    parser.add_argument('--act_dynamic_quant', '-d', type=bool, default=False, help="Available: True, False")
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo.")
@@ -106,8 +105,6 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
                     outliers_suppression=uargs_.outliers_suppression, opname_blacklist=uargs_.opname_blacklist)
     if uargs_.act_dynamic_quant is True:
         cfg.act_quant_granularity = QuantGranularity.PER_TOKEN
-    if uargs_.kvcache_dynamic_quant is True:
-        cfg.kvcache_quant_granularity = QuantGranularity.PER_TOKEN
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
         ptq = RTN(config=cfg)
@@ -182,8 +179,6 @@ def ckpt_name(model_name_, uargs_):
         name += "c8"
     if uargs_.act_dynamic_quant is True:
         name += "_a8dyn"
-    if uargs_.kvcache_dynamic_quant is True:
-        name += "_c8dyn"
     return name
 
 
