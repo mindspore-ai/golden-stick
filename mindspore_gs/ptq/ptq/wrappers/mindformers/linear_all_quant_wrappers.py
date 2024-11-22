@@ -50,7 +50,7 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         super().__init__(linear_name, linear, cfg, network_helper)
 
         is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
-        self.x_quant_max, self.x_quant_min = get_quant_min_max_op(self.tensor_parallel, is_rowparallel)
+        self.x_quant_max, self.x_quant_min = get_quant_min_max_op(cfg.tp_size, is_rowparallel)
 
         self.x_scale = Parameter(initializer('ones', (1,), dtype=dtype.float64))
         self.x_zp = Parameter(initializer('zeros', (1,), dtype=dtype.float64))
@@ -81,7 +81,7 @@ class AllQuantLinearInferCell(LinearInferCell):
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
         quant, qmm, bias = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam,
-                                                 is_deploy, compute_type)
+                                                 is_deploy, cfg.tp_size, compute_type)
         if not is_deploy:
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
             logger.debug(f"AllQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")

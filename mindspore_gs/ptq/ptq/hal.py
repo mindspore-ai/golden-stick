@@ -536,7 +536,7 @@ class AllQuantMatmul(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, linear, parallel_type: ParallelType, q_weight, x_qparam: QuantParam, w_qparam: QuantParam,
-               is_deploy, dst_dtype=dtype.float16) -> (QuantWithSmooth, 'AllQuantMatmul', Parameter):
+               is_deploy, tp_size, dst_dtype=dtype.float16) -> (QuantWithSmooth, 'AllQuantMatmul', Parameter):
         """create"""
         trans_a = False
         trans_b = linear.transpose_b
@@ -569,8 +569,8 @@ class AllQuantMatmul(QuantUnitCell):
             # fuse bias
             origin_bias = linear.bias if linear.has_bias else None
             if parallel_type is ParallelType.ROW_PARALLEL:
-                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, True, dst_dtype,
-                                                              origin_bias)
+                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, tp_size > 1,
+                                                              dst_dtype, origin_bias)
             else:
                 t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype,
                                                               origin_bias)

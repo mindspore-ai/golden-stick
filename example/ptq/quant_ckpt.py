@@ -188,7 +188,6 @@ if __name__ == "__main__":
     uargs = get_args()
     if uargs.debug_mode:
         logger.set_level(logging.DEBUG)
-    algo = create_ptq(uargs)
     mfconfig = MindFormerConfig(uargs.config_path)
     model_name = mfconfig.trainer.model_name
     if mfconfig.model.arch.type == "LlamaForCausalLM":
@@ -205,6 +204,7 @@ if __name__ == "__main__":
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     print('Quanting network...', flush=True)
+    algo = create_ptq(uargs)
     network = quant_net(network, helper, algo, datasets)
     print('Saving checkpoint...', flush=True)
     start = time.time()

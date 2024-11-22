@@ -19,6 +19,7 @@ from enum import Enum
 from typing import List, Union
 
 from mindspore import dtype as msdtype
+from mindspore.communication import get_group_size
 
 from mindspore_gs.common import logger
 from mindspore_gs.common.config import GSBaseConfig
@@ -306,8 +307,16 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
     fallback_blacklist: dict = field(default_factory=dict)
+    tp_size: int = 1
+
+    def _get_tp_size(self):
+        try:
+            self.tp_size = get_group_size()
+        except RuntimeError:
+            pass
 
     def __post_init__(self):
+        self._get_tp_size()
         value_check('act_per_channel', self.act_per_channel, bool)
         value_check('weight_per_channel', self.weight_per_channel, bool)
         value_check('kvcache_per_head', self.kvcache_per_head, bool)

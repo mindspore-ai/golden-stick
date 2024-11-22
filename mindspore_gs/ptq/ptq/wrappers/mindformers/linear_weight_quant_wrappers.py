@@ -71,7 +71,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
             self.layer.compute_dtype
 
         is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
-        self.w_quant_max, self.w_quant_min = get_quant_min_max_op(self.tensor_parallel, is_rowparallel)
+        self.w_quant_max, self.w_quant_min = get_quant_min_max_op(cfg.tp_size, is_rowparallel)
 
         self.q_weight = Parameter(initializer("ones", self.layer.weight.shape, dtype.int8), name=self.layer.weight.name)
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
