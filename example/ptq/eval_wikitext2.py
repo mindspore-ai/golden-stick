@@ -23,12 +23,12 @@ from mindspore_gs.datasets import create_wikitext_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
 
-def evaluate(net, dataset_path, net_helper):
+def evaluate(net, dataset_path, net_helper, n_samples):
     """evaluate."""
     bs_ = net_helper.get_spec("batch_size")
     seq_ = net_helper.get_spec("seq_length")
     tokenizer_ = net_helper.create_tokenizer()
-    ds = create_wikitext_dataset(dataset_path, bs_, seq_, 1, tokenizer_)
+    ds = create_wikitext_dataset(dataset_path, bs_, seq_, 1, tokenizer_, n_samples=n_samples)
     metric = PerplexityMetric()
     metric.clear()
     data_count = 0
@@ -36,13 +36,13 @@ def evaluate(net, dataset_path, net_helper):
     net.is_first_iteration = False
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         data_count += 1
-        logger.info(f"Dataset count: {data_count}/{total_count}")
+        print(f"Dataset count: {data_count}/{total_count}", flush=True)
         input_ids = ds_item['input_ids'].asnumpy()
         net_inputs = net_helper.assemble_inputs(input_ids)
         outputs = net(*net_inputs)
         metric.update(*outputs)
-    logger.info('Evaluate Over!')
-    logger.info(f"PPL: {metric.eval()}")
+    print(f"PPL: {metric.eval()}", flush=True)
+    print('Evaluate Over!', flush=True)
 
 
 def get_args():
@@ -50,6 +50,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
+    parser.add_argument('--n_samples', '-n', type=int, default=-1)
     args = parser.parse_args()
     logger.info(f"evaluate args: {args}")
     return args
@@ -72,4 +73,4 @@ if __name__ == "__main__":
         raise ValueError(err_msg)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
-    evaluate(network, uargs.dataset_path, helper)
+    evaluate(network, uargs.dataset_path, helper, uargs.n_samples)

@@ -23,7 +23,7 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFPa
 from mindformers import MindFormerConfig
 
 
-def evaluate(net, dataset_path, network_helper):
+def evaluate(net, dataset_path, network_helper, n_samples):
     """evaluate `net` with dataset from `dataset_path`."""
     top_k = network_helper.get_spec("top_k")
     top_p = network_helper.get_spec("top_p")
@@ -33,7 +33,8 @@ def evaluate(net, dataset_path, network_helper):
     ignore_token_id = network_helper.get_spec("ignore_token_id")
     pad_token_id = network_helper.get_spec("pad_token_id")
     tokenizer = network_helper.create_tokenizer()
-    ds = create_ceval_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id)
+    ds = create_ceval_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
+                              n_samples=n_samples)
 
     total_score = {}
     data_count = 0
@@ -44,38 +45,38 @@ def evaluate(net, dataset_path, network_helper):
             total_score[subject] = {"correct nums": 0, "total nums": 0}
 
         data_count += 1
-        logger.info(f"Dataset count: {data_count}/{total_count}")
+        print(f"Dataset count: {data_count}/{total_count}", flush=True)
         input_ids = ds_item['input_ids'].asnumpy()
         labels = ds_item['labels'].asnumpy()
 
-        valid_length_each_example = []
+        batch_valid_length = []
         for j in range(input_ids.shape[0]):
             # As the nonzero returns the index and we need length
-            valid_length_each_example.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
-        valid_length_each_example = np.array(valid_length_each_example)
+            batch_valid_length.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
+        batch_valid_length = np.array(batch_valid_length)
 
         outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length,
-                               top_p=top_p, top_k=top_k, max_new_tokens=1)
+                               top_p=top_p, top_k=top_k, max_new_tokens=5)
         output_ids = []
         for j in range(input_ids.shape[0]):
-            output_ids.append(outputs[j][int(valid_length_each_example[j]):])
+            output_ids.append(outputs[j][int(batch_valid_length[j]):])
 
         question = tokenizer.decode(input_ids, skip_special_tokens=True)
         pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
-        logger.info(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}")
+        print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}", flush=True)
 
-        if pres_str == labels_str:
+        if labels_str in pres_str:
             total_score[subject]["correct nums"] = total_score[subject]["correct nums"] + 1
         total_score[subject]["total nums"] = total_score[subject]["total nums"] + 1
 
-    logger.info("各个科目成绩:")
+    print("各个科目成绩:", flush=True)
     total_correct = 0
     for subject, score in total_score.items():
         total_correct += score["correct nums"]
-        logger.info(f"科目: {subject} -- 成绩: {(score['correct nums'] / score['total nums']):.4f}")
-    logger.info(f"总成绩: {(total_correct / data_count):.4f}")
-    logger.info('评测完成!')
+        print(f"科目: {subject} -- 成绩: {(score['correct nums'] / score['total nums']):.4f}", flush=True)
+    print(f"总成绩: {(total_correct / data_count):.4f}", flush=True)
+    print('评测完成!', flush=True)
 
 
 def get_args():
@@ -83,6 +84,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
+    parser.add_argument('--n_samples', '-n', type=int, default=-1)
     args = parser.parse_args()
     logger.info(f"evaluate args: {args}")
     return args
@@ -103,4 +105,4 @@ if __name__ == "__main__":
         raise ValueError(err_msg)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
-    evaluate(network, uargs.dataset_path, helper)
+    evaluate(network, uargs.dataset_path, helper, uargs.n_samples)

@@ -24,7 +24,7 @@ from mindspore_gs.datasets import create_squad_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 
 
-def evaluate(net, dataset_path, network_helper):
+def evaluate(net, dataset_path, network_helper, n_samples):
     """evaluate `net` with dataset from `dataset_path`."""
     top_k = network_helper.get_spec("top_k")
     top_p = network_helper.get_spec("top_p")
@@ -35,7 +35,8 @@ def evaluate(net, dataset_path, network_helper):
     pad_token_id = network_helper.get_spec("pad_token_id")
 
     tokenizer = network_helper.create_tokenizer()
-    ds = create_squad_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id)
+    ds = create_squad_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
+                              n_samples=n_samples)
     metric = EmF1Metric()
     metric.clear()
 
@@ -43,26 +44,25 @@ def evaluate(net, dataset_path, network_helper):
     total_count = ds.get_dataset_size()
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         data_count += 1
-        logger.info(f"Dataset count: {data_count}/{total_count}")
+        print(f"Dataset count: {data_count}/{total_count}", flush=True)
         input_ids = ds_item['input_ids'].asnumpy()
         labels = ds_item['labels'].asnumpy()
 
-        valid_length_each_example = []
+        batch_valid_length = []
         for j in range(input_ids.shape[0]):
             # As the nonzero returns the index and we need length
-            valid_length_each_example.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
-        valid_length_each_example = np.array(valid_length_each_example)
-
+            batch_valid_length.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
+        batch_valid_length = np.array(batch_valid_length)
         outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length, top_p=top_p, top_k=top_k)
         output_ids = []
         for j in range(input_ids.shape[0]):
-            output_ids.append(outputs[j][int(valid_length_each_example[j]):])
+            output_ids.append(outputs[j][int(batch_valid_length[j]):])
 
         pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
         metric.update(pres_str, labels_str)
-    metric.eval()
-    logger.info('Evaluate Over!')
+    print(f"EMF1: {metric.eval()}", flush=True)
+    print('Evaluate Over!', flush=True)
 
 
 def get_args():
@@ -70,6 +70,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
+    parser.add_argument('--n_samples', '-n', type=int, default=-1)
     args = parser.parse_args()
     logger.info(f"evaluate args: {args}")
     return args
@@ -90,4 +91,4 @@ if __name__ == "__main__":
         raise ValueError(err_msg)
     network = helper.create_network()
     logger.info(f'Create Network cost time is {time.time() - start} s.')
-    evaluate(network, uargs.dataset_path, helper)
+    evaluate(network, uargs.dataset_path, helper, uargs.n_samples)

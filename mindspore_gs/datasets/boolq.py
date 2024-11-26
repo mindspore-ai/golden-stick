@@ -71,7 +71,8 @@ class BoolQDataset:
                 answer = 'yes' if data["answer"] else 'no'
                 title = data["title"]
 
-                input_str = f"Read the passage below and answer the question with yes or no.\n### " \
+                input_str = f"Please read the following passage and answer the question directly with either 'yes' or" \
+                            f" 'no' without analysis process.\n\n ### " \
                             f"Passage:\n{title} -- {passage}\n### Question:\n{query}\n### Answer:"
                 sources.append(input_str)
                 targets.append(answer)
