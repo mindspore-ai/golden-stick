@@ -486,7 +486,7 @@ class AllQuantMatmul(QuantUnitCell):
         dequant_scale = np.squeeze(x_qparam.scale.asnumpy() * w_qparam.scale.asnumpy()).astype(np.float64)
         correction = q_correction.astype(np.float64) * dequant_scale
         if origin_bias is not None:
-            return Tensor(origin_bias.asnumpy() + correction, dtype=dst_dtype)
+            return Tensor(origin_bias.asnumpy().astype(np.float64) + correction, dtype=dst_dtype)
         return Tensor(correction, dtype=dst_dtype)
 
     @staticmethod
