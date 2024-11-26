@@ -187,9 +187,7 @@ def omniquant(model, tokernizer=None, max_length=None, prompts=None):
     qnet = apply(model)
     if prompts is None:
         prompts = [
-            "Huawei is an excellent company",
-            # "I like China, China is very Great",
-            # "Is Huawei a Great Company"
+            "I like China, China is very Great",
         ]
     calibrate(qnet, tokernizer, max_length, prompts)
     model = qnet

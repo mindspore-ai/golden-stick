@@ -54,7 +54,7 @@ class SmoothLinearCell(WrapperLinearCell):
         self.compute_type = self.layer.dtype if self.is_linear else self.layer.compute_dtype
 
         self.x_obs_max, self.x_obs_min = get_smooth_x_obs_min_max_op()
-        self.w_obs_max, self.w_obs_min = get_smooth_w_obs_min_max_op(self.tensor_parallel, self.is_colparallel)
+        self.w_obs_max, self.w_obs_min = get_smooth_w_obs_min_max_op(cfg.tp_size, self.is_colparallel)
 
     def _calc_smooth_scale(self, alpha):
         """_calc_smooth_scale"""

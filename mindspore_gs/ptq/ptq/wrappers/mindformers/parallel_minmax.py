@@ -48,7 +48,9 @@ def get_smooth_x_obs_min_max_op():
 
 
 def get_smooth_w_obs_min_max_op(tensor_parallel, is_colparallel):
-    if tensor_parallel and is_colparallel:
+    """get_smooth_w_obs_min_max_op"""
+    need_comm = tensor_parallel is not None and tensor_parallel > 1
+    if need_comm and is_colparallel:
         w_obs_max = MaxFromTensorParallelRegion()
         w_obs_min = MinFromTensorParallelRegion()
     else:
@@ -58,7 +60,9 @@ def get_smooth_w_obs_min_max_op(tensor_parallel, is_colparallel):
 
 
 def get_quant_min_max_op(tensor_parallel, is_rowparallel):
-    if tensor_parallel and is_rowparallel:
+    """get_quant_min_max_op"""
+    need_comm = tensor_parallel is not None and tensor_parallel > 1
+    if need_comm and is_rowparallel:
         quant_max = MaxFromTensorParallelRegion()
         quant_min = MinFromTensorParallelRegion()
     else:
