@@ -26,7 +26,7 @@ from mindspore.dataset import GeneratorDataset
 from mindspore_gs.common import logger
 
 
-class BoolQDataset(GeneratorDataset):
+class BoolQDataset:
     """boolQ dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
                  need_pad=True, n_samples=-1, add_special_tokens=True):
@@ -54,7 +54,6 @@ class BoolQDataset(GeneratorDataset):
         self._load(n_samples)
         self.iter_input_ids = None
         self.iter_labels = None
-        super().__init__(source=self, column_names=["input_ids", "labels"])
 
     def __len__(self):
         return len(self.input_ids)
@@ -143,6 +142,7 @@ def create_boolq_dataset(ds_path: str, mode: str, bs: int, seq_length: int, toke
                          ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
     """create squad dataset"""
     ds = BoolQDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples, add_special_tokens)
+    ds = GeneratorDataset(source=ds, column_names=["input_ids", "labels"])
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.map(operations=type_cast_op, input_columns="labels")

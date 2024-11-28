@@ -99,7 +99,7 @@ def format_example(subject, line, include_answer=True):
     return example
 
 
-class CEvalDataset(GeneratorDataset):
+class CEvalDataset:
     """boolQ dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
                  need_pad=True, n_samples=-1, add_special_tokens=True):
@@ -129,7 +129,6 @@ class CEvalDataset(GeneratorDataset):
         self.iter_subjects = None
         self.iter_input_ids = None
         self.iter_labels = None
-        super().__init__(source=self, column_names=["subjects", "input_ids", "labels"])
 
     def __len__(self):
         return len(self.input_ids)
@@ -226,6 +225,7 @@ def create_ceval_dataset(ds_path: str, mode: str, bs: int, seq_length: int, toke
                          ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
     """create squad dataset"""
     ds = CEvalDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples, add_special_tokens)
+    ds = GeneratorDataset(source=ds, column_names=["subjects", "input_ids", "labels"])
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.map(operations=type_cast_op, input_columns="labels")
