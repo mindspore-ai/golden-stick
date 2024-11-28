@@ -83,6 +83,7 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.v_zp_no_fusion = None
         self.k_v_scale_fusion = None
         self.k_v_zp_fusion = None
+        self.compute_type = layer.key_cache.dtype
         self.kvcache_quant_min, self.kvcache_quant_max = get_quant_min_max(num_bits=8,
                                                                            signed=True,
                                                                            narrow_range=cfg.kvcache_narrow_range)
@@ -94,19 +95,19 @@ class QuantPageAttentionMgrCell(WrapperCell):
 
     def _param_init_asd(self):
         """_param_init_asd"""
-        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
-        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
-        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
-        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
+        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
+        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
+        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
         self.k_v_scale_fusion = Parameter(initializer('ones', (2, self.ic), dtype.int64))
         self.k_v_zp_fusion = Parameter(initializer('ones', (2, self.ic), dtype.int32))
 
     def _param_init_internal(self):
         """_param_init_internal"""
-        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
-        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
-        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
-        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), dtype.float16))
+        self.k_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
+        self.k_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
+        self.v_scale_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
+        self.v_zp_no_fusion = Parameter(initializer('ones', (self.ic), self.compute_type))
         self.k_v_scale_fusion = Parameter(initializer('ones', (2, self.ic), dtype.float16))
         self.k_v_zp_fusion = Parameter(initializer('ones', (2, self.ic), dtype.float16))
 
@@ -140,14 +141,14 @@ class QuantPageAttentionMgrCell(WrapperCell):
                                                             self.kvcache_quant_min,
                                                             self.kvcache_quant_max,
                                                             symmetric=self.kvcache_symmetric)
-        key_t_scale = np.squeeze(key_t_scale).astype(np.float16)
-        key_t_zp = np.squeeze(key_t_zp).astype(np.float16)
-        value_t_scale = np.squeeze(value_t_scale).astype(np.float16)
-        value_t_zp = np.squeeze(value_t_zp).astype(np.float16)
-        self.k_scale_no_fusion.set_data(Tensor(key_t_scale, dtype=dtype.float16))
-        self.k_zp_no_fusion.set_data(Tensor(key_t_zp, dtype=dtype.float16))
-        self.v_scale_no_fusion.set_data(Tensor(value_t_scale, dtype=dtype.float16))
-        self.v_zp_no_fusion.set_data(Tensor(value_t_zp, dtype=dtype.float16))
+        key_t_scale = np.squeeze(key_t_scale).astype(np.float64)
+        key_t_zp = np.squeeze(key_t_zp).astype(np.float64)
+        value_t_scale = np.squeeze(value_t_scale).astype(np.float64)
+        value_t_zp = np.squeeze(value_t_zp).astype(np.float64)
+        self.k_scale_no_fusion.set_data(Tensor(key_t_scale, dtype=self.compute_type))
+        self.k_zp_no_fusion.set_data(Tensor(key_t_zp, dtype=self.compute_type))
+        self.v_scale_no_fusion.set_data(Tensor(value_t_scale, dtype=self.compute_type))
+        self.v_zp_no_fusion.set_data(Tensor(value_t_zp, dtype=self.compute_type))
         param_compute_func = QuantPageAttentionMgrCell.param_compute_map[(DeviceType.ASCEND910B, OpsPriority.ASD)]
         if param_compute_func is None:
             raise ValueError("key ({self.cfg.device_type}, {self.cfg.ops_priority}) is \
@@ -232,9 +233,9 @@ class DeployPageAttentionMgrCell(Cell):
         super().__init__()
         self.layer = kvcache
         self.enable_deploy_fusion = cfg.enable_deploy_fusion
-        self._key_input_quantizer = QuantCellV2(Tensor(k_scale_no_fusion.asnumpy(), dtype=dtype.float16),
+        self._key_input_quantizer = QuantCellV2(Tensor(k_scale_no_fusion.asnumpy(), dtype=k_scale_no_fusion.dtype),
                                                 Tensor(k_zp_no_fusion.asnumpy().astype(np.int8), dtype=dtype.int8))
-        self._value_input_quantizer = QuantCellV2(Tensor(v_scale_no_fusion.asnumpy(), dtype=dtype.float16),
+        self._value_input_quantizer = QuantCellV2(Tensor(v_scale_no_fusion.asnumpy(), dtype=v_scale_no_fusion.dtype),
                                                   Tensor(v_zp_no_fusion.asnumpy().astype(np.int8), dtype=dtype.int8))
         dst_type = self.layer.key_cache.dtype
         n = kvcache.n_kv_heads
