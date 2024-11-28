@@ -22,7 +22,7 @@ import mindspore.dataset.transforms as C
 from mindspore.dataset import GeneratorDataset
 
 
-class WikiText2Dataset(GeneratorDataset):
+class WikiText2Dataset:
     """Wikitext-2 dataset."""
     def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable, need_pad=True,
                  n_samples=-1, add_special_tokens=True):
@@ -44,7 +44,6 @@ class WikiText2Dataset(GeneratorDataset):
         else:
             self._load(n_samples)
         self.iterator = None
-        super().__init__(source=self, column_names=["input_ids"])
 
     def __len__(self):
         return len(self.content)
@@ -137,6 +136,7 @@ def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, max_new_toke
         raise RuntimeError(f"max_decode_len should less than seq_length, but got max_new_tokens: {max_new_tokens}, "
                            f"seq_length: {seq_length}.")
     ds = WikiText2Dataset(ds_path, seq_length, max_new_tokens, tokenizer, need_pad, n_samples, add_special_tokens)
+    ds = GeneratorDataset(source=ds, column_names=["input_ids"])
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.batch(bs, drop_remainder=True)
