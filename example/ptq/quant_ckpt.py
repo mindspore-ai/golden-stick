@@ -170,7 +170,10 @@ def ckpt_name(model_name_, uargs_):
     else:
         name += "_no_smooth"
     if uargs_.act_quant_dtype == msdtype.int8:
-        name += "_a8"
+        if uargs_.act_quant_granularity is QuantGranularity.PER_TOKEN:
+            name += "_a8dyn"
+        else:
+            name += "_a8"
     else:
         name += "_a16"
     if uargs_.weight_quant_dtype == msdtype.int8:
@@ -179,8 +182,6 @@ def ckpt_name(model_name_, uargs_):
         name += "w16"
     if uargs_.kvcache_quant_dtype == msdtype.int8:
         name += "c8"
-    if uargs_.act_quant_granularity is QuantGranularity.PER_TOKEN:
-        name += "_a8dyn"
     return name
 
 
