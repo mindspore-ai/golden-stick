@@ -23,7 +23,7 @@ from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity, PrecisionRecovery
 from mindspore_gs.quantization.quant_utils import quant_tensor
 from mindspore_gs.ptq.ptq.hal import QuantParam, WeightQuantMatmul, WeightQuantInt4Matmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
@@ -37,10 +37,12 @@ class WeightQuantLinearCell(WrapperLinearCell):
 
     @staticmethod
     def reg_self():
+        """register WeightQuantLinearCell"""
         class A16WxChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 support_dtype = [dtype.int8, dtype.qint4x2]
-                return config.weight_quant_dtype in support_dtype and config.act_quant_dtype is None
+                return (config.weight_quant_dtype in support_dtype and config.act_quant_dtype is None
+                        and config.precision_recovery == PrecisionRecovery.NONE)
 
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())

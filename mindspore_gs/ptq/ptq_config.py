@@ -73,6 +73,17 @@ class LayerQuantizeAlgo(Enum):
     A8W8 = 'a8w8'
 
 
+class PrecisionRecovery(Enum):
+    """
+    Precision recovery algorithms.
+
+    - ``GPTQ``: apply gptq algorithm to recovery precision.
+    - ``NONE``: not doing any precision recovery.
+    """
+    GPTQ = 'gptq'
+    NONE = 'none'
+
+
 @algo_cfg_register.register(PTQApproach.OMNI_QUANT)
 @dataclass
 class OmniQuantConfig:
@@ -95,6 +106,21 @@ class OmniQuantConfig:
                              f"post_clip_ratio: {type(self.post_clip_ratio)},"
                              f"smooth_alpha: {type(self.smooth_alpha)}.")
 
+
+@algo_cfg_register.register(PTQApproach.GPTQ)
+@dataclass
+class GPTQQuantConfig:
+    """config for gptq quant algorithm"""
+    block_columns: int = 128
+    activation_order: bool = False
+    damp_percent: float = 0.01
+    static_group: bool = False
+
+    def __post_init__(self):
+        value_check('block_columns', self.block_columns, int)
+        value_check('activation_order', self.activation_order, bool)
+        value_check('damp_percent', self.damp_percent, float)
+        value_check('static_group', self.static_group, bool)
 
 @algo_cfg_register.register(PTQApproach.PTQ)
 @dataclass
@@ -194,6 +220,7 @@ class PTQConfig:
     weight_quant_dtype: msdtype = msdtype.int8
     kvcache_quant_dtype: msdtype = None
     act_quant_dtype: msdtype = None
+    precision_recovery: PrecisionRecovery = PrecisionRecovery.NONE
     outliers_suppression: OutliersSuppressionType = OutliersSuppressionType.NONE
     weight_quant_granularity: QuantGranularity = QuantGranularity.PER_CHANNEL
     kvcache_quant_granularity: QuantGranularity = QuantGranularity.PER_CHANNEL
@@ -215,6 +242,7 @@ class PTQConfig:
         if self.act_quant_dtype not in act_support:
             raise ValueError(f'act_quant_dtype support {act_support}, but got {self.act_quant_dtype}.')
         list_value_check('opname_blacklist', self.opname_blacklist, str)
+        value_check('precision_recovery', self.precision_recovery, PrecisionRecovery)
         value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
         self._check_quant_granularity()
         value_check('group_size', self.group_size, int)
@@ -306,6 +334,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     kvcache_narrow_range: bool = False
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
+    reflash_inputs_after_each_processor: bool = False
     fallback_blacklist: dict = field(default_factory=dict)
     tp_size: int = 1
 
@@ -328,6 +357,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         value_check('enable_deploy_fusion', self.enable_deploy_fusion, bool)
         value_check('kvcache_calibrate_max_new_tokens', self.kvcache_calibrate_max_new_tokens, int)
         value_check('fallback_blacklist', self.fallback_blacklist, dict)
+        value_check('reflash_inputs_after_each_processor', self.reflash_inputs_after_each_processor, bool)
         if self.approach not in PTQApproach.__members__.values():
             raise ValueError(f'Invalid approach: {self.approach}')
         self._check_quant_granularity()
@@ -373,6 +403,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         parsed_dict['kvcache_quant_dtype'] = str(self.kvcache_quant_dtype)
         parsed_dict['weight_quant_dtype'] = str(self.weight_quant_dtype)
         parsed_dict['act_quant_dtype'] = str(self.act_quant_dtype)
+        parsed_dict['precision_recovery'] = self.precision_recovery.name
         parsed_dict['outliers_suppression'] = self.outliers_suppression.name
         parsed_dict['act_quant_granularity'] = self.act_quant_granularity.name
         parsed_dict['kvcache_quant_granularity'] = self.kvcache_quant_granularity.name
@@ -394,6 +425,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             ('backend', BackendTarget),
             ('approach', PTQApproach),
             ('outliers_suppression', OutliersSuppressionType),
+            ('precision_recovery', PrecisionRecovery),
             ('kvcache_quant_dtype', MSDTypeLoader()),
             ('weight_quant_dtype', MSDTypeLoader()),
             ('act_quant_dtype', MSDTypeLoader()),

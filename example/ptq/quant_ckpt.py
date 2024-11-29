@@ -22,7 +22,8 @@ import mindspore as ms
 from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
 from mindformers import MindFormerConfig
-from mindspore_gs.ptq.ptq_config import PTQMode, PTQConfig, OutliersSuppressionType, QuantGranularity
+from mindspore_gs.ptq.ptq_config import (PTQMode, PTQConfig, OutliersSuppressionType,
+                                         PrecisionRecovery, GPTQQuantConfig, QuantGranularity)
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
@@ -40,12 +41,16 @@ def get_args():
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
 
-    parser.add_argument('--weight_quant_dtype', '-w', type=str, default='none', help="Available: 'int8', 'none'")
-    parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'none'")
+    parser.add_argument('--weight_quant_dtype', '-w', type=str, default='none',
+                        help="Available: 'int8', 'int4', 'none'")
+    parser.add_argument('--act_quant_dtype', '-a', type=str, default='none',
+                        help="Available: 'int8', 'int4', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
     parser.add_argument('--act_quant_granularity', '-ag', type=str, default='per-tensor',
                         help="Available: 'per-token', 'per-tensor'")
+    parser.add_argument('--precision_recovery', '-p', type=str, default='none', help="Available: gptq")
+
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo.")
@@ -83,13 +88,17 @@ def get_args():
             if name == 'int8':
                 return msdtype.int8
             return None
-
-        args.weight_quant_dtype = dtype_formatter(args.weight_quant_dtype)
+        if args.weight_quant_dtype == 'int4':
+            args.weight_quant_dtype = msdtype.qint4x2
+        else:
+            args.weight_quant_dtype = msdtype.int8
         args.act_quant_dtype = dtype_formatter(args.act_quant_dtype)
         args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
         args.act_quant_granularity = QuantGranularity.quant_granularity_formatter(args.act_quant_granularity)
         args.outliers_suppression = OutliersSuppressionType.SMOOTH if args.outliers_suppression == 'smooth' \
             else OutliersSuppressionType.NONE
+        args.precision_recovery = PrecisionRecovery.GPTQ if args.precision_recovery == 'gptq' \
+            else PrecisionRecovery.NONE
         args.opname_blacklist = args.opname_blacklist if args.opname_blacklist else []
     else:
         raise ValueError(f"Unsupported approach: {args.approach}")
@@ -102,11 +111,14 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     """Create ptq algorithm."""
     start_time = time.time()
     approach = uargs_.approach
+    algorithm_config = {}
+    if uargs_.precision_recovery == PrecisionRecovery.GPTQ:
+        algorithm_config = GPTQQuantConfig()
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=uargs_.weight_quant_dtype,
                     act_quant_dtype=uargs_.act_quant_dtype, kvcache_quant_dtype=uargs_.kvcache_quant_dtype,
-                    outliers_suppression=uargs_.outliers_suppression,
-                    act_quant_granularity=uargs_.act_quant_granularity,
-                    opname_blacklist=uargs_.opname_blacklist)
+                    outliers_suppression=uargs_.outliers_suppression, opname_blacklist=uargs_.opname_blacklist,
+                    precision_recovery=uargs_.precision_recovery, algo_args=algorithm_config,
+                    act_quant_granularity=uargs_.act_quant_granularity)
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
         ptq = RTN(config=cfg)
@@ -199,13 +211,13 @@ if __name__ == "__main__":
         err_msg = f"Unsupported network arch: {mfconfig.model.arch}, please check model.arch in yaml config, " \
                   f"only support LlamaForCausalLM and ParallelLlamaForCausalLM now"
         raise ValueError(err_msg)
-    datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     start = time.time()
     print('Creating network...', flush=True)
     network = helper.create_network()
+    algo = create_ptq(uargs)
+    datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     print('Quanting network...', flush=True)
-    algo = create_ptq(uargs)
     network = quant_net(network, helper, algo, datasets)
     print('Saving checkpoint...', flush=True)
     start = time.time()

@@ -24,7 +24,7 @@ from mindspore.dataset import GeneratorDataset
 from mindformers.modules import Linear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, PrecisionRecovery, GPTQQuantConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from tests.st.test_utils import get_available_port
 
@@ -169,9 +169,18 @@ def test_ptq_config_error():
     with pytest.raises(ValueError):
         _ = PTQ(config)
 
+    algorithm_config = GPTQQuantConfig()
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None,
+                       precision_recovery=PrecisionRecovery.GPTQ,
+                       algo_args=algorithm_config)
+    with pytest.raises(ValueError):
+        _ = PTQ(config)
+
     config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None,
                        kvcache_quant_dtype=dtype.int8,
-                       outliers_suppression=OutliersSuppressionType.SMOOTH)
+                       outliers_suppression=OutliersSuppressionType.SMOOTH,
+                       precision_recovery=PrecisionRecovery.GPTQ,
+                       algo_args=algorithm_config)
     with pytest.raises(ValueError):
         _ = PTQ(config)
 
@@ -289,7 +298,7 @@ def test_ptq_simplenet(non_decoder):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_Dynamic'])
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_Dynamic', 'A16W4_GPTQ'])
 def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with one cards.
@@ -319,7 +328,7 @@ def test_ptq_llama2_predict_2stage_1p_run(quant_algo):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack'])
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'A16W8C8', 'C8', 'A8W8_FallBack', 'A16W4_GPTQ'])
 def test_ptq_llama2_predict_2stage_2p_run(quant_algo):
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
