@@ -475,16 +475,18 @@ class AllQuantMatmul(QuantUnitCell):
         super().__init__(layer_name)
         self.dst_dtype = dst_dtype
         self.transpose_b = transpose_b
+        scale_dtype = dtype.float32 if self.dst_dtype == dtype.bfloat16 else dtype.int64
         if is_deploy:
-            self.dequant_scale = Parameter(initializer('ones', w_qparam.scale.shape, dtype.int64))
+            self.dequant_scale = Parameter(initializer('ones', w_qparam.scale.shape, scale_dtype))
         else:
             self.dequant_scale = Parameter(Tensor(AllQuantMatmul._compute_dequant_scale(x_qparam.scale.asnumpy(),
-                                                                                        w_qparam.scale.asnumpy()),
-                                                  dtype=dtype.int64))
+                                                                                        w_qparam.scale.asnumpy(),
+                                                                                        dst_dtype),
+                                                  dtype=scale_dtype))
             logger.debug(f"AllQuantMatmul: dequant_scale of Layer({layer_name}) is "
                          f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}, {self.dequant_scale.asnumpy()}}}")
         # FIXME set dtype to dst_dtype when qbmm support bfp16 output
-        self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dtype.float16)
+        self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=self.dst_dtype)
         if w_qparam.zero_point is None:
             self.offset = None
         else:
@@ -602,9 +604,11 @@ class AllQuantMatmul(QuantUnitCell):
         return quant, qmm, bias
 
     @staticmethod
-    def _compute_dequant_scale(input_scale, weight_scale):
+    def _compute_dequant_scale(input_scale, weight_scale, dst_dtype):
         """compute_dequant_scale"""
         dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
+        if dst_dtype == dtype.bfloat16:
+            return dequant_scale
         scale_i64 = NumpyQuantOps.trans_fp32_to_i64(dequant_scale)
         return scale_i64
 
