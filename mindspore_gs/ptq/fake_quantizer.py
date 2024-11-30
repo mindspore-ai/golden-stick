@@ -21,7 +21,7 @@ from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
 from mindspore.nn import Cell
 from mindspore import dtype as mstype
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params
+from .basic_quant_func import get_quant_min_max, cal_quantization_params
 
 
 class FakeQuantizer(Cell):

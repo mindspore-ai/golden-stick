@@ -22,7 +22,7 @@ from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
-from mindspore_gs.quantization.quant_utils import quant_tensor
+from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer

@@ -16,6 +16,7 @@
 
 import os
 import sys
+import time
 from collections import OrderedDict
 import numpy
 import pytest
@@ -106,6 +107,8 @@ def test_resnet_convert_fusion(bn_fold, one_conv_fold):
     data_in = mindspore.Tensor(numpy.ones([1, 3, 224, 224]), mindspore.float32)
     file_name = "./resnet50.mindir"
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    time.sleep(5)
+    assert os.path.exists(file_name)
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)
 
@@ -137,6 +140,8 @@ def test_resnet_convert_no_fusion(bn_fold, one_conv_fold):
     file_name = "./resnet50.mindir"
     data_in = mindspore.Tensor(numpy.ones([1, 3, 224, 224]), mindspore.float32)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    time.sleep(5)
+    assert os.path.exists(file_name)
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)
 

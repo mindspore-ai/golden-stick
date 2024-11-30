@@ -1,4 +1,4 @@
-# Copyright 2022 Huawei Technologies Co., Ltd
+# Copyright 2024 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,9 +18,16 @@ import numpy as np
 import mindspore as ms
 from mindspore.common.dtype import QuantDtype
 from mindspore import Tensor
+from mindspore import dtype as msdtype
 
-__all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max",
-           "get_quant_dtype_num_bits"]
+
+def np_int4data_pack_to_int8(np_data):
+    np_data = np_data.astype(np.int8)
+    np_data &= 0x000F
+    np_data[::, 0::2] <<= 0
+    np_data[::, 1::2] <<= 4
+    np_int4_data = np_data[::, 0::2] | np_data[::, 1::2]
+    return np_int4_data
 
 
 def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
@@ -31,11 +38,7 @@ def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
     raise ValueError("Unsupported QuantDtype.")
 
 
-def cal_quantization_params(input_min,
-                            input_max,
-                            quant_min,
-                            quant_max,
-                            symmetric=False):
+def cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=False):
     r"""
     Calculate quantization params for scale and zero point.
 
@@ -71,6 +74,40 @@ def cal_quantization_params(input_min,
     else:
         zp = np.round(zp_double).astype(np.float64)
     return scale, zp
+
+
+def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, quant_dtype=msdtype.int8, quant_axis=-1,
+                 if_quant_data: bool = True, bits=8):
+    """quant_tensor"""
+    if quant_dtype not in (msdtype.int8, msdtype.qint4x2):
+        raise ValueError(f"Only support quant to int8 and int 4, but got {quant_dtype}")
+    num_bits = bits
+    signed = True
+    if quant_axis == -1:
+        float_max = max_op(tensor)[0].reshape(-1)
+        float_min = min_op(tensor)[0].reshape(-1)
+    else:
+        rank = len(tensor.shape)
+        if rank != 2:
+            raise ValueError(f"Only support rank of tensor being 2, but got {rank}")
+        minmax_axis = 1 if quant_axis == 0 else 0
+        float_max = max_op(tensor, minmax_axis, keepdims=True)[0]
+        float_min = min_op(tensor, minmax_axis, keepdims=True)[0]
+    quant_min, quant_max = get_quant_min_max(num_bits=num_bits, signed=signed, narrow_range=narrow_range)
+    scale, zp = cal_quantization_params(float_min.asnumpy(), float_max.asnumpy(), quant_min, quant_max,
+                                        symmetric=symmetric)
+    if if_quant_data:
+        qtensor = quant_tensor_data(tensor, scale.squeeze(), zp.squeeze(), quant_min, quant_max, quant_axis,
+                                    quant_dtype)
+    else:
+        qtensor = None
+    return scale, zp, qtensor
+
+
+def convert_fp32_to_int64(scale) -> np.ndarray:
+    """convert_fp32_to_int64"""
+    new_scale = np.frombuffer(scale.tobytes(), dtype=np.uint32)
+    return new_scale.astype(np.int64)
 
 
 def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
@@ -195,162 +232,4 @@ def quant_data(data, scale, zero_point, quant_min, quant_max, data_axis=-1):
     quanted_data = np.round((data / scale) + zero_point)
     quanted_data[quanted_data > quant_max] = quant_max
     quanted_data[quanted_data < quant_min] = quant_min
-    return quanted_data
-
-
-def fold_batchnorm(weight, cell_quant):
-    r"""
-    Fold the batchnorm in `Conv2dBnFoldQuant` to weight.
-
-    Calculate from `FakeQuantWithMinMax`'s Parameter or Fake quant primitive.
-
-    Args:
-        weight (numpy.ndarray): Weight of `cell_quant`.
-        cell_quant (Cell): Object of `mindspore.nn.layer.Conv2dBnFoldQuant`.
-
-    Returns:
-        weight (numpy.ndarray): Folded weight.
-        bias (numpy.ndarray): Folded bias.
-    """
-    variance = cell_quant.moving_variance.data.asnumpy()
-    mean = cell_quant.moving_mean.data.asnumpy()
-    gamma = cell_quant.gamma.data.asnumpy()
-    beta = cell_quant.beta.data.asnumpy()
-    epsilon = cell_quant.eps
-    sigma = np.sqrt(variance + epsilon)
-
-    if gamma.shape[0] == weight.shape[0]:
-        # `Conv2d` or `Dense` op weight
-        shape_list = [-1] + [1] * len(weight.shape[1:])
-        gamma_ = gamma.reshape(shape_list)
-        sigma_ = sigma.reshape(shape_list)
-    elif gamma.shape[0] == weight.shape[1]:
-        # `DepthwiseConv2d` op weight
-        shape_list = [1, -1] + [1] * len(weight.shape[2:])
-        gamma_ = gamma.reshape(shape_list)
-        sigma_ = sigma.reshape(shape_list)
-    else:
-        raise ValueError("Unsupported weight shape({})".format(weight.shape))
-
-    weight = weight * gamma_ / sigma_
-    bias = beta - gamma * mean / sigma
-    return weight, bias
-
-
-def without_fold_batchnorm(weight, cell_quant):
-    r"""
-    Fold the batchnorm in `Conv2dBnWithoutFoldQuant` to weight.
-
-    Calculate from `FakeQuantWithMinMax`'s Parameter or Fake quant primitive.
-
-    Args:
-        weight (numpy.ndarray): Weight of `cell_quant`.
-        cell_quant (Cell): Object of `mindspore.nn.layer.Conv2dBnWithoutFoldQuant`.
-
-    Returns:
-        weight (numpy.ndarray): whihout folded weight.
-        bias (numpy.ndarray): without folded bias.
-    """
-    variance = cell_quant.batchnorm.moving_variance.data.asnumpy()
-    mean = cell_quant.batchnorm.moving_mean.data.asnumpy()
-    gamma = cell_quant.batchnorm.gamma.data.asnumpy()
-    beta = cell_quant.batchnorm.beta.data.asnumpy()
-    epsilon = cell_quant.batchnorm.eps
-    sigma = np.sqrt(variance + epsilon)
-
-    if gamma.shape[0] == weight.shape[0]:
-        # `Conv2d` or `Dense` op weight
-        shape_list = [-1] + [1] * len(weight.shape[1:])
-        gamma_ = gamma.reshape(shape_list)
-        sigma_ = sigma.reshape(shape_list)
-    elif gamma.shape[0] == weight.shape[1]:
-        # `DepthwiseConv2d` op weight
-        shape_list = [1, -1] + [1] * len(weight.shape[2:])
-        gamma_ = gamma.reshape(shape_list)
-        sigma_ = sigma.reshape(shape_list)
-    else:
-        raise ValueError("Unsupported weight shape({})".format(weight.shape))
-
-    weight = weight * gamma_ / sigma_
-    bias = beta - gamma * mean / sigma
-    return weight, bias
-
-
-def compute_kl_threshold(data, bitwidth):
-    r"""
-    Using KL-J Distance to calculate the clip threshold.
-
-    Args:
-        - **data** (NumpyArray) - Data observed to calculate the threshold for quantization,
-        - **bitwidth** (QuantDtype) - The datatype of quantization.
-    Outputs:
-        Tensor with Shape 1. Threshold to calculate the data.
-    """
-    data_max = np.abs(data).max()
-    if data_max < 1e-5:
-        return 1e-5
-    hist, bin_edges = np.histogram(np.abs(data), bins='sqrt', range=(0, data_max), density=True)
-    # For the sake of high efficiency, we limit the maximum number of bins to 1024 in `sqrt` mode, If it exceeds the
-    # largest size, turn to use the default bins config.
-    largest_bin_size = 1024
-    if hist.shape[0] > largest_bin_size:
-        hist, bin_edges = np.histogram(np.abs(data), range=(0, data_max), density=True)
-    hist = hist / np.sum(hist)
-    cumsum = np.cumsum(hist)
-    bit_pow_range = pow(2, int(bitwidth) - 1)
-    threshold = []
-    scaling_factor = []
-    kl = []
-    if bit_pow_range + 1 > len(bin_edges) - 1:
-        th_layer_out = bin_edges[-1]
-        return float(th_layer_out)
-    for i in range(bit_pow_range + 1, len(bin_edges), 1):
-        threshold_tmp = (i + 0.5) * (bin_edges[1] - bin_edges[0])
-        threshold = np.concatenate((threshold, [threshold_tmp]))
-        scaling_factor_tmp = threshold_tmp / (bit_pow_range - 1)
-        scaling_factor = np.concatenate((scaling_factor, [scaling_factor_tmp]))
-        # forward interpolation
-        cumsum_tmp = np.copy(cumsum)
-        cumsum_tmp[(i - 1):] = 1
-        fwd_x = np.linspace(0.0, 1.0, bit_pow_range)
-        fwd_xp = np.linspace(0.0, 1.0, i)
-        fwd_fp = cumsum_tmp[:i]
-        forward_interp = np.interp(fwd_x, fwd_xp, fwd_fp)
-        # backward interpolation
-        bwd_x = np.linspace(0.0, 1.0, i)
-        bwd_xp = np.linspace(0.0, 1.0, bit_pow_range)
-        bwd_fp = forward_interp
-        backward_interp = np.interp(bwd_x, bwd_xp, bwd_fp)
-        cumsum_tmp[:i] = backward_interp
-        kl_tmp = np.sum((cumsum - cumsum_tmp) * np.log2(cumsum / cumsum_tmp))  # Kullback-Leibler-J
-        kl = np.concatenate((kl, [kl_tmp]))
-    th_layer_out = threshold[np.argmin(kl)]
-    threshold = float(th_layer_out)
-    if threshold < 1e-5:
-        threshold = 1e-5
-    return threshold
-
-
-def quant_bias_data(tensor: Tensor, scale, dtype=ms.dtype.int32):
-    r"""
-    Calculate int32 bias from fp32. the formula is defined as:
-
-    .. math::
-        int32 = round(bias / (scale_weight * scale_act))
-
-    Args:
-        tensor (Tensor): The bias tensor to be quanted
-        scale (numpy.ndarray): The dimension of channel or 1.
-        dtype(ms.dtype): default is dtype.int32
-
-    Returns:
-        quanted_bias (Tensor): quanted bias tensor
-    """
-
-    quant_scale = Tensor(np.squeeze(scale))
-    quanted_data = ms.ops.round(tensor / quant_scale)
-    quant_min = -2 ** 31
-    quant_max = 2 ** 31 - 1
-    quanted_data = ms.ops.clamp(quanted_data, quant_min, quant_max)
-    quanted_data = ms.ops.cast(quanted_data, dtype)
     return quanted_data

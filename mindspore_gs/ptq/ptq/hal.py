@@ -31,7 +31,13 @@ from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQMode
-from mindspore_gs.quantization.quant_utils import np_int4data_pack_to_int8
+from mindspore_gs.ptq.basic_quant_func import np_int4data_pack_to_int8
+
+
+class KernelType(enum.Enum):
+    ASD = 0
+    ACLNN = 1
+
 
 @dataclasses.dataclass
 class QuantParam:
@@ -72,13 +78,13 @@ class QuantUnitCell(abc.ABC, Cell):
 class QuantWithSmooth(QuantUnitCell):
     """QuantWithSmooth"""
     def __init__(self, layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
-                 smooth_scale: Optional[np.ndarray] = None):
+                 smooth_scale: Optional[np.ndarray] = None, zp_dtype=dtype.int8):
         super().__init__(layer_name)
         self.quant = QuantV2()
         self.parallel_type = parallel_type
         if is_deploy:
             self.input_scale = Parameter(initializer('ones', (ic,), dst_dtype))
-            self.input_zp = Parameter(initializer('zeros', (ic,), dtype.int8))
+            self.input_zp = Parameter(initializer('zeros', (ic,), zp_dtype))
             return
         # fuse smooth.mul and quant
         input_scale_np = x_qparam.scale.asnumpy().astype(np.float16)
@@ -101,14 +107,23 @@ class QuantWithSmooth(QuantUnitCell):
         if self.input_scale.shape != x_qparam.zero_point.shape:
             if isinstance(x_qparam.zero_point, np.number):
                 raise RuntimeError("Shape of scale and zero point are not compatible.")
-            self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.int8),
-                                             dtype=dtype.int8))
+            self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.float16), dtype=zp_dtype))
             logger.debug(f"QuantWithSmooth: input zp from vector of Layer({parallel_type}:{layer_name}) is "
                          f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp}}}")
         else:
-            self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=dtype.int8))
+            self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=zp_dtype))
             logger.debug(f"QuantWithSmooth: input zp of Layer({parallel_type}:{layer_name}) is "
                          f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
+
+    @classmethod
+    def create(cls, layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
+               smooth_scale: Optional[np.ndarray] = None, kernel_type: KernelType = KernelType.ASD):
+        if kernel_type == KernelType.ASD:
+            return cls(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, dtype.int8)
+        if kernel_type == KernelType.ACLNN:
+            return cls(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, dtype.float16)
+        raise RuntimeError(f"Not supported kernel type: {kernel_type}")
+
 
     def construct(self, x):
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
@@ -561,7 +576,8 @@ class AllQuantMatmul(QuantUnitCell):
         else:
             raise ValueError(f"Not support creating AllQuantMatmul from {linear.matmul}.")
         # create quant
-        quant = QuantWithSmooth(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale)
+        quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
+                                       KernelType.ASD)
         # correction into bias
         bias_name = linear.bias.name if linear.has_bias else q_weight.name + "_bias"
         if is_deploy:

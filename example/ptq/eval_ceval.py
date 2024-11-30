@@ -64,10 +64,12 @@ def evaluate(net, dataset_path, network_helper, n_samples):
         question = tokenizer.decode(input_ids, skip_special_tokens=True)
         pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
-        print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}", flush=True)
 
-        if labels_str in pres_str:
+        if labels_str[0].lower() in pres_str[0].lower():
             total_score[subject]["correct nums"] = total_score[subject]["correct nums"] + 1
+            print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}。回答正确", flush=True)
+        else:
+            print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}。回答错误", flush=True)
         total_score[subject]["total nums"] = total_score[subject]["total nums"] + 1
 
     print("各个科目成绩:", flush=True)

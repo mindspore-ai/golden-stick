@@ -115,11 +115,11 @@ model:
     do_sample: False
     quantization_config:
       quant_method: 'ptq'
-      weight_dtype: 'int8'
-      activation_dtype: 'none'
-      kvcache_dtype: 'int8'
-      outliers_suppression: 'None'
-      modules_to_not_convert: []
+      activation_dtype: "none"
+      weight_dtype: "int8"
+      kvcache_dtype: "int8"
+      outliers_suppression: "none"
+      modules_to_not_convert: ['lm_head', 'w2']
       algorithm_args: {}
   arch:
     type: ParallelLlamaForCausalLM
@@ -132,6 +132,7 @@ processor:
     eos_token: '</s>'
     pad_token: '<unk>'
     type: LlamaTokenizer
+    vocab_file: ""
   type: LlamaProcessor
 
 # metric
