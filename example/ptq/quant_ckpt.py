@@ -66,6 +66,7 @@ def get_args():
         args.act_quant_dtype = None
         args.kvcache_quant_dtype = None
         args.outliers_suppression = OutliersSuppressionType.NONE
+        args.precision_recovery = PrecisionRecovery.NONE
         args.opname_blacklist = ['lm_head']
     elif args.approach == 'rtn-c8':
         logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
@@ -74,6 +75,7 @@ def get_args():
         args.act_quant_dtype = None
         args.kvcache_quant_dtype = msdtype.int8
         args.outliers_suppression = OutliersSuppressionType.NONE
+        args.precision_recovery = PrecisionRecovery.NONE
         args.opname_blacklist = []
     elif args.approach == 'smooth_quant':
         logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
@@ -82,6 +84,7 @@ def get_args():
         args.act_quant_dtype = msdtype.int8
         args.kvcache_quant_dtype = None
         args.outliers_suppression = OutliersSuppressionType.SMOOTH
+        args.precision_recovery = PrecisionRecovery.NONE
         args.opname_blacklist = ['lm_head', 'w2']
     elif args.approach == 'ptq':
         def dtype_formatter(name: str):
