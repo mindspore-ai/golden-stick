@@ -14,10 +14,10 @@
 # limitations under the License.
 # ============================================================================
 
-echo "Please prepare a new conda env, prepare Ascend env, and make sure following config is ready."
+echo "Require a new conda env(will reinstall some package), an Ascend env, and make sure following config is good and load_checkpoint field is settled in yaml."
 # config
 MF_PKG_LINK="https://repo.mindspore.cn/mindspore/mindformers/version/202411/20241106/dev_20241106220046_3bf27eb9fe9c95cb364ddee91152d0723b3e29ca_newest/any/mindformers-1.3.0-py3-none-any.whl"
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202410/20241028/master_20241028160026_3ab41988a9960fe968160373ab8a58799e79add0_newest/unified/aarch64/mindspore-2.4.0-cp310-cp310-linux_aarch64.whl"
+MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202411/20241126/master_20241126101834_a95514d8ad1bfa5c2cfb72a7142df7d19a638dbd_newest/unified/aarch64/mindspore-2.4.0-cp310-cp310-linux_aarch64.whl"
 ds_type="boolq"
 dataset="./gs/tests/data/boolq-dataset/dev.jsonl"
 eval_script="eval_boolq.py"
