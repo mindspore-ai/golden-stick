@@ -38,8 +38,8 @@ def name_replace(name: str):
     name = name.replace('.input_layernorm.', '.attention_norm.')
     name = name.replace('.post_attention_layernorm.', '.ffn_norm.')
     name = name.replace('.norm.', '.norm_out.')
-    name = name.replace('.scales', '.matmul.t_scale')
-    name = name.replace('.qzeros', '.matmul.t_zp_neg')
+    name = name.replace('.scales', '.matmul.weight_scale')
+    name = name.replace('.qzeros', '.matmul.weight_zp')
     name = name.replace('.qweight', '.weight')
     return name
 
@@ -86,12 +86,12 @@ def convert_hf_ckpt(torch_ckpt_dir, ms_ckpt_file, dtype=ms.float16):
         name = name_replace(name)
         value = value.asnumpy()
         print(f'\rprocessing parameter: {name} {value.shape}', end='', flush=True)
-        if value.dtype == np.int32 and "weight" in name:
+        if value.dtype == np.int32 and "._layer.weight" in name:
             value = trans_int32_to_int4(value)
             value = value - np.ones(value.shape, dtype=np.int8) * 8
             value = trans_int4_to_qint4x2(value)
             dtype = ms.qint4x2
-        elif value.dtype == np.int32 and "t_zp_neg" in name:
+        elif value.dtype == np.int32 and ".matmul.weight_zp" in name:
             value = trans_int32_to_int4(value)
             value = -1 * value + np.ones(value.shape, dtype=np.int8) * 8
             dtype = ms.float16
