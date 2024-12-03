@@ -53,7 +53,8 @@ def get_args():
 
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
-                        help="A list of model layers not to convert, set blacklist when use PTQ algo.")
+                        help="A list of model layers not to convert, set blacklist when use PTQ algo. "
+                             "For example: -b w2 lm_head.")
     parser.add_argument('--debug_mode', '-e', type=bool, default=False, help="Enable debug info, default: False, "
                                                                              "Available: True, False")
 
@@ -234,4 +235,4 @@ if __name__ == "__main__":
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-    print(f'Checkpoint saved to {save_path}...', flush=True)
+    print(f'Checkpoint saved to {save_ckpt_path}', flush=True)

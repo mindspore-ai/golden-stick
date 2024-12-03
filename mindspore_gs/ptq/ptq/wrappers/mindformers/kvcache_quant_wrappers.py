@@ -33,7 +33,7 @@ from mindspore_gs.ptq.convert_utils import QuantCellV2, AntiQuantCell
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, cal_quantization_params, convert_fp32_to_int64
+from mindspore_gs.ptq.basic_quant_func import get_quant_min_max, cal_quantization_params, convert_fp32_to_int64
 
 
 class DeviceType(Enum):

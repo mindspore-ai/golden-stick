@@ -28,7 +28,7 @@ from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.common import logger
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data, convert_fp32_to_int64
+from mindspore_gs.ptq.basic_quant_func import get_quant_min_max, quant_tensor_data, convert_fp32_to_int64
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy

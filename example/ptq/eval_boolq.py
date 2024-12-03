@@ -59,10 +59,12 @@ def evaluate(net, dataset_path, network_helper, n_samples):
         question = tokenizer.decode(input_ids, skip_special_tokens=True)
         pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
-        print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}", flush=True)
 
-        if labels_str in pres_str:
+        if labels_str[0].lower() in pres_str[0].lower():
             correct += 1
+            print(f"question: {question}\n predict: {pres_str} answer: {labels_str}. correct!", flush=True)
+        else:
+            print(f"question: {question}\n predict: {pres_str} answer: {labels_str}. not correct!", flush=True)
         if data_count % 100 == 0:
             print(f"acc: {correct / data_count}", flush=True)
     print(f"total acc: {correct / data_count}", flush=True)

@@ -15,6 +15,7 @@
 """test slb qat on lenet network and mnist dataset."""
 
 import os
+import time
 from collections import OrderedDict
 import pytest
 import numpy as np
@@ -113,6 +114,8 @@ def test_lenet_convert(run_mode, enable_act_quant):
     data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
     file_name = "./lenet_convert_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
+    time.sleep(5)
+    assert os.path.exists(file_name)
     graph = mindspore.load(file_name)
     mindspore.nn.GraphCell(graph)
 

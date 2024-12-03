@@ -23,7 +23,7 @@ from mindspore.common.api import _pynative_executor
 from mindformers.modules.layers import Linear
 
 from mindspore_gs.common.gs_enum import BackendTarget
-from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_tensor_data
+from mindspore_gs.ptq.basic_quant_func import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.ptq.quant_cell import PTQCell
