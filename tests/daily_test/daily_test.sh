@@ -23,8 +23,8 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_llama2_13b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MF_PKG_LINK="https://repo.mindspore.cn/mindspore/mindformers/version/202411/20241106/dev_20241106220046_3bf27eb9fe9c95cb364ddee91152d0723b3e29ca_newest/any/mindformers-1.3.0-py3-none-any.whl"
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202411/20241126/master_20241126101834_a95514d8ad1bfa5c2cfb72a7142df7d19a638dbd_newest/unified/aarch64/mindspore-2.4.0-cp310-cp310-linux_aarch64.whl"
+MF_PKG_LINK="https://repo.mindspore.cn/mindspore/mindformers/version/202412/20241209/dev_20241209160025_58d99caa026f6b42d7d8aa0f54dff326aaba44cb_newest/any/mindformers-1.3.0-py3-none-any.whl"
+MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202412/20241207/master_20241207160027_89a61db663c299dd266de3f2a821b060d485dac4_newest/unified/aarch64/mindspore-2.5.0-cp310-cp310-linux_aarch64.whl"
 ds_type="boolq"
 dataset="${BASEPATH}/ws/gs/tests/data/boolq-dataset/dev.jsonl"
 eval_script="eval_boolq.py"
@@ -117,12 +117,40 @@ quant()
   cd ..
 }
 
+quant_awq()
+{
+  echo "enter test workspace."
+  cd ws || exit 1
+  echo "${1}"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -o awq -wg per_group -g 128 -b lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
+  sleep ${sleep_time}
+  pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
+  echo "waiting pid ${pid}"
+  tail --pid ${pid} -f "${2}_quant_log/worker_0.log"
+  sleep ${sleep_time}
+  cd ..
+}
+
 prepare_env
 ############################ fp16 ############################
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "float16"
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "float16"
 # fp16 acc
 eval "eval fp16 llama2-13b" "fp16" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
+
+############################ fp16->a8w8 ############################
+# quant ckpt a8w8
+quant "quant llama2-13b-fp16 to a8w8" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "none" "smooth"
+# a8w8 acc
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "\.\/output\/llama2_13b_ptq_smooth_a8w8_ckpt\/"
+eval "eval a8w8 llama2-13b-fp16" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+############################ fp16->a16w8 ############################
+# quant ckpt a16w8
+quant "quant llama2-13b-fp16 to a16w8" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
+# a16w8 acc
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "none" "\.\/output\/llama2_13b_ptq_smooth_a16w8_ckpt\/"
+eval "eval a16w8 llama2-13b-fp16" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->a8w8c8 ############################
 # quant ckpt a8w8c8
@@ -137,6 +165,13 @@ quant "quant llama2-13b-fp16 to a16w8c8" "fp16-a16w8c8" "${BASEPATH}/ws/predict_
 # a8w8c8 acc
 sed_qconfig "${BASEPATH}/ws/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "int8" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8c8_ckpt\/"
 eval "eval a16w8c8 llama2-13b-fp16" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+############################ fp16->awq-a16w4 ############################
+# quant ckpt awq
+quant_awq "quant llama2-13b-fp16 to awq" "fp16-awq" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
+# awq acc
+sed_qconfig "${BASEPATH}/ws/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "awq" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/"
+eval "eval awq llama2-13b-fp16" "fp16-awq" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 
 ############################ bf16 ############################
@@ -161,10 +196,16 @@ eval "eval a16w8 llama2-13b-bf16" "bf16-a16w8" "${BASEPATH}/ws/predict_llama2_13
 
 echo "fp16 llama2-13b ${ds_type} result:"
 tail -n 3 ${BASEPATH}/ws/fp16_eval_log/worker_0.log
+echo "a8w8 llama2-13b-fp16 ${ds_type} result:"
+tail -n 3 ${BASEPATH}/ws/fp16-a8w8_eval_log/worker_0.log
+echo "a16w8 llama2-13b-fp16 ${ds_type} result:"
+tail -n 3 ${BASEPATH}/ws/fp16-a16w8_eval_log/worker_0.log
 echo "a8w8c8 llama2-13b-fp16 ${ds_type} result:"
 tail -n 3 ${BASEPATH}/ws/fp16-a8w8c8_eval_log/worker_0.log
 echo "a16w8c8 llama2-13b-fp16 ${ds_type} result:"
 tail -n 3 ${BASEPATH}/ws/fp16-a16w8c8_eval_log/worker_0.log
+echo "a16w4-awq llama2-13b-fp16 ${ds_type} result:"
+tail -n 3 ${BASEPATH}/ws/fp16-awq_eval_log/worker_0.log
 
 echo "bf16 llama2-13b ${ds_type} result:"
 tail -n 3 ${BASEPATH}/ws/bf16_eval_log/worker_0.log

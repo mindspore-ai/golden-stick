@@ -76,6 +76,7 @@ context:
   device_id: 0
   ascend_config:
     precision_mode: "must_keep_origin_dtype"
+  jit_config: {"jit_level": "O0", "infer_boost": "on"}
 
 # model config
 model:
@@ -101,7 +102,7 @@ model:
     param_init_type: "float16"
     use_past: True
     extend_method: "None" # support "None", "PI", "NTK"
-    use_flash_attention: False
+    use_flash_attention: True
     block_size: 16
     num_blocks: 512
     is_dynamic: True

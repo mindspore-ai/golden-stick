@@ -65,7 +65,7 @@ def add_rmsnorm_quant_fusion_test(approach):
     seq_len = 100
     input_ = "Hello"
     input_ids = tokenizer(input_)['input_ids']
-    network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+    network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3, max_new_tokens=1)
     res_ok = False
     all_files = os.listdir(save_graphs_path)
     for ir_file in all_files:

@@ -137,7 +137,6 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         else:
             self.group_scale = msops.cat(self.group_scale)
             self.group_zero = msops.cat(self.group_zero)
-        logger.info(f'error: {msops.sum(losses).item()}')
 
     def _apply_gptq(self, w, scale, zero):
         """apply gptq"""

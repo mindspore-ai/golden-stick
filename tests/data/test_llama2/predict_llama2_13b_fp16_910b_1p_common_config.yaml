@@ -128,6 +128,7 @@ context:
   save_graphs_path: "./graph"
   device_id: 0
   runtime_num_threads: 1
+  jit_config: {"jit_level": "O0", "infer_boost": "on"}
 
 # model config
 model:
