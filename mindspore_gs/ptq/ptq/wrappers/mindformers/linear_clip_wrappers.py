@@ -44,8 +44,8 @@ class ClipLinearCell(WrapperLinearCell):
         LinearClipper.reg_layer_map(ColumnParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(RowParallelLinear, ClipLinearCell, AutoClipChecker())
 
-    def __init__(self, linear_name, linear, cfg, network_helper):
-        super().__init__(linear_name, linear, cfg, network_helper)
+    def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
         self.is_rowparallel = isinstance(self.layer, RowParallelLinear)
         self.is_colparallel = isinstance(self.layer, ColumnParallelLinear)
         self.is_linear = isinstance(self.layer, Linear)

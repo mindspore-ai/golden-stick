@@ -60,7 +60,7 @@ class LinearSmoother(Algorithm):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
         """infer_and_cache"""
         class Replacer(Processor):
             """Replacer"""
@@ -99,9 +99,12 @@ class LinearAWQSmoother(LinearSmoother):
     """LinearAWQSmoother"""
 
     # pylint: disable=arguments-differ
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None,
-                args=None, kwargs=None):
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
         """infer_and_cache"""
+
+        layer_args = kwargs.get("layer_args", None)
+        layer_kwargs = kwargs.get("layer_kwargs", None)
+
         class Replacer(Processor):
             """Replacer"""
             def __init__(self, inner_config):
@@ -119,7 +122,8 @@ class LinearAWQSmoother(LinearSmoother):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
                 wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper,
-                                                 decoder_layer=decoder_layer, args=args, kwargs=kwargs)
+                                                 decoder_layer=decoder_layer, layer_args=layer_args,
+                                                 layer_kwargs=layer_kwargs)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 nonlocal changed
                 changed = True

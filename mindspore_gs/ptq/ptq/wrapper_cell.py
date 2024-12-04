@@ -28,7 +28,9 @@ class Checker:
 
 class WrapperCell(abc.ABC, Cell):
     """WrapperCell"""
-    def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper):
+
+    # pylint: disable=W0613
+    def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper, **kwargs):
         super().__init__()
         self.cfg = cfg
         self._layer_name = layer_name
