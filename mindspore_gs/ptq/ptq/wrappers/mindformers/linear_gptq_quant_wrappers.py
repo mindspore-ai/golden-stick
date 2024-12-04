@@ -23,7 +23,7 @@ from mindspore.ops import sub as aclnn_sub, add as aclnn_add
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PrecisionRecovery
+from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.basic_quant_func import quant_tensor, quant_tensor_data, get_quant_min_max
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.cholesky_trans import cholesky_compute
@@ -74,8 +74,10 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         if self.cfg.algo_args["static_group"]:
             for i in range(0, self.ic, self.cfg.group_size):
                 scale, zero, _ = quant_tensor(self.layer.weight[:, i : i + self.cfg.group_size], self.w_quant_min,
-                                              self.w_quant_max, self.cfg.weight_quant_dtype, self.weight_quantizer_axis,
-                                              False, 4)
+                                              self.w_quant_max, self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
+                                              self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
+                                              self.cfg.group_size, self.cfg.weight_quant_dtype,
+                                              self.weight_quantizer_axis, False)
                 self.group_scale.append(Tensor(scale, self.layer.weight.dtype).T)
                 self.group_zero.append(Tensor(zero, self.layer.weight.dtype).T)
         group_size = self.cfg.group_size
@@ -100,7 +102,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                         scale, zero, _ = quant_tensor(w[:, (i1 + i):(i1 + i + group_size)], self.w_quant_min,
                                                       self.w_quant_max, self.cfg.weight_narrow_range,
                                                       self.cfg.weight_symmetric, self.cfg.weight_quant_dtype,
-                                                      self.weight_quantizer_axis, False, 4)
+                                                      self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
+                                                      self.cfg.group_size, self.weight_quantizer_axis,
+                                                      self.cfg.weight_quant_dtype, False)
                         scale = Tensor(scale, w0.dtype)
                         zero = Tensor(zero, w0.dtype)
                     if ((i1 + i) // group_size) - now_idx == -1:
@@ -157,9 +161,11 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
     def quant(self):
         """quant"""
         # quant weight
-        scale, zp, _ = quant_tensor(self.layer.weight, self.w_quant_min, self.w_quant_max, self.cfg.weight_narrow_range,
-                                    self.cfg.weight_symmetric, self.cfg.weight_quant_dtype, self.weight_quantizer_axis,
-                                    False, 4)
+        scale, zp, _ = quant_tensor(self.layer.weight, self.w_quant_min, self.w_quant_max,
+                                    self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
+                                    self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
+                                    self.cfg.group_size, self.cfg.weight_quant_dtype,
+                                    self.weight_quantizer_axis, False)
         self._apply_gptq(self.layer.weight, Tensor(scale, dtype=self.layer.weight.dtype),
                          Tensor(zp, dtype=self.layer.weight.dtype))
         weight = quant_tensor_data(self.layer.weight, self.group_scale, self.group_zero, self.weight_quant_min,

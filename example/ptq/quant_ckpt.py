@@ -23,13 +23,45 @@ from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
 from mindformers import MindFormerConfig
 from mindspore_gs.ptq.ptq_config import (PTQMode, PTQConfig, OutliersSuppressionType,
-                                         PrecisionRecovery, GPTQQuantConfig, QuantGranularity)
+                                         PrecisionRecovery, GPTQQuantConfig, QuantGranularity,
+                                         AWQConfig)
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+
+
+def dtype_formatter(name: str):
+    """dtype_formatter"""
+    if name == 'int8':
+        return msdtype.int8
+    if name == 'int4':
+        return msdtype.qint4x2
+    return None
+
+
+def outlier_formatter(name: str):
+    """outlier_formatter"""
+    if name == 'smooth':
+        return OutliersSuppressionType.SMOOTH
+    if name == 'awq':
+        return OutliersSuppressionType.AWQ
+    return OutliersSuppressionType.NONE
+
+
+def granularity_formatter(name: str):
+    """granularity_formatter"""
+    if name == 'per_tensor':
+        return QuantGranularity.PER_TENSOR
+    if name == 'per_channel':
+        return QuantGranularity.PER_CHANNEL
+    if name == 'per_token':
+        return QuantGranularity.PER_TOKEN
+    if name == 'per_group':
+        return QuantGranularity.PER_GROUP
+    return None
 
 
 def get_args():
@@ -47,10 +79,16 @@ def get_args():
                         help="Available: 'int8', 'int4', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
+
     parser.add_argument('--act_quant_granularity', '-ag', type=str, default='per-tensor',
                         help="Available: 'per-token', 'per-tensor'")
     parser.add_argument('--precision_recovery', '-p', type=str, default='none', help="Available: gptq")
 
+    parser.add_argument('--weight_quant_granularity', '-wg', type=str, default="per_channel",
+                        help="Available: per_channel/per_group")
+    parser.add_argument('--kvcache_quant_granularity', '-kvg', type=str, default="per_channel",
+                        help="Available: per_channel/per_token")
+    parser.add_argument('--group_size', '-g', type=int, default=0, help="Available: 64/128")
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo. "
@@ -69,6 +107,10 @@ def get_args():
         args.kvcache_quant_dtype = None
         args.outliers_suppression = OutliersSuppressionType.NONE
         args.precision_recovery = PrecisionRecovery.NONE
+        args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
+        args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
+        args.act_quant_granularity = QuantGranularity.PER_TENSOR
+        args.group_size = 0
         args.opname_blacklist = ['lm_head']
     elif args.approach == 'rtn-c8':
         logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
@@ -78,6 +120,10 @@ def get_args():
         args.kvcache_quant_dtype = msdtype.int8
         args.outliers_suppression = OutliersSuppressionType.NONE
         args.precision_recovery = PrecisionRecovery.NONE
+        args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
+        args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
+        args.act_quant_granularity = QuantGranularity.PER_TENSOR
+        args.group_size = 0
         args.opname_blacklist = []
     elif args.approach == 'smooth_quant':
         logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
@@ -87,22 +133,28 @@ def get_args():
         args.kvcache_quant_dtype = None
         args.outliers_suppression = OutliersSuppressionType.SMOOTH
         args.precision_recovery = PrecisionRecovery.NONE
+        args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
+        args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
+        args.act_quant_granularity = QuantGranularity.PER_TENSOR
+        args.group_size = 0
         args.opname_blacklist = ['lm_head', 'w2']
     elif args.approach == 'ptq':
-        def dtype_formatter(name: str):
-            if name == 'int8':
-                return msdtype.int8
-            if name == 'int4':
-                return msdtype.qint4x2
-            return None
         args.weight_quant_dtype = dtype_formatter(args.weight_quant_dtype)
         args.act_quant_dtype = dtype_formatter(args.act_quant_dtype)
         args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
-        args.outliers_suppression = OutliersSuppressionType.SMOOTH if args.outliers_suppression == 'smooth' \
-            else OutliersSuppressionType.NONE
+        args.outliers_suppression = outlier_formatter(args.outliers_suppression)
+        args.weight_quant_granularity = granularity_formatter(args.weight_quant_granularity)
+        args.kvcache_quant_granularity = granularity_formatter(args.kvcache_quant_granularity)
+        args.act_quant_granularity = granularity_formatter(args.act_quant_granularity)
+        if args.weight_quant_granularity is None:
+            args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
+        if args.kvcache_quant_granularity is None:
+            args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
+        if args.act_quant_granularity is None:
+            args.act_quant_granularity = QuantGranularity.PER_TENSOR
+        args.opname_blacklist = args.opname_blacklist if args.opname_blacklist else []
         args.precision_recovery = PrecisionRecovery.GPTQ if args.precision_recovery == 'gptq' \
             else PrecisionRecovery.NONE
-        args.opname_blacklist = args.opname_blacklist if args.opname_blacklist else []
     else:
         raise ValueError(f"Unsupported approach: {args.approach}")
 
@@ -117,11 +169,16 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     algorithm_config = {}
     if uargs_.precision_recovery == PrecisionRecovery.GPTQ:
         algorithm_config = GPTQQuantConfig()
+    if uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
+        algorithm_config = AWQConfig()
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=uargs_.weight_quant_dtype,
                     act_quant_dtype=uargs_.act_quant_dtype, kvcache_quant_dtype=uargs_.kvcache_quant_dtype,
                     outliers_suppression=uargs_.outliers_suppression, opname_blacklist=uargs_.opname_blacklist,
                     precision_recovery=uargs_.precision_recovery, algo_args=algorithm_config,
-                    act_quant_granularity=uargs_.act_quant_granularity)
+                    act_quant_granularity=uargs_.act_quant_granularity,
+                    weight_quant_granularity=uargs_.weight_quant_granularity,
+                    kvcache_quant_granularity=uargs_.kvcache_quant_granularity,
+                    group_size=uargs_.group_size)
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
         ptq = RTN(config=cfg)
@@ -134,6 +191,9 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     elif approach == 'ptq':
         logger.info("Use ptq algo to quant network and weight.")
         ptq = PTQ(config=cfg)
+        if uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
+            # pylint: disable=protected-access
+            ptq._config.weight_symmetric = False
     else:
         raise ValueError(f"uargs.approach = {uargs_.approach} is unexpected, Available: w8a16, w8a8, c8, ptq.")
     logger.info(f'Create quantizer cost time is {time.time() - start_time} s.')
@@ -182,6 +242,8 @@ def ckpt_name(model_name_, uargs_):
     name = f"{model_name_}_ptq"
     if uargs_.outliers_suppression == OutliersSuppressionType.SMOOTH:
         name += "_smooth"
+    elif uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
+        name += "_awq"
     else:
         name += "_no_smooth"
     if uargs_.act_quant_dtype == msdtype.int8:
@@ -193,6 +255,8 @@ def ckpt_name(model_name_, uargs_):
         name += "_a16"
     if uargs_.weight_quant_dtype == msdtype.int8:
         name += "w8"
+    elif uargs_.weight_quant_dtype == msdtype.qint4x2:
+        name += "w4"
     else:
         name += "w16"
     if uargs_.kvcache_quant_dtype == msdtype.int8:

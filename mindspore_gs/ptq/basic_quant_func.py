@@ -21,6 +21,12 @@ from mindspore import Tensor
 from mindspore import dtype as msdtype
 
 
+QUANT_DTYPE_NUM_BITS = {
+    msdtype.int8: 8,
+    msdtype.qint4x2: 4
+}
+
+
 def np_int4data_pack_to_int8(np_data):
     np_data = np_data.astype(np.int8)
     np_data &= 0x000F
@@ -76,13 +82,19 @@ def cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetri
     return scale, zp
 
 
-def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, quant_dtype=msdtype.int8, quant_axis=-1,
-                 if_quant_data: bool = True, bits=8):
+def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_group, group_size,
+                 quant_dtype=msdtype.int8, quant_axis=-1, if_quant_data: bool = True, if_pesudo_quant: bool = False):
     """quant_tensor"""
-    if quant_dtype not in (msdtype.int8, msdtype.qint4x2):
-        raise ValueError(f"Only support quant to int8 and int 4, but got {quant_dtype}")
-    num_bits = bits
+    if quant_dtype not in QUANT_DTYPE_NUM_BITS.keys():
+        raise ValueError(f"Only support quant to {QUANT_DTYPE_NUM_BITS.keys()}, but got {quant_dtype}")
+    num_bits = QUANT_DTYPE_NUM_BITS[quant_dtype]
+
     signed = True
+
+    org_shape = tensor.shape
+    if need_group and group_size > 0:
+        tensor = tensor.reshape(-1, group_size)
+
     if quant_axis == -1:
         float_max = max_op(tensor)[0].reshape(-1)
         float_min = min_op(tensor)[0].reshape(-1)
@@ -96,11 +108,21 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, quant_
     quant_min, quant_max = get_quant_min_max(num_bits=num_bits, signed=signed, narrow_range=narrow_range)
     scale, zp = cal_quantization_params(float_min.asnumpy(), float_max.asnumpy(), quant_min, quant_max,
                                         symmetric=symmetric)
+
     if if_quant_data:
         qtensor = quant_tensor_data(tensor, scale.squeeze(), zp.squeeze(), quant_min, quant_max, quant_axis,
-                                    quant_dtype)
+                                    msdtype.int8)
+        if if_pesudo_quant:
+            t_scale = Tensor(scale, tensor.dtype)
+            t_zp = Tensor(zp, tensor.dtype)
+            qtensor = (qtensor - t_zp) * t_scale
+        qtensor = qtensor.reshape(org_shape)
     else:
         qtensor = None
+
+    if need_group and quant_axis != -1:
+        scale = scale.reshape(org_shape[quant_axis], -1).T
+        zp = zp.reshape(org_shape[quant_axis], -1).T
     return scale, zp, qtensor
 
 

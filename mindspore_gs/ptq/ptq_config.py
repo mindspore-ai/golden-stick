@@ -37,8 +37,8 @@ class PTQApproach(Enum):
     SMOOTH_QUANT = 'smooth_quant'
     RTN = 'rtn'
     GPTQ = 'gptq'
-    OMNI_QUANT = 'omni_quant'
     PTQ = 'ptq'
+    AWQ = 'awq'
 
 
 class PTQMode(Enum):
@@ -57,9 +57,11 @@ class OutliersSuppressionType(Enum):
     Outliers suppression type for ptq quantizer.
 
     - ``SMOOTH``: apply smooth scale between weight and activate.
+    - ``AWQ``: apply awq algo to search best smooth_scale and clip parameter.
     - ``NONE``: not doing any outliers suppression.
     """
     SMOOTH = 'smooth'
+    AWQ = 'awq'
     NONE = 'none'
 
 
@@ -82,29 +84,6 @@ class PrecisionRecovery(Enum):
     """
     GPTQ = 'gptq'
     NONE = 'none'
-
-
-@algo_cfg_register.register(PTQApproach.OMNI_QUANT)
-@dataclass
-class OmniQuantConfig:
-    """config for omni quant algorithm"""
-    pre_clip_ratio: Union[list, float] = 1.0
-    post_clip_ratio: Union[list, float] = 1.0
-    smooth_alpha: Union[list, float] = 0.5
-    is_revert_by_loss: bool = False
-
-    def __post_init__(self):
-        value_check('pre_clip_ratio', self.pre_clip_ratio, Union[list, float])
-        value_check('post_clip_ratio', self.post_clip_ratio, Union[list, float])
-        value_check('smooth_alpha', self.smooth_alpha, Union[list, float])
-        value_check('is_revert_by_loss', self.is_revert_by_loss, bool)
-        if (not isinstance(self.pre_clip_ratio, type(self.post_clip_ratio))) or \
-            (not isinstance(self.pre_clip_ratio, type(self.smooth_alpha))) or \
-            (not isinstance(self.post_clip_ratio, type(self.smooth_alpha))):
-            raise ValueError(f"pre_clip_ratio, post_clip_ratio and smooth_alpha should have same type,"
-                             f"but got pre_clip_ratio: {type(self.pre_clip_ratio)},"
-                             f"post_clip_ratio: {type(self.post_clip_ratio)},"
-                             f"smooth_alpha: {type(self.smooth_alpha)}.")
 
 
 @algo_cfg_register.register(PTQApproach.GPTQ)
@@ -136,6 +115,42 @@ class SmoothQuantConfig:
 
     def __post_init__(self):
         value_check('alpha', self.alpha, float)
+
+
+@algo_cfg_register.register(PTQApproach.AWQ)
+@dataclass
+class AWQConfig:
+    """
+    config for awq quant algorithm
+
+    - `duo_scaling`: use activation and weight to compute scale.
+    - `smooth_alpha`: the hyper-parameter of smooth search.
+    - `weight_clip_ratio`: the hyper-parameter of clip search.
+    """
+    duo_scaling: bool = True
+    smooth_alpha: Union[list, float] = field(default_factory=lambda: [i/20 for i in range(20)])
+    weight_clip_ratio: Union[list, float] = field(default_factory=lambda: [1- i/20 for i in range(10)])
+
+    def __post_init__(self):
+        value_check('duo_scaling', self.duo_scaling, bool)
+        if not isinstance(self.smooth_alpha, (float, list)):
+            raise TypeError("AWQConfig smooth_alpha only support float or list, "
+                            f"but got {type(self.smooth_alpha)}")
+        if not isinstance(self.weight_clip_ratio, (float, list)):
+            raise TypeError("AWQConfig weight_clip_ratio only support float or list, "
+                            f"but got {type(self.weight_clip_ratio)}")
+        if isinstance(self.smooth_alpha, float) and (self.smooth_alpha < 0 or self.smooth_alpha > 1):
+            raise ValueError("AWQConfig smooth_alpha should >=0 and <=1, "
+                             f"but got {self.smooth_alpha}.")
+        if isinstance(self.weight_clip_ratio, float) and (self.weight_clip_ratio < 0 or self.weight_clip_ratio > 1):
+            raise ValueError("AWQConfig weight_clip_ratio should >=0 and <=1, "
+                             f"but got {self.weight_clip_ratio}.")
+        if isinstance(self.smooth_alpha, list) and any(alpha < 0 or alpha > 1 for alpha in self.smooth_alpha):
+            raise ValueError("AWQConfig smooth_alpha should >=0 and <=1, "
+                             f"but got {self.smooth_alpha}.")
+        if isinstance(self.weight_clip_ratio, list) and any(alpha < 0 or alpha > 1 for alpha in self.weight_clip_ratio):
+            raise ValueError("AWQConfig weight_clip_ratio should >=0 and <=1, "
+                             f"but got {self.weight_clip_ratio}.")
 
 
 class QuantGranularity(Enum):

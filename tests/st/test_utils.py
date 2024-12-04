@@ -187,7 +187,7 @@ def get_available_port(start=10000, end=11000):
                 return False
 
     for port in range(start, end):
-        if is_port_available(port):
+        if not is_port_available(port):
             return port
     return start
 

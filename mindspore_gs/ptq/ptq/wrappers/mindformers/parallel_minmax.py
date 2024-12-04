@@ -43,29 +43,36 @@ class MaxFromTensorParallelRegion(nn.Cell):
         return output, _
 
 
+class SumFromTensorParallelRegion(nn.Cell):
+    "Get sum from tensor-parallel region"
+    def __init__(self):
+        super().__init__()
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.SUM, group=get_tensor_model_parallel_group())
+
+    def construct(self, input_, axis=None, keepdims=False, *, dtype=None):
+        output_parallel = msops.sum(input_, axis, keepdims, dtype=dtype)
+        output = self.all_reduce(output_parallel)
+        return output
+
+
 def get_smooth_x_obs_min_max_op():
     return msops.max, msops.min
 
 
-def get_smooth_w_obs_min_max_op(tensor_parallel, is_colparallel):
-    """get_smooth_w_obs_min_max_op"""
+def get_min_max_op(tensor_parallel, is_split):
+    """get_min_max_op"""
     need_comm = tensor_parallel is not None and tensor_parallel > 1
-    if need_comm and is_colparallel:
-        w_obs_max = MaxFromTensorParallelRegion()
-        w_obs_min = MinFromTensorParallelRegion()
-    else:
-        w_obs_max = msops.max
-        w_obs_min = msops.min
-    return w_obs_max, w_obs_min
-
-
-def get_quant_min_max_op(tensor_parallel, is_rowparallel):
-    """get_quant_min_max_op"""
-    need_comm = tensor_parallel is not None and tensor_parallel > 1
-    if need_comm and is_rowparallel:
+    if need_comm and is_split:
         quant_max = MaxFromTensorParallelRegion()
         quant_min = MinFromTensorParallelRegion()
     else:
         quant_max = msops.max
         quant_min = msops.min
     return quant_max, quant_min
+
+
+def get_w_sum_op(tensor_parallel, is_split):
+    need_comm = tensor_parallel is not None and tensor_parallel > 1
+    if need_comm and is_split:
+        return SumFromTensorParallelRegion()
+    return msops.sum

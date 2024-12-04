@@ -27,7 +27,7 @@ from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
-from .parallel_minmax import get_quant_min_max_op
+from .parallel_minmax import get_min_max_op
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
 
@@ -50,7 +50,7 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         super().__init__(linear_name, linear, cfg, network_helper)
 
         is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
-        self.x_quant_max, self.x_quant_min = get_quant_min_max_op(cfg.tp_size, is_rowparallel)
+        self.x_quant_max, self.x_quant_min = get_min_max_op(cfg.tp_size, is_rowparallel)
 
         self.x_scale = Parameter(initializer('ones', (1,), dtype=dtype.float64))
         self.x_zp = Parameter(initializer('zeros', (1,), dtype=dtype.float64))
@@ -62,6 +62,8 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         # quant activation
         x_scale, x_zp, _ = quant_tensor(self.cat_samples, self.x_quant_min, self.x_quant_max,
                                         self.cfg.act_narrow_range, self.cfg.act_symmetric,
+                                        self.cfg.act_quant_granularity == QuantGranularity.PER_GROUP,
+                                        self.cfg.group_size,
                                         self.cfg.act_quant_dtype, -1, False)
         self.x_scale.set_data(Tensor(x_scale, dtype=dtype.float64))
         self.x_zp.set_data(Tensor(x_zp, dtype=dtype.float64))
