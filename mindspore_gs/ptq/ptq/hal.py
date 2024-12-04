@@ -485,7 +485,7 @@ class AllQuantMatmul(QuantUnitCell):
                                                   dtype=scale_dtype))
             logger.debug(f"AllQuantMatmul: dequant_scale of Layer({layer_name}) is "
                          f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}, {self.dequant_scale.asnumpy()}}}")
-        # FIXME set dtype to dst_dtype when qbmm support bfp16 output
+
         self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=self.dst_dtype)
         if w_qparam.zero_point is None:
             self.offset = None
@@ -607,6 +607,8 @@ class AllQuantMatmul(QuantUnitCell):
     def _compute_dequant_scale(input_scale, weight_scale, dst_dtype):
         """compute_dequant_scale"""
         dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
+        # when dst_dtype is dtype.bfloat16, qbmm ops use asd ops, scale need be fp32
+        # scale need be int64 when qbmm use internal ops
         if dst_dtype == dtype.bfloat16:
             return dequant_scale
         scale_i64 = NumpyQuantOps.trans_fp32_to_i64(dequant_scale)
