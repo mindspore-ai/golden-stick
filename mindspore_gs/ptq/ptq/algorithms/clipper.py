@@ -60,7 +60,7 @@ class LinearClipper(Algorithm):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
         class Replacer(Processor):
             """Replacer"""
             def __init__(self, inner_config):

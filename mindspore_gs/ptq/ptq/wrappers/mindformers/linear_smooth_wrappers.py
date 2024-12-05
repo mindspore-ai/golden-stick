@@ -50,8 +50,8 @@ class SmoothLinearCell(WrapperLinearCell):
         LinearSmoother.reg_layer_map(ColumnParallelLinear, SmoothLinearCell, SmoothChecker())
         LinearSmoother.reg_layer_map(RowParallelLinear, SmoothLinearCell, SmoothChecker())
 
-    def __init__(self, linear_name, linear, cfg, network_helper):
-        super().__init__(linear_name, linear, cfg, network_helper)
+    def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
         self.is_rowparallel = isinstance(self.layer, RowParallelLinear)
         self.is_colparallel = isinstance(self.layer, ColumnParallelLinear)
         self.is_linear = isinstance(self.layer, Linear)
@@ -171,8 +171,8 @@ class AWQSmoothLinearCell(SmoothLinearCell):
         LinearAWQSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAWQSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
 
-    def __init__(self, linear_name, linear, cfg, network_helper, decoder_layer, args, kwargs):
-        super().__init__(linear_name, linear, cfg, network_helper)
+    def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
 
         if cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
             self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, False)
@@ -187,10 +187,10 @@ class AWQSmoothLinearCell(SmoothLinearCell):
         self.oc = linear.weight.shape[self.oc_axis]
         self.fp16_weight = copy.deepcopy(self._layer.weight)
 
-        self.decoder = decoder_layer
+        self.decoder = kwargs["decoder_layer"]
         self.forward_module = None
-        self.args = args
-        self.kwargs = kwargs
+        self.args = kwargs["layer_args"]
+        self.kwargs = kwargs["layer_kwargs"]
 
         self.w_mean = None
         self.x_mean = None

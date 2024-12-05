@@ -42,15 +42,6 @@ def dtype_formatter(name: str):
     return None
 
 
-def outlier_formatter(name: str):
-    """outlier_formatter"""
-    if name == 'smooth':
-        return OutliersSuppressionType.SMOOTH
-    if name == 'awq':
-        return OutliersSuppressionType.AWQ
-    return OutliersSuppressionType.NONE
-
-
 def granularity_formatter(name: str):
     """granularity_formatter"""
     if name == 'per_tensor':
@@ -75,15 +66,14 @@ def get_args():
 
     parser.add_argument('--weight_quant_dtype', '-w', type=str, default='none',
                         help="Available: 'int8', 'int4', 'none'")
-    parser.add_argument('--act_quant_dtype', '-a', type=str, default='none',
-                        help="Available: 'int8', 'int4', 'none'")
+    parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'int4', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
-    parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
 
-    parser.add_argument('--act_quant_granularity', '-ag', type=str, default='per-tensor',
-                        help="Available: 'per-token', 'per-tensor'")
+    parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
     parser.add_argument('--precision_recovery', '-p', type=str, default='none', help="Available: gptq")
 
+    parser.add_argument('--act_quant_granularity', '-ag', type=str, default='per_tensor',
+                        help="Available: 'per_token', 'per_tensor'")
     parser.add_argument('--weight_quant_granularity', '-wg', type=str, default="per_channel",
                         help="Available: per_channel/per_group")
     parser.add_argument('--kvcache_quant_granularity', '-kvg', type=str, default="per_channel",
@@ -97,7 +87,11 @@ def get_args():
                                                                              "Available: True, False")
 
     args = parser.parse_args()
-    args.act_quant_granularity = QuantGranularity.quant_granularity_formatter(args.act_quant_granularity)
+    args.act_quant_granularity = QuantGranularity.from_str(args.act_quant_granularity)
+    args.weight_quant_granularity = QuantGranularity.from_str(args.weight_quant_granularity)
+    args.kvcache_quant_granularity = QuantGranularity.from_str(args.kvcache_quant_granularity)
+    args.outliers_suppression = OutliersSuppressionType.from_str(args.outliers_suppression)
+    args.precision_recovery = PrecisionRecovery.from_str(args.precision_recovery)
 
     if args.approach == 'rtn-a16w8':
         logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
@@ -105,11 +99,6 @@ def get_args():
         args.weight_quant_dtype = msdtype.int8
         args.act_quant_dtype = None
         args.kvcache_quant_dtype = None
-        args.outliers_suppression = OutliersSuppressionType.NONE
-        args.precision_recovery = PrecisionRecovery.NONE
-        args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
-        args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
-        args.act_quant_granularity = QuantGranularity.PER_TENSOR
         args.group_size = 0
         args.opname_blacklist = ['lm_head']
     elif args.approach == 'rtn-c8':
@@ -118,11 +107,6 @@ def get_args():
         args.weight_quant_dtype = None
         args.act_quant_dtype = None
         args.kvcache_quant_dtype = msdtype.int8
-        args.outliers_suppression = OutliersSuppressionType.NONE
-        args.precision_recovery = PrecisionRecovery.NONE
-        args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
-        args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
-        args.act_quant_granularity = QuantGranularity.PER_TENSOR
         args.group_size = 0
         args.opname_blacklist = []
     elif args.approach == 'smooth_quant':
@@ -131,30 +115,13 @@ def get_args():
         args.weight_quant_dtype = msdtype.int8
         args.act_quant_dtype = msdtype.int8
         args.kvcache_quant_dtype = None
-        args.outliers_suppression = OutliersSuppressionType.SMOOTH
-        args.precision_recovery = PrecisionRecovery.NONE
-        args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
-        args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
-        args.act_quant_granularity = QuantGranularity.PER_TENSOR
         args.group_size = 0
         args.opname_blacklist = ['lm_head', 'w2']
     elif args.approach == 'ptq':
         args.weight_quant_dtype = dtype_formatter(args.weight_quant_dtype)
         args.act_quant_dtype = dtype_formatter(args.act_quant_dtype)
         args.kvcache_quant_dtype = dtype_formatter(args.kvcache_quant_dtype)
-        args.outliers_suppression = outlier_formatter(args.outliers_suppression)
-        args.weight_quant_granularity = granularity_formatter(args.weight_quant_granularity)
-        args.kvcache_quant_granularity = granularity_formatter(args.kvcache_quant_granularity)
-        args.act_quant_granularity = granularity_formatter(args.act_quant_granularity)
-        if args.weight_quant_granularity is None:
-            args.weight_quant_granularity = QuantGranularity.PER_CHANNEL
-        if args.kvcache_quant_granularity is None:
-            args.kvcache_quant_granularity = QuantGranularity.PER_CHANNEL
-        if args.act_quant_granularity is None:
-            args.act_quant_granularity = QuantGranularity.PER_TENSOR
         args.opname_blacklist = args.opname_blacklist if args.opname_blacklist else []
-        args.precision_recovery = PrecisionRecovery.GPTQ if args.precision_recovery == 'gptq' \
-            else PrecisionRecovery.NONE
     else:
         raise ValueError(f"Unsupported approach: {args.approach}")
 

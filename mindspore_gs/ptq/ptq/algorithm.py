@@ -45,7 +45,7 @@ class Algorithm:
         """load_mindformers_plugin"""
         raise NotImplementedError
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None):
+    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
         """replace"""
         raise NotImplementedError
 

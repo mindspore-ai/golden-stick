@@ -64,6 +64,15 @@ class OutliersSuppressionType(Enum):
     AWQ = 'awq'
     NONE = 'none'
 
+    @classmethod
+    def from_str(cls, name: str):
+        """outlier_formatter"""
+        if name.lower() == 'smooth':
+            return OutliersSuppressionType.SMOOTH
+        if name.lower() == 'awq':
+            return OutliersSuppressionType.AWQ
+        return OutliersSuppressionType.NONE
+
 
 class LayerQuantizeAlgo(Enum):
     """
@@ -85,6 +94,13 @@ class PrecisionRecovery(Enum):
     GPTQ = 'gptq'
     NONE = 'none'
 
+    @classmethod
+    def from_str(cls, name: str):
+        """outlier_formatter"""
+        if name.lower() == 'gptq':
+            return PrecisionRecovery.GPTQ
+        return PrecisionRecovery.NONE
+
 
 @algo_cfg_register.register(PTQApproach.GPTQ)
 @dataclass
@@ -100,11 +116,6 @@ class GPTQQuantConfig:
         value_check('activation_order', self.activation_order, bool)
         value_check('damp_percent', self.damp_percent, float)
         value_check('static_group', self.static_group, bool)
-
-@algo_cfg_register.register(PTQApproach.PTQ)
-@dataclass
-class PTQQuantConfig:
-    """config for omni quant algorithm"""
 
 
 @algo_cfg_register.register(PTQApproach.SMOOTH_QUANT)
@@ -160,16 +171,16 @@ class QuantGranularity(Enum):
     PER_TOKEN = 'per_token'
     PER_GROUP = 'per_group'
 
-    @staticmethod
-    def quant_granularity_formatter(name: str):
-        '''quant_granularity_formatter'''
-        if name == 'per-token':
+    @classmethod
+    def from_str(cls, name: str):
+        """quant_granularity_formatter"""
+        if name.lower() == 'per_token':
             return QuantGranularity.PER_TOKEN
-        if name == 'per-tensor':
+        if name.lower() == 'per_tensor':
             return QuantGranularity.PER_TENSOR
-        if name == 'per_channel':
+        if name.lower() == 'per_channel':
             return QuantGranularity.PER_CHANNEL
-        if name == 'per_group':
+        if name.lower() == 'per_group':
             return QuantGranularity.PER_GROUP
         return None
 
@@ -267,7 +278,7 @@ class PTQConfig:
             self.algo_args = asdict(self.algo_args)
 
     def _check_quant_granularity(self):
-        '''check_quant_granularity'''
+        """check_quant_granularity"""
         if self.act_quant_granularity != QuantGranularity.PER_TENSOR and self.act_quant_granularity != \
             QuantGranularity.PER_TOKEN:
             raise ValueError(f'self.act_quant_granularity {self.act_quant_granularity} must be '
@@ -292,6 +303,7 @@ class PTQConfig:
             raise ValueError("group_size should equal to 0 when not to do pre_group quantize.")
         if self.weight_quant_granularity == QuantGranularity.PER_GROUP and self.group_size not in [64, 128]:
             raise ValueError("group_size should be in [64, 128] when doing pre_group quantize.")
+
 
 class YamlLoader:
     """Loader for some special item in yaml."""
@@ -353,14 +365,14 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     fallback_blacklist: dict = field(default_factory=dict)
     tp_size: int = 1
 
-    def _get_tp_size(self):
+    def update_tp_size(self):
         try:
             self.tp_size = get_group_size()
         except RuntimeError:
             pass
 
     def __post_init__(self):
-        self._get_tp_size()
+        self.update_tp_size()
         value_check('act_per_channel', self.act_per_channel, bool)
         value_check('weight_per_channel', self.weight_per_channel, bool)
         value_check('kvcache_per_head', self.kvcache_per_head, bool)

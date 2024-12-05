@@ -224,6 +224,7 @@ class PTQ(CompAlgo):
             ValueError: If input `network_helper` is None when mode is `PTQMode.DEPLOY`.
             ValueError: If input datasets is None.
         """
+        self._config.update_tp_size()
         self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
@@ -257,10 +258,7 @@ class PTQ(CompAlgo):
             layer_name, layer = self.decoder_layers[i]
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             for processor in self.pipeline:
-                if isinstance(processor, LinearAWQSmoother):
-                    processor.replace(layer_name, layer, network_helper, cur_args, cur_kwargs)
-                else:
-                    processor.replace(layer_name, layer, network_helper)
+                processor.replace(layer_name, layer, network_helper, layer_args=cur_args, layer_kwargs=cur_kwargs)
 
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()
