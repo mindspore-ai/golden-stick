@@ -116,6 +116,25 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
 ```
 
+##### GPTQ Algorithm
+
+The [GPTQ](https://arxiv.org/abs/2210.17323) algorithm is a PTQ algorithm specifically designed for large-scale pre-trained models. Its core idea is to compensate for weights during the quantization process, thereby reducing the loss of model accuracy caused by low-bit quantization.
+
+The PTQ algorithm supports the use of the GPTQ algorithm for 4-bit weight quantization and has incorporated it into the set of accuracy recovery algorithms. Currently, GPTQ is the only optional algorithm for accuracy recovery.
+
+You can enable the GPTQ algorithm of PTQ with the following configuration item:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery
+from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
+
+algorithm_config = GPTQQuantConfig()
+ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+                       outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
+                       precision_recovery=PrecisionRecovery.GPTQ)
+```
+
 #### Combination Quantification
 
 Thanks to the layered decoupling framework design, the PTQ algorithm can easily combine different algorithmic capabilities:
@@ -140,7 +159,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
                         outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
-In the future, we will also support inter-layer mixed-precision quantization based on this, applying 8bit weight quantization, 8bit full quantization or 4bit weight quantization, etc. according to the sensitivity of different layers to quantization.
+In the future, we will also support inter-layer mixed-precision quantization based on this, applying 8bit weight quantization, 8bit full quantization, etc. according to the sensitivity of different layers to quantization.
 
 ## Samples
 

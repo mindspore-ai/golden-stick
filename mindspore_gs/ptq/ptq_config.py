@@ -106,16 +106,20 @@ class PrecisionRecovery(Enum):
 @dataclass
 class GPTQQuantConfig:
     """config for gptq quant algorithm"""
-    block_columns: int = 128
-    activation_order: bool = False
+    block_size: int = 128
+    desc_act: bool = False
     damp_percent: float = 0.01
-    static_group: bool = False
+    static_groups: bool = False
 
     def __post_init__(self):
-        value_check('block_columns', self.block_columns, int)
-        value_check('activation_order', self.activation_order, bool)
+        value_check('block_size', self.block_size, int)
+        value_check('desc_act', self.desc_act, bool)
         value_check('damp_percent', self.damp_percent, float)
-        value_check('static_group', self.static_group, bool)
+        value_check('static_groups', self.static_groups, bool)
+        if self.block_size < 0:
+            raise ValueError("GPTQConfig block_size should >=0, " f"but got {self.block_size}.")
+        if self.damp_percent < 0 or self.damp_percent > 1:
+            raise ValueError("GPTQConfig damp_percent should >=0 and <=1, " f"but got {self.damp_percent}.")
 
 
 @algo_cfg_register.register(PTQApproach.SMOOTH_QUANT)
@@ -208,6 +212,9 @@ class PTQConfig:
         outliers_suppression (:class:`mindspore_gs.ptq.OutliersSuppressionType`): Used to configure outliers suppression
             method before quantization. OutliersSuppressionType.SMOOTH indicates using smooth method from SmoothQuant
             to suppress outliers, and OutliersSuppressionType.NONE as default indicates doing nothing for outliers.
+        precision_recovery (:class:`mindspore_gs.ptq.PrecisionRecovery`): Used to precision compensation of
+            weights during quantization. PrecisionRecovery.GPTQ indicates using GPTQ method to compensate precision,
+            and PrecisionRecovery.NONE as default indicates doing nothing for precision recovery.
         act_quant_granularity: (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of activation.
             Currently only QuantGranularity.PER_TENSOR and QuantGranularity.PER_TOKEN are supported.
         kvcache_quant_granularity: (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of kvcache.
@@ -224,6 +231,7 @@ class PTQConfig:
         ValueError: If `kvcache_quant_dtype` is not mindspore.dtype.int8 or None.
         ValueError: If `act_quant_dtype` is not mindspore.dtype.int8 or None.
         TypeError: If `outliers_suppression` is not a OutliersSuppressionType.
+        TypeError: If `precision_recovery` is not a PrecisionRecovery.
         ValueError: If `act_quant_granularity` is not QuantGranularity.PER_TENSOR or QuantGranularity.PER_TOKEN.
         ValueError: If `kvcache_quant_granularity` is not QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.
         ValueError: If `act_quant_granularity` is QuantGranularity.PER_TOKEN but weight_quant_dtype != msdtype.int8 or act_quant_dtype != msdtype.int8.
@@ -268,14 +276,23 @@ class PTQConfig:
         if self.act_quant_dtype not in act_support:
             raise ValueError(f'act_quant_dtype support {act_support}, but got {self.act_quant_dtype}.')
         list_value_check('opname_blacklist', self.opname_blacklist, str)
-        value_check('precision_recovery', self.precision_recovery, PrecisionRecovery)
         value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
+        self._check_precision_recovery()
         self._check_quant_granularity()
         value_check('group_size', self.group_size, int)
         if not isinstance(self.algo_args, dict) and not is_dataclass(self.algo_args):
             raise ValueError(f"algo_args's type should be dict or dataclass, but now is {type(self.algo_args)}")
         if self.algo_args and is_dataclass(self.algo_args):
             self.algo_args = asdict(self.algo_args)
+
+    def _check_precision_recovery(self):
+        '''check precision recovery'''
+        if self.precision_recovery == PrecisionRecovery.GPTQ and self.algo_args == {}:
+            self.algo_args = GPTQQuantConfig()
+            logger.warning('GPTQConfig is not configured, it will apply the default parameters.')
+        if self.precision_recovery != PrecisionRecovery.GPTQ and isinstance(self.algo_args, GPTQQuantConfig):
+            logger.warning(f'GPTQConfig is configured, but the precision recovery is {self.precision_recovery}.')
+        value_check('precision_recovery', self.precision_recovery, PrecisionRecovery)
 
     def _check_quant_granularity(self):
         """check_quant_granularity"""

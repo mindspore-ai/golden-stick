@@ -276,15 +276,14 @@ class PTQ(CompAlgo):
 
                 start_time = time.time()
                 processor.process(layer_name, layer)
-                if self._config.reflash_inputs_after_each_processor:
-                    index = 0
-                    for args, kwargs in zip(cur_args, cur_kwargs):
-                        all_args[index][0] = layer(*args, **kwargs)
-                        index += 1
                 processor.deploy(layer_name, layer)
                 network.update_parameters_name()
                 logger.info(f"{i}th layer do {type(processor)} time cost {time.time() - start_time}")
-
+            if self._config.reflash_inputs_after_each_processor:
+                index = 0
+                for args, kwargs in zip(cur_args, cur_kwargs):
+                    all_args[index][0] = layer(*args, **kwargs)
+                    index += 1
             start_time = time.time()
             offload_network(layer)
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")

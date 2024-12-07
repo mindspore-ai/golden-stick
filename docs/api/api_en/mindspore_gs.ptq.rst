@@ -37,6 +37,16 @@ OutliersSuppressionType Enum
 
     mindspore_gs.ptq.OutliersSuppressionType
 
+PrecisionRecovery Enum
+------------------------------
+
+.. autosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.PrecisionRecovery
+
 NetworkHelper
 -------------
 
