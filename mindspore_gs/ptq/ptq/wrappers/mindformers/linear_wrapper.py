@@ -209,5 +209,5 @@ class LinearInferCell(Cell):
         if self.quant_op:
             state_dict.update(self.quant_op.param_shard_state(tensor_parallel_num, **kwargs))
         if hasattr(self.layer.matmul, "param_shard_state"):
-            state_dict.update(self.layer.matmul.param_shard_state(tensor_parallel_num))
+            state_dict.update(self.layer.matmul.param_shard_state(tensor_parallel_num, self.parallel_type))
         return state_dict

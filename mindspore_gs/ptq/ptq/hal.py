@@ -408,8 +408,8 @@ class WeightQuantMatmul(QuantUnitCell):
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
         if parallel_type == ParallelType.COL_PARALLEL:
             smooth_scale_shard = (1,)
-            t_scale_shard = (self.layer.tensor_parallel_group_size,)
-            t_zp_shard = {self.layer.tensor_parallel_group_size}
+            t_scale_shard = (tensor_parallel_num,)
+            t_zp_shard = (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
             smooth_scale_shard = (tensor_parallel_num,)
             t_scale_shard = (1,)
@@ -622,13 +622,13 @@ class AllQuantMatmul(QuantUnitCell):
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
         if parallel_type == ParallelType.COL_PARALLEL:
-            q_shard = (self.layer.tensor_parallel_group_size,)
+            q_shard = (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
             q_shard = (1,)
         else:
             return {}
         shard_state = {self.dequant_scale.name: {'shape': self.dequant_scale.shape, 'shard': q_shard}}
-        if self.offset:
+        if self.offset is not None:
             shard_state[self.offset.name] = {'shape': self.offset.shape, 'shard': q_shard}
         return shard_state
 
