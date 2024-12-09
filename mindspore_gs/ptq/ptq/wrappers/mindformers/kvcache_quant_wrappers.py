@@ -153,9 +153,9 @@ class DeployPageAttentionMgrCell(Cell):
         """provide the sharded state dict based on the config"""
         state_dict = self.quant_pa.param_shard_state(self.tensor_parallel_group_size)
         key_input_state_dict = self._key_input_quantizer.param_shard_state(self.tensor_parallel_group_size)
-        state_dict = state_dict.update(key_input_state_dict)
+        state_dict.update(key_input_state_dict)
         value_input_state_dict = self._value_input_quantizer.param_shard_state(self.tensor_parallel_group_size)
-        state_dict = state_dict.update(value_input_state_dict)
+        state_dict.update(value_input_state_dict)
         return state_dict
 
 

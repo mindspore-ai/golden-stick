@@ -134,10 +134,3 @@ class WeightQuantLinearInferCell(LinearInferCell):
             raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
         self.layer.matmul = qmm
         self.layer.weight = q_weight
-
-    def sharded_state_dict(self, **kwargs):
-        """provide the sharded state dict based on the config"""
-        state_dict = super().sharded_state_dict()
-        qmm_state_dict = self.layer.matmul.param_shard_state(self.layer.tensor_parallel_group_size)
-        state_dict = state_dict.update(qmm_state_dict)
-        return state_dict
