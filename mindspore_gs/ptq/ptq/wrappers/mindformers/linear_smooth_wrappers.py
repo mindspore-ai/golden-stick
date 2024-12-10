@@ -27,7 +27,7 @@ from mindspore_gs.ptq.ptq_config import (
     OutliersSuppressionType,
     QuantGranularity)
 from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy
-from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoother, LinearAWQSmoother
+from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoothQuant, LinearAutoSmoother
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from .parallel_minmax import (
@@ -46,9 +46,9 @@ class SmoothLinearCell(WrapperLinearCell):
             def check(self, config: InnerPTQConfig):
                 return config.outliers_suppression == OutliersSuppressionType.SMOOTH
 
-        LinearSmoother.reg_layer_map(Linear, SmoothLinearCell, SmoothChecker())
-        LinearSmoother.reg_layer_map(ColumnParallelLinear, SmoothLinearCell, SmoothChecker())
-        LinearSmoother.reg_layer_map(RowParallelLinear, SmoothLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(Linear, SmoothLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothLinearCell, SmoothChecker())
 
     def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
         super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
@@ -167,9 +167,9 @@ class AWQSmoothLinearCell(SmoothLinearCell):
             def check(self, config: InnerPTQConfig):
                 return config.outliers_suppression == OutliersSuppressionType.AWQ
 
-        LinearAWQSmoother.reg_layer_map(Linear, AWQSmoothLinearCell, AWQSmoothChecker())
-        LinearAWQSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
-        LinearAWQSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(Linear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
 
     def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
         super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
@@ -187,10 +187,10 @@ class AWQSmoothLinearCell(SmoothLinearCell):
         self.oc = linear.weight.shape[self.oc_axis]
         self.fp16_weight = copy.deepcopy(self._layer.weight)
 
-        self.decoder = kwargs["decoder_layer"]
+        self.decoder = kwargs.get("decoder_layer", None)
         self.forward_module = None
-        self.args = kwargs["layer_args"]
-        self.kwargs = kwargs["layer_kwargs"]
+        self.args = kwargs.get("layer_args", None)
+        self.kwargs = kwargs.get("layer_kwargs", None)
 
         self.w_mean = None
         self.x_mean = None

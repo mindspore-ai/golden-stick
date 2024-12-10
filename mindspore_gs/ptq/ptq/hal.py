@@ -468,6 +468,7 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
             raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
         return wqbmm, q_weight
 
+
 class AllQuantMatmul(QuantUnitCell):
     """all quant mm"""
 
