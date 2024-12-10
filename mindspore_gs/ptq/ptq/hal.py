@@ -180,7 +180,8 @@ class SmoothMatmul(QuantUnitCell):
         raise ValueError(f"Not support creating SmoothMatmul from {src}.")
 
     def construct(self, x, weight):
-        x = msops.mul(x, self.smooth_scale)
+        smooth_scale = msops.cast(self.smooth_scale, x.dtype)
+        x = msops.mul(x, smooth_scale)
         return self.mm(x, weight)
 
     # pylint: disable=arguments-differ
