@@ -183,6 +183,14 @@ class DynamicQuantPageAttentionMgrCell(WrapperCell):
     def process(self):
         pass
 
+    def paged_attn(self, *args, **kwargs):
+        """paged_attn"""
+        return self._layer.paged_attn(*args, **kwargs)
+
+    def paged_attn_with_alibi(self, *args, **kwargs):
+        """paged_attn_with_alibi"""
+        return self._layer.paged_attn_with_alibi(*args, **kwargs)
+
 
 class DynamicQuantPagedAttentionDeploy(Cell):
     """PagedAttention deploy base class"""
