@@ -102,7 +102,7 @@ def test_mf_llama_net_helper():
     assert helper.get_spec('batch_size') == 1
     assert helper.get_spec('seq_length') == 1024
     # pylint: disable=singleton-comparison
-    assert helper.get_spec('use_flash_attention') == False
+    assert helper.get_spec('use_flash_attention') == True
 
     inputs = helper.assemble_inputs(np.ones((1, 1024), dtype=np.int32))
     assert isinstance(inputs, tuple)
