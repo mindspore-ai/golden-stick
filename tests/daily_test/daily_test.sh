@@ -54,6 +54,7 @@ prepare_env()
   cp ./example/ptq/quant_ckpt.py ../daily_quant_ckpt.py || exit 1
   echo "cp eval script"
   cp "./example/ptq/${eval_script}" ../daily_eval.py || exit 1
+  cp "./example/ptq/eval_wikitext2.py" ../daily_eval_wikitext2.py || exit 1
   cd .. || exit 1
   echo "uninstall pkgs"
   pip uninstall mindspore mindformers mindspore-gs -y || exit 1
@@ -82,15 +83,16 @@ sed_dtype()
 sed_qconfig()
 {
   f=$1
-  wqg=${7:-'per_channel'}
-  group_size=${8:-"0"}
-  black_opname=${9:-"[\'lm_head\', \'w2\']"}
-  kqg=${10:-'per_channel'}
+  wqg=${8:-'per_channel'}
+  group_size=${9:-"0"}
+  black_opname=${10:-"[\'lm_head\', \'w2\']"}
+  kqg=${11:-'per_channel'}
   sed -i s/"activation_dtype: .*"/"activation_dtype: \"${2}\""/g ${f}
   sed -i s/"weight_dtype: .*"/"weight_dtype: \"${3}\""/g ${f}
   sed -i s/"kvcache_dtype: .*"/"kvcache_dtype: \"${4}\""/g ${f}
   sed -i s/"outliers_suppression: .*"/"outliers_suppression: \"${5}\""/g ${f}
-  sed -i s/"load_checkpoint: .*"/"load_checkpoint: \'${6}\'"/g ${f}
+  sed -i s/"precision_recovery: .*"/"precision_recovery: \"${6}\""/g ${f}
+  sed -i s/"load_checkpoint: .*"/"load_checkpoint: \'${7}\'"/g ${f}
   sed -i s/"weight_quant_granularity: .*"/"weight_quant_granularity: \'${wqg}\'"/g ${f}
   sed -i s/"group_size: .*"/"group_size: ${group_size}"/g ${f}
   sed -i s/"modules_to_not_convert: .*"/"modules_to_not_convert: ${black_opname}"/g ${f}
@@ -108,6 +110,23 @@ eval()
   msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval.py -c "${3}" -s ${dataset} -n 2000 > "eval_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_eval.py" | grep -v grep | awk -F ' ' '{print$2}')
+  echo "waiting pid ${pid}"
+  tail --pid ${pid} -f "${2}_eval_log/worker_0.log"
+  sleep ${sleep_time}
+  cd ..
+}
+
+eval_wikitext2()
+{
+  echo "enter test workspace."
+  cd ws || exit 1
+  echo "${1}, save yaml to ${2}_eval_log/"
+  mkdir -p "${2}_eval_log"
+  cp "${3}" "${2}_eval_log/"
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir=${2}_eval_log --join=True --cluster_time_out=300 python daily_eval_wikitext2.py -c ${3} -s "${BASEPATH}/ws/gs/tests/data/wikitext2-dataset/test-00000-of-00001.parquet" -n 2000 > eval_${2}_log 2>&1 &" > "${2}_eval_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval_wikitext2.py -c "${3}" -s "${BASEPATH}/ws/gs/tests/data/wikitext2-dataset/test-00000-of-00001.parquet" -n 2000 > "eval_${2}_log" 2>&1 &
+  sleep ${sleep_time}
+  pid=$(ps -u | grep msrun | grep "daily_eval_wikitext2.py" | grep -v grep | awk -F ' ' '{print$2}')
   echo "waiting pid ${pid}"
   tail --pid ${pid} -f "${2}_eval_log/worker_0.log"
   sleep ${sleep_time}
@@ -148,61 +167,93 @@ quant_awq()
   cd ..
 }
 
+quant_gptq()
+{
+  echo "enter test workspace."
+  cd ws || exit 1
+  echo "${1}, save yaml to ${2}_quant_log/"
+  mkdir -p "${2}_quant_log"
+  cp "${3}" "${2}_quant_log/"
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a none -w int4 -k none -p gptq -wg ${4} -g ${5} -b lm_head -t wikitext2 -s "${BASEPATH}/ws/gs/tests/data/wikitext2-dataset/test-00000-of-00001.parquet" > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t wikitext2 -s "${BASEPATH}/ws/gs/tests/data/wikitext2-dataset/test-00000-of-00001.parquet" > "quant_${2}_log" 2>&1 &
+  sleep ${sleep_time}
+  pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
+  echo "waiting pid ${pid}"
+  tail --pid ${pid} -f "${2}_quant_log/worker_0.log"
+  sleep ${sleep_time}
+  cd ..
+}
+
 prepare_env
 ############################ fp16 ############################
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "float16"
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "float16"
 # fp16 acc
 eval "eval fp16 llama2-13b" "fp16" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
+eval_wikitext2 "eval_wikitext2 fp16 llama2-13b" "fp16_wikitext2" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
 
 ############################ fp16->a8w8 ############################
 # quant ckpt a8w8
 quant "quant llama2-13b-fp16 to a8w8" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "none" "smooth"
 # a8w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "\.\/output\/llama2_13b_ptq_smooth_a8w8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "none" "\.\/output\/llama2_13b_ptq_smooth_a8w8_ckpt\/"
 eval "eval a8w8 llama2-13b-fp16" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->a16w8 ############################
 # quant ckpt a16w8
 quant "quant llama2-13b-fp16 to a16w8" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
 # a16w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "none" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
 eval "eval a16w8 llama2-13b-fp16" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->a8w8c8 ############################
 # quant ckpt a8w8c8
 quant "quant llama2-13b-fp16 to a8w8c8" "fp16-a8w8c8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "int8" "smooth"
 # a8w8c8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "int8" "smooth" "\.\/output\/llama2_13b_ptq_smooth_a8w8c8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "int8" "smooth" "none" "\.\/output\/llama2_13b_ptq_smooth_a8w8c8_ckpt\/"
 eval "eval a8w8c8 llama2-13b-fp16" "fp16-a8w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->a16w8c8 ############################
 # quant ckpt a16w8c8
 quant "quant llama2-13b-fp16 to a16w8c8" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "int8" "none"
 # a8w8c8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "int8" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8c8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "int8" "None" "none" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8c8_ckpt\/"
 eval "eval a16w8c8 llama2-13b-fp16" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->awq-pergroup-a16w4 ############################
 # quant ckpt awq
 quant_awq "quant llama2-13b-fp16 to awq-pergroup" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
 # awq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "none" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']"
 eval "eval awq-pergroup llama2-13b-fp16" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->awq-perchannel-a16w4 ############################
 # quant ckpt awq
 quant_awq "quant llama2-13b-fp16 to awq-perchannel" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
 # awq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "none" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
 eval "eval awq-perchannel llama2-13b-fp16" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->a16w16c8-pertoken ############################
 # a16w16c8 pertoken
 ckpt_path=$(grep -oP "load_checkpoint:\s*'\K[^']+" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" | sed 's/[&/\]/\\&/g')
 echo ${ckpt_path}
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "none" "int8" "None" "${ckpt_path}" "per_channel" "0" "[\'lm_head\', \'w2\']" "per_token"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "none" "int8" "None" "none" "${ckpt_path}" "per_channel" "0" "[\'lm_head\', \'w2\']" "per_token"
 eval "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+############################ fp16->gptq-pergroup-a16w4 ############################
+# quant ckpt gptq
+quant_gptq "quant llama2-13b-fp16 to gptq-pergroup" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
+# gptq acc
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']"
+eval_wikitext2 "eval gptq-pergroup llama2-13b-fp16" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+############################ fp16->gptq-perchannel-a16w4 ############################
+# quant ckpt gptq
+quant_gptq "quant llama2-13b-fp16 to gptq-perchannel" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
+# gptq acc
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
+eval_wikitext2 "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 
 ############################ bf16 ############################
@@ -215,14 +266,14 @@ eval "eval bf16 llama2-13b" "bf16" "./predict_llama2_13b_qckpt.yaml"
 # quant ckpt a8w8
 quant "quant llama2-13b-bf16 to a8w8" "bf16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "none" "smooth"
 # a8w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "\.\/output\/llama2_13b_ptq_smooth_a8w8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "none" "\.\/output\/llama2_13b_ptq_smooth_a8w8_ckpt\/"
 eval "eval a8w8 llama2-13b-bf16" "bf16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ bf16->a16w8 ############################
 # quant ckpt a16w8
 quant "quant llama2-13b-bf16 to a16w8" "bf16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
 # a8w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "none" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
 eval "eval a16w8 llama2-13b-bf16" "bf16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 conda_path=$(pip show mindspore | grep 'Location' | awk -F ' ' '{print$2}')
@@ -244,6 +295,7 @@ echo_result()
 }
 
 echo_result "fp16 llama2-13b" "${BASEPATH}/ws/fp16_eval_log/worker_0.log"
+echo_result "fp16_wikitext2 llama2-13b" "${BASEPATH}/ws/fp16_wikitext2_eval_log/worker_0.log"
 echo_result "fp16->a8w8 llama2-13b" "${BASEPATH}/ws/fp16-a8w8_eval_log/worker_0.log"
 echo_result "fp16->a16w8 llama2-13b" "${BASEPATH}/ws/fp16-a16w8_eval_log/worker_0.log"
 echo_result "fp16->a8w8c8 llama2-13b" "${BASEPATH}/ws/fp16-a8w8c8_eval_log/worker_0.log"
@@ -251,6 +303,8 @@ echo_result "fp16->a16w8c8 llama2-13b" "${BASEPATH}/ws/fp16-a16w8c8_eval_log/wor
 echo_result "fp16->a16w4-awq-pergroup llama2-13b" "${BASEPATH}/ws/fp16-awq-pergroup_eval_log/worker_0.log"
 echo_result "fp16->a16w4-awq-perchannel llama2-13b" "${BASEPATH}/ws/fp16-awq-perchannel_eval_log/worker_0.log"
 echo_result "fp16->a16w16c8-pertoken llama2-13b" "${BASEPATH}/ws/fp16-a16w16c8-pertoken_eval_log/worker_0.log"
+echo_result "fp16->a16w4-gptq-pergroup llama2-13b" "${BASEPATH}/ws/fp16-gptq-pergroup_eval_log/worker_0.log"
+echo_result "fp16->a16w4-gptq-perchannel llama2-13b" "${BASEPATH}/ws/fp16-gptq-perchannel_eval_log/worker_0.log"
 
 echo_result "bf16 llama2-13b" "${BASEPATH}/ws/bf16_eval_log/worker_0.log"
 echo_result "bf16->a8w8 llama2-13b" "${BASEPATH}/ws/bf16-a8w8_eval_log/worker_0.log"
