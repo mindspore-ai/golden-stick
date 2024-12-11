@@ -149,7 +149,7 @@ eval "eval a8w8 llama2-13b-fp16" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_
 # quant ckpt a16w8
 quant "quant llama2-13b-fp16 to a16w8" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
 # a16w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "none" "\.\/output\/llama2_13b_ptq_smooth_a16w8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "\.\/output\/llama2_13b_ptq_smooth_a16w8_ckpt\/"
 eval "eval a16w8 llama2-13b-fp16" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->a8w8c8 ############################
