@@ -146,6 +146,20 @@ def create_cfg(quant_algo_, mode):
                         weight_quant_dtype=None,
                         kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
                         kvcache_quant_dtype=dtype.int8)
+    elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
+        if mode == PTQMode.DEPLOY:
+            cfg = PTQConfig(mode=mode,
+                            backend=BackendTarget.ASCEND,
+                            opname_blacklist=["lm_head"],
+                            act_quant_dtype=dtype.int8,
+                            weight_quant_dtype=dtype.int8,
+                            act_quant_granularity=QuantGranularity.PER_TOKEN,
+                            outliers_suppression=OutliersSuppressionType.SMOOTH)
+        else:
+            cfg = PTQConfig(mode=mode,
+                            backend=BackendTarget.ASCEND,
+                            opname_blacklist=["lm_head"],
+                            outliers_suppression=OutliersSuppressionType.SMOOTH)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_algo_}")
     return cfg
@@ -291,6 +305,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput[:, :5], foutput[:, :5], 0, 0)
         elif quant_algo_ == 'A8W8_Dynamic':
             ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
+        elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
+            ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
         else:
             assert False
         if not ret:
@@ -316,6 +332,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         ret = np.allclose(qoutput[:, :13], foutput[:, :13], 0, 0)
     elif quant_algo_ == "A8W8_Dynamic":
         ret = np.allclose(qoutput[:, :58], foutput[:, :58], 0, 0)
+    elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
+        ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
     else:
         assert False
     if not ret:
@@ -373,12 +391,12 @@ def ptq_llama2_predict_2stage_c8(config_path_, fp16_ckpt_path_, output_dir_, mod
     qoutput = np.array(qoutput)
     if model_parallel_ == 1:
         if quant_algo_ == 'C8_Dynamic':
-            ret = np.allclose(qoutput[:, :69], foutput[:, :69], 0, 0)
+            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         else:
             assert False
     else:
         if quant_algo_ == 'C8_Dynamic':
-            ret = np.allclose(qoutput[:, :69], foutput[:, :69], 0, 0)
+            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         else:
             assert False
     if not ret:

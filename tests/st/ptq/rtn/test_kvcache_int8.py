@@ -26,7 +26,7 @@ from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.convert_utils import QuantCellV2
 from mindspore_gs.ptq.round_to_nearest.quant_cells.mindformers.quant_cells import PagedAttentionQuant
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
-from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, QuantGranularity
 from mindspore_gs.common.gs_enum import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
@@ -228,6 +228,114 @@ def kv_predict_llama2_2stage(device, mode, model_parallel, enable_deploy_fusion=
     return np.allclose(npqoutput[:, :75], npfoutput[:, :75], 0, 0)
 
 
+def c8_pertoken_predict_llama2_2stage(device, mode, model_parallel):
+    """test_kv_predict_llama2_2stage"""
+    os.environ['GRAPH_OP_RUN'] = "1"
+    device_id = os.environ.get('DEVICE_ID', '0')
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    print(f"---------------- Testing params: {device} {mode} ", flush=True)
+    context.set_context(device_target=device, mode=mode, device_id=int(device_id),
+                        jit_config={"jit_level": "O0", "infer_boost": "on"})
+    if model_parallel == 1:
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_1p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-1p/rank_0/fp16.ckpt"
+    else:
+        fp16_config_path = "../../../data/test_llama2/predict_llama2_13b_2p.yaml"
+        fp16_ckpt_path = "../../../data/test_llama2/llama2-13b-2p"
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    fp16_config_path = os.path.join(cur_dir, fp16_config_path)
+    fp16_ckpt_path = os.path.join(cur_dir, fp16_ckpt_path)
+
+    def c8_pertoken_infer(input_, ckpt_path, config_path):
+        config = set_config(config_path)
+        config.model.model_config.use_past = True
+        config.model.model_config.use_flash_attention = True
+        config.model.model_config.is_dynamic = True
+        network = LlamaForCausalLM(config.model.model_config)
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["lm_head"],
+                        kvcache_quant_dtype=msdtype.int8, weight_quant_dtype=None,
+                        kvcache_quant_granularity=QuantGranularity.PER_TOKEN)
+        ptq = RTN(config=cfg)
+        network = ptq.apply(network)
+        network = ptq.convert(network)
+
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        seq_len = 100
+        input_ids = tokenizer(input_)['input_ids']
+        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+        answer = tokenizer.decode(outputs, skip_special_tokens=True)
+        return outputs, answer
+
+    def fp16_infer(input_, ckpt_path, config_path):
+        config = set_config(config_path)
+        network = LlamaForCausalLM(config.model.model_config)
+        tokenizer = LlamaTokenizer(vocab_file=tokenizer_path)
+        if model_parallel == 1:
+            load_checkpoint(ckpt_path, network)
+        else:
+            network = load_distribut_checkpoint(config, ckpt_path, network)
+        seq_len = 100
+        input_ids = tokenizer(input_)['input_ids']
+        outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
+        answer = tokenizer.decode(outputs, skip_special_tokens=True)
+        return outputs, answer
+    example = "hello"
+    foutput, _ = fp16_infer(example, fp16_ckpt_path, fp16_config_path)
+    qoutput, _ = c8_pertoken_infer(example, fp16_ckpt_path, fp16_config_path)
+    npfoutput = np.array(foutput)
+    npqoutput = np.array(qoutput)
+    print(npfoutput)
+    print(npqoutput)
+    return np.allclose(npqoutput[:, :3], npfoutput[:, :3], 0, 0)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("device", ["Ascend"])
+@pytest.mark.parametrize("mode", [GRAPH_MODE])
+def test_c8_pertoken_llama2_predict_2stage_1p(device, mode):
+    """
+    Feature: test RTQ kvcache int8 pertoken quant in two stages with one cards.
+    Description: apply RTQ kvcache int8 pertoken quant on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = int(os.environ.get("sq_test_model_parallel", 1))
+    assert c8_pertoken_predict_llama2_2stage(device, mode, model_parallel)
+
+
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_c8_pertoken_llama2_predict_2stage_2p():
+    """
+    Feature: test RTQ kvcache int8 pertoken quant in two stages with two cards.
+    Description: apply RTQ kvcache int8 pertoken quant on llama2 and check accuracy.
+    Expectation: accuracy is good.
+    """
+    model_parallel = 2
+    os.environ['sq_test_model_parallel'] = str(model_parallel)
+    cur_file = os.path.abspath(__file__)
+    return_code = os.system(
+        f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
+        "--master_port=10926 --join=True --log_dir=./test_rtn_c8_pertoken_predict_llama2_13b_logs "
+        f"pytest -s {cur_file}::test_c8_pertoken_llama2_predict_2stage_1p"
+    )
+    if return_code != 0:
+        log_file = open("./test_rtn_c8_pertoken_predict_llama2_13b_logs/worker_1.log", "r", encoding="utf-8")
+        for line in log_file:
+            print(line, flush=True)
+        log_file.close()
+
+    assert return_code == 0
+
+
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -243,6 +351,8 @@ def test_kv_llama2_predict_2stage_1p(device, mode):
     assert kv_predict_llama2_2stage(device, mode, model_parallel)
 
 
+@pytest.mark.skip(reason="re-enable after ckpt is split.")
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_kv_llama2_predict_2stage_2p():
