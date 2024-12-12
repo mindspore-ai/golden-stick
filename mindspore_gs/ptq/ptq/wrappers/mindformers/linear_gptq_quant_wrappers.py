@@ -19,6 +19,8 @@ import time
 
 from mindspore import Tensor, dtype, numpy
 from mindspore import ops as msops
+from mindspore.communication import get_rank
+from mindspore.communication.management import GlobalComm
 from mindspore.ops import sub as aclnn_sub, add as aclnn_add
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
@@ -26,7 +28,7 @@ from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.basic_quant_func import quant_tensor, quant_tensor_data, get_quant_min_max
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
-from mindspore_gs.ptq.cholesky_trans import cholesky_compute
+from mindspore_gs.ptq.ptq.hal import ParallelType
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 
@@ -53,6 +55,15 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         self.cfg.reflash_inputs_after_each_processor = True
         self.group_scale = []
         self.group_zero = []
+        self.rank_id = get_rank()
+        if self.parallel_type == ParallelType.ROW_PARALLEL and self.cfg.tp_size > 1:
+            self.weight_need_allgather = True
+        else:
+            self.weight_need_allgather = False
+        if self.weight_need_allgather:
+            self.h = msops.zeros((self.ic * self.cfg.tp_size, self.ic * self.cfg.tp_size))
+        else:
+            self.h = msops.zeros((self.ic, self.ic))
         self.weight_quant_min, self.weight_quant_max = get_quant_min_max(num_bits=4, signed=self.cfg.weight_symmetric,
                                                                          narrow_range=self.cfg.weight_narrow_range)
 
@@ -66,30 +77,33 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             sqr = math.sqrt(2 / self.nsamples)
             self.samples[i] = sqr * self.samples[i]
             self.h *= sqe
-            self.samples[i] = self.samples[i].astype(dtype.float32)
-            self.h += msops.matmul(self.samples[i].t(), self.samples[i])
+            if self.weight_need_allgather:
+                inp = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(self.samples[i].T)
+                inp = Tensor(inp.T, dtype=dtype.float32)
+                self.h += msops.matmul(inp.T, inp)
+            else:
+                self.samples[i] = self.samples[i].astype(dtype.float32)
+                self.h += msops.matmul(self.samples[i].T, self.samples[i])
 
-    def _gptq_precision_recovery(self, w, hinv, scale, zero):
+    def _gptq_precision_recovery(self, weight, hinv, scale, zero):
         """precision recovery use gptq"""
-        if self.cfg.algo_args["static_group"]:
-            for i in range(0, self.ic, self.cfg.group_size):
-                scale, zero, _ = quant_tensor(self.layer.weight[:, i : i + self.cfg.group_size], self.w_quant_min,
-                                              self.w_quant_max, self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
-                                              self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
-                                              self.cfg.group_size, self.cfg.weight_quant_dtype,
-                                              self.weight_quantizer_axis, False)
+        group_size = self.cfg.group_size
+        if self.cfg.algo_args["static_groups"] and group_size != 0:
+            for i in range(0, weight.shape[1], group_size):
+                scale, zero, _ = quant_tensor(weight[:, i : i + group_size], self.w_quant_min, self.w_quant_max,
+                                              self.cfg.weight_narrow_range, self.cfg.weight_symmetric, False,
+                                              0, self.cfg.weight_quant_dtype, self.weight_quantizer_axis, False)
                 self.group_scale.append(Tensor(scale, self.layer.weight.dtype).T)
                 self.group_zero.append(Tensor(zero, self.layer.weight.dtype).T)
-        group_size = self.cfg.group_size
-        losses = msops.zeros_like(w, dtype=w.dtype)
-        q = msops.zeros_like(w, dtype=w.dtype)
+        losses = msops.zeros_like(weight, dtype=weight.dtype)
+        q = msops.zeros_like(weight, dtype=weight.dtype)
         now_idx = 1
-        for i1 in range(0, self.ic, self.cfg.algo_args["block_columns"]):
-            i2 = min(i1 + self.cfg.algo_args["block_columns"], self.ic)
+        for i1 in range(0, weight.shape[1], self.cfg.algo_args["block_size"]):
+            i2 = min(i1 + self.cfg.algo_args["block_size"], weight.shape[1])
             count = i2 - i1
-            w1 = w[:, i1:i2]
+            w1 = weight[:, i1:i2]
             q1 = msops.zeros_like(w1, dtype=w1.dtype)
-            err = msops.zeros_like(w1, dtype=w1.dtype)
+            err = msops.zeros_like(w1, dtype=dtype.float32)
             losses1 = msops.zeros_like(w1, dtype=w1.dtype)
             hinv1 = hinv[i1:i2, i1:i2]
             hinv2 = hinv[i1:i2, i2:]
@@ -98,20 +112,22 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 d = hinv1[i, i]
 
                 if group_size != 0:
-                    if (i1 + i) % group_size == 0:
-                        scale, zero, _ = quant_tensor(w[:, (i1 + i):(i1 + i + group_size)], self.w_quant_min,
-                                                      self.w_quant_max, self.cfg.weight_narrow_range,
-                                                      self.cfg.weight_symmetric, self.cfg.weight_quant_dtype,
-                                                      self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
-                                                      self.cfg.group_size, self.weight_quantizer_axis,
-                                                      self.cfg.weight_quant_dtype, False)
-                        scale = Tensor(scale, w0.dtype)
-                        zero = Tensor(zero, w0.dtype)
-                    if ((i1 + i) // group_size) - now_idx == -1:
-                        self.group_scale.append(scale.T)
-                        self.group_zero.append(zero.T)
-                        now_idx += 1
-
+                    if not self.cfg.algo_args["static_groups"]:
+                        if (i1 + i) % group_size == 0:
+                            scale, zero, _ = quant_tensor(weight[:, (i1 + i):(i1 + i + group_size)], self.w_quant_min,
+                                                          self.w_quant_max, self.cfg.weight_narrow_range,
+                                                          self.cfg.weight_symmetric, False, 0,
+                                                          self.cfg.weight_quant_dtype, self.weight_quantizer_axis,
+                                                          False)
+                            scale = Tensor(scale, dtype.float32)
+                            zero = Tensor(zero, dtype.float32)
+                        if ((i1 + i) // group_size) - now_idx == -1:
+                            self.group_scale.append(scale.T)
+                            self.group_zero.append(zero.T)
+                            now_idx += 1
+                    else:
+                        scale = self.group_scale[i1 // group_size].T
+                        zero = self.group_zero[i1 // group_size].T
                 q0 = msops.clip_by_value(aclnn_add(msops.round(w0.unsqueeze(1) / scale), zero),
                                          Tensor(self.weight_quant_min), Tensor(self.weight_quant_max))
                 q0 = scale * aclnn_sub(q0, zero)
@@ -125,7 +141,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 err[:, i] = err1
 
             q[:, i1:i2] = q1
-            w[:, i2:] = aclnn_sub(w[:, i2:], err.matmul(hinv2))
+            weight[:, i2:] = aclnn_sub(weight[:, i2:], err.matmul(hinv2))
             losses[:, i1:i2] = losses1 / 2
         if group_size == 0:
             self.group_scale.append(scale)
@@ -137,42 +153,70 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         else:
             self.group_scale = msops.cat(self.group_scale)
             self.group_zero = msops.cat(self.group_zero)
+        logger.info(f'error: {msops.sum(losses)}')
+        if self.weight_need_allgather and group_size != 0:
+            self.group_scale = self.group_scale[self.rank_id * self.w_scale.shape[0] :
+                                                self.rank_id * self.w_scale.shape[0] + self.w_scale.shape[0], :]
+            self.group_zero = self.group_zero[self.rank_id * self.w_zp.shape[0] :
+                                              self.rank_id * self.w_zp.shape[0] + self.w_zp.shape[0], :]
+        return weight
 
-    def _apply_gptq(self, w, scale, zero):
+    def _apply_gptq(self, scale, zero):
         """apply gptq"""
         self._hessian_compute()
-        if self.cfg.algo_args["activation_order"]:
-            sort = msops.Sort(descending=True)
-            _, perm = sort(numpy.diag(self.h))
-            w = w[:, perm]
+        self.samples.clear()
+        dead = numpy.diag(self.h) == 0
+        dead = msops.nonzero(dead)
+        if dead.shape[0] > 0:
+            self.h[dead, dead] = 1
+            self.layer.weight[:, dead] = 0
+        if self.weight_need_allgather:
+            weight = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(self.layer.weight.T)
+            weight = Tensor(weight.T, dtype=self.layer.weight.dtype)
+        else:
+            weight = self.layer.weight.value()
+        if self.cfg.algo_args["desc_act"]:
+            perm = msops.argsort(numpy.diag(self.h), descending=True)
+            weight = weight[:, perm]
             self.h = self.h[perm][:, perm]
-
+        from mindspore_gs.ptq.cholesky_trans import cholesky_compute
         cholesky_time = time.time()
         hinv = cholesky_compute(self.h, self.cfg.algo_args["damp_percent"])
+        del self.h
         logger.info(f'[TIME]end cholesky part with time {time.time() - cholesky_time}s')
         quant_tick = time.time()
-        self._gptq_precision_recovery(w, hinv, scale, zero)
+        qweight = self._gptq_precision_recovery(weight, hinv, scale, zero)
         logger.info(f'[TIME]quant layers with time {time.time() - quant_tick}s')
-        if self.cfg.algo_args["activation_order"]:
-            w = w[:, perm]
-        self.layer.weight = w
+        if self.cfg.algo_args["desc_act"]:
+            qweight = qweight[:, perm]
+        if self.weight_need_allgather:
+            self.layer.weight = qweight[:, self.rank_id * self.ic : self.rank_id * self.ic + self.ic]
+        else:
+            self.layer.weight = qweight
 
     def quant(self):
         """quant"""
-        # quant weight
         scale, zp, _ = quant_tensor(self.layer.weight, self.w_quant_min, self.w_quant_max,
                                     self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                     self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                     self.cfg.group_size, self.cfg.weight_quant_dtype,
                                     self.weight_quantizer_axis, False)
-        self._apply_gptq(self.layer.weight, Tensor(scale, dtype=self.layer.weight.dtype),
-                         Tensor(zp, dtype=self.layer.weight.dtype))
-        weight = quant_tensor_data(self.layer.weight, self.group_scale, self.group_zero, self.weight_quant_min,
-                                   self.weight_quant_max, self.weight_quantizer_axis)
-        self.q_weight.set_data(Tensor(weight, dtype=dtype.int8))
+        self._apply_gptq(Tensor(scale, dtype=self.layer.weight.dtype), Tensor(zp, dtype=self.layer.weight.dtype))
+        if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP and self.cfg.group_size != 0:
+            weight = msops.zeros_like(self.layer.weight, dtype=dtype.int8)
+            for i in range(self.ic):
+                w_scale = self.group_scale[i // self.cfg.group_size, :]
+                w_zero = self.group_zero[i // self.cfg.group_size, :]
+                weight[:, i] = quant_tensor_data(self.layer.weight[:, i], w_scale.T, w_zero.T, self.weight_quant_min,
+                                                 self.weight_quant_max, self.weight_quantizer_axis, dtype=dtype.int8)
+        else:
+            weight = quant_tensor_data(self.layer.weight, self.group_scale, self.group_zero, self.weight_quant_min,
+                                       self.weight_quant_max, self.weight_quantizer_axis, dtype=dtype.int8)
+        self.q_weight.set_data(Tensor(weight.asnumpy(), dtype=dtype.int8))
         self.w_scale.set_data(Tensor(self.group_scale, dtype=dtype.float64))
         self.w_zp.set_data(Tensor(self.group_zero, dtype=dtype.float64))
-        del self.h
+        self.group_scale = None
+        self.group_zero = None
 
     def process(self):
         self.quant()

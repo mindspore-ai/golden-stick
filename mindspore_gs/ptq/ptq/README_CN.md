@@ -116,6 +116,25 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
 ```
 
+##### GPTQ算法
+
+[GPTQ](https://arxiv.org/abs/2210.17323)算法是一种针对大规模预训练模型的PTQ算法。其核心思想是在量化过程中对权重weight进行补偿，从而减少低bit量化导致模型精度的损失。
+
+PTQ算法支持使用GPTQ算法进行4bit权重量化，并将其添加到了精度恢复算法集中，精度恢复算法当前仅GPTQ算法可选。
+
+可以通过如下配置项使能PTQ的GPTQ算法:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery
+from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
+
+algorithm_config = GPTQQuantConfig()
+ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+                       outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
+                       precision_recovery=PrecisionRecovery.GPTQ)
+```
+
 #### 组合量化
 
 得益于分层解耦框架设计，PTQ算法可以方便的将不同的算法能力组合在一起：
@@ -140,7 +159,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
                         outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
-后续我们还将基于此支持层间混合精度量化，根据不同层对于量化的敏感程度，应用8bit权重量化、8bit全量化或者4bit权重量化等。
+后续我们还将基于此支持层间混合精度量化，根据不同层对于量化的敏感程度，应用8bit权重量化、8bit全量化等。
 
 ## 示例
 

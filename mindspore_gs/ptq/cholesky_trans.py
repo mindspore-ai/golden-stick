@@ -17,7 +17,7 @@
 import os
 import ctypes
 import numpy as np
-from mindspore import Tensor, dtype, numpy
+from mindspore import Tensor, numpy
 from mindspore import ops as msops
 from mindspore_gs.common import logger
 
@@ -58,7 +58,7 @@ def cholesky_compute(h, damp_percent=0.01):
             # Note: cholesky_transform will change H with inplace way
             hinv, flag = cholesky_transform(h.numpy().copy())
             if not flag:
-                hinv = Tensor(hinv, dtype.float16)
+                hinv = Tensor(hinv)
                 logger.info(f"Successful! the accumulated damp is {damp_sum}")
                 break
             h[diag, diag] += damp
@@ -69,7 +69,7 @@ def cholesky_compute(h, damp_percent=0.01):
     else:
         h = np.linalg.cholesky(h.numpy())
         h = np.linalg.inv(h.T) @ np.linalg.inv(h)
-        hinv = Tensor(np.linalg.cholesky(h).T, dtype.float16)
+        hinv = Tensor(np.linalg.cholesky(h).T)
     return hinv
 
 def cholesky_transform(h):

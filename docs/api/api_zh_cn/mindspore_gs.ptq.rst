@@ -37,6 +37,16 @@ PTQ 模式枚举
 
     mindspore_gs.ptq.OutliersSuppressionType
 
+精度补偿类型
+--------------------
+
+.. mscnautosummary::
+    :toctree: ptq
+    :nosignatures:
+    :template: classtemplate.rst
+
+    mindspore_gs.ptq.PrecisionRecovery
+
 网络适配层
 -----------------
 
