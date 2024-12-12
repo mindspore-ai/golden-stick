@@ -194,22 +194,30 @@ quant "quant llama2-13b-bf16 to a16w8" "bf16-a16w8" "${BASEPATH}/ws/predict_llam
 sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
 eval "eval a16w8 llama2-13b-bf16" "bf16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
+conda_path=$(pip show mindspore | grep 'Location' | awk -F ' ' '{print$2}')
+echo "mindspore commit:"
+cat ${conda_path}/mindspore/.commit_id
+echo "mindspore_gs commit:"
+cat ${conda_path}/mindspore_gs/.commit_id
+echo "mindformers commit:"
+cat ${conda_path}/mindformers/.commit_id
+
 echo "fp16 llama2-13b ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/fp16_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/fp16_eval_log/worker_0.log
 echo "a8w8 llama2-13b-fp16 ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/fp16-a8w8_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/fp16-a8w8_eval_log/worker_0.log
 echo "a16w8 llama2-13b-fp16 ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/fp16-a16w8_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/fp16-a16w8_eval_log/worker_0.log
 echo "a8w8c8 llama2-13b-fp16 ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/fp16-a8w8c8_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/fp16-a8w8c8_eval_log/worker_0.log
 echo "a16w8c8 llama2-13b-fp16 ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/fp16-a16w8c8_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/fp16-a16w8c8_eval_log/worker_0.log
 echo "a16w4-awq llama2-13b-fp16 ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/fp16-awq_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/fp16-awq_eval_log/worker_0.log
 
 echo "bf16 llama2-13b ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/bf16_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/bf16_eval_log/worker_0.log
 echo "a8w8 llama2-13b-bf16 ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/bf16-a8w8_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/bf16-a8w8_eval_log/worker_0.log
 echo "a16w8 llama2-13b-bf16 ${ds_type} result:"
-tail -n 3 ${BASEPATH}/ws/bf16-a16w8_eval_log/worker_0.log
+tail -n 2 ${BASEPATH}/ws/bf16-a16w8_eval_log/worker_0.log
