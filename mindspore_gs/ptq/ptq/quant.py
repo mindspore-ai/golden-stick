@@ -140,6 +140,8 @@ class PTQ(CompAlgo):
                 self._config.kvcache_quant_dtype in kvcache_support_dtype:
             logger.info("Adding Quantizer to pipeline.")
             self.pipeline.append(Quantizer(self._config))
+        if self.pipeline == []:
+            logger.warning('No layer found in network is suitable for quantization, please check configuration items.')
 
     def _load_mindformers_plugin(self):
         for algorithm in self.pipeline:
@@ -192,14 +194,6 @@ class PTQ(CompAlgo):
         if config.weight_quant_dtype is None and \
                 config.act_quant_dtype == dtype.int8:
             raise ValueError("PTQ algorithm do not support only quant activation.")
-        if config.weight_quant_dtype is None and config.act_quant_dtype is None \
-            and config.kvcache_quant_dtype is None and \
-                config.outliers_suppression == OutliersSuppressionType.NONE:
-            logger.warning("PTQ algorithm does not quantify any layers when"
-                           "weight_quant_dtype=None,"
-                           "act_quant_dtype=None,"
-                           "kvcache_quant_dtype=None and"
-                           "outliers_suppression=None")
         if config.weight_quant_dtype == dtype.qint4x2 and (config.act_quant_dtype == dtype.int8 or \
                                                            config.kvcache_quant_dtype == dtype.int8):
             raise ValueError("PTQ algorithm only support quant weight in int4 alone."
