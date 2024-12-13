@@ -117,8 +117,10 @@ model:
       quant_method: 'ptq'
       activation_dtype: "none"
       weight_dtype: "int8"
+      weight_quant_granularity: "per_channel"
       kvcache_dtype: "int8"
-      outliers_suppression: "none"
+      group_size: 0
+      outliers_suppression: "None"
       modules_to_not_convert: ['lm_head', 'w2']
       algorithm_args: {}
   arch:

@@ -31,10 +31,10 @@ from mindspore_gs.ptq.ptq_config import (
     PTQApproach, PTQMode,
     OutliersSuppressionType)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, SearchInputs
 from mindspore_gs.ptq.processor import Processor
 from .algorithm import Algorithm
-from .algorithms import LinearSmoother, LinearAWQSmoother, LinearClipper, Quantizer
+from .algorithms import LinearSmoothQuant, LinearAutoSmoother, LinearClipper, Quantizer
 
 
 class InputCatcher(Cell):
@@ -127,11 +127,11 @@ class PTQ(CompAlgo):
         weight_support_dtype = [dtype.int8, dtype.qint4x2]
         kvcache_support_dtype = [dtype.int8]
         if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
-            logger.info("Adding LinearSmoother to pipeline.")
-            self.pipeline.append(LinearSmoother(self._config))
+            logger.info("Adding LinearSmoothQuant to pipeline.")
+            self.pipeline.append(LinearSmoothQuant(self._config))
         if self._config.outliers_suppression == OutliersSuppressionType.AWQ:
-            logger.info("Adding LinearAWQSmoother to pipeline.")
-            self.pipeline.append(LinearAWQSmoother(self._config))
+            logger.info("Adding LinearAutoSmoother to pipeline.")
+            self.pipeline.append(LinearAutoSmoother(self._config))
         if self._config.algo_args.get("weight_clip_ratio"):
             logger.info("Adding LinearCliper to pipeline.")
             self.pipeline.append(LinearClipper(self._config))
@@ -258,7 +258,8 @@ class PTQ(CompAlgo):
             layer_name, layer = self.decoder_layers[i]
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             for processor in self.pipeline:
-                processor.replace(layer_name, layer, network_helper, layer_args=cur_args, layer_kwargs=cur_kwargs)
+                processor.replace(layer_name, layer, network_helper,
+                                  search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
 
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()

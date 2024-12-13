@@ -15,6 +15,7 @@
 """ptq wrapper cell base class."""
 
 import abc
+import dataclasses
 from mindspore.nn import Cell
 from mindspore import ops as msops
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig
@@ -24,6 +25,13 @@ from mindspore_gs.ptq.network_helpers import NetworkHelper
 class Checker:
     def check(self, config: InnerPTQConfig):
         raise NotImplementedError
+
+
+@dataclasses.dataclass
+class SearchInputs:
+    layer: Cell
+    layer_args: []
+    layer_kwargs: {}
 
 
 class WrapperCell(abc.ABC, Cell):

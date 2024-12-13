@@ -277,9 +277,9 @@ class PTQConfig:
             raise ValueError(f'act_quant_dtype support {act_support}, but got {self.act_quant_dtype}.')
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
-        self._check_precision_recovery()
-        self._check_quant_granularity()
         value_check('group_size', self.group_size, int)
+        self._check_quant_granularity()
+        self._check_precision_recovery()
         if not isinstance(self.algo_args, dict) and not is_dataclass(self.algo_args):
             raise ValueError(f"algo_args's type should be dict or dataclass, but now is {type(self.algo_args)}")
         if self.algo_args and is_dataclass(self.algo_args):

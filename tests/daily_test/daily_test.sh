@@ -82,18 +82,26 @@ sed_dtype()
 sed_qconfig()
 {
   f=$1
+  wqg=${7:-'per_channel'}
+  group_size=${8:-"0"}
+  black_opname=${9:-"[\'lm_head\', \'w2\']"}
   sed -i s/"activation_dtype: .*"/"activation_dtype: \"${2}\""/g ${f}
   sed -i s/"weight_dtype: .*"/"weight_dtype: \"${3}\""/g ${f}
   sed -i s/"kvcache_dtype: .*"/"kvcache_dtype: \"${4}\""/g ${f}
   sed -i s/"outliers_suppression: .*"/"outliers_suppression: \"${5}\""/g ${f}
   sed -i s/"load_checkpoint: .*"/"load_checkpoint: \'${6}\'"/g ${f}
+  sed -i s/"weight_quant_granularity: .*"/"weight_quant_granularity: \'${wqg}\'"/g ${f}
+  sed -i s/"group_size: .*"/"group_size: ${group_size}"/g ${f}
+  sed -i s/"modules_to_not_convert: .*"/"modules_to_not_convert: ${black_opname}"/g ${f}
 }
 
 eval()
 {
   echo "enter test workspace."
   cd ws || exit 1
-  echo "${1}"
+  echo "${1}, save yaml to ${2}_eval_log/"
+  mkdir -p "${2}_eval_log"
+  cp "${3}" "${2}_eval_log/"
   msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval.py -c "${3}" -s ${dataset} -n 2000 > "eval_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_eval.py" | grep -v grep | awk -F ' ' '{print$2}')
@@ -107,7 +115,9 @@ quant()
 {
   echo "enter test workspace."
   cd ws || exit 1
-  echo "${1}"
+  echo "${1}, save yaml to ${2}_quant_log/"
+  mkdir -p "${2}_quant_log"
+  cp "${3}" "${2}_quant_log/"
   msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a $4 -w $5 -k $6 -o $7 -b w2 lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
@@ -121,8 +131,10 @@ quant_awq()
 {
   echo "enter test workspace."
   cd ws || exit 1
-  echo "${1}"
-  msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -o awq -wg per_group -g 128 -b lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
+  echo "${1}, save yaml to ${2}_quant_log/"
+  mkdir -p "${2}_quant_log"
+  cp "${3}" "${2}_quant_log/"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
   echo "waiting pid ${pid}"
@@ -149,7 +161,7 @@ eval "eval a8w8 llama2-13b-fp16" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_
 # quant ckpt a16w8
 quant "quant llama2-13b-fp16 to a16w8" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
 # a16w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "\.\/output\/llama2_13b_ptq_smooth_a16w8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
 eval "eval a16w8 llama2-13b-fp16" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->a8w8c8 ############################
@@ -163,15 +175,22 @@ eval "eval a8w8c8 llama2-13b-fp16" "fp16-a8w8c8" "${BASEPATH}/ws/predict_llama2_
 # quant ckpt a16w8c8
 quant "quant llama2-13b-fp16 to a16w8c8" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "int8" "none"
 # a8w8c8 acc
-sed_qconfig "${BASEPATH}/ws/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "int8" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8c8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "int8" "None" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8c8_ckpt\/"
 eval "eval a16w8c8 llama2-13b-fp16" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
-############################ fp16->awq-a16w4 ############################
+############################ fp16->awq-pergroup-a16w4 ############################
 # quant ckpt awq
-quant_awq "quant llama2-13b-fp16 to awq" "fp16-awq" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
+quant_awq "quant llama2-13b-fp16 to awq-pergroup" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
 # awq acc
-sed_qconfig "${BASEPATH}/ws/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "awq" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/"
-eval "eval awq llama2-13b-fp16" "fp16-awq" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']"
+eval "eval awq-pergroup llama2-13b-fp16" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+############################ fp16->awq-perchannel-a16w4 ############################
+# quant ckpt awq
+quant_awq "quant llama2-13b-fp16 to awq-perchannel" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
+# awq acc
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
+eval "eval awq-perchannel llama2-13b-fp16" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 
 ############################ bf16 ############################
@@ -200,24 +219,26 @@ cat ${conda_path}/mindspore/.commit_id
 echo "mindspore_gs commit:"
 cat ${conda_path}/mindspore_gs/.commit_id
 echo "mindformers commit:"
-cat ${conda_path}/mindformers/.commit_id
+head -n 3 ${conda_path}/mindformers/.commit_id
 
-echo "----------------- fp16 llama2-13b ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/fp16_eval_log/worker_0.log
-echo "----------------- a8w8 llama2-13b-fp16 ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/fp16-a8w8_eval_log/worker_0.log
-echo "----------------- a16w8 llama2-13b-fp16 ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/fp16-a16w8_eval_log/worker_0.log
-echo "----------------- a8w8c8 llama2-13b-fp16 ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/fp16-a8w8c8_eval_log/worker_0.log
-echo "----------------- a16w8c8 llama2-13b-fp16 ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/fp16-a16w8c8_eval_log/worker_0.log
-echo "----------------- a16w4-awq llama2-13b-fp16 ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/fp16-awq_eval_log/worker_0.log
+echo_result()
+{
+  name=$1
+  path=$2
+  if [ -f "${path}" ]; then
+    echo "----------------- ${name} ${ds_type} result -----------------"
+    tail -n 2 ${BASEPATH}/ws/fp16_eval_log/worker_0.log
+  fi
+}
 
-echo "----------------- bf16 llama2-13b ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/bf16_eval_log/worker_0.log
-echo "----------------- a8w8 llama2-13b-bf16 ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/bf16-a8w8_eval_log/worker_0.log
-echo "----------------- a16w8 llama2-13b-bf16 ${ds_type} result -----------------"
-tail -n 2 ${BASEPATH}/ws/bf16-a16w8_eval_log/worker_0.log
+echo_result "fp16 llama2-13b" "${BASEPATH}/ws/fp16_eval_log/worker_0.log"
+echo_result "fp16->a8w8 llama2-13b" "${BASEPATH}/ws/fp16-a8w8_eval_log/worker_0.log"
+echo_result "fp16->a16w8 llama2-13b" "${BASEPATH}/ws/fp16-a16w8_eval_log/worker_0.log"
+echo_result "fp16->a8w8c8 llama2-13b" "${BASEPATH}/ws/fp16-a8w8c8_eval_log/worker_0.log"
+echo_result "fp16->a16w8c8 llama2-13b" "${BASEPATH}/ws/fp16-a16w8c8_eval_log/worker_0.log"
+echo_result "fp16->a16w4-awq-pergroup llama2-13b" "${BASEPATH}/ws/fp16-awq-pergroup_eval_log/worker_0.log"
+echo_result "fp16->a16w4-awq-perchannel llama2-13b" "${BASEPATH}/ws/fp16-awq-perchannel_eval_log/worker_0.log"
+
+echo_result "bf16 llama2-13b" "${BASEPATH}/ws/bf16_eval_log/worker_0.log"
+echo_result "bf16->a8w8 llama2-13b" "${BASEPATH}/ws/bf16-a8w8_eval_log/worker_0.log"
+echo_result "bf16->a16w8 llama2-13b" "${BASEPATH}/ws/bf16-a16w8_eval_log/worker_0.log"
