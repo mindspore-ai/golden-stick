@@ -296,18 +296,18 @@ class PTQConfig:
 
     def _check_quant_granularity(self):
         """check_quant_granularity"""
-        if self.act_quant_granularity != QuantGranularity.PER_TENSOR and self.act_quant_granularity != \
-            QuantGranularity.PER_TOKEN:
-            raise ValueError(f'self.act_quant_granularity {self.act_quant_granularity} must be '
-                             'QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.')
-        if self.weight_quant_granularity != QuantGranularity.PER_CHANNEL and self.weight_quant_granularity != \
-            QuantGranularity.PER_GROUP:
-            raise ValueError(f'self.weight_quant_granularity {self.weight_quant_granularity} must be '
-                             'QuantGranularity.PER_CHANNEL or QuantGranularity.PER_GROUP.')
-        if self.kvcache_quant_granularity != QuantGranularity.PER_CHANNEL and self.kvcache_quant_granularity != \
-            QuantGranularity.PER_TOKEN:
-            raise ValueError(f'self.kvcache_quant_granularity {self.kvcache_quant_granularity} must be '
-                             'QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.')
+        act_quant_granularity_support = [QuantGranularity.PER_TENSOR, QuantGranularity.PER_TOKEN]
+        weight_quant_granularity_support = [QuantGranularity.PER_CHANNEL, QuantGranularity.PER_GROUP]
+        kvcache_quant_granularity_support = [QuantGranularity.PER_CHANNEL, QuantGranularity.PER_TOKEN]
+        if self.act_quant_granularity not in act_quant_granularity_support:
+            raise ValueError(f'act_quant_granularity support {act_quant_granularity_support}, '
+                             f'but got {self.act_quant_granularity}.')
+        if self.weight_quant_granularity not in weight_quant_granularity_support:
+            raise ValueError(f'weight_quant_granularity support {weight_quant_granularity_support}, '
+                             f'but got {self.weight_quant_granularity}.')
+        if self.kvcache_quant_granularity not in kvcache_quant_granularity_support:
+            raise ValueError(f'kvcache_quant_granularity support {kvcache_quant_granularity_support}, '
+                             f'but got {self.kvcache_quant_granularity}.')
         if (self.weight_quant_dtype != msdtype.int8 or self.act_quant_dtype != msdtype.int8) and \
             self.act_quant_granularity is QuantGranularity.PER_TOKEN:
             raise ValueError(f'when self.act_quant_granularity is QuantGranularity.PER_TOKEN, self.weight_quant_dtype: {self.weight_quant_dtype} '
