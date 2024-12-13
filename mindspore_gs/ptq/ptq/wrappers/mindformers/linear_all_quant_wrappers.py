@@ -24,7 +24,7 @@ from mindformers.experimental.infer.core.layers import RowParallelLinear, Column
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType
+from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType, KernelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
@@ -83,7 +83,7 @@ class AllQuantLinearInferCell(LinearInferCell):
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
         quant, qmm, bias = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam,
-                                                 is_deploy, cfg.tp_size, compute_type)
+                                                 is_deploy, cfg.tp_size, compute_type, KernelType.INTERNAL)
         if not is_deploy:
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
             logger.debug(f"AllQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
