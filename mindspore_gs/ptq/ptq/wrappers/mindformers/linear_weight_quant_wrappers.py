@@ -85,7 +85,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
         else:
             scale_zp_shape = (self.oc,)
         self.w_scale = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
-        self.w_zp = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
+        self.w_zp = Parameter(initializer('zeros', scale_zp_shape, dtype=dtype.float64))
 
     def quant(self):
         """quant"""
