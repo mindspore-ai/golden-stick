@@ -207,6 +207,75 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128, algo_args=awq_config)
 ```
 
+#### 动态量化算法
+
+当前金箍棒仅支持per-token的动态量化。per-token量化是指为每个token分配独立的量化参数来减少误差。动态量化是指量化参数在推理阶段实时计算，而不需要离线计算量化参数。
+
+per-token动态量化算法是在推理过程中对激活/KVcache进行per-token在线量化，在线计算出来token维度上的scale和zp，而无需使用数据集进行校准量化，与离线静态量化相比精度更高。当前per-token动态量化仅支持对称量化。
+
+##### 激活 per-token动态量化
+
+激活per-token动态量化，首先需要对权重进行RoundToNearest量化，然后再使用量化的权重进行W8A8-per-token推理。同时激活per-token动态量化也支持smooth操作，因此也可以在量化过程中计算smooth参数。
+
+- 包含smooth参数的激活per-token动态量化
+
+  当需要包含smooth参数时，对应的配置项如下。
+
+  ```python
+  from mindspore import dtype as msdtype
+  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
+  outliers_suppression=OutliersSuppressionType.SMOOTH)
+  ```
+
+  此时激活对应的计算公式如下：
+
+  $$scale = \frac{row\_max(abs(X_{float} \cdot smooth\_scale))} {127}$$
+
+  $$x_{int} = round(x_{float} \div scale)$$
+
+- 不包含smooth参数的激活per-token动态量化
+
+  当不包含smooth参数时，对应的配置项如下。
+
+  ```python
+  from mindspore import dtype as msdtype
+  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+  weight_quant_granularity=QuantGranularity.PER_TOKEN,
+  outliers_suppression=OutliersSuppressionType.NONE)
+  ```
+
+  此时激活对应的计算公式如下：
+
+  $$scale = \frac{row\_max(abs(X_{{float}}))} {127}$$
+
+  $$x_{int} = round(x_{float} \div scale)$$
+
+同时也可以直接使用PTQ算法w8a16量化后的权重进行W8A8-per-token推理。
+
+##### KVCache per-token动态量化
+
+对KVCache进行per-token动态量化，无需离线量化操作，可以直接传入原始的浮点权重直接进行推理即可。对应的配置项如下。
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
+kvcache_quant_dtype=msdtype.int8,
+kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+此时KVCache对应的计算公式如下：
+
+$$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
+
+$$KVCache_{int} = round(KVCache_{float} \div scale)$$
+
 #### 组合量化
 
 得益于分层解耦框架设计，PTQ算法可以方便的将不同的算法能力组合在一起：
