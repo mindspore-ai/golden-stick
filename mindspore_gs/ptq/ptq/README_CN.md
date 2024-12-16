@@ -104,7 +104,7 @@ ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_qu
 
 ![](images/zh_cn/smooth_quant.png)
 
-SmoothQuant算法通过数学等价变换，将激活上的异常值转移一部分到权重上，从而将难以量化的激活和极易量化的权重转化为较易量化的激活和较易量化的权重，实现量化精度的提升。
+[SmoothQuant](https://arxiv.org/pdf/2211.10438)算法通过数学等价变换，将激活上的异常值转移一部分到权重上，从而将难以量化的激活和极易量化的权重转化为较易量化的激活和较易量化的权重，实现量化精度的提升。
 
 可以通过如下配置项使能PTQ的SmoothQuant能力：
 
@@ -116,7 +116,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
 ```
 
-##### GPTQ算法
+#### GPTQ算法
 
 [GPTQ](https://arxiv.org/abs/2210.17323)算法是一种针对大规模预训练模型的PTQ算法。其核心思想是在量化过程中对权重weight进行补偿，从而减少低bit量化导致模型精度的损失。
 
@@ -133,6 +133,60 @@ algorithm_config = GPTQQuantConfig()
 ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
                        precision_recovery=PrecisionRecovery.GPTQ)
+```
+
+#### AWQ算法
+
+[研究](https://arxiv.org/pdf/2306.00978)发现LLM中的每个权重并不是同等重要的，只有0.1%~1%的小部分权重对模型的输出精度影响很大，我们称这部分权重为显著权重。如果在量化过程中能够保护显著权重的精度，对其他权重进行低比特量化，就可以在精度几乎不变的情况下大幅降低模型的内存占用。
+
+![](images/zh_cn/awq.png)
+
+[Activation-Aware Weight Quantization，简称AWQ](https://arxiv.org/pdf/2306.00978)基于激活值分布挑选显著权重，并且考虑到硬件效率，通过缩放的方式来保护显著权重，避免同一个权重张量使用不同数据类型存储，从而实现了硬件友好的高精度权重量化算法，可以实现4bit甚至更低bit的量化。除了显著权重的保护，AWQ还引入了动态权重截断技术进一步提升量化的精度。
+
+金箍棒通过新增一种异常值抑制方法来支持AWQ。AWQ同时支持PerChannel量化和PerGroup量化，可以通过如下配置项使能PTQ的PerChannel AWQ算法:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ)
+```
+
+或者：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ,
+                       weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0)
+```
+
+可以通过如下配置项使能PTQ的PerGroup AWQ算法:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ,
+                       weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128)
+```
+
+> 考虑到PerGroup量化在昇腾硬件上的推理性能，推荐将group_size设置为64或者128。
+
+同时可以通过AWQConfig来指定AWQ的超参搜索范围：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity, AWQConfig
+
+awq_config = AWQConfig(duo_scaling=False, smooth_alpha=[0.5, 0.7, 0.9], weight_clip_ratio=[0.90, 0.95, 0.99])
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ,
+                       weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128, algo_args=awq_config)
 ```
 
 #### 组合量化
@@ -250,12 +304,12 @@ workspace
 
 4. 修改model.arch.type字段为ParallelLlamaForCausalLM。
 
-5. 修改use_parallel为True, parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。
+5. 修改use_parallel为False，parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。
 
 修改后的yaml配置文件中，并行相关的配置应该类似于这样：
 
 ```yaml
-use_parallel: True
+use_parallel: False
 parallel:
   parallel_mode: "STAND_ALONE"
   gradients_mean: False
@@ -275,12 +329,6 @@ parallel_config:
   micro_batch_num: 16
   vocab_emb_dp: True
   gradient_aggregation_group: 4
-```
-
-需要注意的是MindFormers的ParallelLlamaForCausalLM 7B网络即便在单卡上，也必须使用msrun才能成功运行。msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/master/model_train/parallel/msrun_launcher.html)，下面是一个简单的样例命令：
-
-```bash
-msrun --worker_num=1 --local_worker_num=1 --master_port=12345 --log_dir=msrun_log --join=True --cluster_time_out=300 python sample.py
 ```
 
 完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
@@ -362,7 +410,7 @@ print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
 
 #### 3.1. 评估FP16网络的F1EM指标
 
-使用squad1.1 dev数据集评估ParallelLlamaForCausalLM-7B网络的F1EM指标。完整样例可以参考[eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py)。注意需用msrun运行，msrun的使用方式可以参考[msrun使用说明](https://www.mindspore.cn/docs/zh-CN/master/model_train/parallel/msrun_launcher.html)。
+使用squad1.1 dev数据集评估ParallelLlamaForCausalLM-7B网络的F1EM指标。完整样例可以参考[eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py)。
 
 > 评测前请确认yaml配置文件中的load_checkpoint字段已正确配置了非量化的网络checkpoint文件路径:`/path/to/workspace/llama2_7b.ckpt`。并配置context.mode为0，即静态图模式。
 
