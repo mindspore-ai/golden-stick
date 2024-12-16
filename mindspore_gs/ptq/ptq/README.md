@@ -104,9 +104,9 @@ It is found that, unlike CNNs and small transformer networks, when the number of
 
 ![](images/en/smooth_quant.png)
 
-The SmoothQuant algorithm transfers a portion of the outliers on the activations to the weights through a mathematically equivalent transformation, thus transforming the difficult-to-quantify activations and very easy-to-quantify weights into easy-to-quantify activations and easy-to-quantify weights, and realizing the improvement of quantization accuracy.
+The [SmoothQuant](https://arxiv.org/pdf/2211.10438) algorithm transfers a portion of the outliers on the activations to the weights through a mathematically equivalent transformation, thus transforming the difficult-to-quantify activations and very easy-to-quantify weights into easy-to-quantify activations and easy-to-quantify weights, and realizing the improvement of quantization accuracy.
 
-You can enable the SmoothQuant capability of PTQ with the following configuration item:
+User can enable the SmoothQuant capability of PTQ with the following configuration item:
 
 ```python
 from mindspore import dtype as msdtype
@@ -116,13 +116,13 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
 ```
 
-##### GPTQ Algorithm
+#### GPTQ Algorithm
 
 The [GPTQ](https://arxiv.org/abs/2210.17323) algorithm is a PTQ algorithm specifically designed for large-scale pre-trained models. Its core idea is to compensate for weights during the quantization process, thereby reducing the loss of model accuracy caused by low-bit quantization.
 
 The PTQ algorithm supports the use of the GPTQ algorithm for 4-bit weight quantization and has incorporated it into the set of accuracy recovery algorithms. Currently, GPTQ is the only optional algorithm for accuracy recovery.
 
-You can enable the GPTQ algorithm of PTQ with the following configuration item:
+User can enable the GPTQ algorithm of PTQ with the following configuration item:
 
 ```python
 from mindspore import dtype as msdtype
@@ -133,6 +133,60 @@ algorithm_config = GPTQQuantConfig()
 ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
                        precision_recovery=PrecisionRecovery.GPTQ)
+```
+
+#### AWQ Algorithm
+
+The [Research](https://arxiv.org/pdf/2306.00978) finds that weights are not equally important for LLMs’ performance. There is a small fraction (0.1%-1%) of weights called salient weights which are significantly important to LLMs’ performance. Skipping the quantization of these salient weights while quantization other weights to low bits can archive dramatically reducation of LLM inference memory footprint with low quantization accuracy loss.
+
+![](images/en/awq.png)
+
+In [Activation-Aware Weight Quantization, AWQ](https://arxiv.org/pdf/2306.00978), the salient weights are selected based on the distribution of activation values, and considering the hardware efficiency, the salient weights are protected by scaling to avoid the same weight tensor from being stored by different data types, so as to realize the hardware-friendly and high-precision weighting algorithm, which can realize the quantization to 4bits or even lower bits. In addition to the protection of significant weights, AWQ also introduces dynamic weight truncation technology to further improve the accuracy of quantization.
+
+MindSpore Golden Stick supports AWQ by adding an `OutliersSuppressionType` method called `OutliersSuppressionType.AWQ`. AWQ algorithm supports both PerChannel quantization and PerGroup quantization, and user can enable the PerChannel AWQ algorithm of PTQ by using the following configuration items:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ)
+```
+
+or：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ,
+                       weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0)
+```
+
+User can enable the PerGroup AWQ algorithm of PTQ by using the following configuration items:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ,
+                       weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128)
+```
+
+> Considering the inference performance of PerGroup quantization on the Ascend hardware, it is recommended to set the group_size to 64 or 128.
+
+At the same time, AWQConfig can be used to specify the hyperparameter search range of AWQ:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity, AWQConfig
+
+awq_config = AWQConfig(duo_scaling=False, smooth_alpha=[0.5, 0.7, 0.9], weight_clip_ratio=[0.90, 0.95, 0.99])
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+                       outliers_suppression=OutliersSuppressionType.AWQ,
+                       weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128, algo_args=awq_config)
 ```
 
 #### Combination Quantification
@@ -250,12 +304,12 @@ Constructing the ParallelLlamaForCausalLM 7B network for the MindFormers bin fir
 
 4. Modify the model.arch.type field to ParallelLlamaForCausalLM.
 
-5. Modify use_parallel to True, parallel.parallel_mode to 'STAND_ALONE', and parallel_config.data_parallel to 1, and parallel.full_batch to False.
+5. Modify use_parallel to False, parallel.parallel_mode to 'STAND_ALONE', and parallel_config.data_parallel to 1, and parallel.full_batch to False.
 
 In the modified yaml configuration file, the parallel-related configuration should look like this:
 
 ```yaml
-use_parallel: True
+use_parallel: False
 parallel:
   parallel_mode: "STAND_ALONE"
   gradients_mean: False
@@ -275,12 +329,6 @@ parallel_config:
   micro_batch_num: 16
   vocab_emb_dp: True
   gradient_aggregation_group: 4
-```
-
-Note that the ParallelLlamaForCausalLM 7B network from MindFormers must use msrun to run even on a single card. the use of msrun can refer to [msrun instructions](https://www.mindspore.cn/docs/en/master/model_train/parallel/msrun_launcher.html), here is an example:
-
-```bash
-msrun --worker_num=1 --local_worker_num=1 --master_port=12345 --log_dir=msrun_log --join=True --cluster_time_out=300 python sample.py
 ```
 
 the complete sample code can be found in [quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py).
@@ -357,7 +405,7 @@ We can enable different quantization capabilities according to the PTQConfig con
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
+                           outliers_suppression=OutliersSuppressionType.NONE)
     ```
 
 - smooth-quant weight quantization combined kvcache int8 quantization
@@ -367,7 +415,7 @@ We can enable different quantization capabilities according to the PTQConfig con
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+                           outliers_suppression=OutliersSuppressionType.SMOOTH)
     ```
 
 Once you have the PTQConfig, the next step is to construct the PTQ algorithm with the following code:
@@ -404,7 +452,7 @@ After a successful run, the quantized checkpoint file is saved under the `/path/
 
 #### 3.1. Evaluating F1EM Metrics for FP16 Networks
 
-Evaluation of F1EM metrics for the ParallelLlamaForCausalLM-7B network using the squad1.1 dev dataset. A full sample can be found in [eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py). Note that msrun is required to run it, and the usage of msrun can be found in [msrun usage instructions](https://www.mindspore.cn/docs/en/master/model_train/parallel/msrun_launcher.html).
+Evaluation of F1EM metrics for the ParallelLlamaForCausalLM-7B network using the squad1.1 dev dataset. A full sample can be found in [eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py).
 
 > Before the review, please make sure that the load_checkpoint field in the yaml configuration file is properly configured with the non-quantized network checkpoint file path:`/path/to/workspace/llama2_7b.ckpt`. And configure context.mode to 0, which is the static graph mode.
 
