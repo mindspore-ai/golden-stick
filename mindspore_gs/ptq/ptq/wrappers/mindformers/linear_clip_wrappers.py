@@ -38,7 +38,7 @@ class ClipLinearCell(WrapperLinearCell):
     def reg_self():
         class AutoClipChecker(Checker):
             def check(self, config: InnerPTQConfig):
-                return config.algo_args.get("weight_clip_ratio")
+                return config.algo_args.get("weight_clip_ratio", [1 - i/20 for i in range(10)])
 
         LinearClipper.reg_layer_map(Linear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(ColumnParallelLinear, ClipLinearCell, AutoClipChecker())
@@ -182,7 +182,7 @@ class ClipLinearCell(WrapperLinearCell):
 
     def process(self):
         super(ClipLinearCell, self).process()
-        weight_clip_ratio = self.cfg.algo_args.get("weight_clip_ratio")
+        weight_clip_ratio = self.cfg.algo_args.get("weight_clip_ratio", [1 - i/20 for i in range(10)])
         if isinstance(weight_clip_ratio, list):
             clip_val = self._search_best_clip(weight_clip_ratio)
         elif isinstance(weight_clip_ratio, float):
