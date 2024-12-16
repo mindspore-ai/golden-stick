@@ -15,9 +15,11 @@
 """ptq wrapper cells for mindformers."""
 
 import copy
+import enum
 from types import MethodType
+from typing import Optional
 
-from mindspore import Tensor
+from mindspore import Tensor, nn
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
@@ -28,7 +30,7 @@ from mindspore_gs.ptq.ptq_config import (
     QuantGranularity)
 from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy
 from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoothQuant, LinearAutoSmoother
-from mindspore_gs.ptq.ptq.wrapper_cell import Checker
+from mindspore_gs.ptq.ptq.wrapper_cell import Checker, SearchInputs
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from .parallel_minmax import (
     get_smooth_x_obs_min_max_op,
@@ -37,18 +39,15 @@ from .parallel_minmax import (
 from .linear_wrapper import WrapperLinearCell
 
 
+class SmoothMethod(enum.Enum):
+    NONE = 0
+    SMOOTH_QUANT = 1
+    AWQ = 2
+    AUTO = 3
+
+
 class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
-
-    @staticmethod
-    def reg_self():
-        class SmoothChecker(Checker):
-            def check(self, config: InnerPTQConfig):
-                return config.outliers_suppression == OutliersSuppressionType.SMOOTH
-
-        LinearSmoothQuant.reg_layer_map(Linear, SmoothLinearCell, SmoothChecker())
-        LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothLinearCell, SmoothChecker())
-        LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothLinearCell, SmoothChecker())
 
     def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
         super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
@@ -63,8 +62,19 @@ class SmoothLinearCell(WrapperLinearCell):
 
         self.x_obs_max, self.x_obs_min = get_smooth_x_obs_min_max_op()
         self.w_obs_max, self.w_obs_min = get_min_max_op(cfg.tp_size, self.is_colparallel)
+        self.smooth_method = self._get_smooth_method()
+
+    def _get_smooth_method(self):
+        raise NotImplementedError
 
     def _calc_smooth_scale(self, alpha):
+        if self.smooth_method is SmoothMethod.SMOOTH_QUANT:
+            return self._calc_smooth_quant_smooth_scale(alpha)
+        if self.smooth_method is SmoothMethod.AWQ:
+            return self._calc_awq_smooth_scale(alpha)
+        raise RuntimeError(f"Unsupported SmoothMethod: {self.smooth_method}")
+
+    def _calc_smooth_quant_smooth_scale(self, alpha):
         """_calc_smooth_scale"""
         act_max = msops.maximum(msops.abs(self.x_obs_max(self.cat_samples, 0)[0]),
                                 msops.abs(self.x_obs_min(self.cat_samples, 0)[0]))
@@ -81,6 +91,23 @@ class SmoothLinearCell(WrapperLinearCell):
         # set 0 or nan to 1.0 to avoid quantization error
         smooth_scale[input_max_pow == 0] = 1.0
         smooth_scale[weight_max_pow == 0] = 1.0
+        return smooth_scale
+
+    def _calc_awq_smooth_scale(self, alpha):
+        """_calc_smooth_scale"""
+        if self.cfg.algo_args.get("duo_scaling", True):
+            x_pow = msops.pow(self.x_mean, alpha)
+            w_pow = msops.pow(self.w_mean, 1 - alpha) + 1e-4
+            smooth_scale = (x_pow / w_pow).clamp(min=1e-4)
+        else:
+            smooth_scale = msops.pow(self.x_mean, alpha).clamp(1e-4).reshape(-1)
+
+        minmax_norm = msops.sqrt(self.scale_max(smooth_scale)[0] * self.scale_min(smooth_scale)[0])
+        smooth_scale = smooth_scale / minmax_norm
+        smooth_scale[self.x_mean == 0] = 1
+        smooth_scale[self.w_mean == 0] = 1
+        logger.debug(f"AWQSmoothLinearCell: search scale alpha {alpha}, smooth scale of Layer({self._layer_name}) "
+                     f"is {{{smooth_scale.shape}, {smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
         return smooth_scale
 
     def _apply_weight_smooth(self, smooth_scale: Tensor):
@@ -158,7 +185,81 @@ class SmoothLinearCell(WrapperLinearCell):
         return state_dict
 
 
-class AWQSmoothLinearCell(SmoothLinearCell):
+class SmoothQuantLinearCell(SmoothLinearCell):
+    """SmoothLinearCell"""
+    @staticmethod
+    def reg_self():
+        class SmoothChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.outliers_suppression == OutliersSuppressionType.SMOOTH
+
+        LinearSmoothQuant.reg_layer_map(Linear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+
+    def _get_smooth_method(self):
+        return SmoothMethod.SMOOTH_QUANT
+
+
+class AWQLinearCell(SmoothLinearCell):
+    """SmoothLinearCell"""
+    @staticmethod
+    def reg_self():
+        class AWQChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return False
+
+        LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
+
+    def _get_smooth_method(self):
+        return SmoothMethod.AWQ
+
+
+class SearchLinearCell(nn.Cell):
+    """SearchLinearCell"""
+    def __init__(self, search_inputs: Optional[SearchInputs] = None):
+        super().__init__()
+        self.target_layer = search_inputs.layer if search_inputs else None
+        self.target_args = search_inputs.layer_args if search_inputs else None
+        self.target_kwargs = search_inputs.layer_kwargs if search_inputs else None
+
+    def _target_forward(self):
+        if self.target_layer is None:
+            return None
+        # pylint: disable=not-callable
+        return self.target_layer(*self.target_args, **self.target_kwargs)
+
+    def _try_next(self) -> tuple:
+        raise NotImplementedError
+
+    def _loss(self, ground, pred):
+        raise NotImplementedError
+
+    def _settle_best(self, best_hyper_param: tuple):
+        raise NotImplementedError
+
+    def search_best(self):
+        """search_best"""
+        ground = self._target_forward()
+        min_loss = float("inf")
+        best_hyper_param = None
+        while True:
+            hyper_param = self._try_next()
+            if not hyper_param:
+                break
+            pred = self._target_forward()
+            loss = self._loss(ground, pred)
+            if loss < min_loss:
+                min_loss = loss
+                best_hyper_param = hyper_param
+        if not best_hyper_param:
+            raise RuntimeError(f"No search space found.")
+        self._settle_best(best_hyper_param)
+
+
+class AWQSmoothLinearCell(AWQLinearCell):
     """AWQLinearCell"""
 
     @staticmethod
@@ -232,23 +333,6 @@ class AWQSmoothLinearCell(SmoothLinearCell):
         logger.debug(f"AWQSmoothLinearCell: x_mean of Layer({self._layer_name}) is {{{self.x_mean.shape}, "
                      f"{self.x_mean.dtype}, {self.x_mean.asnumpy()}}}")
 
-    def _calc_smooth_scale(self, alpha):
-        """_calc_smooth_scale"""
-        if self.cfg.algo_args.get("duo_scaling", True):
-            x_pow = msops.pow(self.x_mean, alpha)
-            w_pow = msops.pow(self.w_mean, 1 - alpha) + 1e-4
-            smooth_scale = (x_pow / w_pow).clamp(min=1e-4)
-        else:
-            smooth_scale = msops.pow(self.x_mean, alpha).clamp(1e-4).reshape(-1)
-
-        minmax_norm = msops.sqrt(self.scale_max(smooth_scale)[0] * self.scale_min(smooth_scale)[0])
-        smooth_scale = smooth_scale / minmax_norm
-        smooth_scale[self.x_mean == 0] = 1
-        smooth_scale[self.w_mean == 0] = 1
-        logger.debug(f"AWQSmoothLinearCell: search scale alpha {alpha}, smooth scale of Layer({self._layer_name}) "
-                     f"is {{{smooth_scale.shape}, {smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
-        return smooth_scale
-
     def _search_best_scale(self, alpha):
         """search best scale"""
         best_scale = self._compute_best_scale(alpha)
@@ -302,7 +386,7 @@ class AWQSmoothLinearCell(SmoothLinearCell):
         logger.info(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
                     f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
         if best_ratio == -1:
-            raise ValueError(f"best_ratio=-1 is not correct, please check history  of loss: {history}.")
+            raise ValueError(f"best_ratio=-1 is not correct, please check history of loss: {history}.")
         return best_scale
 
     def _attn_forward(self, samples):

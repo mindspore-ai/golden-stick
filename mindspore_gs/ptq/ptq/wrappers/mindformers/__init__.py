@@ -14,7 +14,7 @@
 # ============================================================================
 """Wrapper cells for PTQ for MindFormers."""
 
-from .linear_smooth_wrappers import SmoothLinearCell, AWQSmoothLinearCell
+from .linear_smooth_wrappers import SmoothQuantLinearCell, AWQSmoothLinearCell
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_gptq_quant_wrappers import GptqWeightQuantLinearCell
 from .linear_clip_wrappers import ClipLinearCell
@@ -22,7 +22,7 @@ from .linear_all_quant_wrappers import AllQuantLinearCell
 from .linear_dynamic_quant_wrappers import DynamicQuantLinearCell
 from .kvcache_quant_wrappers import QuantPageAttentionMgrCell, DynamicQuantPageAttentionMgrCell
 
-SmoothLinearCell.reg_self()
+SmoothQuantLinearCell.reg_self()
 AWQSmoothLinearCell.reg_self()
 WeightQuantLinearCell.reg_self()
 GptqWeightQuantLinearCell.reg_self()
