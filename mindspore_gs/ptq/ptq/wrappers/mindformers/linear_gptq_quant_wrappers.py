@@ -55,7 +55,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         self.cfg.reflash_inputs_after_each_processor = True
         self.group_scale = []
         self.group_zero = []
-        self.rank_id = get_rank()
+        if self.cfg.tp_size > 1:
+            self.rank_id = get_rank()
         if self.parallel_type == ParallelType.ROW_PARALLEL and self.cfg.tp_size > 1:
             self.weight_need_allgather = True
         else:
@@ -85,16 +86,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 self.samples[i] = self.samples[i].astype(dtype.float32)
                 self.h += msops.matmul(self.samples[i].T, self.samples[i])
 
-    def _gptq_precision_recovery(self, weight, hinv, scale, zero):
+    def _gptq_precision_recovery(self, weight, hinv, scale, zero, perm):
         """precision recovery use gptq"""
         group_size = self.cfg.group_size
-        if self.cfg.algo_args["static_groups"] and group_size != 0:
-            for i in range(0, weight.shape[1], group_size):
-                scale, zero, _ = quant_tensor(weight[:, i : i + group_size], self.w_quant_min, self.w_quant_max,
-                                              self.cfg.weight_narrow_range, self.cfg.weight_symmetric, False,
-                                              0, self.cfg.weight_quant_dtype, self.weight_quantizer_axis, False)
-                self.group_scale.append(Tensor(scale, self.layer.weight.dtype).T)
-                self.group_zero.append(Tensor(zero, self.layer.weight.dtype).T)
         losses = msops.zeros_like(weight, dtype=weight.dtype)
         q = msops.zeros_like(weight, dtype=weight.dtype)
         now_idx = 1
@@ -104,7 +98,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             w1 = weight[:, i1:i2]
             q1 = msops.zeros_like(w1, dtype=w1.dtype)
             err = msops.zeros_like(w1, dtype=dtype.float32)
-            losses1 = msops.zeros_like(w1, dtype=w1.dtype)
+            losses1 = msops.zeros_like(w1, dtype=dtype.float32)
             hinv1 = hinv[i1:i2, i1:i2]
             hinv2 = hinv[i1:i2, i2:]
             for i in range(count):
@@ -126,8 +120,11 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                             self.group_zero.append(zero.T)
                             now_idx += 1
                     else:
-                        scale = self.group_scale[i1 // group_size].T
-                        zero = self.group_zero[i1 // group_size].T
+                        idx = i1
+                        if self.cfg.algo_args["desc_act"]:
+                            idx = perm[idx]
+                        scale = self.group_scale[idx // group_size].T
+                        zero = self.group_zero[idx // group_size].T
                 q0 = msops.clip_by_value(aclnn_add(msops.round(w0.unsqueeze(1) / scale), zero),
                                          Tensor(self.weight_quant_min), Tensor(self.weight_quant_max))
                 q0 = scale * aclnn_sub(q0, zero)
@@ -175,20 +172,30 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             weight = Tensor(weight.T, dtype=self.layer.weight.dtype)
         else:
             weight = self.layer.weight.value()
+        if self.cfg.algo_args["static_groups"] and self.cfg.group_size != 0:
+            for i in range(0, weight.shape[1], self.cfg.group_size):
+                scale, zero, _ = quant_tensor(weight[:, i : i + self.cfg.group_size], self.w_quant_min,
+                                              self.w_quant_max, self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
+                                              False, 0, self.cfg.weight_quant_dtype,
+                                              self.weight_quantizer_axis, False)
+                self.group_scale.append(Tensor(scale, self.layer.weight.dtype).T)
+                self.group_zero.append(Tensor(zero, self.layer.weight.dtype).T)
+        perm = []
         if self.cfg.algo_args["desc_act"]:
             perm = msops.argsort(numpy.diag(self.h), descending=True)
             weight = weight[:, perm]
             self.h = self.h[perm][:, perm]
+            invperm = msops.argsort(perm)
         from mindspore_gs.ptq.cholesky_trans import cholesky_compute
         cholesky_time = time.time()
         hinv = cholesky_compute(self.h, self.cfg.algo_args["damp_percent"])
         del self.h
         logger.info(f'[TIME]end cholesky part with time {time.time() - cholesky_time}s')
         quant_tick = time.time()
-        qweight = self._gptq_precision_recovery(weight, hinv, scale, zero)
+        qweight = self._gptq_precision_recovery(weight, hinv, scale, zero, perm)
         logger.info(f'[TIME]quant layers with time {time.time() - quant_tick}s')
         if self.cfg.algo_args["desc_act"]:
-            qweight = qweight[:, perm]
+            qweight = qweight[:, invperm]
         if self.weight_need_allgather:
             self.layer.weight = qweight[:, self.rank_id * self.ic : self.rank_id * self.ic + self.ic]
         else:
