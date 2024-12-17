@@ -79,7 +79,7 @@ def create_cfg(quant_algo_, mode):
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["lm_head"])
     elif quant_algo_ == 'A16W4_GPTQ':
-        algorithm_config = GPTQQuantConfig(block_size=32)
+        algorithm_config = GPTQQuantConfig(block_size=32, desc_act=True)
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["w2", "lm_head"],

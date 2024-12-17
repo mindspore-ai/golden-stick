@@ -289,9 +289,14 @@ class PTQConfig:
         '''check precision recovery'''
         if self.precision_recovery == PrecisionRecovery.GPTQ and self.algo_args == {}:
             self.algo_args = GPTQQuantConfig()
-            logger.warning('GPTQConfig is not configured, it will apply the default parameters.')
+            logger.warning('GPTQQuantConfig is not configured, it will apply the default parameters.')
         if self.precision_recovery != PrecisionRecovery.GPTQ and isinstance(self.algo_args, GPTQQuantConfig):
-            logger.warning(f'GPTQConfig is configured, but the precision recovery is {self.precision_recovery}.')
+            logger.warning(f'GPTQQuantConfig is configured, but the precision recovery is {self.precision_recovery}.')
+        if self.precision_recovery == PrecisionRecovery.GPTQ and \
+                self.weight_quant_granularity == QuantGranularity.PER_GROUP and \
+                (self.algo_args.desc_act and not self.algo_args.static_groups):
+            raise ValueError('when performing GPTQ quantization using per-group quantization, '
+                             'if desc_act is set to True, then static_groups must also be set to True.')
         value_check('precision_recovery', self.precision_recovery, PrecisionRecovery)
 
     def _check_quant_granularity(self):
@@ -310,12 +315,12 @@ class PTQConfig:
                              f'but got {self.kvcache_quant_granularity}.')
         if (self.weight_quant_dtype != msdtype.int8 or self.act_quant_dtype != msdtype.int8) and \
             self.act_quant_granularity is QuantGranularity.PER_TOKEN:
-            raise ValueError(f'when self.act_quant_granularity is QuantGranularity.PER_TOKEN, self.weight_quant_dtype: {self.weight_quant_dtype} '
-                             f'and self.act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
+            raise ValueError(f'when act_quant_granularity is QuantGranularity.PER_TOKEN, weight_quant_dtype: {self.weight_quant_dtype} '
+                             f'and act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
         if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
-            raise ValueError('when self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, self.kvcache_quant_dtype must be mindspore.dtype.int8.')
+            raise ValueError('when kvcache_quant_granularity is QuantGranularity.PER_TOKEN, kvcache_quant_dtype must be mindspore.dtype.int8.')
         if self.mode == PTQMode.QUANTIZE and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
-            logger.warning('self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, not need quantize for kvcache.')
+            logger.warning('kvcache_quant_granularity is QuantGranularity.PER_TOKEN, not need quantize for kvcache.')
         if self.weight_quant_granularity != QuantGranularity.PER_GROUP and self.group_size != 0:
             raise ValueError("group_size should equal to 0 when not to do pre_group quantize.")
         if self.weight_quant_granularity == QuantGranularity.PER_GROUP and self.group_size not in [64, 128]:
