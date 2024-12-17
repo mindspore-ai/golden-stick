@@ -230,7 +230,7 @@ echo_result()
   path=$2
   if [ -f "${path}" ]; then
     echo "----------------- ${name} ${ds_type} result -----------------"
-    tail -n 2 ${path}
+    grep "total acc" ${path}
   fi
 }
 
