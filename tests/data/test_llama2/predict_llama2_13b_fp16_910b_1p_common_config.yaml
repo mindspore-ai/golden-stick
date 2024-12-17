@@ -98,14 +98,6 @@ parallel_config:
 # when model parallel is greater than 1, we can set micro_batch_interleave_num=2, that may accelerate the train process.
 micro_batch_interleave_num: 1
 
-# recompute config
-recompute_config:
-  recompute: True
-  select_recompute: False
-  parallel_optimizer_comm_recompute: False
-  mp_comm_recompute: True
-  recompute_slice_activation: True
-
 # callbacks
 callbacks:
   - type: MFLossMonitor
@@ -127,7 +119,6 @@ context:
   save_graphs: False
   save_graphs_path: "./graph"
   device_id: 0
-  runtime_num_threads: 1
   jit_config: {"jit_level": "O0", "infer_boost": "on"}
 
 # model config

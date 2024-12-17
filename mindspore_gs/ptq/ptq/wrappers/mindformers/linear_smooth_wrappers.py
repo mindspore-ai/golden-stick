@@ -292,15 +292,15 @@ class AWQSmoothLinearCell(SmoothLinearCell):
             self._layer.weight.set_data(Tensor(self.fp16_weight.asnumpy(), dtype=self.compute_type))
 
             loss = msops.mse_loss(fp16_output, pseudo_output, reduction='mean')
-            logger.debug(f"AWQSmoothLinearCell: search scale alpha {ratio}, scale loss of Layer({self._layer_name}) "
-                         f"is {{{loss.shape}, {loss.dtype}, {loss}}}")
+            logger.info(f"AWQSmoothLinearCell: search scale alpha {ratio}, scale loss of Layer({self._layer_name}) "
+                        f"is {{{loss.shape}, {loss.dtype}, {loss}}}")
             history.append(loss)
             if loss < best_error:
                 best_error = loss
                 best_ratio = ratio
                 best_scale = scales
-        logger.debug(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
-                     f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+        logger.info(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
+                    f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
         if best_ratio == -1:
             raise ValueError(f"best_ratio=-1 is not correct, please check history  of loss: {history}.")
         return best_scale
