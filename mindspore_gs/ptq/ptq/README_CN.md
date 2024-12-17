@@ -118,21 +118,39 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
 
 #### GPTQ算法
 
-[GPTQ](https://arxiv.org/abs/2210.17323)算法是一种针对大规模预训练模型的PTQ算法。其核心思想是在量化过程中对权重weight进行补偿，从而减少低bit量化导致模型精度的损失。
+[GPTQ](https://arxiv.org/abs/2210.17323)(Gradient-based Post-training Quantization)算法由OBD、OBS、OBC(OBQ)算法一步步演化而来，GPTQ算法是OBQ算法的加速版本。
+GPTQ算法的核心思想是对某个block内的所有参数逐个量化，每个参数量化后，需要适当调整这个block内其他未量化的参数，以弥补量化造成的精度损失。
 
-PTQ算法支持使用GPTQ算法进行4bit权重量化，并将其添加到了精度恢复算法集中，精度恢复算法当前仅GPTQ算法可选。
+![](images/zh_cn/gptq.png)
 
-可以通过如下配置项使能PTQ的GPTQ算法:
+PTQ算法支持使用GPTQ算法进行8bit和4bit权重量化，并将其添加到了精度恢复算法集中，精度恢复算法当前仅GPTQ算法可选。
+
+GPTQ算法支持per_group和per_channel量化，可以通过如下配置项使能GPTQ算法的per_channel量化:
 
 ```python
 from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
 
-algorithm_config = GPTQQuantConfig()
+algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
 ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
-                       precision_recovery=PrecisionRecovery.GPTQ)
+                       weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0,
+                       precision_recovery = PrecisionRecovery.GPTQ)
+```
+
+可以通过如下配置项使能GPTQ算法的per_group量化:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery, QuantGranularity
+from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
+
+algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
+ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+                       outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
+                       weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128,
+                       precision_recovery = PrecisionRecovery.GPTQ)
 ```
 
 #### AWQ算法

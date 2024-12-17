@@ -118,21 +118,38 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
 
 #### GPTQ Algorithm
 
-The [GPTQ](https://arxiv.org/abs/2210.17323) algorithm is a PTQ algorithm specifically designed for large-scale pre-trained models. Its core idea is to compensate for weights during the quantization process, thereby reducing the loss of model accuracy caused by low-bit quantization.
+The [GPTQ](https://arxiv.org/abs/2210.17323) (Gradient-based Post-training Quantization) algorithm is a step-by-step evolution of the OBD, OBS, OBC (OBQ) algorithm, and the GPTQ algorithm is an accelerated version of the OBQ algorithm.
+The core idea of the GPTQ algorithm is to quantize all weights in a block one by one, and after each weight is quantized, other unquantified weights in the block need to be appropriately adjusted to make up for the loss of accuracy caused by quantization.
 
-The PTQ algorithm supports the use of the GPTQ algorithm for 4-bit weight quantization and has incorporated it into the set of accuracy recovery algorithms. Currently, GPTQ is the only optional algorithm for accuracy recovery.
+![](images/en/gptq.png)
 
-User can enable the GPTQ algorithm of PTQ with the following configuration item:
+The PTQ algorithm supports the use of the GPTQ algorithm for 8-bit and 4-bit weight quantization and has incorporated it into the set of accuracy recovery algorithms. Currently, GPTQ is the only optional algorithm for accuracy recovery.
+The GPTQ algorithm supports per_group and per_channel quantization, and you can enable the per_channel quantization of the GPTQ algorithm through the following configuration items:
 
 ```python
 from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
 
-algorithm_config = GPTQQuantConfig()
+algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
 ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
-                       precision_recovery=PrecisionRecovery.GPTQ)
+                       weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0,
+                       precision_recovery = PrecisionRecovery.GPTQ)
+```
+
+You can enable the per_group quantization of the GPTQ algorithm through the following configuration items:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecovery, QuantGranularity
+from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
+
+algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
+ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+                       outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
+                       weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128,
+                       precision_recovery = PrecisionRecovery.GPTQ)
 ```
 
 #### AWQ Algorithm
