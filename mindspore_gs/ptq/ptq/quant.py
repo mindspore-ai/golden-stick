@@ -130,11 +130,10 @@ class PTQ(CompAlgo):
             logger.info("Adding LinearSmoothQuant to pipeline.")
             self.pipeline.append(LinearSmoothQuant(self._config))
         if self._config.outliers_suppression == OutliersSuppressionType.AWQ:
-            logger.info("Adding LinearAutoSmoother to pipeline.")
-            self.pipeline.append(LinearAutoSmoother(self._config))
-        if self._config.algo_args.get("weight_clip_ratio"):
             logger.info("Adding LinearCliper to pipeline.")
             self.pipeline.append(LinearClipper(self._config))
+            logger.info("Adding LinearAutoSmoother to pipeline.")
+            self.pipeline.append(LinearAutoSmoother(self._config))
         if self._config.act_quant_dtype in act_support_dtype or \
             self._config.weight_quant_dtype in weight_support_dtype or \
                 self._config.kvcache_quant_dtype in kvcache_support_dtype:

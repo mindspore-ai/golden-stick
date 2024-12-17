@@ -234,7 +234,7 @@ class AWQSmoothLinearCell(SmoothLinearCell):
 
     def _calc_smooth_scale(self, alpha):
         """_calc_smooth_scale"""
-        if self.cfg.algo_args.get("duo_scaling"):
+        if self.cfg.algo_args.get("duo_scaling", True):
             x_pow = msops.pow(self.x_mean, alpha)
             w_pow = msops.pow(self.w_mean, 1 - alpha) + 1e-4
             smooth_scale = (x_pow / w_pow).clamp(min=1e-4)
@@ -327,7 +327,7 @@ class AWQSmoothLinearCell(SmoothLinearCell):
     def smooth(self):
         """smooth"""
         self._get_statistic_data()
-        smooth_alpha = self.cfg.algo_args.get('smooth_alpha', 0.5)
+        smooth_alpha = self.cfg.algo_args.get('smooth_alpha', [i/20 for i in range(20)])
         if isinstance(smooth_alpha, list):
             smooth_scale = self._search_best_scale(smooth_alpha)
         elif isinstance(smooth_alpha, float):
