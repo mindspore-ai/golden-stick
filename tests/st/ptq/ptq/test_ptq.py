@@ -170,17 +170,23 @@ def test_ptq_config_error():
     with pytest.raises(ValueError):
         _ = PTQ(config)
 
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None)
+    with pytest.raises(ValueError):
+        _ = PTQ(config)
+
     config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None,
+                       kvcache_quant_dtype=dtype.int8,
+                       outliers_suppression=OutliersSuppressionType.SMOOTH)
+    with pytest.raises(ValueError):
+        _ = PTQ(config)
+
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.int8,
                        precision_recovery=PrecisionRecovery.GPTQ)
     with pytest.raises(ValueError):
         _ = PTQ(config)
 
-    algorithm_config = GPTQQuantConfig()
-    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None,
-                       kvcache_quant_dtype=dtype.int8,
-                       outliers_suppression=OutliersSuppressionType.SMOOTH,
-                       precision_recovery=PrecisionRecovery.GPTQ,
-                       algo_args=algorithm_config)
+    config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.int8,
+                       outliers_suppression=OutliersSuppressionType.AWQ)
     with pytest.raises(ValueError):
         _ = PTQ(config)
 
@@ -190,8 +196,8 @@ def test_ptq_config_error():
 @pytest.mark.env_onecard
 def test_gptq_config_error():
     """
-    Feature: simulated GPTQConfig __post_init__ function.
-    Description: Feed invalid value of GPTQConfig to __post_init__ function.
+    Feature: simulated GPTQQuantConfig __post_init__ function.
+    Description: Feed invalid value of GPTQQuantConfig to __post_init__ function.
     Expectation: Except ValueError.
     """
     with pytest.raises(TypeError):

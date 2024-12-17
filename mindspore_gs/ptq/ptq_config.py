@@ -295,8 +295,8 @@ class PTQConfig:
         if self.precision_recovery == PrecisionRecovery.GPTQ and \
                 self.weight_quant_granularity == QuantGranularity.PER_GROUP and \
                 (self.algo_args.desc_act and not self.algo_args.static_groups):
-            raise ValueError('when performing GPTQ quantization using per-group quantization, '
-                             'if desc_act is set to True, then static_groups must also be set to True.')
+            raise ValueError('when using GPTQ algorithm with per_group quantization, '
+                             'if desc_act is True ,then static_groups must be true.')
         value_check('precision_recovery', self.precision_recovery, PrecisionRecovery)
 
     def _check_quant_granularity(self):
@@ -317,6 +317,10 @@ class PTQConfig:
             self.act_quant_granularity is QuantGranularity.PER_TOKEN:
             raise ValueError(f'when act_quant_granularity is QuantGranularity.PER_TOKEN, weight_quant_dtype: {self.weight_quant_dtype} '
                              f'and act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
+        if (self.weight_quant_dtype == msdtype.int8 and self.act_quant_dtype == msdtype.int8) and \
+            self.weight_quant_granularity != QuantGranularity.PER_CHANNEL:
+            raise ValueError(f'when weight_quant_dtype is int8 and act_quant_dtype is int8, the weight_quant_granularity must be QuantGranularity.PER_CHANNEL,'
+                             f' but got {self.weight_quant_granularity}.')
         if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
             raise ValueError('when kvcache_quant_granularity is QuantGranularity.PER_TOKEN, kvcache_quant_dtype must be mindspore.dtype.int8.')
         if self.mode == PTQMode.QUANTIZE and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
