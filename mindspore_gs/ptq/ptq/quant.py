@@ -29,7 +29,7 @@ from mindspore_gs.ptq.processor import transform_network_inplace
 from mindspore_gs.ptq.ptq_config import (
     PTQConfig, InnerPTQConfig,
     PTQApproach, PTQMode,
-    OutliersSuppressionType)
+    OutliersSuppressionType, PrecisionRecovery)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, SearchInputs
 from mindspore_gs.ptq.processor import Processor
@@ -193,6 +193,11 @@ class PTQ(CompAlgo):
         if config.weight_quant_dtype is None and \
                 config.act_quant_dtype == dtype.int8:
             raise ValueError("PTQ algorithm do not support only quant activation.")
+        if config.weight_quant_dtype == dtype.int8 and \
+                config.act_quant_dtype == dtype.int8 and \
+                (config.outliers_suppression == OutliersSuppressionType.AWQ or \
+                 config.precision_recovery == PrecisionRecovery.GPTQ):
+            raise ValueError("AWQ algorithm and GPTQ algorithm do not support quant activation.")
         if config.weight_quant_dtype == dtype.qint4x2 and (config.act_quant_dtype == dtype.int8 or \
                                                            config.kvcache_quant_dtype == dtype.int8):
             raise ValueError("PTQ algorithm only support quant weight in int4 alone."
