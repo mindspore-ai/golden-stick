@@ -116,6 +116,75 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
                         outliers_suppression=OutliersSuppressionType.SMOOTH)
 ```
 
+#### Dynamic Quantization Algorithm
+
+Currently, the Golden Stick supports only per-token dynamic quantization. The per-token quantization algorithm refers to the allocation of independent quantization parameters for each token to minimize errors. Dynamic quantization implies that the quantization parameters are computed in real time during the inference phase, without the need for offline calculation of quantization parameters.
+
+per-token dynamic quantization algorithm is to execute per-token online quantization of activation or KVcache in the process of inference, and calculate the scale and zp of token dimension online without using dataset for calibration quantization, which is more accurate than offline static quantization. Currently, per-token dynamic quantization supports only symmetric quantization.
+
+##### Activation per-token Dynamic Quantization
+
+For activation per-token dynamic quantization, RoundToNearest quantization of weights is required first, and then we can use quantized weights to perform W8A8-per-token inference. per-token dynamic quantization with activation also supports smooth operation, so smooth parameters can be calculated during the quantization process.
+
+- Activation per-token Dynamic Quantization With Smooth Parameter
+
+    If you want to include the smooth parameter, the corresponding configuration items are as follows.
+
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
+    outliers_suppression=OutliersSuppressionType.SMOOTH)
+    ```
+
+    At this time, the corresponding calculation formula for activation is as follows:
+
+    $$scale = \frac{row\_max(abs(X_{float} \cdot smooth\_scale))} {127}$$
+
+    $$x_{int} = round(x_{float} \div scale)$$
+
+- Activation per-token Dynamic Quantization Without Smooth Parameter
+
+    If the smooth parameter is not included, the corresponding configuration items are as follows.
+
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+    weight_quant_granularity=QuantGranularity.PER_TOKEN,
+    outliers_suppression=OutliersSuppressionType.NONE)
+    ```
+
+    At this time, the corresponding calculation formula for activation is as follows:
+
+    $$scale = \frac{row\_max(abs(X_{{float}}))} {127}$$
+
+    $$x_{int} = round(x_{float} \div scale)$$
+
+W8A8-per-token inference can also be carried out directly using w8a16 quantized weight of PTQ algorithm.
+
+##### KVCache per-token Dynamic Quantization
+
+per-token dynamic quantization of KVCache, without offline quantization operation, can be directly passed in the original floating point weight for direct inference. The corresponding configuration items are as follows:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
+kvcache_quant_dtype=msdtype.int8,
+kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+At this time, the corresponding calculation formula for KVCache is as follows:
+
+$$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
+
+$$KVCache_{int} = round(KVCache_{float} \div scale)$$
+
 #### GPTQ Algorithm
 
 The [GPTQ](https://arxiv.org/abs/2210.17323) (Gradient-based Post-training Quantization) algorithm is a step-by-step evolution of the OBD, OBS, OBC (OBQ) algorithm, and the GPTQ algorithm is an accelerated version of the OBQ algorithm.

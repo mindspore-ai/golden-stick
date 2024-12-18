@@ -311,6 +311,8 @@ def test_c8_pertoken_llama2_predict_2stage_1p(device, mode):
     assert c8_pertoken_predict_llama2_2stage(device, mode, model_parallel)
 
 
+@pytest.mark.skip(reason="re-enable after ckpt is split.")
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_c8_pertoken_llama2_predict_2stage_2p():
@@ -336,7 +338,6 @@ def test_c8_pertoken_llama2_predict_2stage_2p():
     assert return_code == 0
 
 
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
@@ -351,8 +352,6 @@ def test_kv_llama2_predict_2stage_1p(device, mode):
     assert kv_predict_llama2_2stage(device, mode, model_parallel)
 
 
-@pytest.mark.skip(reason="re-enable after ckpt is split.")
-@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_kv_llama2_predict_2stage_2p():
