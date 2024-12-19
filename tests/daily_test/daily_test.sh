@@ -85,6 +85,7 @@ sed_qconfig()
   wqg=${7:-'per_channel'}
   group_size=${8:-"0"}
   black_opname=${9:-"[\'lm_head\', \'w2\']"}
+  kqg=${10:-'per_channel'}
   sed -i s/"activation_dtype: .*"/"activation_dtype: \"${2}\""/g ${f}
   sed -i s/"weight_dtype: .*"/"weight_dtype: \"${3}\""/g ${f}
   sed -i s/"kvcache_dtype: .*"/"kvcache_dtype: \"${4}\""/g ${f}
@@ -93,6 +94,7 @@ sed_qconfig()
   sed -i s/"weight_quant_granularity: .*"/"weight_quant_granularity: \'${wqg}\'"/g ${f}
   sed -i s/"group_size: .*"/"group_size: ${group_size}"/g ${f}
   sed -i s/"modules_to_not_convert: .*"/"modules_to_not_convert: ${black_opname}"/g ${f}
+  sed -i s/"kvcache_quant_granularity: .*"/"kvcache_quant_granularity: \'${kqg}\'"/g ${f}
 }
 
 eval()
@@ -199,7 +201,7 @@ eval "eval awq-perchannel llama2-13b-fp16" "fp16-awq-perchannel" "${BASEPATH}/ws
 # a16w16c8 pertoken
 ckpt_path=$(grep -oP 'load_checkpoint:\s*\K.+' "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" | sed 's/[&/\]/\\&/g')
 echo ${ckpt_path}
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "none" "int8" "None" "${ckpt_path}" "per_token"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "none" "int8" "None" "${ckpt_path}" "per_channel" "0" "[\'lm_head\', \'w2\']" "per_token"
 eval "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 
