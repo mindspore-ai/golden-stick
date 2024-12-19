@@ -195,6 +195,13 @@ quant_awq "quant llama2-13b-fp16 to awq-perchannel" "fp16-awq-perchannel" "${BAS
 sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
 eval "eval awq-perchannel llama2-13b-fp16" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
+############################ fp16->a16w16c8-pertoken ############################
+# a16w16c8 pertoken
+ckpt_path=$(grep -oP 'load_checkpoint:\s*\K.+' "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" | sed 's/[&/\]/\\&/g')
+echo ${ckpt_path}
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "none" "int8" "None" "${ckpt_path}" "per_token"
+eval "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
 
 ############################ bf16 ############################
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "bfloat16"
@@ -241,6 +248,7 @@ echo_result "fp16->a8w8c8 llama2-13b" "${BASEPATH}/ws/fp16-a8w8c8_eval_log/worke
 echo_result "fp16->a16w8c8 llama2-13b" "${BASEPATH}/ws/fp16-a16w8c8_eval_log/worker_0.log"
 echo_result "fp16->a16w4-awq-pergroup llama2-13b" "${BASEPATH}/ws/fp16-awq-pergroup_eval_log/worker_0.log"
 echo_result "fp16->a16w4-awq-perchannel llama2-13b" "${BASEPATH}/ws/fp16-awq-perchannel_eval_log/worker_0.log"
+echo_result "fp16->a16w16c8-pertoken llama2-13b" "${BASEPATH}/ws/fp16-a16w16c8-pertoken_eval_log/worker_0.log"
 
 echo_result "bf16 llama2-13b" "${BASEPATH}/ws/bf16_eval_log/worker_0.log"
 echo_result "bf16->a8w8 llama2-13b" "${BASEPATH}/ws/bf16-a8w8_eval_log/worker_0.log"
