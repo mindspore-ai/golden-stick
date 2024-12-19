@@ -119,6 +119,7 @@ model:
       weight_dtype: "int8"
       weight_quant_granularity: "per_channel"
       kvcache_dtype: "int8"
+      kvcache_quant_granularity: "per_channel"
       group_size: 0
       outliers_suppression: "None"
       modules_to_not_convert: ['lm_head', 'w2']
