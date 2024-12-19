@@ -122,14 +122,13 @@ class ClipLinearCell(WrapperLinearCell):
 
         for i_b in range(org_w_shape[0] // oc_batch_size):
             # [oc_batch_size, 1, n_group, group_size]
+            logger.info(f"ClipLinearCell: search iter {i_b}")
             w = w_all[i_b * oc_batch_size : (i_b + 1) * oc_batch_size]
-            logger.debug(f"ClipLinearCell: search iter {i_b}, "
-                         f"w of Layer({self._layer_name}) is {{{w.shape}, "
+            logger.debug(f"w of Layer({self._layer_name}) is {{{w.shape}, "
                          f"{w.dtype}, {w.asnumpy()}}}")
             # [oc, 1, n_group, 1]
             org_max_val = self.w_obs_max(msops.abs(w), axis=-1, keepdims=True)[0]
-            logger.debug(f"ClipLinearCell: search iter {i_b}, "
-                         f"org_max_val of Layer({self._layer_name}) is {{{org_max_val.shape}, "
+            logger.debug(f"org_max_val of Layer({self._layer_name}) is {{{org_max_val.shape}, "
                          f"{org_max_val.dtype}, {org_max_val.asnumpy()}}}")
             best_max_val = copy.deepcopy(org_max_val)
             min_errs = msops.ones_like(org_max_val) * 1e9
@@ -158,9 +157,9 @@ class ClipLinearCell(WrapperLinearCell):
                 cur_out = msops.sum(msops.mul(input_feat, q_w), dim=-1)
 
                 err = msops.mean(msops.pow(cur_out - org_out, 2), axis=1).reshape(min_errs.shape)
-                logger.debug(f"ClipLinearCell: search iter {i_b}, weight_clip_ratio {i_s}, "
-                             f"clip err of Layer({self._layer_name}) is {{{err.shape}, "
-                             f"{err.dtype}, {err.asnumpy()}}}")
+                logger.info(f"ClipLinearCell: search iter {i_b}, weight_clip_ratio {i_s}, "
+                            f"clip err of Layer({self._layer_name}) is {{{err.shape}, "
+                            f"{err.dtype}, {err.asnumpy()}}}")
                 del cur_w
                 del cur_out
                 cur_best_idx = err < min_errs
