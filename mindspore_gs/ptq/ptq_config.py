@@ -221,7 +221,7 @@ class PTQConfig:
             Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_TOKEN are supported.
         weight_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of weight.
             Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_GROUP are supported.
-        group_size (int): group_size of per_group quantization, suggest using 64 or 128.
+        group_size (int, optional): group_size of per_group quantization, suggest using 64 or 128. Default value: ``0``.
 
     Raises:
         ValueError: If `mode` is not PTQMode.QUANTIZE or PTQMode.DEPLOY.
