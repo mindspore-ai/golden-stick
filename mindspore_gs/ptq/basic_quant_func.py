@@ -110,7 +110,7 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_g
                                         symmetric=symmetric)
 
     if if_quant_data:
-        qtensor = quant_tensor_data(tensor, scale.squeeze(), zp.squeeze(), quant_min, quant_max, quant_axis,
+        qtensor = quant_tensor_data(tensor, scale, zp, quant_min, quant_max, quant_axis,
                                     msdtype.int8)
         if if_pesudo_quant:
             t_scale = Tensor(scale, tensor.dtype)
@@ -119,7 +119,6 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_g
         qtensor = qtensor.reshape(org_shape)
     else:
         qtensor = None
-
     if need_group and quant_axis != -1:
         scale = scale.reshape(org_shape[quant_axis], -1).T
         zp = zp.reshape(org_shape[quant_axis], -1).T
@@ -167,26 +166,11 @@ def quant_tensor_data(tensor: Tensor, scale, zero_point, quant_min, quant_max, d
         raise ValueError("`scale` and `zero_point` should have the same shape.")
     if scale.shape[0] < 0:
         raise ValueError("`scale` and `zero_point` shape should be greater than zero.")
-    if tensor.shape[data_axis] != scale.shape[0]:
+    if tensor.shape[data_axis] != scale.shape[data_axis]:
         raise ValueError(f"Dim({tensor.shape[data_axis]}) of `data`'s `data_axis`({data_axis}) should be equal to "
                          f"`scale`'s shape({scale.shape}[0]).")
     if data_axis >= len(tensor.shape):
         raise ValueError("`data_axis` out of range of `data`'s shape.")
-
-    if data_axis >= 0:
-        # for perchannel
-        if data_axis == 0:
-            # `Conv2d` or `Dense` op weight
-            shape_list = [-1] + [1] * len(tensor.shape[1:])
-            scale = scale.reshape(shape_list)
-            zero_point = zero_point.reshape(shape_list)
-        elif data_axis == 1:
-            # `DepthwiseConv2d` op weight
-            shape_list = [1, -1] + [1] * len(tensor.shape[2:])
-            scale = scale.reshape(shape_list)
-            zero_point = zero_point.reshape(shape_list)
-        else:
-            raise ValueError("Unsupported data_axis({})".format(data_axis))
 
     t_scale = Tensor(scale)
     t_scale.asnumpy()

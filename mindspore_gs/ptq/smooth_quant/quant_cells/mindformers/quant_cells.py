@@ -445,9 +445,6 @@ class SQLinearWrapper(PTQCell):
                 narrow_range=weight_quant_params.get(LinearFakeQuantizer.attr_key_narrow_range))
             scale = np.array(weight_quant_params.get(LinearFakeQuantizer.attr_key_quant_scale))
             zp = np.array(weight_quant_params.get(LinearFakeQuantizer.attr_key_quant_zero_point))
-            if not self._handler.transpose_b:
-                scale = scale.transpose()
-                zp = zp.transpose()
             weight_quant = quant_tensor_data(weight, scale, zp, quant_min, quant_max,
                                              self._weight_axis)
             self._handler.weight = Parameter(Tensor(weight_quant, dtype=dtype.int8), name=self._handler.weight.name)
