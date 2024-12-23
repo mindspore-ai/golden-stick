@@ -3,8 +3,11 @@
 "golden-stick/mindspore_gs/net_transform.py"                                                                             "protected-access"
 
 # expriments
-"golden-stick/mindspore_gs/exprimental/trace/llama2.py"                                                                  "redefined-outer-name"
-"golden-stick/mindspore_gs/exprimental/trace/trace.py"                                                                  "redefined-outer-name"
+"golden-stick/mindspore_gs/experimental/trace/llama2.py"                                                                  "redefined-outer-name"
+"golden-stick/mindspore_gs/experimental/trace/trace.py"                                                                   "redefined-outer-name"
+"golden-stick/mindspore_gs/experimental/LRD/LRD.py"                                                                       "relative-beyond-top-level"
+"golden-stick/mindspore_gs/experimental/LRD/eval_bool.py"                                                                 "relative-beyond-top-level"
+"golden-stick/mindspore_gs/experimental/LRD/lrd_mf_net_helpers.py"                                                        "relative-beyond-top-level"
 
 # Quantization
 "golden-stick/mindspore_gs/quantization/net_policy.py"                                                                   "unused-argument"
