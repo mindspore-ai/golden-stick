@@ -767,10 +767,10 @@ class C8PagedAttentionCell(QuantUnitCell):
         ic = k_qparam.scale.shape[0]
         is_deploy = cfg.mode == PTQMode.DEPLOY
         self.enable_deploy_fusion = cfg.enable_deploy_fusion
+        kernel_type = KernelType.INTERNAL if compute_type == dtype.bfloat16 else KernelType.ASD
         if is_deploy:
             if self.enable_deploy_fusion:
-                self.k_v_scale_fusion = Parameter(initializer('ones', (2, ic), dtype=dtype.int64))
-                self.k_v_zp_fusion = Parameter(initializer('zeros', (2, ic), dtype=dtype.int32))
+                self.k_v_scale_fusion, self.k_v_zp_fusion = self.__param_init(kernel_type, ic)
             else:
                 self.k_scale_no_fusion = Parameter(initializer('ones', (ic), compute_type))
                 self.k_zp_no_fusion = Parameter(initializer('zeros', (ic), compute_type))
@@ -781,15 +781,32 @@ class C8PagedAttentionCell(QuantUnitCell):
             self.k_zp_no_fusion = Parameter(Tensor(k_qparam.zero_point.asnumpy(), dtype=compute_type))
             self.v_scale_no_fusion = Parameter(Tensor(v_qparam.scale.asnumpy(), dtype=compute_type))
             self.v_zp_no_fusion = Parameter(Tensor(v_qparam.zero_point.asnumpy(), dtype=compute_type))
-            self.k_v_scale_fusion, self.k_v_zp_fusion = self._fusion_params_compute(k_qparam.scale.asnumpy(),
-                                                                                    k_qparam.zero_point.asnumpy(),
-                                                                                    v_qparam.scale.asnumpy(),
-                                                                                    v_qparam.zero_point.asnumpy())
+            self.k_v_scale_fusion, self.k_v_zp_fusion = self._param_compute(kernel_type,
+                                                                            k_qparam.scale.asnumpy(),
+                                                                            k_qparam.zero_point.asnumpy(),
+                                                                            v_qparam.scale.asnumpy(),
+                                                                            v_qparam.zero_point.asnumpy())
         self._key_output_anti_quant = AntiQuantCell(n, d, compute_type)
         self._value_output_anti_quant = AntiQuantCell(n, d, compute_type)
         self.quant = QuantV2()
 
-    def _fusion_params_compute(self, key_t_scale, key_t_zp, value_t_scale, value_t_zp):
+    def __param_init(self, kernel_type, ic):
+        if kernel_type == KernelType.ASD:
+            return Parameter(initializer('ones', (2, ic), dtype=dtype.int64)), \
+                    Parameter(initializer('zeros', (2, ic), dtype=dtype.int32))
+        if kernel_type == KernelType.INTERNAL:
+            return Parameter(initializer('ones', (2, ic), dtype.float16)), \
+                    Parameter(initializer('zeros', (2, ic), dtype.float16))
+        raise ValueError(f"kernel_type:{kernel_type} is unsupported in C8PagedAttentionCell.")
+
+    def _param_compute(self, kernel_type, key_t_scale, key_t_zp, value_t_scale, value_t_zp):
+        if kernel_type == KernelType.ASD:
+            return self._param_compute_asd(key_t_scale, key_t_zp, value_t_scale, value_t_zp)
+        if kernel_type == KernelType.INTERNAL:
+            return self._param_compute_internal(key_t_scale, key_t_zp, value_t_scale, value_t_zp)
+        raise ValueError(f"kernel_type:{kernel_type} is unsupported in C8PagedAttentionCell.")
+
+    def _param_compute_asd(self, key_t_scale, key_t_zp, value_t_scale, value_t_zp):
         """_param_compute_asd"""
         t_scale_len = key_t_scale.shape[0]
         key_t_scale = convert_fp32_to_int64(key_t_scale.astype(np.float32))
@@ -804,6 +821,19 @@ class C8PagedAttentionCell(QuantUnitCell):
 
         k_v_scale_fusion = Parameter((Tensor(key_value_t_scale, dtype=dtype.int64)))
         k_v_zp_fusion = Parameter((Tensor(key_value_t_zp, dtype=dtype.int32)))
+        return k_v_scale_fusion, k_v_zp_fusion
+
+    def _param_compute_internal(self, key_t_scale, key_t_zp, value_t_scale, value_t_zp):
+        """_param_compute_internal"""
+        t_scale_len = key_t_scale.shape[0]
+        key_value_t_scale = np.concatenate((key_t_scale.reshape((1, t_scale_len)),
+                                            value_t_scale.reshape((1, t_scale_len))))
+        t_zp_len = key_t_zp.shape[0]
+        key_t_zp = key_t_zp*-1
+        value_t_zp = value_t_zp*-1
+        key_value_t_zp = np.concatenate((key_t_zp.reshape((1, t_zp_len)), value_t_zp.reshape((1, t_zp_len))))
+        k_v_scale_fusion = Parameter(Tensor(key_value_t_scale, dtype=dtype.float16))
+        k_v_zp_fusion = Parameter(Tensor(key_value_t_zp, dtype=dtype.float16))
         return k_v_scale_fusion, k_v_zp_fusion
 
     # pylint: disable=W0613
