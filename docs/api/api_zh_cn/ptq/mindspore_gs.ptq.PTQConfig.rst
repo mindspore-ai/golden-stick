@@ -1,7 +1,7 @@
 mindspore_gs.ptq.PTQConfig
 ============================================================
 
-.. py:class:: mindspore_gs.ptq.PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=<class 'list'>, algo_args=<class 'dict'>, weight_quant_dtype=Int8, kvcache_quant_dtype=None, act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.NONE, precision_recovery=PrecisionRecovery.NONE, weight_quant_granularity=QuantGranularity.PER_TENSOR, group_size=0, act_quant_granularity=QuantGranularity.PER_TENSOR, kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
+.. py:class:: mindspore_gs.ptq.PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=<class 'list'>, algo_args=<class 'dict'>, weight_quant_dtype=Int8, kvcache_quant_dtype=None, act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.NONE, precision_recovery=PrecisionRecovery.NONE, weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0, act_quant_granularity=QuantGranularity.PER_TENSOR, kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
 
     用于配置 MindSpore Golden Stick 后量化算法的数据类。
 
