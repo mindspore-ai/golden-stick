@@ -30,7 +30,8 @@ from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.datasets import get_datasets
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper, \
+    MFParallelTeleChat2Helper
 
 
 def dtype_formatter(name: str):
@@ -241,6 +242,8 @@ if __name__ == "__main__":
         helper = MFLlama2Helper(uargs.config_path)
     elif mfconfig.model.arch.type == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(uargs.config_path)
+    elif mfconfig.model.arch.type == "ParallelTelechatForCausalLM":
+        helper = MFParallelTeleChat2Helper(uargs.config_path)
     else:
         err_msg = f"Unsupported network arch: {mfconfig.model.arch}, please check model.arch in yaml config, " \
                   f"only support LlamaForCausalLM and ParallelLlamaForCausalLM now"

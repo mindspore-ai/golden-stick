@@ -19,7 +19,8 @@ import time
 import numpy as np
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_ceval_dataset
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper, \
+    MFParallelTeleChat2Helper
 from mindformers import MindFormerConfig
 
 
@@ -101,6 +102,8 @@ if __name__ == "__main__":
         helper = MFLlama2Helper(config)
     elif config.model.arch.type == "ParallelLlamaForCausalLM":
         helper = MFParallelLlama2Helper(config)
+    elif config.model.arch.type == "ParallelTelechatForCausalLM":
+        helper = MFParallelTeleChat2Helper(uargs.config_path)
     else:
         err_msg = f"Unsupported network arch: {config.model.arch}, please check model.arch in yaml config, " \
                   f"only support LlamaForCausalLM and ParallelLlamaForCausalLM now"

@@ -248,3 +248,27 @@ class MFParallelLlama2Helper(MFLlama2Helper):
     def _load_ckpt(self, network):
         """_load_ckpt"""
         transform_and_load_checkpoint(self.mf_config, None, network, None)
+
+
+class MFParallelTeleChat2Helper(MFParallelLlama2Helper):
+    """MFParallelTeleChat2Helper"""
+
+    def create_network(self):
+        from research.telechat2.infer.telechat import ParallelTelechatForCausalLM
+        from research.telechat2.telechat_config import TelechatConfig
+        build_context(self.mf_config)
+        model_config = TelechatConfig(**self.mf_config.model.model_config)
+        network = ParallelTelechatForCausalLM(model_config)
+        network.set_train(False)
+        network.phase = 'predict'
+        ckpt_path = self.mf_config.load_checkpoint
+        if ckpt_path:
+            self._load_ckpt(network)
+        ms.ms_memory_recycle()
+        network.phase = 'predict'
+        return network
+
+    def create_tokenizer(self):
+        """create_tokenizer."""
+        from research.telechat2.telechat_tokenizer import TelechatTokenizer
+        return TelechatTokenizer(vocab_file=self.get_spec('vocab_file'))
