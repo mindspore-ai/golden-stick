@@ -57,7 +57,7 @@ class OutliersSuppressionType(Enum):
     Outliers suppression type for ptq quantizer.
 
     - ``SMOOTH``: apply smooth scale between weight and activate.
-    - ``AWQ``: apply awq algo to search best smooth_scale and clip parameter.
+    - ``AWQ``: apply awq algorithm to outliers suppression.
     - ``NONE``: not doing any outliers suppression.
     """
     SMOOTH = 'smooth'
@@ -66,7 +66,7 @@ class OutliersSuppressionType(Enum):
 
     @classmethod
     def from_str(cls, name: str):
-        """outlier_formatter"""
+        """Convert name to outliers suppression algorithm type."""
         if name.lower() == 'smooth':
             return OutliersSuppressionType.SMOOTH
         if name.lower() == 'awq':
@@ -96,7 +96,7 @@ class PrecisionRecovery(Enum):
 
     @classmethod
     def from_str(cls, name: str):
-        """outlier_formatter"""
+        """Convert name to precision recovery algorithm type."""
         if name.lower() == 'gptq':
             return PrecisionRecovery.GPTQ
         return PrecisionRecovery.NONE
