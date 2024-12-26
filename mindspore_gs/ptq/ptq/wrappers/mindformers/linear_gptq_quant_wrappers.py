@@ -26,7 +26,7 @@ from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PrecisionRecovery, QuantGranularity
-from mindspore_gs.ptq.basic_quant_func import quant_tensor, quant_tensor_data, get_quant_min_max
+from mindspore_gs.ptq.basic_quant_func import quant_tensor, get_quant_min_max
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.hal import ParallelType
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
@@ -55,6 +55,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         self.cfg.reflash_inputs_after_each_processor = True
         self.group_scale = []
         self.group_zero = []
+        self.qweight = []
         if self.cfg.tp_size > 1:
             self.rank_id = get_rank()
         if self.parallel_type == ParallelType.ROW_PARALLEL and self.cfg.tp_size > 1:
@@ -127,6 +128,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                         zero = self.group_zero[idx // group_size].T
                 q0 = msops.clip_by_value(aclnn_add(msops.round(w0.unsqueeze(1) / scale), zero),
                                          Tensor(self.weight_quant_min), Tensor(self.weight_quant_max))
+                self.qweight.append(q0)
                 q0 = scale * aclnn_sub(q0, zero)
                 q0 = q0.flatten()
                 delta_loss = aclnn_sub(w0, q0) ** 2 / d ** 2
@@ -150,6 +152,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         else:
             self.group_scale = msops.cat(self.group_scale)
             self.group_zero = msops.cat(self.group_zero)
+        self.qweight = msops.cat(self.qweight, 1)
         logger.info(f'error: {msops.sum(losses)}')
         if self.weight_need_allgather and group_size != 0:
             self.group_scale = self.group_scale[self.rank_id * self.w_scale.shape[0] :
@@ -196,8 +199,10 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         logger.info(f'[TIME]quant layers with time {time.time() - quant_tick}s')
         if self.cfg.algo_args["desc_act"]:
             qweight = qweight[:, invperm]
+            self.qweight = self.qweight[:, invperm]
         if self.weight_need_allgather:
             self.layer.weight = qweight[:, self.rank_id * self.ic : self.rank_id * self.ic + self.ic]
+            self.qweight = self.qweight[:, self.rank_id * self.ic : self.rank_id * self.ic + self.ic]
         else:
             self.layer.weight = qweight
 
@@ -209,21 +214,12 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                                     self.cfg.group_size, self.cfg.weight_quant_dtype,
                                     self.weight_quantizer_axis, False)
         self._apply_gptq(Tensor(scale, dtype=self.layer.weight.dtype), Tensor(zp, dtype=self.layer.weight.dtype))
-        if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP and self.cfg.group_size != 0:
-            weight = msops.zeros_like(self.layer.weight, dtype=dtype.int8)
-            for i in range(self.ic):
-                w_scale = self.group_scale[i // self.cfg.group_size, :]
-                w_zero = self.group_zero[i // self.cfg.group_size, :]
-                weight[:, i] = quant_tensor_data(self.layer.weight[:, i], w_scale.T, w_zero.T, self.weight_quant_min,
-                                                 self.weight_quant_max, self.weight_quantizer_axis, dtype=dtype.int8)
-        else:
-            weight = quant_tensor_data(self.layer.weight, self.group_scale, self.group_zero, self.weight_quant_min,
-                                       self.weight_quant_max, self.weight_quantizer_axis, dtype=dtype.int8)
-        self.q_weight.set_data(Tensor(weight.asnumpy(), dtype=dtype.int8))
+        self.q_weight.set_data(Tensor(self.qweight, dtype=dtype.int8))
         self.w_scale.set_data(Tensor(self.group_scale, dtype=dtype.float64))
         self.w_zp.set_data(Tensor(self.group_zero, dtype=dtype.float64))
         self.group_scale = None
         self.group_zero = None
+        self.qweight = None
 
     def process(self):
         self.quant()

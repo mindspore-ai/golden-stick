@@ -15,7 +15,6 @@
 """ptq wrapper cells for mindformers."""
 
 import numpy as np
-
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 
@@ -81,6 +80,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
             if self.ic % (self.cfg.group_size * cfg.tp_size) != 0:
                 raise ValueError(f"input channel {self.ic} can not divide group_size {self.cfg.group_size}.")
+            if self.ic == self.cfg.group_size:
+                raise ValueError(f"input channel {self.ic} can not equal to group_size {self.cfg.group_size}.")
             scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
         else:
             scale_zp_shape = (self.oc,)
@@ -95,9 +96,12 @@ class WeightQuantLinearCell(WrapperLinearCell):
                                                self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                                self.cfg.group_size, self.cfg.weight_quant_dtype,
                                                self.weight_quantizer_axis)
+        if self.cfg.weight_quant_granularity == QuantGranularity.PER_CHANNEL:
+            w_scale = np.squeeze(w_scale)
+            w_zp = np.squeeze(w_zp)
         self.q_weight.set_data(Tensor(q_weight.asnumpy(), dtype=dtype.int8))
-        self.w_scale.set_data(Tensor(np.squeeze(w_scale), dtype=dtype.float64))
-        self.w_zp.set_data(Tensor(np.squeeze(w_zp), dtype=dtype.float64))
+        self.w_scale.set_data(Tensor(w_scale, dtype=dtype.float64))
+        self.w_zp.set_data(Tensor(w_zp, dtype=dtype.float64))
 
     def process(self):
         super().process()

@@ -103,8 +103,8 @@ class LinearQuant(PTQCell):
             weight_qparams.get(LinearFakeQuantizer.attr_key_narrow_range))
         scale = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_scale)
         zp = weight_qparams.get(LinearFakeQuantizer.attr_key_quant_zero_point)
-        weight_quant = quant_tensor_data(weight, np.squeeze(np.array(scale)), np.squeeze(np.array(zp)),
-                                         quant_min, quant_max, self._weight_axis, dtype.int8)
+        weight_quant = quant_tensor_data(weight, np.array(scale), np.array(zp), quant_min, quant_max,
+                                         self._weight_axis, dtype.int8)
         np_weight_quant = weight_quant.asnumpy()
         del weight_quant
         self._linear.weight = Parameter(Tensor(np_weight_quant, dtype=dtype.int8),
