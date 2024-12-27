@@ -406,7 +406,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
             self.forward_module = self.decoder.feed_forward
         else:
             self.forward_module = self._layer
-        return self.forward_module(self.cat_samples)
+        return self.forward_module(self.cat_samples.expand_dims(0))
 
     def smooth(self):
         """smooth"""
