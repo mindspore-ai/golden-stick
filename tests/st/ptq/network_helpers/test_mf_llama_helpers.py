@@ -238,5 +238,4 @@ def test_mf_parallel_llama_net_helper():
 
     inputs = helper.assemble_inputs(np.ones((1, 1024), dtype=np.int32))
     assert isinstance(inputs, tuple)
-    #FIXME ccsszz, ApplyRotaryPosEmb position_ids=None
-    # network(*inputs)
+    network(*inputs)
