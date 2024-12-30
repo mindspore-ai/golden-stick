@@ -7,7 +7,7 @@
 
 ### API Change
 
-* api change
+* The quant_method "rtn" and "smooth_quant" is deprecated. Please replace them with "ptq".
 
 ### Contributors
 

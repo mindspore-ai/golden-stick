@@ -136,6 +136,18 @@ def test_inner_ptq_config():
         _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_quant_dtype=None, kvcache_quant_dtype=None)
     with pytest.raises(ValueError):
         _ = InnerPTQConfig(approach=PTQApproach.RTN, weight_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8)
+    with pytest.raises(ValueError):
+        _ = InnerPTQConfig(
+            approach=PTQApproach.RTN,
+            kvcache_quant_dtype=msdtype.int8,
+            kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+        )
+    with pytest.raises(ValueError):
+        _ = InnerPTQConfig(
+            approach=PTQApproach.RTN,
+            kvcache_quant_dtype=msdtype.int8,
+            kvcache_quant_granularity=QuantGranularity.PER_CHANNEL,
+        )
 
     cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
     assert cfg.approach == PTQApproach.SMOOTH_QUANT
@@ -180,13 +192,14 @@ def test_inner_ptq_func():
     Expectation: as expect
     """
     inner_cfg = InnerPTQConfig()
+    inner_cfg.approach = PTQApproach.PTQ
     inner_cfg.mode = PTQMode.DEPLOY
     inner_cfg.backend = BackendTarget.ASCEND
     inner_cfg.act_quant_dtype = msdtype.int8
 
     ptq_cfg = PTQConfig(mode=PTQMode.DEPLOY,
                         backend=BackendTarget.ASCEND, act_quant_dtype=msdtype.int8)
-    convert_inner_cfg = inner_cfg.inner_config(ptq_cfg)
+    convert_inner_cfg = inner_cfg.inner_config(cfg=ptq_cfg, approach=PTQApproach.PTQ)
     assert convert_inner_cfg == inner_cfg
 
     with pytest.raises(TypeError):

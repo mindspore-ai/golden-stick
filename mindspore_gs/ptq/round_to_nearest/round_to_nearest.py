@@ -33,10 +33,11 @@ from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.ptq_config import (PTQConfig, InnerPTQConfig, PTQMode,
                                          PTQApproach, BackendTarget, QuantGranularity, OutliersSuppressionType)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.common.utils import value_check
+from mindspore_gs.common.utils import value_check, deprecated
 from .rtn_net_policy import RTNNetPolicy
 
 
+@deprecated(version="1.0.0", substitute="mindspore_gs.ptq.PTQ")
 class RoundToNearest(CompAlgo):
     """
     Native implementation for post training quantization based on min/max statistic values.
