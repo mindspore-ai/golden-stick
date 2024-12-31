@@ -21,6 +21,8 @@ import numpy as np
 import mindspore as ms
 from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.dataset import GeneratorDataset
+from mindspore.ops.auto_generate import SiLU, SplitWithSize
+from mindspore.ops import operations as P
 from mindformers.modules import Linear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
@@ -28,6 +30,174 @@ from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
                               PrecisionRecovery, GPTQQuantConfig, AWQConfig)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from tests.st.test_utils import get_available_port
+
+
+class SwiGLU(nn.Cell):
+    """
+    SwiGLU
+    """
+    _size = 0
+
+    def __init__(self):
+        super(SwiGLU, self).__init__()
+        self.size = SwiGLU._size
+        self.silu = SiLU()
+        self.split = SplitWithSize()
+        self.mul = P.Mul()
+
+    @classmethod
+    def set_size(cls, size):
+        cls._size = size
+
+    def construct(self, x):
+        x0, x1 = self.split(x, (self.size, self.size), -1)
+        output = self.mul(x1, self.silu(x0))
+        return output
+
+
+class SimpleSwiGLUNet(nn.Cell):
+    """
+    Network with single linear and SwiGLU activation to be quant
+    """
+    class DecoderCell(nn.Cell):
+        """decoder cell"""
+        def __init__(self, linear):
+            super().__init__()
+            self.linear = linear
+
+        def construct(self, *args, **kwargs):
+            """linear"""
+            return self.linear(*args, **kwargs)
+
+    def __init__(self):
+        super(SimpleSwiGLUNet, self).__init__()
+        self.hidden_act = SwiGLU
+        SwiGLU.set_size(512)
+        linear = Linear(in_channels=1024, out_channels=1024, activation=self.hidden_act, weight_init="ones")
+        linear.out_channels = 512
+        self.decoder = SimpleNet.DecoderCell(linear)
+
+    def construct(self, x):
+        """decoder"""
+        return self.decoder(x)
+
+
+class SimpleSwiGLUNetworkHelper(NetworkHelper):
+    """SimpleSwiGLUNetworkHelper"""
+    def __init__(self, **kwargs) -> None:
+        self.attrs = kwargs
+
+    def create_network(self):
+        return SimpleSwiGLUNet()
+
+    def get_spec(self, name: str):
+        return self.attrs.get(name, None)
+
+    def create_tokenizer(self, **kwargs):
+        return None
+
+    def generate(self, network: nn.Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
+        input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',
+                           constant_values=0)
+        return network(Tensor(input_ids, dtype=dtype.float16))
+
+    def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
+        raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
+
+
+def quant_simple_swiglu_net(non_decoder, quant_type):
+    """
+    Feature: quant simplenet which including one linear and SwiGLU activation.
+    Description: quant simplenet with A8W8C8 PTQ algorithm.
+    Expectation: correct quant simplenet.
+    """
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+
+    net_helper = SimpleSwiGLUNetworkHelper(seq_length=1024)
+    network = net_helper.create_network()
+    ds = create_foo_ds(1)
+
+    if quant_type == "w8a8":
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
+    else:
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        weight_quant_dtype=dtype.int8)
+    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    ptq = PTQ(config=cfg)
+    if non_decoder:
+        ptq.decoder_layer_types.append(SimpleSwiGLUNet.DecoderCell)
+    network = ptq.apply(network, net_helper, datasets=ds)
+    network = ptq.convert(network)
+    ms.save_checkpoint(network.parameters_dict(), os.path.join("./simpleswiglunet-quant.ckpt"),
+                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
+                        "float_weight" not in x)
+
+
+def eval_simple_swiglu_net(non_decoder, quant_type):
+    """
+    Feature: eval simplenet which including one linear and SwiGLU activation.
+    Description: eval the accuracy of quantized simplenet.
+    Expectation: correct accuracy.
+    """
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
+
+    net_helper = SimpleSwiGLUNetworkHelper(seq_length=1024)
+    network = net_helper.create_network()
+    ds = create_foo_ds(1)
+
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        input_ids = ds_item['input_ids'].asnumpy()
+        foutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+    if quant_type == "w8a8":
+        cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
+    else:
+        cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"])
+    ptq = PTQ(config=cfg)
+    if non_decoder:
+        ptq.decoder_layer_types.append(SimpleSwiGLUNet.DecoderCell)
+    network = ptq.apply(network, ds=ds)
+    network = ptq.convert(network)
+    param_dict = ms.load_checkpoint('./simpleswiglunet-quant.ckpt')
+    ms.load_param_into_net(network, param_dict)
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        input_ids = ds_item['input_ids'].asnumpy()
+        qoutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+    np.allclose(foutput.asnumpy(), qoutput.asnumpy(), 0, 0)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("non_decoder", [True, False])
+@pytest.mark.parametrize("quant_type", ["w8a16", "w8a8"])
+def test_ptq_simple_swiglu_net(non_decoder, quant_type):
+    """
+    Feature: quant and eval simplenet which including one linear and SwiGLU activation.
+    Description: quant net and eval the accuracy of quantized simplenet.
+    Expectation: correct accuracy.
+    """
+    quant_simple_swiglu_net(non_decoder, quant_type)
+    eval_simple_swiglu_net(non_decoder, quant_type)
 
 
 class SimpleNet(nn.Cell):
