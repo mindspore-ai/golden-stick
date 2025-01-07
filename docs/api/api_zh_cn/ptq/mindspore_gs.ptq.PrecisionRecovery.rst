@@ -9,6 +9,6 @@ mindspore_gs.ptq.PrecisionRecovery
     - ``NONE`` : 不做精度补偿。
 
     .. py:method:: from_str(name: str)
-       :classmethod:
+        :classmethod:
 
         将 `name` 转换成精度补偿算法类型。
