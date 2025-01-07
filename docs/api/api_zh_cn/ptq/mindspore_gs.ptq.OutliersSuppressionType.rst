@@ -10,6 +10,6 @@ mindspore_gs.ptq.OutliersSuppressionType
     - ``NONE`` : 不做异常值抑制。
 
     .. py:method:: from_str(name: str)
-       :classmethod:
+        :classmethod:
 
         将 `name` 转换成异常值抑制算法类型。
