@@ -78,7 +78,12 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.key_t_zp.set_data(Tensor(np.squeeze(key_t_zp)))
         self.value_t_scale.set_data(Tensor(np.squeeze(value_t_scale)))
         self.value_t_zp.set_data(Tensor(np.squeeze(value_t_zp)))
-
+        self.cfg.dumper.dump_data(self.layer_name, "|key_quant_params|input0_key_cache_inputs", key_cat_samples)
+        self.cfg.dumper.dump_data(self.layer_name, "|key_quant_params|output0_key_scale", self.key_t_scale)
+        self.cfg.dumper.dump_data(self.layer_name, "|key_quant_params|output1_key_zp", self.key_t_zp)
+        self.cfg.dumper.dump_data(self.layer_name, "|value_quant_params|input0_value_cache_inputs", value_cat_samples)
+        self.cfg.dumper.dump_data(self.layer_name, "|value_quant_params|output0_value_scale", self.value_t_scale)
+        self.cfg.dumper.dump_data(self.layer_name, "|value_quant_params|output1_value_zp", self.value_t_zp)
         self.key_samples.clear()
         self.value_samples.clear()
 

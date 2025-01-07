@@ -67,7 +67,7 @@ def get_args():
 
     parser.add_argument('--weight_quant_dtype', '-w', type=str, default='none',
                         help="Available: 'int8', 'int4', 'none'")
-    parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'int4', 'none'")
+    parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
 
     parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
@@ -86,6 +86,8 @@ def get_args():
                              "For example: -b w2 lm_head.")
     parser.add_argument('--debug_mode', '-e', type=bool, default=False, help="Enable debug info, default: False, "
                                                                              "Available: True, False")
+    parser.add_argument('--dump_path', '-d', type=str, default="", help="Save the quantized data to the provided file "
+                                                                        "path.")
 
     args = parser.parse_args()
     args.act_quant_granularity = QuantGranularity.from_str(args.act_quant_granularity)
@@ -159,6 +161,8 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     elif approach == 'ptq':
         logger.info("Use ptq algo to quant network and weight.")
         ptq = PTQ(config=cfg)
+        # pylint: disable=protected-access
+        ptq._config.dumper.get_dump_path(uargs_.dump_path)
         if uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
             # pylint: disable=protected-access
             ptq._config.weight_symmetric = False

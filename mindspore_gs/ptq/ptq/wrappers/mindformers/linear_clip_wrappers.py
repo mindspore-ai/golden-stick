@@ -190,6 +190,7 @@ class ClipLinearCell(WrapperLinearCell):
             raise ValueError(f"AWQConfig clip alpha only support list or float type, but got {type(weight_clip_ratio)}")
         logger.debug(f"ClipLinearCell: best clip_val of Layer({self._layer_name}) is {{{clip_val.shape}, "
                      f"{clip_val.dtype}, {clip_val.asnumpy()}}}")
+        self.cfg.dumper.dump_data(self.layer_name, "|awq_clip_val", clip_val)
         self._apply_clip(clip_val)
 
     def deploy(self):
