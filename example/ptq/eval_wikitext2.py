@@ -63,7 +63,6 @@ if __name__ == "__main__":
     config = MindFormerConfig(uargs.config_path)
     config.run_mode = 'eval'
     config.model.model_config.use_past = False
-    config.model.model_config.use_flash_attention = False
     if config.model.arch.type == "LlamaForCausalLM":
         helper = MFLlama2Helper(config)
     elif config.model.arch.type == "ParallelLlamaForCausalLM":
