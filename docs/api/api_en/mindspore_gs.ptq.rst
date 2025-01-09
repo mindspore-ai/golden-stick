@@ -15,40 +15,13 @@ PTQ Config
     :nosignatures:
     :template: classtemplate.rst
 
+    mindspore_gs.ptq.PTQMode
+    mindspore_gs.ptq.OutliersSuppressionType
+    mindspore_gs.ptq.PrecisionRecovery
     mindspore_gs.ptq.PTQConfig
 
-PTQMode Enum
--------------
-
-.. autosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.PTQMode
-
-OutliersSuppressionType Enum
-------------------------------
-
-.. autosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.OutliersSuppressionType
-
-PrecisionRecovery Enum
-------------------------------
-
-.. autosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
-    mindspore_gs.ptq.PrecisionRecovery
-
 NetworkHelper
--------------
+------------------
 
 .. autosummary::
     :toctree: ptq
@@ -59,8 +32,8 @@ NetworkHelper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
-PTQ Algorithm
--------------
+Post Training Quantization Algorithm
+---------------------------------------------
 
 .. autosummary::
     :toctree: ptq
@@ -68,13 +41,4 @@ PTQ Algorithm
     :template: classtemplate.rst
 
     mindspore_gs.ptq.PTQ
-
-RoundToNearest Algorithm
---------------------------------
-
-.. autosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
     mindspore_gs.ptq.RoundToNearest
