@@ -15,37 +15,10 @@ PTQ 配置
     :nosignatures:
     :template: classtemplate.rst
 
-    mindspore_gs.ptq.PTQConfig
-
-PTQ 模式枚举
--------------
-
-.. mscnautosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
     mindspore_gs.ptq.PTQMode
-
-异常值抑制类型枚举
---------------------
-
-.. mscnautosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
     mindspore_gs.ptq.OutliersSuppressionType
-
-精度补偿类型
---------------------
-
-.. mscnautosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
     mindspore_gs.ptq.PrecisionRecovery
+    mindspore_gs.ptq.PTQConfig
 
 网络适配层
 -----------------
@@ -59,8 +32,8 @@ PTQ 模式枚举
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
-PTQ 算法
--------------
+训练后量化算法
+-------------------
 
 .. mscnautosummary::
     :toctree: ptq
@@ -68,13 +41,4 @@ PTQ 算法
     :template: classtemplate.rst
 
     mindspore_gs.ptq.PTQ
-
-RoundToNearest 算法
---------------------------------
-
-.. mscnautosummary::
-    :toctree: ptq
-    :nosignatures:
-    :template: classtemplate.rst
-
     mindspore_gs.ptq.RoundToNearest
