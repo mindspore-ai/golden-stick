@@ -214,8 +214,6 @@ def ckpt_name(model_name_, uargs_):
         name += "_awq"
     else:
         name += "_no_smooth"
-    if uargs_.precision_recovery == PrecisionRecovery.GPTQ:
-        name += "_gptq"
     if uargs_.act_quant_dtype == msdtype.int8:
         if uargs_.act_quant_granularity is QuantGranularity.PER_TOKEN:
             name += "_a8dyn"
