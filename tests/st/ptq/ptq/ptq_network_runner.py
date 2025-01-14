@@ -20,11 +20,9 @@ import numpy as np
 
 import mindspore as ms
 from mindspore.communication import get_rank
-from mindspore import save_checkpoint, set_context
-from mindspore import GRAPH_MODE, PYNATIVE_MODE, dtype
+from mindspore import save_checkpoint
+from mindspore import dtype
 from mindspore.dataset import GeneratorDataset
-from mindspore.communication.management import init
-from mindformers import AutoModel
 from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
@@ -183,12 +181,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     helper.mf_config.context.device_id = device_id
     config = helper.mf_config
 
-    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
-    init()
-    network = AutoModel.from_config(config, download_checkpoint=False)
-    network.set_train(False)
-    network.phase = 'predict'
-    transform_and_load_checkpoint(config, None, network, None)
+    network = helper.create_network()
     tokenizer = helper.create_tokenizer()
 
     def generate_(net, tokenizer_, input_):
@@ -229,6 +222,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
 
 def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     """eval llama2 by float ckpt and int ckpt"""
+    ms.set_context(mode=0)
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
@@ -239,17 +233,13 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
-    helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
+    helper.mf_config.load_checkpoint = "" #os.path.join(cur_dir_, ckpt_path_)
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
 
     device_id = int(os.environ.get('DEVICE_ID', '0'))
     helper.mf_config.context.device_id = device_id
     config = helper.mf_config
-
-    set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
-    network = AutoModel.from_config(config, download_checkpoint=False)
-    network.set_train(False)
-    network.phase = 'predict'
+    network = helper.create_network()
     if is_quant:
         cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
         ptq = PTQ(config=cfg)
@@ -260,6 +250,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
         ptq._config.enable_deploy_fusion = False
         network = ptq.apply(network)
         network = ptq.convert(network)
+    config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
     transform_and_load_checkpoint(config, None, network, None)
     tokenizer = helper.create_tokenizer()
 
@@ -359,12 +350,7 @@ def fp16_llama2_infer(config_path_, ckpt_path, output_dir_, example, quant_algo_
     helper.mf_config.context.device_id = device_id
     config = helper.mf_config
 
-    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"}, max_device_memory="8GB")
-    init()
-    network = AutoModel.from_config(config, download_checkpoint=False)
-    network.set_train(False)
-    network.phase = 'predict'
-    transform_and_load_checkpoint(config, None, network, None)
+    network = helper.create_network()
     tokenizer = helper.create_tokenizer()
 
     def generate_(net, tokenizer_, input_):
