@@ -67,6 +67,9 @@ class AllQuantLinearCell(WeightQuantLinearCell):
                                         self.cfg.act_quant_dtype, -1, False)
         self.x_scale.set_data(Tensor(x_scale, dtype=dtype.float64))
         self.x_zp.set_data(Tensor(x_zp, dtype=dtype.float64))
+        self.cfg.dumper.dump_data(self.layer_name, "|activation_params|input0_activation_inputs", self.cat_samples)
+        self.cfg.dumper.dump_data(self.layer_name, "|activation_params|output0_activation_scale", self.x_scale)
+        self.cfg.dumper.dump_data(self.layer_name, "|activation_params|output1_activation_zp", self.x_zp)
 
     def deploy(self):
         return AllQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,

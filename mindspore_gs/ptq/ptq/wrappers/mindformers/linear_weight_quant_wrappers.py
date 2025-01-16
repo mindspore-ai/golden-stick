@@ -102,6 +102,10 @@ class WeightQuantLinearCell(WrapperLinearCell):
         self.q_weight.set_data(Tensor(q_weight.asnumpy(), dtype=dtype.int8))
         self.w_scale.set_data(Tensor(w_scale, dtype=dtype.float64))
         self.w_zp.set_data(Tensor(w_zp, dtype=dtype.float64))
+        self.cfg.dumper.dump_data(self.layer_name, "|weight_params|input0_weight", self.layer.weight)
+        self.cfg.dumper.dump_data(self.layer_name, "|weight_params|output0_qweight", self.q_weight)
+        self.cfg.dumper.dump_data(self.layer_name, "|weight_params|output1_weight_scale", self.w_scale)
+        self.cfg.dumper.dump_data(self.layer_name, "|weight_params|output2_weight_zp", self.w_zp)
 
     def process(self):
         super().process()

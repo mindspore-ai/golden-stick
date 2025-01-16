@@ -24,6 +24,7 @@ from mindspore.nn import Cell
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
+from mindspore_gs.common.dumper import Dumper
 from mindspore_gs.common.utils import offload_network, value_check
 from mindspore_gs.ptq.processor import transform_network_inplace
 from mindspore_gs.ptq.ptq_config import (
@@ -112,6 +113,7 @@ class PTQ(CompAlgo):
             self._config = PTQConfig()
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig().inner_config(self._config, approach=PTQApproach.PTQ)
+        self._config.dumper = Dumper()
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
         self.pipeline: List[Algorithm] = []

@@ -86,6 +86,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             else:
                 self.samples[i] = self.samples[i].astype(dtype.float32)
                 self.h += msops.matmul(self.samples[i].T, self.samples[i])
+        self.cfg.dumper.dump_data(self.layer_name, "|hessian_matrix|input0_activation_inputs",
+                                  msops.cat(tuple(self.samples), axis=0))
+        self.cfg.dumper.dump_data(self.layer_name, "|hessian_matrix|output0_hessian", self.h)
 
     def _gptq_precision_recovery(self, weight, hinv, scale, zero, perm):
         """precision recovery use gptq"""
@@ -192,6 +195,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         from mindspore_gs.ptq.cholesky_trans import cholesky_compute
         cholesky_time = time.time()
         hinv = cholesky_compute(self.h, self.cfg.algo_args["damp_percent"])
+        self.cfg.dumper.dump_data(self.layer_name, "|cholesky_decomposition|input0_hessian", self.h)
+        self.cfg.dumper.dump_data(self.layer_name, "|cholesky_decomposition|output0_inv_hessian", hinv)
         del self.h
         logger.info(f'[TIME]end cholesky part with time {time.time() - cholesky_time}s')
         quant_tick = time.time()

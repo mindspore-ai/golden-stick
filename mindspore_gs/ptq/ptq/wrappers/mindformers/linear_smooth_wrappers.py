@@ -76,38 +76,54 @@ class SmoothLinearCell(WrapperLinearCell):
 
     def _calc_smooth_quant_smooth_scale(self, alpha):
         """_calc_smooth_scale"""
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|input0_alpha", Tensor(alpha))
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|input1_activation_inputs",
+                                  self.cat_samples)
         act_max = msops.maximum(msops.abs(self.x_obs_max(self.cat_samples, 0)[0]),
                                 msops.abs(self.x_obs_min(self.cat_samples, 0)[0]))
         logger.debug(f"SmoothLinearCell: act_max of Layer({self._layer_name}) is {{{act_max.shape}, {act_max.dtype}, "
                      f"{act_max.asnumpy()}}}")
         input_max_pow = msops.pow(act_max, alpha)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|output0_activation_minmax_pow",
+                                  input_max_pow)
         weight_smooth_minmax_axis = -2 if self.layer.transpose_b else -1
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input0_alpha", Tensor(alpha))
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input1_weight", self.layer.weight)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input2_weight_minmax_axis",
+                                  Tensor(weight_smooth_minmax_axis))
         weight_max = msops.maximum(msops.abs(self.w_obs_max(self.layer.weight, weight_smooth_minmax_axis)[0]),
                                    msops.abs(self.w_obs_min(self.layer.weight, weight_smooth_minmax_axis)[0]))
         logger.debug(f"SmoothLinearCell: weight_max of Layer({self._layer_name}) is {{{weight_max.shape}, "
                      f"{act_max.dtype}, {weight_max.asnumpy()}}}")
         weight_max_pow = msops.pow(weight_max, 1 - alpha)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|output0_weight_max_pow", weight_max_pow)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|input0_input_max_pow", input_max_pow)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|input1_weight_max_pow", weight_max_pow)
         smooth_scale = msops.div(input_max_pow, weight_max_pow).clamp(1e-5)
         # set 0 or nan to 1.0 to avoid quantization error
         smooth_scale[input_max_pow == 0] = 1.0
         smooth_scale[weight_max_pow == 0] = 1.0
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|output0_smooth_scale", smooth_scale)
         return smooth_scale
 
     def _calc_awq_smooth_scale(self, alpha):
         """_calc_smooth_scale"""
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|input0_alpha", Tensor(alpha))
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|input1_activation_mean", self.x_mean)
         if self.cfg.algo_args.get("duo_scaling", True):
             x_pow = msops.pow(self.x_mean, alpha)
             w_pow = msops.pow(self.w_mean, 1 - alpha) + 1e-4
+            self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|input2_weight_mean", self.w_mean)
             smooth_scale = (x_pow / w_pow).clamp(min=1e-4)
         else:
             smooth_scale = msops.pow(self.x_mean, alpha).clamp(1e-4).reshape(-1)
-
         minmax_norm = msops.sqrt(self.scale_max(smooth_scale)[0] * self.scale_min(smooth_scale)[0])
         smooth_scale = smooth_scale / minmax_norm
         smooth_scale[self.x_mean == 0] = 1
         smooth_scale[self.w_mean == 0] = 1
         logger.debug(f"AWQSmoothLinearCell: search scale alpha {alpha}, smooth scale of Layer({self._layer_name}) "
                      f"is {{{smooth_scale.shape}, {smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|output0_smooth_scale", smooth_scale)
         return smooth_scale
 
     def _apply_weight_smooth(self, smooth_scale: Tensor):
@@ -322,14 +338,21 @@ class AWQSmoothLinearCell(AWQLinearCell):
             weight = self._layer.weight.reshape(dst_shape)
         else:
             weight = self._layer.weight
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|weight_mean|input0_weight", weight)
         w_max = msops.max(msops.abs(weight), self.ic_axis, keepdims=True)[0] + 1e-6
         w_scale = msops.abs(weight) / w_max
         w_scale = w_scale.reshape(org_shape)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|weight_mean|input1_weight_scale", w_scale)
         self.w_mean = self._get_mean_weight(w_scale, self.oc_axis)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|weight_mean|output0_weight_mean", self.w_mean)
         logger.debug(f"AWQSmoothLinearCell: w_mean of Layer({self._layer_name}) is {{{self.w_mean.shape}, "
                      f"{self.w_mean.dtype}, {self.w_mean.asnumpy()}}}")
         # compute mean of activation
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|activation_mean|input0_activation_inputs",
+                                  self.cat_samples)
         self.x_mean = msops.mean(msops.abs(self.cat_samples), axis=0)
+        self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|activation_mean|output0_activation_mean",
+                                  self.x_mean)
         logger.debug(f"AWQSmoothLinearCell: x_mean of Layer({self._layer_name}) is {{{self.x_mean.shape}, "
                      f"{self.x_mean.dtype}, {self.x_mean.asnumpy()}}}")
 
