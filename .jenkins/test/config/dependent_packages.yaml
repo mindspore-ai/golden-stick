@@ -1,4 +1,4 @@
 mindspore:
-  '/mindspore/mindspore/version/202412/20241216/master_20241216010020_9507f216a52458ea4098b2402a37fe7f2b11db2b_newest/'
+  '/mindspore/mindspore/version/202501/20250108/master_20250108010019_7c97aac8e9c2624c299010d70c8202e443d78c51_newest/'
 mindformers:
-  '/mindspore/mindformers/version/202412/20241212/dev_20241212160025_a1047d3d1b4847e2015bc5097b65cb29ff39c923_newest/'
+  '/mindspore/mindformers/version/202501/20250108/dev_20250108010017_48afd0578ad21c0cd4d3466951c784ef60df4658_newest/'
