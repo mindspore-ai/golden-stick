@@ -162,7 +162,7 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
         logger.info("Use ptq algo to quant network and weight.")
         ptq = PTQ(config=cfg)
         # pylint: disable=protected-access
-        ptq._config.dumper.get_dump_path(uargs_.dump_path)
+        ptq._config.dumper.set_dump_path(uargs_.dump_path)
         if uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
             # pylint: disable=protected-access
             ptq._config.weight_symmetric = False
