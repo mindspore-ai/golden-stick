@@ -16,6 +16,9 @@
 util functions for golden-stick
 """
 
+import types
+import warnings
+from functools import wraps
 from mindspore import nn
 
 
@@ -54,3 +57,58 @@ def offload_network(network: nn.Cell):
     for _, param in network.parameters_dict().items():
         # pylint: disable=protected-access
         param._offload()
+
+
+def deprecated(version, substitute=None):
+    """deprecated warning
+
+    Args:
+        version (str): version that the operator or function is deprecated.
+        substitute (str): the substitute name for deprecated operator or function.
+    """
+
+    def decorate(target):
+        warnings.filterwarnings("always", category=DeprecationWarning)
+        warn_string = (
+            f"'{target.__name__}' is deprecated from version {version} and "
+            f"will be removed in a future version."
+        )
+        subsequent_indent = "    "
+        doc_string = f"{subsequent_indent}.. deprecated:: {version}"
+        target_type = "method"
+        if isinstance(target, type):
+            target_type = "class"
+        if isinstance(target, types.FunctionType):
+            target_type = "function"
+
+        if substitute:
+            doc_string = (
+                f"{doc_string}\n{subsequent_indent}{subsequent_indent}"
+                f"Use :{target_type}:`{substitute}` instead."
+            )
+            warn_string = f"{warn_string} Use '{substitute}' instead."
+
+        target.__doc__ = f"{doc_string}\n\n{target.__doc__}"
+        if isinstance(target, type):
+            origin_init = target.__init__
+
+            @wraps(origin_init)
+            def new_init(self, *args, **kwargs):
+                warnings.warn(warn_string, category=DeprecationWarning)
+                return origin_init(self, *args, **kwargs)
+
+            target.__init__ = new_init
+            return target
+
+        if callable(target):
+
+            @wraps(target)
+            def wrapper(*args, **kwargs):
+                warnings.warn(warn_string, category=DeprecationWarning)
+                ret = target(*args, **kwargs)
+                return ret
+
+            return wrapper
+        return target
+
+    return decorate

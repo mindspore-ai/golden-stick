@@ -3,6 +3,9 @@ mindspore_gs.ptq.RoundToNearest
 
 .. py:class:: mindspore_gs.ptq.RoundToNearest(config=None)
 
+    .. deprecated:: 1.0.0
+        请使用 :class:`mindspore_gs.ptq.PTQ` 代替。
+
     后量化算法的基本实现，通过统计最大最小值实现模型量化。
 
     参数：

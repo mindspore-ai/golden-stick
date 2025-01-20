@@ -346,6 +346,7 @@ def test_nothing_to_apply_convert(device_target):
     ds = create_foo_ds(1)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        warnings.simplefilter("always", category=DeprecationWarning)
         network = ptq.apply(network, net_helper, ds)
         ptq.convert(network)
 

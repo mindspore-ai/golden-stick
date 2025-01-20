@@ -31,11 +31,12 @@ from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, 
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.smooth_quant.sq_cell import SQCell
 from mindspore_gs.common import logger
-from mindspore_gs.common.utils import value_check
+from mindspore_gs.common.utils import value_check, deprecated
 from mindspore_gs.ptq.smooth_quant.sq_net_policy import SQNetPolicy
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 
+@deprecated(version="1.0.0", substitute="mindspore_gs.ptq.PTQ")
 class SmoothQuant(CompAlgo):
     """smooth quant for ptq"""
 

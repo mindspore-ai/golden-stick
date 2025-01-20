@@ -434,8 +434,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
                         and self.kvcache_quant_granularity is not QuantGranularity.PER_TOKEN:
             raise ValueError("when self.kvcache_quant_granularity not QuantGranularity.PER_TOKEN, weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, "
                              f"{self.approach} isn't supported.")
-        if self.approach is PTQApproach.RTN and self.kvcache_quant_dtype == msdtype.int8 and self.kvcache_quant_granularity is not QuantGranularity.PER_TOKEN:
-            raise ValueError("The c8 quant in RTN is discarded.")
+        if self.approach is PTQApproach.RTN and self.kvcache_quant_dtype == msdtype.int8:
+            raise ValueError("The 'kvcache-int8' quant in RTN is deprecated. Please replace the value of the 'approach' parameter with 'PTQ'.")
 
     def _check_quant_granularity(self):
         if self.approach is PTQApproach.RTN and (self.act_quant_granularity is QuantGranularity.PER_TOKEN or \
@@ -507,4 +507,5 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
                 inner_cfg.algo_args.update(val)
             else:
                 setattr(inner_cfg, key, val)
+        inner_cfg.__post_init__()
         return inner_cfg
