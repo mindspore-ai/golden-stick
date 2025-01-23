@@ -13,3 +13,6 @@ mindspore_gs.ptq.OutliersSuppressionType
         :classmethod:
 
         将 `name` 转换成异常值抑制算法类型。
+
+        参数：
+            - **name** (str) - 异常值抑制算法的字符串名。

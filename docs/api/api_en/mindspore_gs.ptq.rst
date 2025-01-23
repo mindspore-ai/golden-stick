@@ -19,6 +19,8 @@ PTQ Config
     mindspore_gs.ptq.OutliersSuppressionType
     mindspore_gs.ptq.PrecisionRecovery
     mindspore_gs.ptq.PTQConfig
+    mindspore_gs.ptq.AWQConfig
+    mindspore_gs.ptq.GPTQQuantConfig
 
 NetworkHelper
 ------------------
