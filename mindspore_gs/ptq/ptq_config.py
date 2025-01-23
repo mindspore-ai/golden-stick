@@ -66,7 +66,12 @@ class OutliersSuppressionType(Enum):
 
     @classmethod
     def from_str(cls, name: str):
-        """Convert name to outliers suppression algorithm type."""
+        """
+        Convert name to outliers suppression algorithm type.
+
+        Args:
+            name (str): the string name of the outliers suppression algorithm.
+        """
         if name.lower() == 'smooth':
             return OutliersSuppressionType.SMOOTH
         if name.lower() == 'awq':
@@ -96,7 +101,12 @@ class PrecisionRecovery(Enum):
 
     @classmethod
     def from_str(cls, name: str):
-        """Convert name to precision recovery algorithm type."""
+        """
+        Convert name to precision recovery algorithm type.
+
+        Args:
+            name (str): the string name of the precision recovery algorithm.
+        """
         if name.lower() == 'gptq':
             return PrecisionRecovery.GPTQ
         return PrecisionRecovery.NONE
@@ -105,7 +115,27 @@ class PrecisionRecovery(Enum):
 @algo_cfg_register.register(PTQApproach.GPTQ)
 @dataclass
 class GPTQQuantConfig:
-    """config for gptq quant algorithm"""
+    """
+    config for gptq quant algorithm
+
+    Args:
+        block_size (int, optional): The size of block compensation in precision recovery. Default value: ``128``.
+        desc_act (bool, optional): Whether to perform importance sorting on the Hessian matrix. Default value: ``False``.
+        damp_percent (float, optional): The percentage of the average of the diagonal elements of the Hessian matrix during numerical stable computations. Default value: ``0.01``.
+        static_groups (bool, optional): Whether to perform per_group calculation before precision recovery in the GPTQ algorithm. Default value: ``False``.
+
+    Raises:
+        TypeError: If `block_size` is not type int.
+        TypeError: If `desc_act` is not type bool.
+        TypeError: If `damp_percent` is not type float.
+        TypeError: If `static_groups` is not type bool.
+        ValueError: If `block_size` is less than 0.
+        ValueError: If `damp_percent` is less than 0 or greater than 1.
+
+    Examples:
+        >>> from mindspore_gs.ptq import GPTQQuantConfig
+        >>> GPTQQuantConfig(block_size=128, desc_act=False, damp_percent=0.01, static_groups=False)
+    """
     block_size: int = 128
     desc_act: bool = False
     damp_percent: float = 0.01
@@ -138,9 +168,21 @@ class AWQConfig:
     """
     config for awq quant algorithm
 
-    - `duo_scaling`: use activation and weight to compute scale.
-    - `smooth_alpha`: the hyper-parameter of smooth search.
-    - `weight_clip_ratio`: the hyper-parameter of clip search.
+    Args:
+        duo_scaling (bool, optional): Use activation and weight to compute scale. Default value: ``True``.
+        smooth_alpha (List[float], optional): The hyper-parameter of smooth search. Default value: ``[i/20 for i in range(20)]``.
+        weight_clip_ratio (List[float], optional): The hyper-parameter of clip search. Default value: ``[i/20 for i in range(10)]``.
+
+    Raises:
+        TypeError: If `duo_scaling` is not type bool.
+        TypeError: If `smooth_alpha` is not type float or list.
+        TypeError: If `weight_clip_ratio` is not float or list.
+        ValueError: If `smooth_alpha` is less than 0 or greater than 1.
+        ValueError: If `weight_clip_ratio` is less than 0 or greater than 1.
+
+    Examples:
+        >>> from mindspore_gs.ptq import AWQConfig
+        >>> AWQConfig(duo_scaling=True, smooth_alpha=[i/20 for i in range(20)], weight_clip_ratio=[i/20 for i in range(10)])
     """
     duo_scaling: bool = True
     smooth_alpha: Union[list, float] = field(default_factory=lambda: [i/20 for i in range(20)])

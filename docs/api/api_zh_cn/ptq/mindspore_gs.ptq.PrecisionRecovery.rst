@@ -12,3 +12,6 @@ mindspore_gs.ptq.PrecisionRecovery
         :classmethod:
 
         将 `name` 转换成精度补偿算法类型。
+
+        参数：
+            - **name** (str) - 精度补偿算法的字符串名。
