@@ -21,7 +21,7 @@ from mindspore.ops import functional as F
 from mindspore.nn import Cell
 from mindspore.common.hook_handle import HookHandle
 from mindformers.modules.layers import Linear
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType, QuantWithSmooth

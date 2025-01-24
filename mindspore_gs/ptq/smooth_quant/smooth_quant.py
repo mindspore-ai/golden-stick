@@ -15,6 +15,7 @@
 """SmoothQuant algorithm."""
 import warnings
 
+from dataclasses import asdict
 import os
 from typing import Tuple
 import copy
@@ -27,7 +28,9 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq import PTQMode
-from mindspore_gs.ptq.ptq_config import PTQConfig, InnerPTQConfig, PTQApproach, BackendTarget, OutliersSuppressionType
+from mindspore_gs.common import BackendTarget
+from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, SmoothQuantConfig
+from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.smooth_quant.sq_cell import SQCell
 from mindspore_gs.common import logger
@@ -49,6 +52,8 @@ class SmoothQuant(CompAlgo):
         else:
             self._config = PTQConfig()
         # convert PTQConfig to InnerConfig to add inner parameters
+        if not self._config.algo_args:
+            self._config.algo_args = asdict(SmoothQuantConfig())
         self._config = InnerPTQConfig.inner_config(self._config, approach=PTQApproach.SMOOTH_QUANT)
         SmoothQuant._ptq_config_check(self._config)
         if self._config.backend != BackendTarget.ASCEND:

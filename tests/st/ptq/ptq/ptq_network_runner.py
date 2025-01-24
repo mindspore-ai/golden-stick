@@ -27,9 +27,10 @@ from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.ptq_config import (PTQConfig, PTQMode,
-                                         OutliersSuppressionType, LayerQuantizeAlgo,
+                                         OutliersSuppressionType,
                                          PrecisionRecovery, GPTQQuantConfig,
                                          QuantGranularity, AWQConfig)
+from mindspore_gs.ptq.context import LayerQuantizeAlgo
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network

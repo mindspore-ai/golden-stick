@@ -21,7 +21,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.fake_quantizer import FakeQuantizer
 from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.context import InnerPTQConfig
 from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
 
 

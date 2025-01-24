@@ -24,10 +24,8 @@ from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import (
-    InnerPTQConfig, PTQMode,
-    OutliersSuppressionType,
-    QuantGranularity)
+from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy
 from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoothQuant, LinearAutoSmoother
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker, SearchInputs

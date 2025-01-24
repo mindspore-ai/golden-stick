@@ -30,8 +30,9 @@ from mindspore_gs import CompAlgo
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.quant_cell import PTQCell
 from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.ptq.ptq_config import (PTQConfig, InnerPTQConfig, PTQMode,
-                                         PTQApproach, BackendTarget, QuantGranularity, OutliersSuppressionType)
+from mindspore_gs.common import BackendTarget
+from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, QuantGranularity, OutliersSuppressionType
+from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.common.utils import value_check, deprecated
 from .rtn_net_policy import RTNNetPolicy

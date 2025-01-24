@@ -27,7 +27,8 @@ from mindspore.nn import Cell
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_world_size
 
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, QuantGranularity
+from mindspore_gs.ptq.ptq_config import QuantGranularity
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer

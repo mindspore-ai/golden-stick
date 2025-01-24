@@ -17,7 +17,7 @@
 from mindspore.rewrite import PatternEngine
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_policy import PTQNetPolicy
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.context import InnerPTQConfig
 
 
 class SQNetPolicy(PTQNetPolicy):

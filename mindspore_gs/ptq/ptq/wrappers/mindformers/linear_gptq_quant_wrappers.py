@@ -25,7 +25,8 @@ from mindspore.ops import sub as aclnn_sub, add as aclnn_add
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PrecisionRecovery, QuantGranularity
+from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor, get_quant_min_max
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.hal import ParallelType

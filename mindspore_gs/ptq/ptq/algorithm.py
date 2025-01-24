@@ -21,7 +21,8 @@ from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.processor import Processor, transform_network_inplace
-from mindspore_gs.ptq.ptq_config import LayerQuantizeAlgo, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import OutliersSuppressionType
+from mindspore_gs.ptq.context import LayerQuantizeAlgo
 from mindspore_gs.common import logger
 from .wrapper_cell import WrapperCell
 
