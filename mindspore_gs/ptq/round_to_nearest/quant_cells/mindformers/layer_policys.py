@@ -15,7 +15,8 @@
 """RTNLayerPolicy for mindformers layers."""
 
 from mindspore.nn import Cell
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, QuantGranularity
+from mindspore_gs.ptq.ptq_config import QuantGranularity
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.round_to_nearest.rtn_layer_policy import RTNLayerPolicy

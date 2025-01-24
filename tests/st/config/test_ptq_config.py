@@ -19,9 +19,9 @@ import sys
 import pytest
 from mindspore import dtype as msdtype
 
-from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, InnerPTQConfig, PTQApproach, PTQMode, \
-                                        OutliersSuppressionType, QuantGranularity
-from mindspore_gs.common.gs_enum import BackendTarget
+from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, PTQMode, OutliersSuppressionType, QuantGranularity
+from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
+from mindspore_gs.common import BackendTarget
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
 
@@ -169,9 +169,6 @@ def test_ptq_algo_config():
     Description: Feed invalid param to ptq_config to raise value error.
     Expectation: all value is consistent with default
     """
-    cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
-    assert cfg.algo_args.get('alpha') == 0.5
-
     cfg = InnerPTQConfig(approach=PTQApproach.RTN)
     assert cfg.mode == PTQMode.QUANTIZE
     assert cfg.backend == BackendTarget.ASCEND
@@ -278,12 +275,6 @@ def test_algo_args():
     assert isinstance(inner_cfg.algo_args, dict)
     assert "alpha" in inner_cfg.algo_args
     assert inner_cfg.algo_args["alpha"] == 0.8
-
-    inner_cfg = InnerPTQConfig(approach=PTQApproach.SMOOTH_QUANT)
-    assert inner_cfg.algo_args
-    assert isinstance(inner_cfg.algo_args, dict)
-    assert "alpha" in inner_cfg.algo_args
-    assert inner_cfg.algo_args["alpha"] == SmoothQuantConfig().alpha
 
     # use dict as algo_args
     cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, algo_args={'a': 1})

@@ -18,7 +18,7 @@ import abc
 import dataclasses
 from mindspore.nn import Cell
 from mindspore import ops as msops
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 

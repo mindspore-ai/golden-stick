@@ -48,6 +48,7 @@
 
 # PTQ
 "golden-stick/mindspore_gs/ptq/ptq_config.py"                                                            "line-too-long"
+"golden-stick/mindspore_gs/ptq/context.py"                                                            "line-too-long"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"

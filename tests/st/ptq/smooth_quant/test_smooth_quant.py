@@ -33,7 +33,8 @@ from mindformers.trainer.utils import transform_and_load_checkpoint
 
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, SmoothQuantConfig, PTQApproach, OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import SmoothQuantConfig, OutliersSuppressionType
+from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
 from mindspore_gs.ptq.smooth_quant.smooth_quant import SmoothQuant
 from mindspore_gs.ptq.smooth_quant.quant_cells.mindformers.layer_policys import LinearLayerPolicy
 from mindspore_gs.ptq.smooth_quant.quant_cells.mindformers.quant_cells import SQLinearActObserver, \
@@ -364,7 +365,8 @@ def test_sq_linear_wrapper(mode, transpose_b):
     """
     context.set_context(device_target="Ascend", mode=mode)
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
-                    act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH)
+                    act_quant_dtype=dtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+                    algo_args=SmoothQuantConfig())
     inner_cfg = InnerPTQConfig.inner_config(cfg, PTQApproach.SMOOTH_QUANT)
     act_in = 5
     act_out = 6

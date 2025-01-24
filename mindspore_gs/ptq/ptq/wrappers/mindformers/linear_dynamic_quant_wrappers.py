@@ -18,7 +18,8 @@ from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 from mindspore import dtype
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq_config import InnerPTQConfig, PTQMode, QuantGranularity
+from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.hal import QuantParam, DynamicQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
