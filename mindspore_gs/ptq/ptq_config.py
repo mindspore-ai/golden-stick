@@ -89,7 +89,7 @@ class PrecisionRecovery(Enum):
 @dataclass
 class GPTQQuantConfig:
     """
-    config for gptq quant algorithm
+    Config for gptq quant algorithm.
 
     Args:
         block_size (int, optional): The size of block compensation in precision recovery. Default value: ``128``.
@@ -137,12 +137,14 @@ class SmoothQuantConfig:
 @dataclass
 class AWQConfig:
     """
-    config for awq quant algorithm
+    AWQConfig(duo_scaling=True, smooth_alpha=[i/20 for i in range(20)], weight_clip_ratio=[1-i/20 for i in range(10)])
+
+    Config for awq quant algorithm.
 
     Args:
         duo_scaling (bool, optional): Use activation and weight to compute scale. Default value: ``True``.
         smooth_alpha (List[float], optional): The hyper-parameter of smooth search. Default value: ``[i/20 for i in range(20)]``.
-        weight_clip_ratio (List[float], optional): The hyper-parameter of clip search. Default value: ``[i/20 for i in range(10)]``.
+        weight_clip_ratio (List[float], optional): The hyper-parameter of clip search. Default value: ``[1-i/20 for i in range(10)]``.
 
     Raises:
         TypeError: If `duo_scaling` is not type bool.
@@ -153,7 +155,7 @@ class AWQConfig:
 
     Examples:
         >>> from mindspore_gs.ptq import AWQConfig
-        >>> AWQConfig(duo_scaling=True, smooth_alpha=[i/20 for i in range(20)], weight_clip_ratio=[i/20 for i in range(10)])
+        >>> AWQConfig(duo_scaling=True, smooth_alpha=[i/20 for i in range(20)], weight_clip_ratio=[1-i/20 for i in range(10)])
     """
     duo_scaling: bool = True
     smooth_alpha: Union[list, float] = field(default_factory=lambda: [i/20 for i in range(20)])
