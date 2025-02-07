@@ -184,7 +184,14 @@ class AWQConfig:
 
 
 class QuantGranularity(Enum):
-    """quant granularity."""
+    """
+    Quant granularity for ptq quantizer.
+
+    - ``PER_TENSOR``: apply quant granularity to per_tensor.
+    - ``PER_CHANNEL``: apply quant granularity to per_channel.
+    - ``PER_TOKEN``: apply quant granularity to per_token.
+    - ``PER_GROUP``: apply quant granularity to per_group.
+    """
     PER_TENSOR = 'per_tensor'
     PER_CHANNEL = 'per_channel'
     PER_TOKEN = 'per_token'
@@ -192,7 +199,12 @@ class QuantGranularity(Enum):
 
     @classmethod
     def from_str(cls, name: str):
-        """quant_granularity_formatter"""
+        """
+        Convert name to quant granularity type.
+
+        Args:
+            name (str): the string name of the quant granularity.
+        """
         if name.lower() == 'per_token':
             return QuantGranularity.PER_TOKEN
         if name.lower() == 'per_tensor':
