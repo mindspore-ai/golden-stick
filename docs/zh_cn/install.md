@@ -1,5 +1,7 @@
 # 安装MindSpore Golden Stick
 
+[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/docs/zh_cn/install.md)
+
 [View English](../docs_en/install.md)
 
 <!-- TOC -->
@@ -31,6 +33,7 @@ MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表�
 
 | MindSpore Golden Stick版本 |                             分支                                  | MindSpore版本 |
 | :---------------------: | :-----------------------------------------------------------------: | :-------: |
+|          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0   |
 |          0.6.0          | [r0.6](https://gitee.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0   |
 |          0.5.0          | [r0.5](https://gitee.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1   |
 |          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0   |
@@ -51,8 +54,8 @@ pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{ms_version}/Gol
 ```
 
 > - 在联网状态下，安装whl包时会自动下载MindSpore Golden Stick安装包的依赖项（依赖项详情参见requirement.txt），其余情况需自行安装。
-> - `{ms_version}`表示与MindSpore Golden Stick匹配的MindSpore版本号，例如下载0.6.0版本MindSpore Golden Stick时，`{ms_version}`应写为2.4.0。
-> - `{mg_version}`表示MindSpore Golden Stick版本号，例如下载0.6.0版本MindSpore Golden Stick时，`{mg_version}`应写为0.6.0。
+> - `{ms_version}`表示与MindSpore Golden Stick匹配的MindSpore版本号，例如下载1.0.0版本MindSpore Golden Stick时，`{ms_version}`可写为2.5.0。
+> - `{mg_version}`表示MindSpore Golden Stick版本号，例如下载1.0.0版本MindSpore Golden Stick时，`{mg_version}`应写为1.0.0。
 
 ## 源码编译安装
 

@@ -1,5 +1,7 @@
 # 应用PTQ算法
 
+[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/mindspore_gs/ptq/ptq/README_CN.md)
+
 [View English](./README.md)
 
 ## PTQ算法介绍
