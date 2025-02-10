@@ -53,6 +53,7 @@ class MFNetworkHelper(NetworkHelper):
             self.mf_config = MindFormerConfig(config)
         build_parallel_config(self.mf_config)
         self.mf_config.model.model_config.parallel_config = self.mf_config.parallel_config
+        self.mf_config.model.model_config.moe_config = self.mf_config.moe_config
 
     def create_network(self):
         """
