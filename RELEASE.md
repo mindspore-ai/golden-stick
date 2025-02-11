@@ -2,6 +2,25 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 1.0.0 Release Notes
+
+### Major Features and Improvements
+
+* The Post-Training Quantization algorithm `PTQ` supports the `GPTQ` quantization algorithm, which can quantize weight to 8 bit or 4 bit. `GPTQ` has been added to the precision recovery algorithm set and can be selected through `precision_recovery` in `PTQConfig`. Currently, only the `GPTQ` algorithm is available for precision recovery.
+* The Post-Training Quantization algorithm `PTQ` supports the `AWQ` quantization algorithm. It enables `AWQ` by adding a new outlier suppression method to quantize the weights to 4 bits. The outlier suppression method can be selected through `outliers_suppression` in `PTQConfig`, and currently, two methods are available: `smooth` and `awq`.
+
+### API Change
+
+* The quantization methods `RoundToNearest` and `SmoothQuant` are deprecated. Please replace them with `PTQ`.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+huangzhuo, zhangminli, ccsszz, yyyyrf, hangangqiang
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 0.6.0 Release Notes
 
 ### Major Features and Improvements

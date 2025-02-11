@@ -2,6 +2,25 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 1.0.0 Release Notes
+
+### 主要特性和增强
+
+* 训练后量化算法 `PTQ` 支持 `GPTQ` 量化算法，可对权重进行8bit或4bit量化。`GPTQ` 已添加至精度恢复算法集中，可通过 `PTQConfig` 中的 `precision_recovery` 来进行算法选择，当前精度恢复算法仅 `GPTQ` 算法可选。
+* 训练后量化算法 `PTQ` 支持 `AWQ` 量化算法，通过新增一种异常值抑制方法来使能 `AWQ` ，对权重进行4bit量化。可通过 `PTQConfig` 中的 `outliers_suppression` 来进行异常值抑制方法选择，当前可选 `smooth` 和 `awq` 两种方法。
+
+### API变更
+
+* `RoundToNearest` 和 `SmoothQuant` 量化方法已经被废弃，请使用 `PTQ` 进行代替。
+
+### 贡献者
+
+感谢以下人员做出的贡献:
+
+huangzhuo, zhangminli, ccsszz, yyyyrf, hangangqiang
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 0.6.0 Release Notes
 
 ### 主要特性和增强

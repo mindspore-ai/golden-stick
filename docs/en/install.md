@@ -1,5 +1,7 @@
 # Installing MindSpore Golden Stick
 
+[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/docs/en/install.md)
+
 [查看中文](../docs_zh_cn/install.md)
 
 <!-- TOC -->
@@ -31,6 +33,7 @@ The MindSpore Golden Stick depends on the MindSpore training and inference frame
 
 | MindSpore Golden Stick Version |                         Branch                               | MindSpore Version |
 | :---------------------: | :-----------------------------------------------------------------: | :-------: |
+|          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0   |
 |          0.6.0          | [r0.6](https://gitee.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0   |
 |          0.5.0          | [r0.5](https://gitee.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1   |
 |          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0   |
@@ -52,7 +55,7 @@ pip install  https://ms-release.obs.cn-north-4.myhuaweicloud.com/{MindSpore_vers
 
 > - Installing whl package will download MindSpore Golden Stick dependencies automatically (detail of dependencies is shown in requirement.txt),  other dependencies should install manually.
 > - `{MindSpore_version}` stands for the version of MindSpore. For the version matching relationship between MindSpore and MindSpore Golden Stick, please refer to [page](https://www.mindspore.cn/versions).
-> - `{ms_version}` stands for the version of MindSpore Golden Stick. For example, if you would like to download version 0.6.0, you should fill 2.4.0 in `{MindSpore_version}` and fill 0.6.0 in `{mg_version}`.
+> - `{ms_version}` stands for the version of MindSpore Golden Stick. For example, if you would like to download version 1.0.0, you should fill 2.5.0 in `{MindSpore_version}` and fill 1.0.0 in `{mg_version}`.
 
 ## Installing from Source Code
 

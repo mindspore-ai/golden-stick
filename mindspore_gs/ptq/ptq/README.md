@@ -1,5 +1,7 @@
 # Applying the PTQ Algorithm
 
+[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/mindspore_gs/ptq/ptq/README.md)
+
 [查看中文](./README_CN.md)
 
 ## Introduction to the PTQ Algorithm
