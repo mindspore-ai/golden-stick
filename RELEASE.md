@@ -8,6 +8,7 @@
 
 * The Post-Training Quantization algorithm `PTQ` supports the `GPTQ` quantization algorithm, which can quantize weight to 8 bit or 4 bit. `GPTQ` has been added to the precision recovery algorithm set and can be selected through `precision_recovery` in `PTQConfig`. Currently, only the `GPTQ` algorithm is available for precision recovery.
 * The Post-Training Quantization algorithm `PTQ` supports the `AWQ` quantization algorithm. It enables `AWQ` by adding a new outlier suppression method to quantize the weights to 4 bits. The outlier suppression method can be selected through `outliers_suppression` in `PTQConfig`, and currently, two methods are available: `smooth` and `awq`.
+* The Post-Training Quantization algorithm `PTQ` supports per-token dynamic quantization for activations, enabling online quantization of activations. This can be configured through `PTQConfig` with `act_quant_granularity=QuantGranularity.PER_TOKEN`.
 
 ### API Change
 
