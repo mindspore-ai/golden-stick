@@ -1,5 +1,7 @@
 # Applying RoundToNearest Post-Quantization Algorithm
 
+[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/mindspore_gs/ptq/round_to_nearest/README.md)
+
 [查看中文](./README_CN.ipynb)
 
 ## Introduction to RoundToNearest Post-Quantization Algorithm
@@ -157,7 +159,7 @@ Step 3: Prepare the Llama2 7B network checkpoint file, the Llama2 disambiguator 
 ```text
 !cd workspace; wget --no-check-certificate -O llama2_7b.ckpt https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/llama2_7b.ckpt
 !cd workspace; wget --no-check-certificate -O tokenizer.model https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model
-!cd workspace; cp ../configs/predict_llama2_7b_910b.yaml ./
+!cd workspace; cp ../configs/predict_llama2_7b.yaml ./
 ```
 
 The running results are as follows:
@@ -182,7 +184,7 @@ tokenizer.model     100%[===================>] 488.01K  --.-KB/s    in 0.1s
 
 > If you encounter network problems when downloading, you can try to use the browser to download the corresponding file manually and put it into the appropriate directory.
 
-Step 4: Modify the predict_llama2_7b_910b.yaml file by overriding the paths of checkpoint, tokenizer to the load_checkpoint field in the yaml configuration file and to the vocab_file field in the processor chapter respectively. Also modify the device_id in the context chapter to the current idle device id of the machine.
+Step 4: Modify the predict_llama2_7b.yaml file by overriding the paths of checkpoint, tokenizer to the load_checkpoint field in the yaml configuration file and to the vocab_file field in the processor chapter respectively. Also modify the device_id in the context chapter to the current idle device id of the machine.
 
 After completing the above preparation, check the catalog structure:
 
@@ -201,7 +203,7 @@ The running results are as follows:
 │   └── wiki.valid.tokens
 ├── tokenizer.model
 ├── wikitext-2-v1.zip
-└── predict_llama2_7b_910b.yaml
+└── predict_llama2_7b.yaml
 
 1 directory, 7 files
 ```
@@ -267,7 +269,7 @@ def quant_network(net: LlamaForCausalLM, mode=PTQMode.QUANTIZE, backend=BackendT
 start = time.time()
 print('------------------------- Creating network...', flush=True)
 net_mgr: Llama2Network = Llama2Network()
-config = net_mgr.create_mfconfig("./workspace/predict_llama2_7b_910b.yaml")
+config = net_mgr.create_mfconfig("./workspace/predict_llama2_7b.yaml")
 network = net_mgr.create_network(config)
 logger.info(f'Create Network cost time is {time.time() - start} s.')
 start = time.time()
@@ -318,7 +320,7 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 
 
 net_mgr: Llama2Network = Llama2Network()
-fp16_network_config = net_mgr.create_mfconfig("./workspace/predict_llama2_7b_910b.yaml")
+fp16_network_config = net_mgr.create_mfconfig("./workspace/predict_llama2_7b.yaml")
 fp16_network_config.model.model_config.use_past = False
 pad_token_id = fp16_network_config.model.model_config.pad_token_id
 fp16_network = net_mgr.create_network(fp16_network_config)
@@ -372,7 +374,7 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 
 
 net_mgr: Llama2Network = Llama2Network()
-network_config = net_mgr.create_mfconfig("./workspace/predict_llama2_7b_910b.yaml")
+network_config = net_mgr.create_mfconfig("./workspace/predict_llama2_7b.yaml")
 network_config.model.model_config.use_past = False
 pad_token_id = network_config.model.model_config.pad_token_id
 w8a16_network = net_mgr.create_network(network_config)
