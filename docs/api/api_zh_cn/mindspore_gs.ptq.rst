@@ -18,7 +18,10 @@ PTQ 配置
     mindspore_gs.ptq.PTQMode
     mindspore_gs.ptq.OutliersSuppressionType
     mindspore_gs.ptq.PrecisionRecovery
+    mindspore_gs.ptq.QuantGranularity
     mindspore_gs.ptq.PTQConfig
+    mindspore_gs.ptq.AWQConfig
+    mindspore_gs.ptq.GPTQQuantConfig
 
 网络适配层
 -----------------
