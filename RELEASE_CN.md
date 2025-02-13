@@ -8,6 +8,7 @@
 
 * 训练后量化算法 `PTQ` 支持 `GPTQ` 量化算法，可对权重进行8bit或4bit量化。`GPTQ` 已添加至精度恢复算法集中，可通过 `PTQConfig` 中的 `precision_recovery` 来进行算法选择，当前精度恢复算法仅 `GPTQ` 算法可选。
 * 训练后量化算法 `PTQ` 支持 `AWQ` 量化算法，通过新增一种异常值抑制方法来使能 `AWQ` ，对权重进行4bit量化。可通过 `PTQConfig` 中的 `outliers_suppression` 来进行异常值抑制方法选择，当前可选 `smooth` 和 `awq` 两种方法。
+* 训练后量化算法 `PTQ` 支持激活per-token动态量化，实现对激活的在线量化。可通过 `PTQConfig` 中的 `act_quant_granularity=QuantGranularity.PER_TOKEN`进行配置。
 
 ### API变更
 
