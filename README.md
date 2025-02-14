@@ -2,25 +2,6 @@
 
 [查看中文](./README_CN.md)
 
-<!-- TOC -->
-
-- MindSpore Golden Stick
-    - [Overview](#overview)
-    - [Design Features](#design-features)
-    - [General Process of Applying the MindSpore Golden Stick](#general-process-of-applying-the-mindspore-golden-stick)
-    - [Documents](#documents)
-        - [Installation](#installation)
-        - [Quick Start](#quick-start)
-        - [Compression Algorithm](#compression-algorithm)
-        - [Model Deployment](#model-deployment)
-    - [Community](#community)
-        - [Governance](#governance)
-        - [Communication](#communication)
-    - [Contributions](#contributions)
-    - [License](#license)
-
-<!-- /TOC -->
-
 ## Overview
 
 MindSpore Golden Stick is a model compression algorithm set jointly designed and developed by Huawei's Noah team and Huawei's MindSpore team. The architecture diagram of MindSpore Golden Stick is shown in the figure below, which is divided into five parts:
