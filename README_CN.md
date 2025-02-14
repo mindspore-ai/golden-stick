@@ -2,25 +2,6 @@
 
 [View English](./README.md)
 
-<!-- TOC -->
-
-- MindSpore Golden Stick
-    - [概述](#概述)
-    - [应用MindSpore Golden Stick算法的一般流程](#应用mindspore-golden-stick算法的一般流程)
-    - [未来规划](#未来规划)
-    - [文档](#文档)
-        - [安装](#安装)
-        - [快速入门](#快速入门)
-        - [压缩算法](#压缩算法)
-        - [模型部署](#模型部署)
-    - [社区](#社区)
-        - [治理](#治理)
-        - [交流](#交流)
-    - [贡献](#贡献)
-    - [许可证](#许可证)
-
-<!-- /TOC -->
-
 ## 概述
 
 MindSpore Golden Stick是华为诺亚团队和华为MindSpore团队联合设计开发的一个模型压缩算法集。MindSpore Golden Stick的架构图如下图所示，分为五个部分：

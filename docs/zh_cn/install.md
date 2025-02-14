@@ -4,17 +4,6 @@
 
 [View English](../docs_en/install.md)
 
-<!-- TOC -->
-
-- 安装MindSpore Golden Stick
-    - [环境限制](#环境限制)
-    - [MindSpore版本依赖关系](#MindSpore版本依赖关系)
-    - [pip安装](#pip安装)
-    - [源码编译安装](#源码编译安装)
-    - [验证安装是否成功](#验证安装是否成功)
-
-<!-- /TOC -->
-
 ## 环境限制
 
 下表列出了安装、编译和运行MindSpore Golden Stick所需的系统环境：
