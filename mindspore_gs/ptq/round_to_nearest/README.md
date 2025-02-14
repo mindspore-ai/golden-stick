@@ -134,9 +134,9 @@ Step 1: creates a working directory:
 !mkdir workspace
 ```
 
-Step 2: Prepare the dataset. You need to download the wikitext2 dataset manually due to permissions restrictions:
+Step 2: Prepare the dataset:
 
-Dataset download address: [WikiText2 dataset](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-2-v1.zip)
+Dataset download address: WikiText2 dataset
 
 After downloading the dataset, you need to copy the dataset file to the workspace directory created in the previous step and make sure that the dataset file name is wikitext-2-v1.zip, and then run the decompression code:
 
