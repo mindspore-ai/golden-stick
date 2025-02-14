@@ -134,7 +134,7 @@ Step 1: creates a working directory:
 !mkdir workspace
 ```
 
-Step 2: Prepare the dataset.
+Step 2: Prepare the dataset:
 
 Dataset download: WikiText2 dataset
 
