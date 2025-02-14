@@ -1,19 +1,8 @@
 # Installing MindSpore Golden Stick
 
-[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/docs/en/install.md)
+[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/docs/en/install.md)
 
 [查看中文](../docs_zh_cn/install.md)
-
-<!-- TOC -->
-
-- Installing MindSpore Golden Stick
-    - [Environmental Restrictions](#environmental-restrictions)
-    - [Version Dependency](#version-dependency)
-    - [Installing from pip Command](#installing-from-pip-command)
-    - [Installing from Source Code](#installing-from-source-code)
-    - [Verification](#verification)
-
-<!-- /TOC -->
 
 ## Environmental Restrictions
 
