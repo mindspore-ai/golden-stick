@@ -70,7 +70,7 @@ def infer(yaml_file):
     model_config = DeepseekV3Config(**model_config)
 
     tokenizer = LlamaTokenizerFast(config.processor.tokenizer.vocab_file,
-                                   config.processor.tokenizer.tokenize_file,
+                                   config.processor.tokenizer.tokenizer_file,
                                    unk_token=config.processor.tokenizer.unk_token,
                                    bos_token=config.processor.tokenizer.bos_token,
                                    eos_token=config.processor.tokenizer.eos_token,
