@@ -24,6 +24,7 @@ from mindspore.ops.auto_generate import DynamicQuantExt, KVCacheScatterUpdate
 from mindspore.common.initializer import initializer, Zero
 from mindspore.nn import Cell
 
+from mindformers.experimental.infer.core.parallel_paged_attention_mgr import ParallelPagedAttentionMgr
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_world_size
 
@@ -47,6 +48,7 @@ class QuantPageAttentionMgrCell(WrapperCell):
                         QuantGranularity.PER_CHANNEL
 
         Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
+        Quantizer.reg_layer_map(ParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
 
     def __init__(self, linear_name, layer, cfg, network_helper, **kwargs):
         super().__init__(linear_name, layer, cfg, network_helper, **kwargs)
@@ -107,12 +109,12 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.layer.reshape_and_cache(x, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
 
     # pylint: disable=W0613
-    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
+    def paged_attn(self, query, batch_valid_length, block_tables, *args, **kwargs):
         """The forward compute of Paged Attention."""
         return self.layer.paged_attention(query, self.layer.key_cache, self.layer.value_cache, block_tables,
                                           batch_valid_length)
 
-    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor, *args, **kwargs):
         """The forward compute of KVCache for Paged Attention with alibi tensor."""
         return self.layer.paged_attention_with_alibi(query, self.layer.key_cache, self.layer.value_cache,
                                                      block_tables, batch_valid_length, alibi_tensor)
@@ -140,18 +142,18 @@ class DeployPageAttentionMgrCell(Cell):
         self.tensor_parallel_group_size = get_tensor_model_parallel_world_size()
 
     # pylint: disable=W0613
-    def construct(self, key, value, slot_mapping, batch_valid_length=None):
+    def construct(self, key, value, slot_mapping, *args, **kwargs):
         """The forward compute of KVCache for Paged Attention."""
         key = self._key_input_quantizer(key)
         value = self._value_input_quantizer(value)
         self.layer.reshape_and_cache(key, value, self.layer.key_cache, self.layer.value_cache, slot_mapping)
 
     # pylint: disable=W0613
-    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
+    def paged_attn(self, query, batch_valid_length, block_tables, *args, **kwargs):
         """The forward compute of Paged Attention."""
         return self.quant_pa.paged_attn(self.layer, query, batch_valid_length, block_tables)
 
-    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor, *args, **kwargs):
         """The forward compute of Paged Attention."""
         return self.quant_pa.paged_attn_with_alibi(self.layer, query, batch_valid_length, block_tables, alibi_tensor)
 
@@ -176,6 +178,7 @@ class DynamicQuantPageAttentionMgrCell(WrapperCell):
                         QuantGranularity.PER_TOKEN
 
         Quantizer.reg_layer_map(PagedAttentionMgr, DynamicQuantPageAttentionMgrCell, KVCacheInt8())
+        Quantizer.reg_layer_map(ParallelPagedAttentionMgr, DynamicQuantPageAttentionMgrCell, KVCacheInt8())
 
     def deploy(self):
         return DynamicQuantPagedAttentionDeploy(self.layer)
@@ -276,7 +279,8 @@ class DynamicQuantPagedAttentionDeploy(Cell):
         pass
 
     # pylint: disable=W0221
-    def construct(self, key, value, slot_mapping, batch_valid_length):
+    # pylint: disable=W0613
+    def construct(self, key, value, slot_mapping, batch_valid_length, *args, **kwargs):
         """The forward compute of KVCache for Paged Attention."""
         if self.is_first_iteration:
             batch_idx = batch_valid_length * 0
@@ -291,7 +295,7 @@ class DynamicQuantPagedAttentionDeploy(Cell):
                                                slot_mapping)
 
     # pylint: disable=W0613
-    def paged_attn(self, query, batch_valid_length, block_tables, attn_mask=None, q_seq_lens=None):
+    def paged_attn(self, query, batch_valid_length, block_tables, *args, **kwargs):
         """The forward compute of Paged Attention."""
         key_scale = self.reshape(self.key_scale, (1, self.max_batch_size, self.max_seq_length))
         value_scale = self.reshape(self.value_scale, (1, self.max_batch_size, self.max_seq_length))
@@ -299,7 +303,7 @@ class DynamicQuantPagedAttentionDeploy(Cell):
         return self.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache, block_tables,
                                     batch_valid_length, kv_scale, self.kv_offset)
 
-    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor):
+    def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor, *args, **kwargs):
         """The forward compute of KVCache for Paged Attention with alibi tensor."""
         key_scale = self.reshape(self.key_scale, (1, self.max_batch_size, self.max_seq_length))
         value_scale = self.reshape(self.value_scale, (1, self.max_batch_size, self.max_seq_length))
