@@ -273,3 +273,99 @@ class MFParallelTeleChat2Helper(MFParallelLlama2Helper):
         """create_tokenizer."""
         from research.telechat2.telechat_tokenizer import TelechatTokenizer
         return TelechatTokenizer(vocab_file=self.get_spec('vocab_file'))
+
+
+class MFDSV3Helper(MFNetworkHelper):
+    """MFDSV3Helper"""
+    def __init__(self, config: Union[str, MindFormerConfig] = None):
+        super().__init__(config)
+        self._decoder_infos = OrderedDict()
+
+    def create_network(self):
+        from research.deepseek3.deepseek3_model import DeepseekV3ForCausalLM
+        from research.deepseek3.deepseek3_config import DeepseekV3Config
+        build_context(self.mf_config)
+        model_config = DeepseekV3Config(**self.mf_config.model.model_config)
+        network = DeepseekV3ForCausalLM(model_config)
+        network.set_train(False)
+        network.phase = 'predict'
+        ckpt_path = self.mf_config.load_checkpoint
+        if ckpt_path:
+            self._load_ckpt(network)
+        ms.ms_memory_recycle()
+        network.phase = 'predict'
+        return network
+
+    def create_tokenizer(self):
+        """create_tokenizer."""
+        from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
+        return LlamaTokenizerFast(vocab_file=self.get_spec('vocab_file'),
+                                  tokenizer_file=self.get_spec('tokenizer_file'))
+
+    @staticmethod
+    def _get_slots(bs, block_size, prefill_max_len, is_prefill, block_tables, valid_length_example):
+        """get_slots."""
+        slot_mapping = []
+        for i in range(bs):
+            block_table = block_tables[i]
+            if is_prefill:
+                slots = [block_table[k // block_size] * block_size + k % block_size
+                         for k in range(valid_length_example[i])]
+                null_slot_idx = -1
+                num_elements_to_add = prefill_max_len - valid_length_example[i]
+                for _ in range(num_elements_to_add):
+                    slots.append(null_slot_idx)
+            else:
+                current_idx = valid_length_example[i] - 1
+                slots = [block_table[current_idx // block_size] * block_size + current_idx % block_size]
+            slot_mapping = slot_mapping + slots
+
+        return np.array(slot_mapping, copy=False, dtype=np.int32)
+
+    @staticmethod
+    def _get_pa_inputs(bs, seq, block_size, valid_length):
+        """_get_pa_inputs"""
+        valid_length_each_example = np.array([valid_length])
+        prefill_max_len = max(valid_length_each_example)
+        required_block_num = math.ceil(seq / block_size)
+        block_tables = np.arange(required_block_num, dtype=np.int32).reshape(bs, -1)
+        slot_mapping = MFDSV3Helper._get_slots(bs, block_size, prefill_max_len, True, block_tables,
+                                               valid_length_each_example)
+        block_tables = Tensor(block_tables, mstype.int32)
+        slot_mapping = Tensor(slot_mapping, mstype.int32)
+        return block_tables, slot_mapping
+
+    def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
+        """
+        Assemble network inputs for predict from input tokens in numpy ndarray format.
+
+        Args:
+            input_ids (numpy.ndarray): Input tokens.
+            kwargs (Dict): Extensible parameter for subclasses.
+
+        Returns:
+            A list of `mindspore.Tensor` as inputs of network predict.
+        """
+        value_check('input_ids', input_ids, np.ndarray)
+        shape = input_ids.shape
+        if len(shape) > 2:
+            raise ValueError(f"Only support two-dimension(bs, seq_length) input_ids, got: {shape}.")
+        bs = self.mf_config.model.model_config.batch_size
+        seq = self.mf_config.model.model_config.seq_length
+        if shape[0] > bs or shape[1] > seq:
+            raise ValueError(f"Input input_ids shape({shape}) out of max shape({bs}, {seq}).")
+        pad_token_id = self.mf_config.model.model_config.pad_token_id
+        use_past = self.mf_config.model.model_config.use_past
+        input_ids = np.pad(input_ids, ((0, bs - shape[0]), (0, seq - shape[1])), 'constant',
+                           constant_values=pad_token_id)
+        t_input_ids = Tensor(input_ids)
+        if not use_past:
+            return t_input_ids, None, None, None, None, None, None, None, None, None, None, None
+        block_size = self.mf_config.model.model_config.block_size
+
+        block_tables, slot_mapping = MFDSV3Helper._get_pa_inputs(bs, seq, block_size, shape[1])
+        return t_input_ids, None, None, None, None, None, None, None, None, None, block_tables, slot_mapping
+
+    def _load_ckpt(self, network):
+        """_load_ckpt"""
+        transform_and_load_checkpoint(self.mf_config, None, network, None)

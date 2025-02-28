@@ -18,7 +18,7 @@ from typing import Tuple
 from mindspore.nn import Cell
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.ptq.context import InnerPTQConfig
+from mindspore_gs.ptq.context import InnerPTQConfig, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, Checker
@@ -28,12 +28,6 @@ class LinearClipper(Algorithm):
     """clip got lienar"""
 
     linear_map = {}
-
-    def __init__(self, config=None):
-        super().__init__()
-        if not isinstance(config, InnerPTQConfig):
-            raise TypeError(f'Shall init LinearClipper with InnerPTQConfig, bug got {type(config)}')
-        self._config = config
 
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
@@ -63,21 +57,24 @@ class LinearClipper(Algorithm):
     def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
         class Replacer(Processor):
             """Replacer"""
-            def __init__(self, inner_config):
-                self._inner_config = inner_config
+            def __init__(self, algorithm):
+                self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                for opname in clip_skip_layer:
-                    if opname in cell_name:
-                        logger.info(f"{cell_name} is in blacklist, keep not being supperssed.")
-                        return cell, True
-                wrapper_cell_type = LinearClipper.get_wrapper_layer(type(cell), self._inner_config)
+                layer_config = self.handler.get_layer_config(cell_name)
+                if (not layer_config or layer_config.outliers_suppression != OutliersSuppressionType.AWQ or
+                        any(opname in cell_name for opname in layer_config.opname_blacklist) or
+                        any(opname in cell_name for opname in clip_skip_layer)):
+                    logger.info(f"{cell_name} is in blacklist, keep not being clip.")
+                    return cell, True
+                logger.debug(f"{cell_name} layer config: {layer_config}.")
+                wrapper_cell_type = LinearClipper.get_wrapper_layer(type(cell), layer_config)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=layer_config, network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 nonlocal changed
                 changed = True
@@ -85,9 +82,7 @@ class LinearClipper(Algorithm):
 
         changed = False
         clip_skip_layer = ["wq", "wk", "w_qkv"]
-        clip_skip_layer.extend(self._config.opname_blacklist)
-        Replacer(self._config).process(decoder_layer, decoder_layer_name)
+        Replacer(self).process(decoder_layer, decoder_layer_name)
         if not changed:
-            warn_str = f"No layer found in network is suitable to clip, please check network and opname_blacklist" \
-                       f"({self._config.opname_blacklist})."
+            warn_str = f"No layer found in network is suitable to clip, please check network and opname_blacklist."
             logger.warning(warn_str)

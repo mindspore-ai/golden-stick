@@ -16,6 +16,7 @@
 from typing import Tuple
 
 from mindspore.nn import Cell
+from mindspore import dtype as msdtype
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
@@ -28,12 +29,6 @@ class Quantizer(Algorithm):
     """quanter for linear and PageAttentionMgr"""
 
     layer_map = {}
-
-    def __init__(self, config=None):
-        super().__init__()
-        if not isinstance(config, InnerPTQConfig):
-            raise TypeError(f'Shall init Quantizer with InnerPTQConfig, bug got {type(config)}')
-        self._config = config
 
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
@@ -64,39 +59,39 @@ class Quantizer(Algorithm):
 
         class Replacer(Processor):
             """Replacer"""
-            def __init__(self, inner_config):
-                self._inner_config = inner_config
+            def __init__(self, algorithm):
+                self.handler = algorithm
+
+            @staticmethod
+            def _is_quant(config):
+                act_support_dtype = [msdtype.int8]
+                weight_support_dtype = [msdtype.int8, msdtype.qint4x2]
+                kvcache_support_dtype = [msdtype.int8]
+                return (config.act_quant_dtype in act_support_dtype or
+                        config.weight_quant_dtype in weight_support_dtype or
+                        config.kvcache_quant_dtype in kvcache_support_dtype)
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                for opname in self._inner_config.opname_blacklist:
-                    if opname in cell_name:
-                        logger.info(f"{cell_name} is in blacklist, keep not being quant.")
-                        return cell, True
-
-                op_config = self._inner_config
-                for fallback_name in self._inner_config.fallback_blacklist.keys():
-                    if fallback_name in cell_name:
-                        fallback_algo = self._inner_config.fallback_blacklist.get(fallback_name)
-                        logger.info(f"fallback {cell_name} to {fallback_algo}.")
-                        # pylint: disable=W0212
-                        op_config = Quantizer._get_fallback_config(fallback_algo, op_config)
-                        break
-
-                wrapper_cell_type = Quantizer.get_wrapper_layer(type(cell), op_config)
+                layer_config = self.handler.get_layer_config(cell_name)
+                if (not layer_config or not self._is_quant(layer_config) or
+                        any(opname in cell_name for opname in layer_config.opname_blacklist)):
+                    logger.info(f"{cell_name} is in blacklist, keep not being quant.")
+                    return cell, True
+                logger.debug(f"{cell_name} layer config: {layer_config}.")
+                wrapper_cell_type = Quantizer.get_wrapper_layer(type(cell), layer_config)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
                 nonlocal changed
-                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=self._inner_config, network_helper=network_helper)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=layer_config, network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with quant cell {wrapper_cell_type}.")
                 changed = True
                 return wrapper_cell, True
 
         changed = False
-        Replacer(self._config).process(decoder_layer, decoder_layer_name)
+        Replacer(self).process(decoder_layer, decoder_layer_name)
         if not changed:
-            warn_str = f"No layer found in network is suitable to quantize, please check network and opname_blacklist" \
-                       f"({self._config.opname_blacklist})."
+            warn_str = f"No layer found in network is suitable to quantize, please check network and opname_blacklist."
             logger.warning(warn_str)
