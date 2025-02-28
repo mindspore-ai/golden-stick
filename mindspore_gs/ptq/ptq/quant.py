@@ -100,7 +100,7 @@ class PTQ(CompAlgo):
         >>> quant_net = ptq.convert(fake_quant_net)
     """
 
-    def __init__(self, config: Union[dict, PTQConfig] = None):
+    def __init__(self, config: Union[dict, PTQConfig] = None, layer_configs=None):
         super().__init__()
         if config is not None:
             if not isinstance(config, PTQConfig):
@@ -108,10 +108,18 @@ class PTQ(CompAlgo):
             self._config = config
         else:
             self._config = PTQConfig()
+        if layer_configs is None:
+            self._layer_configs = {}
+        else:
+            self._layer_configs = layer_configs
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig().inner_config(self._config, approach=PTQApproach.PTQ)
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
+        for key, config_ in self._layer_configs.items():
+            if config_:
+                self._layer_configs[key] = InnerPTQConfig().inner_config(config_, approach=PTQApproach.PTQ)
+                PTQ._ptq_config_check(self._layer_configs[key])
         self.pipeline: List[Algorithm] = []
         self.decoder_layers: list[Cell] = []
         self.decoder_layer_types: list = []
@@ -121,24 +129,14 @@ class PTQ(CompAlgo):
 
     def _build_pipeline(self):
         """build pipline"""
-        act_support_dtype = [dtype.int8]
-        weight_support_dtype = [dtype.int8, dtype.qint4x2]
-        kvcache_support_dtype = [dtype.int8]
-        if self._config.outliers_suppression == OutliersSuppressionType.SMOOTH:
-            logger.info("Adding LinearSmoothQuant to pipeline.")
-            self.pipeline.append(LinearSmoothQuant(self._config))
-        if self._config.outliers_suppression == OutliersSuppressionType.AWQ:
-            logger.info("Adding LinearCliper to pipeline.")
-            self.pipeline.append(LinearClipper(self._config))
-            logger.info("Adding LinearAutoSmoother to pipeline.")
-            self.pipeline.append(LinearAutoSmoother(self._config))
-        if self._config.act_quant_dtype in act_support_dtype or \
-            self._config.weight_quant_dtype in weight_support_dtype or \
-                self._config.kvcache_quant_dtype in kvcache_support_dtype:
-            logger.info("Adding Quantizer to pipeline.")
-            self.pipeline.append(Quantizer(self._config))
-        if self.pipeline == []:
-            logger.warning('No layer found in network is suitable for quantization, please check configuration items.')
+        logger.info("Adding LinearSmoothQuant to pipeline.")
+        self.pipeline.append(LinearSmoothQuant(self._config, self._layer_configs))
+        logger.info("Adding LinearCliper to pipeline.")
+        self.pipeline.append(LinearClipper(self._config, self._layer_configs))
+        logger.info("Adding LinearAutoSmoother to pipeline.")
+        self.pipeline.append(LinearAutoSmoother(self._config, self._layer_configs))
+        logger.info("Adding Quantizer to pipeline.")
+        self.pipeline.append(Quantizer(self._config, self._layer_configs))
 
     def _load_mindformers_plugin(self):
         for algorithm in self.pipeline:

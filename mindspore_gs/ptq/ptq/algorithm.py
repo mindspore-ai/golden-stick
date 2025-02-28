@@ -13,12 +13,15 @@
 # limitations under the License.
 # ============================================================================
 """Algorithm base class."""
+import re
 import warnings
 import copy
 from typing import Tuple
 
 from mindspore import dtype as msdtype
 from mindspore.nn import Cell
+
+from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.processor import Processor, transform_network_inplace
 from mindspore_gs.ptq.ptq_config import OutliersSuppressionType
@@ -29,6 +32,18 @@ from .wrapper_cell import WrapperCell
 
 class Algorithm:
     """Algorithm"""
+    def __init__(self, net_config=None, layer_configs=None):
+        if not isinstance(net_config, InnerPTQConfig):
+            raise TypeError(f'net_config should be InnerPTQConfig, bug got {type(net_config)}')
+        self.net_config = net_config
+        if layer_configs:
+            self.layer_configs = layer_configs
+        else:
+            self.layer_configs = {}
+        for config in self.layer_configs:
+            if not config and not isinstance(config, InnerPTQConfig):
+                raise TypeError(f'layer_configs should be InnerPTQConfig, bug got {type(config)}')
+
     @staticmethod
     def _get_fallback_config(fallback_algo, origin_config):
         """get fallback config"""
@@ -41,6 +56,20 @@ class Algorithm:
         else:
             raise ValueError("Only support fallback layer quantization algorithm to A16w8 Now.")
         return new_config
+
+    def get_layer_config(self, layer_name):
+        """get_layer_config"""
+        layer_config = None
+        found = False
+        for name, config in self.layer_configs.items():
+            found = re.match(name, layer_name)
+            if found:
+                layer_config = config
+                break
+        if not found:
+            layer_config = self.net_config
+        logger.debug(f"{layer_name} layer config: {layer_config}.")
+        return layer_config
 
     def load_mindformers_plugin(self):
         """load_mindformers_plugin"""
