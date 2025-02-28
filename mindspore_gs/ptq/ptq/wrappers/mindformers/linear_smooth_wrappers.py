@@ -26,7 +26,7 @@ from mindformers.experimental.infer.core.layers import ColumnParallelLinear, Row
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy
+from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy, OutlierSuppressionPlusMatmulForDeploy
 from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoothQuant, LinearAutoSmoother
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker, SearchInputs
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
@@ -42,6 +42,7 @@ class SmoothMethod(enum.Enum):
     SMOOTH_QUANT = 1
     AWQ = 2
     AUTO = 3
+    OSP = 4
 
 
 class SmoothLinearCell(WrapperLinearCell):
@@ -450,3 +451,29 @@ class AWQSmoothLinearCell(AWQLinearCell):
         self.layer.weight._offload()
         self.cat_samples = None
         self.samples.clear()
+
+
+class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
+    """SmoothQuantPlusLinearCell"""
+
+    @staticmethod
+    def reg_self():
+        class OutlierSuppressionPlusChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS
+
+        LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusLinearCell, OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear,
+                                         OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelLinear,
+                                         OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
+
+    def _get_smooth_method(self):
+        return SmoothMethod.OSP
+
+    def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
+        """_apply_act_smooth_by_insert_op_for_deploy"""
+        self._layer.matmul = OutlierSuppressionPlusMatmulForDeploy.create(self._layer_name, self._layer.matmul, ic=ic,
+                                                                          compute_dtype=compute_dtype)
