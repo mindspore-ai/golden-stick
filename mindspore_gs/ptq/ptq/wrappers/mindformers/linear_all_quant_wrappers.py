@@ -14,8 +14,8 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 
-from mindspore import Parameter, Tensor, dtype
 from mindspore import ops as msops
+from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 
 from mindformers.modules.layers import Linear
@@ -25,7 +25,8 @@ from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType, KernelType
+from mindspore_gs.ptq.ptq.hal import (QuantParam, AllQuantMatmul, ParallelType, KernelType,
+                                      OutlierSuppressionPlusMatmulForDeploy)
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
@@ -98,7 +99,13 @@ class AllQuantLinearInferCell(LinearInferCell):
         self._set_act_quant(quant)
         if linear.has_bias is False:
             self.layer.has_bias = True
+            self.layer.has_quant_bias = False
             self.layer.bias_add = msops.Add()
-        self.layer.bias = bias
+        if isinstance(self.layer.matmul, OutlierSuppressionPlusMatmulForDeploy):
+            self.layer.has_bias = False
+            self.layer.has_quant_bias = True
+            qmm.quant_bias = bias
+        else:
+            self.layer.bias = bias
         self.layer.matmul = qmm
         self.layer.weight = q_weight

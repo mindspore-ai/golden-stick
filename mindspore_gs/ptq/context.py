@@ -49,6 +49,7 @@ class LayerQuantizeAlgo(Enum):
     """
     A16W8 = 'a16w8'
     A8W8 = 'a8w8'
+    A8DYNAMICW8 = 'a8dynamic-w8'
 
 
 class YamlLoader:
