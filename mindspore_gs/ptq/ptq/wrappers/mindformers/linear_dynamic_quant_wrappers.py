@@ -41,6 +41,12 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(ColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
 
+    def _quant_info(self):
+        res = super()._quant_info()
+        if self.cfg.act_quant_dtype == dtype.int8:
+            return f'{res}-A8-{str(self.cfg.act_quant_granularity)}'
+        raise RuntimeError(f"Unexpected act_quant_dtype: {self.cfg.act_quant_dtype}.")
+
     def deploy(self):
         return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
                                            QuantParam(self.w_scale, self.w_zp), self.compute_type, self.parallel_type)

@@ -29,8 +29,9 @@ from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType, QuantWithS
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
     """WrapperCell"""
-    def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper, **kwargs):
-        super().__init__(layer_name, layer, cfg, network_helper, **kwargs)
+    def __init__(self, layer_name: str, layer, context: InnerPTQConfig, cfg: InnerPTQConfig,
+                 network_helper: NetworkHelper, **kwargs):
+        super().__init__(layer_name, layer, context, cfg, network_helper, **kwargs)
         self.hook_handle: Optional[HookHandle] = None
 
     def add_hook(self):

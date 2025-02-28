@@ -48,8 +48,8 @@ class SmoothMethod(enum.Enum):
 class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
 
-    def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
         self.is_rowparallel = isinstance(self.layer, RowParallelLinear)
         self.is_colparallel = isinstance(self.layer, ColumnParallelLinear)
         self.is_linear = isinstance(self.layer, Linear)
@@ -215,6 +215,9 @@ class SmoothQuantLinearCell(SmoothLinearCell):
     def _get_smooth_method(self):
         return SmoothMethod.SMOOTH_QUANT
 
+    def _quant_info(self):
+        return "SmoothQuant"
+
 
 class AWQLinearCell(SmoothLinearCell):
     """SmoothLinearCell"""
@@ -227,6 +230,9 @@ class AWQLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
+
+    def _quant_info(self) -> str:
+        return ""
 
     def _get_smooth_method(self):
         return SmoothMethod.AWQ
@@ -287,8 +293,8 @@ class AWQSmoothLinearCell(AWQLinearCell):
         LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
 
-    def __init__(self, linear_name, linear, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
 
         if cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
             self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, False)
@@ -310,6 +316,9 @@ class AWQSmoothLinearCell(AWQLinearCell):
 
         self.w_mean = None
         self.x_mean = None
+
+    def _quant_info(self):
+        return "AWQ"
 
     def _get_mean_weight(self, weight, axis):
         """_get_mean_weight"""

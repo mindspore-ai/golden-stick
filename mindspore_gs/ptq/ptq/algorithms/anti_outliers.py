@@ -68,19 +68,20 @@ class LinearSmoothQuant(LinearSmoother):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                layer_config = self.handler.get_layer_config(cell_name)
-                if (not layer_config or layer_config.outliers_suppression == OutliersSuppressionType.NONE or
-                        any(opname in cell_name for opname in layer_config.opname_blacklist)):
+                layer_policy = self.handler.get_layer_policy(cell_name)
+                if (not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE or
+                        any(opname in cell_name for opname in layer_policy.opname_blacklist)):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, True
-                logger.debug(f"{cell_name} layer config: {layer_config}.")
-                wrapper_cell_type = LinearSmoothQuant.get_wrapper_layer(type(cell), layer_config)
+                logger.debug(f"{cell_name} layer policy: {layer_policy}.")
+                wrapper_cell_type = LinearSmoothQuant.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=layer_config, network_helper=network_helper)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
+                                                 network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 nonlocal changed
                 changed = True
@@ -127,19 +128,20 @@ class LinearAWQ(LinearSmoother):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                layer_config = self.handler.get_layer_config(cell_name)
-                if (not layer_config or layer_config.outliers_suppression == OutliersSuppressionType.NONE or
-                        any(opname in cell_name for opname in layer_config.opname_blacklist)):
+                layer_policy = self.handler.get_layer_policy(cell_name)
+                if (not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE or
+                        any(opname in cell_name for opname in layer_policy.opname_blacklist)):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, True
-                logger.debug(f"{cell_name} layer config: {layer_config}.")
-                wrapper_cell_type = LinearAWQ.get_wrapper_layer(type(cell), layer_config)
+                logger.debug(f"{cell_name} layer policy: {layer_policy}.")
+                wrapper_cell_type = LinearAWQ.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=layer_config, network_helper=network_helper)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
+                                                 network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 nonlocal changed
                 changed = True
@@ -192,21 +194,21 @@ class LinearAutoSmoother(LinearSmoother):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                layer_config = self.handler.get_layer_config(cell_name)
-                if (not layer_config or layer_config.outliers_suppression == OutliersSuppressionType.NONE or
-                        any(opname in cell_name for opname in layer_config.opname_blacklist)):
+                layer_policy = self.handler.get_layer_policy(cell_name)
+                if (not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE or
+                        any(opname in cell_name for opname in layer_policy.opname_blacklist)):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, True
-                logger.debug(f"{cell_name} layer config: {layer_config}.")
-                wrapper_cell_type = LinearAutoSmoother.get_wrapper_layer(type(cell), layer_config)
+                logger.debug(f"{cell_name} layer policy: {layer_policy}.")
+                wrapper_cell_type = LinearAutoSmoother.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, cfg=layer_config, network_helper=network_helper,
-                                                 decoder_layer=search_layer, layer_args=search_args,
-                                                 layer_kwargs=search_kwargs)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
+                                                 network_helper=network_helper, decoder_layer=search_layer,
+                                                 layer_args=search_args, layer_kwargs=search_kwargs)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 nonlocal changed
                 changed = True

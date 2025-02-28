@@ -14,7 +14,8 @@
 # ============================================================================
 """PTQ algorithm."""
 from functools import partial
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Optional
+from collections import OrderedDict
 import time
 import os
 import copy
@@ -76,6 +77,7 @@ class PTQ(CompAlgo):
 
     Raises:
         TypeError: If `config` type is not PTQConfig when it's not ``None``.
+        TypeError: If any value in `layer_policies` type is not PTQConfig when it's not ``None``.
         ValueError: If not PYNATIVE mode when mode in config is PTQMode.QUANTIZE.
         ValueError: If act_quant_dtype is int8 and weight_quant_dtype is None.
 
@@ -100,7 +102,7 @@ class PTQ(CompAlgo):
         >>> quant_net = ptq.convert(fake_quant_net)
     """
 
-    def __init__(self, config: Union[dict, PTQConfig] = None, layer_configs=None):
+    def __init__(self, config: Union[dict, PTQConfig] = None, layer_policies=None):
         super().__init__()
         if config is not None:
             if not isinstance(config, PTQConfig):
@@ -108,18 +110,22 @@ class PTQ(CompAlgo):
             self._config = config
         else:
             self._config = PTQConfig()
-        if layer_configs is None:
-            self._layer_configs = {}
+        if layer_policies is None:
+            self.layer_policies = OrderedDict()
         else:
-            self._layer_configs = layer_configs
+            if not isinstance(layer_policies, OrderedDict):
+                raise TypeError(f'layer_policies should be an OrderedDict, bug got {type(layer_policies)}.')
+            self.layer_policies = layer_policies
+        if any(not isinstance(key, str) for key in self.layer_policies.keys()):
+            raise TypeError(f'all key of layer_policies should be a string.')
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig().inner_config(self._config, approach=PTQApproach.PTQ)
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
-        for key, config_ in self._layer_configs.items():
+        for key, config_ in self.layer_policies.items():
             if config_:
-                self._layer_configs[key] = InnerPTQConfig().inner_config(config_, approach=PTQApproach.PTQ)
-                PTQ._ptq_config_check(self._layer_configs[key])
+                self.layer_policies[key] = InnerPTQConfig().inner_config(config_, approach=PTQApproach.PTQ)
+                PTQ._ptq_config_check(self.layer_policies[key])
         self.pipeline: List[Algorithm] = []
         self.decoder_layers: list[Cell] = []
         self.decoder_layer_types: list = []
@@ -130,13 +136,13 @@ class PTQ(CompAlgo):
     def _build_pipeline(self):
         """build pipline"""
         logger.info("Adding LinearSmoothQuant to pipeline.")
-        self.pipeline.append(LinearSmoothQuant(self._config, self._layer_configs))
+        self.pipeline.append(LinearSmoothQuant(self._config, self.layer_policies))
         logger.info("Adding LinearCliper to pipeline.")
-        self.pipeline.append(LinearClipper(self._config, self._layer_configs))
+        self.pipeline.append(LinearClipper(self._config, self.layer_policies))
         logger.info("Adding LinearAutoSmoother to pipeline.")
-        self.pipeline.append(LinearAutoSmoother(self._config, self._layer_configs))
+        self.pipeline.append(LinearAutoSmoother(self._config, self.layer_policies))
         logger.info("Adding Quantizer to pipeline.")
-        self.pipeline.append(Quantizer(self._config, self._layer_configs))
+        self.pipeline.append(Quantizer(self._config, self.layer_policies))
 
     def _load_mindformers_plugin(self):
         for algorithm in self.pipeline:
@@ -337,3 +343,13 @@ class PTQ(CompAlgo):
                 raise ValueError(
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
         return net_opt
+
+    def _summary_layer(self, layer_name, layer: Cell) -> Optional[str]:
+        info = self._config.layer_quant_info_collect.get(layer_name)
+        return info
+
+    def _summary_title(self):
+        return "Network Quantization Summary"
+
+    def _summary_desc_name(self):
+        return "quant_type"

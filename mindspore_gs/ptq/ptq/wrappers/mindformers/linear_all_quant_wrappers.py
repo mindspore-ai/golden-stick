@@ -47,14 +47,20 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, AllQuantLinearCell, A8W8Checker())
 
-    def __init__(self, linear_name, linear, cfg: InnerPTQConfig, network_helper, **kwargs):
-        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
 
         is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
         self.x_quant_max, self.x_quant_min = get_min_max_op(cfg.tp_size, is_rowparallel)
 
         self.x_scale = Parameter(initializer('ones', (1,), dtype=dtype.float64))
         self.x_zp = Parameter(initializer('zeros', (1,), dtype=dtype.float64))
+
+    def _quant_info(self):
+        res = super()._quant_info()
+        if self.cfg.act_quant_dtype == dtype.int8:
+            return f'{res}-A8-{str(self.cfg.act_quant_granularity)}'
+        raise RuntimeError(f"Unexpected act_quant_dtype: {self.cfg.act_quant_dtype}.")
 
     def quant(self):
         """quant"""

@@ -86,6 +86,8 @@ def create_ptq():
     logger.info("Use ptq algo to quant network and weight.")
     ptq = PTQ(config=cfg, layer_configs=OrderedDict({r'.*attention\.wo.*': wo_config,
                                                      r'.*feed_forward.*': ffn_config}))
+    from openmind_modules.deepseek3.deepseek3_model import DeepseekV3DecodeLayer
+    ptq.decoder_layers.append(DeepseekV3DecodeLayer)
     logger.info(f'Create quantizer cost time is {time.time() - start_time} s.')
     return ptq
 

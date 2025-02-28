@@ -49,8 +49,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(ColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(RowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
 
-    def __init__(self, linear_name, linear, cfg: InnerPTQConfig, network_helper, **kwargs):
-        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
         self.nsamples = 0
         self.h = msops.zeros((self.layer.weight.shape[1], self.layer.weight.shape[1]))
         self.cfg.reflash_inputs_after_each_processor = True

@@ -48,8 +48,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
         Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
 
-    def __init__(self, linear_name, linear, cfg: InnerPTQConfig, network_helper, **kwargs):
-        super().__init__(linear_name, linear, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
         if isinstance(self.layer, RowParallelLinear):
             self.parallel_type = ParallelType.ROW_PARALLEL
         elif isinstance(self.layer, ColumnParallelLinear):
@@ -88,6 +88,13 @@ class WeightQuantLinearCell(WrapperLinearCell):
             scale_zp_shape = (self.oc,)
         self.w_scale = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
         self.w_zp = Parameter(initializer('zeros', scale_zp_shape, dtype=dtype.float64))
+
+    def _quant_info(self):
+        if self.cfg.weight_quant_dtype == dtype.int8:
+            return f'W8-{str(self.cfg.weight_quant_granularity)}'
+        if self.cfg.weight_quant_dtype == dtype.qint4x2:
+            return f'W4-{str(self.cfg.weight_quant_granularity)}'
+        raise RuntimeError(f"Unexpected weight_quant_dtype: {self.cfg.weight_quant_dtype}.")
 
     def quant(self):
         """quant"""

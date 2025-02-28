@@ -17,11 +17,13 @@
 import abc
 import enum
 import os.path
+from typing import Optional
 
 from mindspore.nn.cell import Cell
 from mindspore.train.callback import Callback
 from mindspore import export, context
 from mindspore_gs.common import logger
+from mindspore_gs.common.print_table import print_table
 from mindspore_gs.common.validator import Validator
 
 
@@ -185,6 +187,34 @@ class CompAlgo(abc.ABC):
         """
 
         return net_opt
+
+    def _summary_layer(self, layer_name: str, layer: Cell) -> Optional[str]:
+        return None
+
+    def _summary_title(self):
+        return ""
+
+    def _summary_desc_name(self):
+        return "describe"
+
+    def summary(self, network):
+        """summary"""
+        results = []
+        def process(root: Cell, name_prefix):
+            """Iterate the whole network and call callback function `process_cell`."""
+            if root is None:
+                return
+            for name, cell in root.name_cells().items():
+                full_cell_name = f"{name_prefix}.{name}"
+                info = self._summary_layer(full_cell_name, cell)
+                if info:
+                    results.append((full_cell_name, info))
+                else:
+                    process(cell, full_cell_name)
+        process(network, 'network')
+        if results:
+            print_table(self._summary_title(), self._summary_desc_name(), results)
+
 
     def loss(self, loss_fn: callable) -> callable:
         """

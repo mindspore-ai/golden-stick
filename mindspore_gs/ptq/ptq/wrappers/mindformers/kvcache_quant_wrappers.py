@@ -50,8 +50,8 @@ class QuantPageAttentionMgrCell(WrapperCell):
         Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
         Quantizer.reg_layer_map(ParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
 
-    def __init__(self, linear_name, layer, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, layer, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, layer, context: InnerPTQConfig, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, layer, cfg, context, network_helper, **kwargs)
         self.key_samples = []
         self.value_samples = []
         n = layer.n_kv_heads
@@ -62,6 +62,11 @@ class QuantPageAttentionMgrCell(WrapperCell):
         self.key_t_scale = Parameter(initializer('zeros', (self.ic,), dtype=dtype.float64))
         self.value_t_zp = Parameter(initializer('zeros', (self.ic,), dtype=dtype.float64))
         self.value_t_scale = Parameter(initializer('zeros', (self.ic,), dtype=dtype.float64))
+
+    def _quant_info(self):
+        if self.cfg.kvcache_quant_dtype == dtype.int8:
+            return f'C8-{str(self.cfg.kvcache_quant_granularity)}'
+        raise RuntimeError(f"Unexpected kvcache_quant_dtype: {self.cfg.kvcache_quant_dtype}.")
 
     def process(self):
         if not self.key_samples or not self.value_samples:
@@ -179,6 +184,11 @@ class DynamicQuantPageAttentionMgrCell(WrapperCell):
 
         Quantizer.reg_layer_map(PagedAttentionMgr, DynamicQuantPageAttentionMgrCell, KVCacheInt8())
         Quantizer.reg_layer_map(ParallelPagedAttentionMgr, DynamicQuantPageAttentionMgrCell, KVCacheInt8())
+
+    def _quant_info(self):
+        if self.cfg.kvcache_quant_dtype == dtype.int8:
+            return f'C8-{str(self.cfg.kvcache_quant_granularity)}'
+        raise RuntimeError(f"Unexpected kvcache_quant_dtype: {self.cfg.kvcache_quant_dtype}.")
 
     def deploy(self):
         return DynamicQuantPagedAttentionDeploy(self.layer)

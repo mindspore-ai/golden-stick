@@ -32,17 +32,17 @@ from .wrapper_cell import WrapperCell
 
 class Algorithm:
     """Algorithm"""
-    def __init__(self, net_config=None, layer_configs=None):
+    def __init__(self, net_config=None, layer_policies=None):
         if not isinstance(net_config, InnerPTQConfig):
             raise TypeError(f'net_config should be InnerPTQConfig, bug got {type(net_config)}')
         self.net_config = net_config
-        if layer_configs:
-            self.layer_configs = layer_configs
+        if layer_policies:
+            self.layer_policies = layer_policies
         else:
-            self.layer_configs = {}
-        for config in self.layer_configs:
+            self.layer_policies = {}
+        for config in self.layer_policies:
             if not config and not isinstance(config, InnerPTQConfig):
-                raise TypeError(f'layer_configs should be InnerPTQConfig, bug got {type(config)}')
+                raise TypeError(f'layer_policies should be InnerPTQConfig, bug got {type(config)}')
 
     @staticmethod
     def _get_fallback_config(fallback_algo, origin_config):
@@ -57,19 +57,22 @@ class Algorithm:
             raise ValueError("Only support fallback layer quantization algorithm to A16w8 Now.")
         return new_config
 
-    def get_layer_config(self, layer_name):
-        """get_layer_config"""
-        layer_config = None
-        found = False
-        for name, config in self.layer_configs.items():
-            found = re.match(name, layer_name)
-            if found:
-                layer_config = config
-                break
+    def get_layer_policy(self, layer_name) -> InnerPTQConfig:
+        """get_layer_policy"""
+        layer_policy = None
+        found = ''
+        for name, config in self.layer_policies.items():
+            tmp = re.match(name, layer_name)
+            if tmp:
+                if found:
+                    raise RuntimeError(f"layer_policy '{found}' and '{name}' conflict, matching same layer "
+                                       f"'{layer_name}'.")
+                found = name
+                layer_policy = config
         if not found:
-            layer_config = self.net_config
-        logger.debug(f"{layer_name} layer config: {layer_config}.")
-        return layer_config
+            layer_policy = self.net_config
+        logger.debug(f"{layer_name} layer policy: {layer_policy}.")
+        return layer_policy
 
     def load_mindformers_plugin(self):
         """load_mindformers_plugin"""
