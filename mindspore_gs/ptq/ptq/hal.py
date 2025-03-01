@@ -86,6 +86,7 @@ class QuantWithSmooth(QuantUnitCell):
         self.parallel_type = parallel_type
         self.input_scale = None
         self.input_zp = None
+        self.is_perchannel = False
 
     @staticmethod
     def create(layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
@@ -107,8 +108,12 @@ class QuantWithSmooth(QuantUnitCell):
             input_scale_shard = (1,)
             input_zp_shard = (1,)
         elif self.parallel_type == ParallelType.ROW_PARALLEL:
-            input_scale_shard = (tensor_parallel_num,)
-            input_zp_shard = (tensor_parallel_num,)
+            if self.is_perchannel:
+                input_scale_shard = (tensor_parallel_num,)
+                input_zp_shard = (tensor_parallel_num,)
+            else:
+                input_scale_shard = (1,)
+                input_zp_shard = (1,)
         else:
             return {}
         return {self.input_scale.name: {'shape': self.input_scale.shape, 'shard': input_scale_shard},
@@ -166,25 +171,25 @@ class QuantWithSmoothHighPerformance(QuantWithSmooth):
                  smooth_scale: Optional[np.ndarray] = None, zp_dtype=dtype.int8):
         super().__init__(layer_name, parallel_type)
         self.quant = QuantV2()
+        self.is_perchannel = smooth_scale is not None
         if is_deploy:
-            self.input_scale = Parameter(initializer('ones', (ic,), dst_dtype))
-            self.input_zp = Parameter(initializer('zeros', (ic,), zp_dtype))
+            if not self.is_perchannel:
+                self.input_scale = Parameter(initializer('ones', (1,), dst_dtype))
+                self.input_zp = Parameter(initializer('zeros', (1,), zp_dtype))
+            else:
+                self.input_scale = Parameter(initializer('ones', (ic,), dst_dtype))
+                self.input_zp = Parameter(initializer('zeros', (ic,), zp_dtype))
             return
         # fuse smooth.mul and quant
         input_scale_np = x_qparam.scale.asnumpy().astype(np.float16)
-        if smooth_scale is not None:
+        if self.is_perchannel:
             final_scale_np = input_scale_np / smooth_scale.astype(np.float16)
             logger.debug(f"QuantWithSmoothHighPerformance: input scale with smooth scale of Layer({parallel_type}:"
                          f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
         else:
-            if input_scale_np.shape == (1,):  # aclnn quant op not support pertensor
-                final_scale_np = np.tile(input_scale_np, ic)
-                logger.debug(f"QuantWithSmoothHighPerformance: input scale from vector of Layer({parallel_type}:"
-                             f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
-            else:
-                final_scale_np = input_scale_np
-                logger.debug(f"QuantWithSmoothHighPerformance: input scale of Layer({parallel_type}:{layer_name}) is "
-                             f"{{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+            final_scale_np = input_scale_np
+            logger.debug(f"QuantWithSmoothHighPerformance: input scale from vector of Layer({parallel_type}:"
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
         self.input_scale = Parameter(Tensor(final_scale_np, dtype=dst_dtype))
 
         if self.input_scale.shape != x_qparam.zero_point.shape:

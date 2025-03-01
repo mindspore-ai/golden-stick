@@ -66,7 +66,7 @@ class LinearClipper(Algorithm):
                         any(opname in cell_name for opname in layer_policy.opname_blacklist) or
                         any(opname in cell_name for opname in clip_skip_layer)):
                     logger.info(f"{cell_name} is in blacklist, keep not being clip.")
-                    return cell, True
+                    return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
                 wrapper_cell_type = LinearClipper.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:

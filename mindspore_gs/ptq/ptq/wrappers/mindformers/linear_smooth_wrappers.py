@@ -478,6 +478,8 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
         LinearAutoSmoother.reg_layer_map(RowParallelLinear,
                                          OutlierSuppressionPlusLinearCell,
                                          OutlierSuppressionPlusChecker())
+    def _quant_info(self):
+        return "OutlierSuppressionPlus"
 
     def _get_smooth_method(self):
         return SmoothMethod.OSP
