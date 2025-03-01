@@ -85,8 +85,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 inp = Tensor(inp.T, dtype=dtype.float32)
                 self.h += msops.matmul(inp.T, inp)
             else:
-                self.samples[i] = self.samples[i].astype(dtype.float32)
-                self.h += msops.matmul(self.samples[i].T, self.samples[i])
+                samples = self.samples[i].astype(dtype.float32)
+                self.h += msops.matmul(samples.transpose(1, 0), samples)
         self.cfg.dumper.dump_data(self.layer_name, "|hessian_matrix|input0_activation_inputs",
                                   msops.cat(tuple(self.samples), axis=0))
         self.cfg.dumper.dump_data(self.layer_name, "|hessian_matrix|output0_hessian", self.h)
