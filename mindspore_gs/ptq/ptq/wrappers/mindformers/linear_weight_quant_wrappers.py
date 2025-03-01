@@ -15,7 +15,7 @@
 """ptq wrapper cells for mindformers."""
 
 import numpy as np
-from mindspore import Parameter, Tensor, dtype
+from mindspore import Parameter, Tensor, dtype, ops
 from mindspore.common.initializer import initializer
 
 from mindformers.modules.layers import Linear
@@ -86,6 +86,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
             scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
         else:
             scale_zp_shape = (self.oc,)
+        if isinstance(linear.matmul, ops.auto_generate.GroupedMatmulV4):
+            scale_zp_shape = (linear.weight.shape[0], linear.weight.shape[2])
         self.w_scale = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
         self.w_zp = Parameter(initializer('zeros', scale_zp_shape, dtype=dtype.float64))
 

@@ -70,6 +70,7 @@ class LinearInferCell(Cell):
     def __init__(self, linear: Linear, parallel_type: ParallelType):
         super().__init__()
         self._layer = linear
+        self._layer.has_quant_bias = False
         self.parallel_type = parallel_type
 
         self.has_act_quant = False
@@ -88,6 +89,8 @@ class LinearInferCell(Cell):
         """Forward process, x should be a tensor"""
         out_shape = self._layer.shape(x)[:-1] + (self._layer.out_channels,)
         x = self._layer.reshape(x, (-1, self._layer.in_channels))
+        if self.has_act_quant:
+            x = self.quant_op(x)
         if self._layer.expert_flag and not self._layer.use_gmm:
             if self._layer.use_expert_group_size is True:
                 x = self._layer.reshape(x, (-1, self._layer.expert_num, self._layer.expert_group_size,
@@ -97,8 +100,6 @@ class LinearInferCell(Cell):
                                             self._layer.in_channels))
         ori_dtype = F.dtype(x)
         x = self._layer.cast(x, self._layer.dtype)
-        if self.has_act_quant:
-            x = self.quant_op(x)
         # apply gmm to the inference of moe structural models when use_past=True.
         if self._layer.use_gmm:
             x = self._layer.matmul([x], [self._layer.weight], None, None, None, None, None, group_list)[0]
@@ -112,7 +113,7 @@ class LinearInferCell(Cell):
         output = self._layer.reshape(x, out_shape)
         return output
 
-    def col_linear_forward(self, input_parallel, weight=None):
+    def col_linear_forward(self, input_parallel, weight=None, group_list=None):
         """
         Forward of ColumnParallelLinear.
         Performs a linear transformation considering various parallel modes and data type conversions.
@@ -135,7 +136,10 @@ class LinearInferCell(Cell):
             input_parallel = self.quant_op(input_parallel)
         output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size_per_partition,)
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size))
-        output_parallel = self._layer.matmul(input_parallel, weight)
+        if self._layer.is_expert and self._layer.expert_num > 1:
+            output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
+        else:
+            output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
         if self._layer.has_bias:
             output_parallel = self._layer.bias_add(
                 output_parallel, self._layer.cast(self._layer.bias, self._layer.compute_dtype)
@@ -149,7 +153,7 @@ class LinearInferCell(Cell):
             output = output_parallel
         return output
 
-    def row_linear_forward(self, input_):
+    def row_linear_forward(self, input_, group_list=None):
         """
         Forward of RowParallelLinear.
         Performs a linear transformation considering various parallel modes and data type conversions.
@@ -166,14 +170,20 @@ class LinearInferCell(Cell):
             input_parallel = self.quant_op(input_parallel)
         output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size,)
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size_per_partition))
-        output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
+        if self._layer.is_expert and self._layer.expert_num > 1:
+            output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
+        else:
+            output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
 
         if self._layer.sequence_parallel:
             output_parallel = output_parallel.swapaxes(0, 1).contiguous()
             output = self._layer.reduce_scatter_to_sp_region(output_parallel)
             output = output.swapaxes(0, 1).contiguous()
         else:
-            output = self._layer.reduce_from_mp_region(output_parallel)
+            if self._layer.moe_delay_allreduce:
+                output = output_parallel
+            else:
+                output = self._layer.reduce_from_mp_region(output_parallel)
 
         if self._layer.has_bias:
             output = self._layer.bias_add(output, self._layer.cast(self._layer.bias, self._layer.compute_dtype))
@@ -181,29 +191,43 @@ class LinearInferCell(Cell):
         output = self._layer.reshape(output, output_shape)
         return output
 
-    def construct(self, x):
+    def construct(self, x, group_list=None):
         """linear deploy construct"""
         if self.parallel_type == ParallelType.NO_PARALLEL:
-            return self.linear_forward(x)
+            return self.linear_forward(x, group_list=group_list)
         if self.parallel_type == ParallelType.COL_PARALLEL:
-            x = self.col_linear_forward(x)
+            x = self.col_linear_forward(x, group_list=group_list)
         if self.parallel_type == ParallelType.ROW_PARALLEL:
-            x = self.row_linear_forward(x)
+            x = self.row_linear_forward(x, group_list=group_list)
         return x
 
     def sharded_state_dict(self, **kwargs):
         """provide the sharded state dict based on the config"""
         state_dict = {}
+        if self.parallel_type == ParallelType.NO_PARALLEL:
+            return {}
         tensor_parallel_num = self.layer.tensor_parallel_group_size
         if self.parallel_type == ParallelType.COL_PARALLEL:
-            w_shard = (tensor_parallel_num, 1) if self.layer.transpose_b else (1, tensor_parallel_num)
+            if self._layer.is_expert and self._layer.expert_num > 1:
+                w_shard = (1, tensor_parallel_num, 1) if self.layer.transpose_b else (1, 1, tensor_parallel_num)
+            else:
+                w_shard = (tensor_parallel_num, 1) if self.layer.transpose_b else (1, tensor_parallel_num)
             if self.layer.has_bias:
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape,
                                                     'shard': (tensor_parallel_num,)}
+            if self.layer.has_quant_bias:
+                state_dict[self.layer.matmul.quant_bias.name] = {'shape': self.layer.matmul.quant_bias.shape,
+                                                                 'shard': (tensor_parallel_num,)}
         elif self.parallel_type == ParallelType.ROW_PARALLEL:
-            w_shard = (1, tensor_parallel_num) if self.layer.transpose_b else (tensor_parallel_num, 1)
+            if self._layer.is_expert and self._layer.expert_num > 1:
+                w_shard = (1, 1, tensor_parallel_num) if self.layer.transpose_b else (1, tensor_parallel_num, 1)
+            else:
+                w_shard = (1, tensor_parallel_num) if self.layer.transpose_b else (tensor_parallel_num, 1)
             if self.layer.has_bias:
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape, 'shard': (1,)}
+            if self.layer.has_quant_bias:
+                state_dict[self.layer.matmul.quant_bias.name] = {'shape': self.layer.matmul.quant_bias.shape,
+                                                                 'shard': (1,)}
         else:
             return {}
         state_dict[self.layer.weight.name] = {'shape': self.layer.weight.shape, 'shard': w_shard}
