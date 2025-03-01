@@ -76,7 +76,7 @@ class Quantizer(Algorithm):
                 if (not layer_policy or not self._is_quant(layer_policy) or
                         any(opname in cell_name for opname in layer_policy.opname_blacklist)):
                     logger.info(f"{cell_name} is in blacklist, keep not being quant.")
-                    return cell, True
+                    return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
                 wrapper_cell_type = Quantizer.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:

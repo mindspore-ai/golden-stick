@@ -180,7 +180,7 @@ class PTQ(CompAlgo):
         if walker.layers:
             self.decoder_layers = walker.layers
             return
-        self.decoder_layers = [("root", network)]
+        self.decoder_layers = [("network", network)]
         logger.warning(
             f"No decoder layer found in network. Visible decoder layer types: {self.decoder_layer_types}, "
             "please modify PTQ.decoder_layer_types before invoking apply method. If not, PTQ will take lots of memory.")

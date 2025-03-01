@@ -109,6 +109,10 @@ def test_type():
     with pytest.raises(TypeError):
         PTQ(config=cfg, layer_policies=OrderedDict({'1': 1, '3': 3}))
 
+    ptq = PTQ(cfg)
+    with pytest.raises(TypeError):
+        ptq.summary(1)
+
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training

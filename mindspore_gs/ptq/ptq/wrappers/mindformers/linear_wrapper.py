@@ -89,6 +89,8 @@ class LinearInferCell(Cell):
         """Forward process, x should be a tensor"""
         out_shape = self._layer.shape(x)[:-1] + (self._layer.out_channels,)
         x = self._layer.reshape(x, (-1, self._layer.in_channels))
+        ori_dtype = F.dtype(x)
+        x = self._layer.cast(x, self._layer.dtype)
         if self.has_act_quant:
             x = self.quant_op(x)
         if self._layer.expert_flag and not self._layer.use_gmm:
@@ -98,8 +100,6 @@ class LinearInferCell(Cell):
             else:
                 x = self._layer.reshape(x, (self._layer.outer_batch, self._layer.expert_num, -1,
                                             self._layer.in_channels))
-        ori_dtype = F.dtype(x)
-        x = self._layer.cast(x, self._layer.dtype)
         # apply gmm to the inference of moe structural models when use_past=True.
         if self._layer.use_gmm:
             x = self._layer.matmul([x], [self._layer.weight], None, None, None, None, None, group_list)[0]

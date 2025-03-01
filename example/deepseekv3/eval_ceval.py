@@ -14,14 +14,11 @@
 # ============================================================================
 """Quant network."""
 
-import os
 import argparse
 import time
 from collections import OrderedDict
 
-import mindspore as ms
 from mindspore import dtype as msdtype
-from mindspore.communication import get_rank
 from mindformers import MindFormerConfig
 from mindspore_gs.ptq.ptq_config import (PTQMode, PTQConfig, OutliersSuppressionType,
                                          PrecisionRecovery, QuantGranularity)
@@ -57,6 +54,7 @@ def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
+    parser.add_argument('--question', '-q', type=str, required=True)
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
 
@@ -69,24 +67,26 @@ def create_ptq():
     """Create ptq algorithm."""
     start_time = time.time()
     cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                    act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+                    act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS,
                     opname_blacklist=['lkv2kv', 'lm_head'], precision_recovery=PrecisionRecovery.NONE,
                     act_quant_granularity=QuantGranularity.PER_TENSOR,
                     weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-    wo_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+    wo_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                          act_quant_dtype=msdtype.int8,
                           outliers_suppression=OutliersSuppressionType.NONE,
                           precision_recovery=PrecisionRecovery.NONE,
                           act_quant_granularity=QuantGranularity.PER_TENSOR,
                           weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-    ffn_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+    ffn_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                           act_quant_dtype=msdtype.int8,
                            outliers_suppression=OutliersSuppressionType.NONE,
                            precision_recovery=PrecisionRecovery.NONE,
-                           act_quant_granularity=QuantGranularity.PER_TENSOR,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
                            weight_quant_granularity=QuantGranularity.PER_CHANNEL)
     logger.info("Use ptq algo to quant network and weight.")
-    ptq = PTQ(config=cfg, layer_configs=OrderedDict({r'.*attention\.wo.*': wo_config,
-                                                     r'.*feed_forward.*': ffn_config}))
-    from openmind_modules.deepseek3.deepseek3_model import DeepseekV3DecodeLayer
+    ptq = PTQ(config=cfg, layer_policies=OrderedDict({r'.*\.wo.*': wo_config,
+                                                      r'.*\.feed_forward\..*': ffn_config}))
+    from openmind_modules.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     ptq.decoder_layers.append(DeepseekV3DecodeLayer)
     logger.info(f'Create quantizer cost time is {time.time() - start_time} s.')
     return ptq
@@ -118,6 +118,7 @@ def quant_net(net, ptq):
     start_time = time.time()
     net.phase = "quant_convert"
     ptq.convert(net)
+    ptq.summary(net)
     logger.info(f'Convert to real quantize cost time is {time.time() - start_time} s.')
     logger.info(f'Quant Network cost total time is {time.time() - quant_start} s.')
     return net
@@ -142,25 +143,3 @@ if __name__ == "__main__":
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     print('Quanting network...', flush=True)
     network = quant_net(network, algo)
-    print('Saving checkpoint...', flush=True)
-    start = time.time()
-    try:
-        rank_id = get_rank()
-    except RuntimeError:
-        rank_id = 0
-
-    if mfconfig.load_ckpt_format == "safetensors":
-        save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(model_name)}_safetensors")
-        save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
-        os.makedirs(save_path, exist_ok=True)
-        ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, "ptq"),
-                           choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x,
-                           format="safetensors")
-    else:
-        save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(model_name)}_ckpt")
-        save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
-        os.makedirs(save_path, exist_ok=True)
-        ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, "ptq.ckpt"),
-                           choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
-    logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-    print(f'Checkpoint saved to {save_ckpt_path}', flush=True)
