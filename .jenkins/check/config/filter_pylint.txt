@@ -8,6 +8,8 @@
 "golden-stick/mindspore_gs/experimental/LRD/LRD.py"                                                                       "relative-beyond-top-level"
 "golden-stick/mindspore_gs/experimental/LRD/eval_bool.py"                                                                 "relative-beyond-top-level"
 "golden-stick/mindspore_gs/experimental/LRD/lrd_mf_net_helpers.py"                                                        "relative-beyond-top-level"
+"golden-stick/mindspore_gs/experimental/long_context_compress/razor_attention/wrappers/vllm_mindspore/__init__.py"              "syntax-error"
+"golden-stick/mindspore_gs/experimental/long_context_compress/razor_attention/wrappers/vllm_mindspore/attention_wrappers.py"    "syntax-error"
 
 # Quantization
 "golden-stick/mindspore_gs/quantization/net_policy.py"                                                                   "unused-argument"
