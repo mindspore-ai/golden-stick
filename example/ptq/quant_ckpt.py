@@ -70,7 +70,8 @@ def get_args():
     parser.add_argument('--act_quant_dtype', '-a', type=str, default='none', help="Available: 'int8', 'none'")
     parser.add_argument('--kvcache_quant_dtype', '-k', type=str, default='none', help="Available: 'int8', 'none'")
 
-    parser.add_argument('--outliers_suppression', '-o', type=str, default='none', help="Available: 'smooth', 'none'")
+    parser.add_argument('--outliers_suppression', '-o', type=str, default='none',
+                        help="Available: 'smooth', 'outlier-suppression+', 'none'")
     parser.add_argument('--precision_recovery', '-p', type=str, default='none', help="Available: gptq")
 
     parser.add_argument('--act_quant_granularity', '-ag', type=str, default='per_tensor',
@@ -216,6 +217,8 @@ def ckpt_name(model_name_, uargs_):
         name += "_smooth"
     elif uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
         name += "_awq"
+    elif uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS:
+        name += "_outlier_suppression+"
     else:
         name += "_no_smooth"
     if uargs_.precision_recovery == PrecisionRecovery.GPTQ:

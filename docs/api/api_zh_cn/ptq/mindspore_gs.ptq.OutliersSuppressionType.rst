@@ -7,6 +7,7 @@ mindspore_gs.ptq.OutliersSuppressionType
 
     - ``SMOOTH`` : 使用SMOOTH方法做异常值抑制。
     - ``AWQ`` : 使用AWQ方法做异常值抑制。
+    - ``OUTLIER_SUPPRESSION_PLUS`` : 使用OUTLIER_SUPPRESSION_PLUS方法做异常值抑制
     - ``NONE`` : 不做异常值抑制。
 
     .. py:method:: from_str(name: str)

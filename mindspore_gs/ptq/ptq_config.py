@@ -42,10 +42,12 @@ class OutliersSuppressionType(Enum):
 
     - ``SMOOTH``: apply smooth scale between weight and activate.
     - ``AWQ``: apply awq algorithm to outliers suppression.
+    - ``OUTLIER_SUPPRESSION_PLUS``: apply OUTLIER_SUPPRESSION_PLUS algorithm to outliers suppression.
     - ``NONE``: not doing any outliers suppression.
     """
     SMOOTH = 'smooth'
     AWQ = 'awq'
+    OUTLIER_SUPPRESSION_PLUS = 'outlier-suppression+'
     NONE = 'none'
 
     @classmethod
@@ -60,6 +62,8 @@ class OutliersSuppressionType(Enum):
             return OutliersSuppressionType.SMOOTH
         if name.lower() == 'awq':
             return OutliersSuppressionType.AWQ
+        if name.lower() == 'outlier-suppression+':
+            return OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS
         return OutliersSuppressionType.NONE
 
 
