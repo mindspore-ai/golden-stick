@@ -105,6 +105,8 @@ setup(
         'numpy >= 1.17.0',
         'scipy >= 1.5.2',
         'pyyaml>=6.0',
+        'matplotlib',
+        'prettytable',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

@@ -38,7 +38,8 @@ class WrapperCell(abc.ABC, Cell):
     """WrapperCell"""
 
     # pylint: disable=W0613
-    def __init__(self, layer_name: str, layer, cfg: InnerPTQConfig, network_helper: NetworkHelper, **kwargs):
+    def __init__(self, layer_name: str, layer, context: InnerPTQConfig, cfg: InnerPTQConfig,
+                 network_helper: NetworkHelper, **kwargs):
         super().__init__()
         self.cfg = cfg
         self._layer_name = layer_name
@@ -46,6 +47,10 @@ class WrapperCell(abc.ABC, Cell):
         self.net_helper = network_helper
         self.samples = []
         self.cat_samples = None
+        context.report_quant_info(layer_name, self._quant_info())
+
+    def _quant_info(self) -> str:
+        raise NotImplementedError
 
     @property
     def layer(self):

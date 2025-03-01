@@ -201,6 +201,9 @@ class QuantGranularity(Enum):
     PER_TOKEN = 'per_token'
     PER_GROUP = 'per_group'
 
+    def __str__(self):
+        return self.value
+
     @classmethod
     def from_str(cls, name: str):
         """

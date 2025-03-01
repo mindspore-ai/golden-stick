@@ -110,9 +110,18 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     reflash_inputs_after_each_processor: bool = False
     fallback_blacklist: dict = field(default_factory=dict)
     tp_size: int = 1
+    layer_quant_info_collect: dict = field(default_factory=dict)
 
     dump_path: str = ""
     dumper: Dumper = Dumper()
+
+    def report_quant_info(self, layer_name: str, quant_type: str):
+        info = self.layer_quant_info_collect.get(layer_name)
+        if info:
+            info += f"-{quant_type}"
+        else:
+            info = quant_type
+        self.layer_quant_info_collect[layer_name] = info
 
     def update_tp_size(self):
         try:
