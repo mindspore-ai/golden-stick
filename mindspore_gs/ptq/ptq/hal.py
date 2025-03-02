@@ -439,7 +439,7 @@ class DynamicQuantMatmul(QuantUnitCell):
         self.dynamic_quant = DynamicQuantExt()
         self.is_group_mm = is_group_mm
         if is_group_mm:
-            self.qbmm = GroupedMatmulV4(split_item=3, group_type=0, group_list_type=1, act_type=0)
+            self.qbmm = GroupedMatmulV4()
         else:
             self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
 
@@ -500,7 +500,7 @@ class DynamicQuantMatmul(QuantUnitCell):
         qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
         if self.is_group_mm:
             output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
-                               group_list)[0]
+                               group_list, split_item=3, group_type=0, group_list_type=1)[0]
         else:
             output = self.qbmm(qx, quant_weight, self.weight_scale, None, None, x_scale)
         return output.astype(self.dst_dtype)
@@ -540,7 +540,7 @@ class WeightQuantMatmul(QuantUnitCell):
                          f"{{{self.weight_zp.shape}, {self.weight_zp.dtype}, {self.weight_zp.asnumpy()}}}")
         self.is_grouped_mm = is_grouped_mm
         if self.is_grouped_mm:
-            self.weight_qbmm = GroupedMatmulV4(split_item=3, group_type=0, group_list_type=1, act_type=0)
+            self.weight_qbmm = GroupedMatmulV4()
         else:
             self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
         self.has_smooth = smooth_scale is not None
@@ -605,7 +605,7 @@ class WeightQuantMatmul(QuantUnitCell):
             x = msops.mul(x, self.smooth_scale)
         if self.is_grouped_mm:
             output = self.weight_qbmm([x], [weight], None, None, None, [self.weight_scale], [self.weight_zp], None,
-                                      group_list)[0]
+                                      group_list, split_item=3, group_type=0, group_list_type=1)[0]
         else:
             output = self.weight_qbmm(x, weight, self.weight_scale, self.weight_zp, None, None, None)
         return output.astype(self.dst_dtype)
