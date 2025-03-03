@@ -199,7 +199,8 @@ class CompAlgo(abc.ABC):
 
     def summary(self, network):
         """
-        Print network summary info for some algorithm of each target layer.
+        Print a summary of the quantization algorithms used by each target layer of the network.
+        For example: A8pertensor-W8perchannel.
 
         Args:
             network (Cell): input network to summary.

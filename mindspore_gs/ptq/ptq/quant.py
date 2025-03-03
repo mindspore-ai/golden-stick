@@ -74,6 +74,9 @@ class PTQ(CompAlgo):
 
     Args:
         config(:class:`mindspore_gs.ptq.PTQConfig`, optional): config for PTQ, default is ``None``.
+        layer_policies(dict, optional): quantization strategy for layers, default is ``None``.
+            The key of `layer_policies` is regular string to match the layer name,
+            the value of `layer_policies` is :class:`mindspore_gs.ptq.PTQConfig`.
 
     Raises:
         TypeError: If `config` type is not PTQConfig when it's not ``None``.
@@ -94,12 +97,17 @@ class PTQ(CompAlgo):
         >>> helper = MFLlama2Helper(mfconfig)
         >>> backend = BackendTarget.ASCEND
         >>> ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
-                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
-        >>> ptq = PTQ(ptq_config)
+        ...             weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+        ...             outliers_suppression=OutliersSuppressionType.SMOOTH)
+        >>> attn_policy = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend,
+        ...             weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+        ...             outliers_suppression=OutliersSuppressionType.NONE)
+        >>> layer_policy = OrderedDict({r'.*Attention.wo.*': attn_policy})
+        >>> ptq = PTQ(ptq_config, layer_policy)
         >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
         >>> fake_quant_net = ptq.apply(network, helper)
         >>> quant_net = ptq.convert(fake_quant_net)
+        >>> ptq.summary(quant_net)
     """
 
     def __init__(self, config: Union[dict, PTQConfig] = None, layer_policies=None):
