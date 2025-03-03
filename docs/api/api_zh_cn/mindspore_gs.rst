@@ -74,3 +74,10 @@ mindspore_gs
 
         异常：
             - **ValueError** - `save_mindir_path` 不是非空字符串。
+
+    .. py:method:: summary(network: Cell)
+
+        打印网络每个目标层所使用的量化算法的汇总信息。例如：A8pertensor-W8perchannel。
+
+        参数：
+            - **network** (Cell) - 要打印汇总信息的网络。

@@ -1,12 +1,13 @@
 mindspore_gs.ptq.PTQ
 ============================================================
 
-.. py:class:: mindspore_gs.ptq.PTQ(config: Union[dict, PTQConfig] = None)
+.. py:class:: mindspore_gs.ptq.PTQ(config: Union[dict, PTQConfig] = None, layer_policies: dict = None)
 
     量化算法PTQ的基本实现，支持激活、权重和kvcache的组合量化。
 
     参数：
         - **config** (:class:`mindspore_gs.ptq.PTQConfig`, 可选) - 用于配置PTQ量化算法，默认值为 ``None``。
+        - **layer_policies** (dict, 可选) - 层的量化策略，默认值为 ``None`` 。`layer_policies` 的key为正则字符串用来匹配层的名称，value为 :class:`mindspore_gs.ptq.PTQConfig`。
 
     异常：
         - **TypeError** - `config` 在输入不为 ``None`` 时，元素类型不为 PTQConfig。
