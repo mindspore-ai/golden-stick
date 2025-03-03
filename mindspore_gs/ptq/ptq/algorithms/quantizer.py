@@ -72,6 +72,8 @@ class Quantizer(Algorithm):
                         config.kvcache_quant_dtype in kvcache_support_dtype)
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if not Quantizer.layer_map.get(type(cell)):
+                    return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 if (not layer_policy or not self._is_quant(layer_policy) or
                         any(opname in cell_name for opname in layer_policy.opname_blacklist)):

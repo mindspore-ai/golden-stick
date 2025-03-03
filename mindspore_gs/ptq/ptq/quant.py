@@ -22,6 +22,7 @@ import copy
 import tqdm
 from mindspore import dtype, get_context, PYNATIVE_MODE
 from mindspore.nn import Cell
+from mindspore.nn.utils import no_init_parameters
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
@@ -263,8 +264,9 @@ class PTQ(CompAlgo):
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = self.decoder_layers[i]
                 for processor in self.pipeline:
-                    processor.replace(layer_name, layer)
-                    processor.deploy(layer_name, layer)
+                    with no_init_parameters():
+                        processor.replace(layer_name, layer)
+                        processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
         if self._config.mode == PTQMode.QUANTIZE and get_context("mode") != PYNATIVE_MODE:
