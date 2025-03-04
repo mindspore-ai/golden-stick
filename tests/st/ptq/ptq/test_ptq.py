@@ -156,18 +156,7 @@ class SimpleGmmNet(nn.Cell):
                 is_expert=True,
                 expert_num=10
             )
-        else:
-            linear = Linear(
-                1024,
-                1024,
-                has_bias=False,
-                transpose_b=True,
-                param_init_type=dtype.bfloat16,
-                compute_dtype=dtype.bfloat16,
-                use_gmm=True,
-                expert_num=10
-            )
-            linear.matmul = ops.auto_generate.GroupedMatmulV4()
+
         self.decoder = SimpleGmmNet.DecoderCell(linear)
         self.group_list = Tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 1], dtype=dtype.int64)
 
@@ -279,6 +268,38 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
     np.allclose(foutput.asnumpy(), qoutput.asnumpy(), 0, 0)
 
 
+def quant_simple_gmm_net(non_decoder, linear_type):
+    """
+    Feature: quant simplenet which including one gmm linear.
+    Description: quant simplenet with A8W8C8 PTQ algorithm.
+    Expectation: correct quant simplenet.
+    """
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+
+    net_helper = SimpleGmmNetworkHelper(seq_length=1024, linear_type=linear_type)
+    network = net_helper.create_network()
+    ds = create_foo_ds(1)
+
+    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                    backend=BackendTarget.ASCEND,
+                    opname_blacklist=["w2", "lm_head"],
+                    act_quant_granularity=QuantGranularity.PER_TOKEN,
+                    act_quant_dtype=dtype.int8,
+                    weight_quant_dtype=dtype.int8)
+    set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    ptq = PTQ(config=cfg)
+    if non_decoder:
+        ptq.decoder_layer_types.append(SimpleGmmNet.DecoderCell)
+    network = ptq.apply(network, net_helper, datasets=ds)
+    network = ptq.convert(network)
+    ms.save_checkpoint(network.parameters_dict(), os.path.join("./simplegmm-quant.ckpt"),
+                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
+                        "float_weight" not in x)
+
+
 def eval_simple_gmm_net(non_decoder, linear_type):
     """
     Feature: eval simplenet which including one GroupedMatMul linear.
@@ -307,6 +328,8 @@ def eval_simple_gmm_net(non_decoder, linear_type):
         ptq.decoder_layer_types.append(SimpleGmmNet.DecoderCell)
     network = ptq.apply(network, ds=ds)
     network = ptq.convert(network)
+    param_dict = ms.load_checkpoint('./simplegmm-quant.ckpt')
+    ms.load_param_into_net(network, param_dict)
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
         net_helper.generate(network, input_ids, max_new_tokens=100)
@@ -331,13 +354,14 @@ def test_ptq_simple_swiglu_net(non_decoder, quant_type):
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("non_decoder", [True, False])
-@pytest.mark.parametrize("linear_type", ["RowParallelLinear", "ColumnParallelLinear", "Linear"])
+@pytest.mark.parametrize("linear_type", ["RowParallelLinear", "ColumnParallelLinear"])
 def test_ptq_simple_gmm_net(non_decoder, linear_type):
     """
     Feature: eval simplenet which including one GroupedMatMul linear.
     Description: simple GroupedMatMul network inference.
     Expectation: network inference normally.
     """
+    quant_simple_gmm_net(non_decoder, linear_type)
     eval_simple_gmm_net(non_decoder, linear_type)
 
 

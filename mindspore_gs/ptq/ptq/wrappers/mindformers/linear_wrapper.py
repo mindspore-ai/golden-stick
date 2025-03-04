@@ -18,6 +18,7 @@ from typing import Optional
 
 from mindspore import ops as msops
 from mindspore.ops import functional as F
+from mindspore.ops.auto_generate import GroupedMatmulV4
 from mindspore.nn import Cell
 from mindspore.common.hook_handle import HookHandle
 from mindformers.modules.layers import Linear
@@ -38,14 +39,18 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
         def hook_fn(_, inps):
             x = inps[0]
             self.samples.append(msops.squeeze(x))
+        def hook_fn_gmm(_, inps):
+            x = inps[0][0]
+            self.samples.append(msops.squeeze(x))
         # mindspore can only hook cell.
         last_mm = (self._layer, 'matmul')
         cur_mm = self._layer.matmul
         while True:
-            if isinstance(cur_mm, msops.MatMul):
+            if isinstance(cur_mm, (msops.MatMul, GroupedMatmulV4)):
                 target = MatmulCellForHook(self._layer_name, cur_mm)
                 setattr(last_mm[0], last_mm[1], target)
-                self.hook_handle = target.register_forward_pre_hook(hook_fn)
+                self.hook_handle = target.register_forward_pre_hook(hook_fn if isinstance(cur_mm, msops.MatMul) else
+                                                                    hook_fn_gmm)
                 break
             if isinstance(cur_mm, MatmulCellForHook):
                 self.hook_handle = cur_mm.register_forward_pre_hook(hook_fn)

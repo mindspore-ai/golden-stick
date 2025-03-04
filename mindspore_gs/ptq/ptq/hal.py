@@ -452,7 +452,7 @@ class DynamicQuantMatmul(QuantUnitCell):
     @staticmethod
     def _from_matmul_cell(layer_name, is_deploy, src: MatmulCellForHook, w_qparam: QuantParam, transpose_a=False,
                           transpose_b=False, dst_dtype=dtype.float16):
-        if not isinstance(src.mm, msops.MatMul):
+        if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             raise ValueError(
                 f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
         return DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype, None)
@@ -557,7 +557,7 @@ class WeightQuantMatmul(QuantUnitCell):
     @classmethod
     def _from_matmul_cell(cls, layer_name, src: MatmulCellForHook, w_qparam: QuantParam, is_deploy,
                           transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
-        if not isinstance(src.mm, msops.MatMul):
+        if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             raise ValueError(
                 f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
         return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, None)

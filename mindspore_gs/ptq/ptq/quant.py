@@ -302,7 +302,7 @@ class PTQ(CompAlgo):
                 for args, kwargs in zip(cur_args, cur_kwargs):
                     output = layer(*args, **kwargs)
                     if len(self.decoder_layers) > 1:
-                        all_args[index][0] = output
+                        all_args[index][0] = output[0] if isinstance(output, tuple) else output
                     index += 1
 
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook())
