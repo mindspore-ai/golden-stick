@@ -16,7 +16,7 @@
 
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-from mindspore import dtype
+from mindspore import dtype, ops
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -40,6 +40,12 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(Linear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+        self.cfg = cfg
+        if isinstance(linear.matmul, ops.auto_generate.GroupedMatmulV4) and self.cfg.mode != PTQMode.DEPLOY:
+            raise ValueError("A8W8Dynamic algorithm only support gmm linear on deploy mode.")
 
     def _quant_info(self):
         res = super()._quant_info()
