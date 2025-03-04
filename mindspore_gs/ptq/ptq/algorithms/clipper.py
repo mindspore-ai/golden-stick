@@ -64,7 +64,9 @@ class LinearClipper(Algorithm):
                 if not LinearClipper.linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if (not layer_policy or layer_policy.outliers_suppression != OutliersSuppressionType.AWQ or
+                is_satisfied = layer_policy.outliers_suppression == OutliersSuppressionType.AWQ or \
+                    layer_policy.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID
+                if (not layer_policy or not is_satisfied or
                         any(opname in cell_name for opname in layer_policy.opname_blacklist) or
                         any(opname in cell_name for opname in clip_skip_layer)):
                     logger.info(f"{cell_name} is in blacklist, keep not being clip.")

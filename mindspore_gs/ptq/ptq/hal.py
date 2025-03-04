@@ -307,6 +307,11 @@ class SmoothMatmul(QuantUnitCell):
         logger.debug(f"SmoothMatmul: smooth_scale for act of Layer({layer_name}) is {{{self.smooth_scale.shape}, "
                      f"{self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}")
 
+    def update(self, layer_name, mm, smooth_scale_):
+        self.layer_name = layer_name
+        self.mm = mm
+        self.smooth_scale.set_data(msops.div(1, smooth_scale_))
+
     @classmethod
     def _from_matmul_cell(cls, layer_name, src: MatmulCellForHook, smooth_scale):
         if not isinstance(src.mm, msops.MatMul):

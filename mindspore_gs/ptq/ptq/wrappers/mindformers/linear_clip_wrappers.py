@@ -159,9 +159,9 @@ class ClipLinearCell(WrapperLinearCell):
                 cur_out = msops.sum(msops.mul(input_feat, q_w), dim=-1)
 
                 err = msops.mean(msops.pow(cur_out - org_out, 2), axis=1).reshape(min_errs.shape)
-                logger.info(f"ClipLinearCell: search iter {i_b}, weight_clip_ratio {i_s}, "
-                            f"clip err of Layer({self._layer_name}) is {{{err.shape}, "
-                            f"{err.dtype}, {err.asnumpy()}}}")
+                logger.info(f"Layer {self._layer_name}, weight clip search iter {i_b}, ratio {i_s}")
+                logger.debug(f"clip err of Layer({self._layer_name}) is {{{err.shape}, "
+                             f"{err.dtype}, {err.asnumpy()}}}")
                 del cur_w
                 del cur_out
                 cur_best_idx = err < min_errs
