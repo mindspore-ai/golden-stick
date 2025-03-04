@@ -107,7 +107,9 @@ def test_type():
     with pytest.raises(TypeError):
         PTQ(config=cfg, layer_policies=OrderedDict({1: cfg, 3: cfg}))
     with pytest.raises(TypeError):
-        PTQ(config=cfg, layer_policies=OrderedDict({'1': 1, '3': 3}))
+        PTQ(config=cfg, layer_policies=OrderedDict({r'(\d': cfg}))
+    with pytest.raises(TypeError):
+        PTQ(config=cfg, layer_policies=OrderedDict({r'\d+': 1}))
 
     ptq = PTQ(cfg)
     with pytest.raises(TypeError):

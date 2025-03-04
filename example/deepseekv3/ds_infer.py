@@ -26,13 +26,13 @@ from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.core.parallel_config import build_parallel_config
 from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 
-from openmind_modules.deepseek3.deepseek3 import DeepseekV3ForCausalLM
-from openmind_modules.deepseek3.deepseek3_config import DeepseekV3Config
+from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
+from research.deepseek3.deepseek3_config import DeepseekV3Config
 
 input_questions = [['介绍下北京故宫']]
 def create_ptq():
-    '''create_ptq'''
-    from openmind_modules.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
+    """create_ptq"""
+    from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     from mindspore_gs.ptq import PTQ
     from mindspore_gs.common import BackendTarget
     from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, PrecisionRecovery, QuantGranularity
@@ -41,26 +41,19 @@ def create_ptq():
                     opname_blacklist=['lkv2kv', 'lm_head'], precision_recovery=PrecisionRecovery.NONE,
                     act_quant_granularity=QuantGranularity.PER_TENSOR,
                     weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-    wo_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                          act_quant_dtype=msdtype.int8,
-                          outliers_suppression=OutliersSuppressionType.NONE,
-                          precision_recovery=PrecisionRecovery.NONE,
-                          act_quant_granularity=QuantGranularity.PER_TENSOR,
-                          weight_quant_granularity=QuantGranularity.PER_CHANNEL)
     ffn_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                            act_quant_dtype=msdtype.int8,
                            outliers_suppression=OutliersSuppressionType.NONE,
                            precision_recovery=PrecisionRecovery.NONE,
                            act_quant_granularity=QuantGranularity.PER_TOKEN,
                            weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-    ptq = PTQ(config=cfg, layer_policies=OrderedDict({r'.*\.wo.*': wo_config,
-                                                      r'.*\.feed_forward\..*': ffn_config}))
+    ptq = PTQ(config=cfg, layer_policies=OrderedDict({r'.*\.feed_forward\..*': ffn_config}))
     ptq.decoder_layers.append(DeepseekV3DecodeLayer)
     return ptq
 
 
 def infer(yaml_file):
-    '''infer'''
+    """infer"""
     config = MindFormerConfig(yaml_file)
     build_context(config)
     build_parallel_config(config)
@@ -70,7 +63,7 @@ def infer(yaml_file):
     model_config = DeepseekV3Config(**model_config)
 
     tokenizer = LlamaTokenizerFast(config.processor.tokenizer.vocab_file,
-                                   config.processor.tokenizer.tokenize_file,
+                                   config.processor.tokenizer.tokenizer_file,
                                    unk_token=config.processor.tokenizer.unk_token,
                                    bos_token=config.processor.tokenizer.bos_token,
                                    eos_token=config.processor.tokenizer.eos_token,
@@ -98,8 +91,8 @@ def infer(yaml_file):
         answer = tokenizer.decode(output)
         print("answer:", answer)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--yaml_file', default=None, type=str)
     args = parser.parse_args()
