@@ -38,7 +38,7 @@ def create_ptq():
     from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity
     cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
                     act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
-                    opname_blacklist=['lm_head'], weight_quant_granularity=QuantGranularity.PER_GROUP,
+                    opname_blacklist=['lkv2kv', 'lm_head'], weight_quant_granularity=QuantGranularity.PER_GROUP,
                     group_size=128)
     ptq = PTQ(config=cfg)
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
