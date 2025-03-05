@@ -19,15 +19,16 @@ import pytest
 import numpy as np
 
 import mindspore as ms
-from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE
+from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE, ops
 from mindspore.dataset import GeneratorDataset
 from mindspore.ops.auto_generate import SiLU, SplitWithSize
 from mindspore.ops import operations as P
 from mindformers.modules import Linear
+from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
-                              PrecisionRecovery, GPTQQuantConfig, AWQConfig)
+                              PrecisionRecovery, GPTQQuantConfig, AWQConfig, QuantGranularity)
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from tests.st.test_utils import get_available_port
 
@@ -100,6 +101,99 @@ class SimpleSwiGLUNetworkHelper(NetworkHelper):
         input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',
                            constant_values=0)
         return network(Tensor(input_ids, dtype=dtype.float16))
+
+    def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
+        raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
+
+
+class SimpleGmmNet(nn.Cell):
+    """
+    Network with single GroupedMatmul linear
+    """
+    class DecoderCell(nn.Cell):
+        """decoder cell"""
+        def __init__(self, linear):
+            super().__init__()
+            self.linear = linear
+
+        def construct(self, *args, **kwargs):
+            """linear"""
+            return self.linear(*args, **kwargs)
+
+    class ParallelConfig(nn.Cell):
+        """ParallelConfig"""
+        def __init__(self):
+            super().__init__()
+            self.use_sequence_parallel = False
+
+    def __init__(self, linear_type):
+        super(SimpleGmmNet, self).__init__()
+        self.config = SimpleGmmNet.ParallelConfig()
+        if linear_type == "ColumnParallelLinear":
+            linear = ColumnParallelLinear(
+                1024,
+                1024,
+                config=self.config,
+                bias=False,
+                transpose_b=True,
+                gather_output=False,
+                param_init_type=dtype.bfloat16,
+                compute_dtype=dtype.bfloat16,
+                is_expert=True,
+                expert_num=10
+            )
+        elif linear_type == "RowParallelLinear":
+            linear = RowParallelLinear(
+                1024,
+                1024,
+                config=self.config,
+                input_is_parallel=True,
+                bias=False,
+                skip_bias_add=True,
+                transpose_b=True,
+                param_init_type=dtype.bfloat16,
+                compute_dtype=dtype.bfloat16,
+                is_expert=True,
+                expert_num=10
+            )
+        else:
+            linear = Linear(
+                1024,
+                1024,
+                has_bias=False,
+                transpose_b=True,
+                param_init_type=dtype.bfloat16,
+                compute_dtype=dtype.bfloat16,
+                use_gmm=True,
+                expert_num=10
+            )
+            linear.matmul = ops.auto_generate.GroupedMatmulV4()
+        self.decoder = SimpleGmmNet.DecoderCell(linear)
+        self.group_list = Tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 1], dtype=dtype.int64)
+
+    def construct(self, x):
+        """decoder"""
+        return self.decoder(x, group_list=self.group_list)
+
+
+class SimpleGmmNetworkHelper(NetworkHelper):
+    """SimpleGmmNetworkHelper"""
+    def __init__(self, **kwargs) -> None:
+        self.attrs = kwargs
+
+    def create_network(self):
+        return SimpleGmmNet(self.attrs["linear_type"])
+
+    def get_spec(self, name: str):
+        return self.attrs.get(name, None)
+
+    def create_tokenizer(self, **kwargs):
+        return None
+
+    def generate(self, network: nn.Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
+        input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',
+                           constant_values=0)
+        return network(Tensor(input_ids, dtype=dtype.bfloat16))
 
     def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
         raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
@@ -185,6 +279,39 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
     np.allclose(foutput.asnumpy(), qoutput.asnumpy(), 0, 0)
 
 
+def eval_simple_gmm_net(non_decoder, linear_type):
+    """
+    Feature: eval simplenet which including one GroupedMatMul linear.
+    Description: simple GroupedMatMul network inference.
+    Expectation: network inference normally.
+    """
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
+
+    net_helper = SimpleGmmNetworkHelper(seq_length=1024, linear_type=linear_type)
+    network = net_helper.create_network()
+    ds = create_foo_ds(1)
+
+    cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                    backend=BackendTarget.ASCEND,
+                    opname_blacklist=["w2", "lm_head"],
+                    act_quant_granularity=QuantGranularity.PER_TOKEN,
+                    act_quant_dtype=dtype.int8,
+                    weight_quant_dtype=dtype.int8)
+    ptq = PTQ(config=cfg)
+    if non_decoder:
+        ptq.decoder_layer_types.append(SimpleGmmNet.DecoderCell)
+    network = ptq.apply(network, ds=ds)
+    network = ptq.convert(network)
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        input_ids = ds_item['input_ids'].asnumpy()
+        net_helper.generate(network, input_ids, max_new_tokens=100)
+
+
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -198,6 +325,20 @@ def test_ptq_simple_swiglu_net(non_decoder, quant_type):
     """
     quant_simple_swiglu_net(non_decoder, quant_type)
     eval_simple_swiglu_net(non_decoder, quant_type)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
+@pytest.mark.parametrize("non_decoder", [True, False])
+@pytest.mark.parametrize("linear_type", ["RowParallelLinear", "ColumnParallelLinear", "Linear"])
+def test_ptq_simple_gmm_net(non_decoder, linear_type):
+    """
+    Feature: eval simplenet which including one GroupedMatMul linear.
+    Description: simple GroupedMatMul network inference.
+    Expectation: network inference normally.
+    """
+    eval_simple_gmm_net(non_decoder, linear_type)
 
 
 class SimpleNet(nn.Cell):

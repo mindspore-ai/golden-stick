@@ -102,7 +102,7 @@ class LinearInferCell(Cell):
                                             self._layer.in_channels))
         # apply gmm to the inference of moe structural models when use_past=True.
         if self._layer.use_gmm:
-            x = self._layer.matmul([x], [self._layer.weight], None, None, None, None, None, group_list)[0]
+            x = self._layer.matmul(x, self._layer.weight, group_list)
         else:
             x = self._layer.matmul(x, self.layer.weight)
         if self._layer.has_bias:
