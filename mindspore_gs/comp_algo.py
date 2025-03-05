@@ -229,7 +229,7 @@ class CompAlgo(abc.ABC):
 
     def loss(self, loss_fn: callable) -> callable:
         """
-        Define how to adjust loss-function for algorithm. Subclass is not need to overridden this method if current
+        Define how to adjust loss-function for algorithm. Subclass is not need to override this method if current
         algorithm not care loss-function.
 
         Args:

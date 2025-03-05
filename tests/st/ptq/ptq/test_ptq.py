@@ -19,7 +19,7 @@ import pytest
 import numpy as np
 
 import mindspore as ms
-from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE, ops
+from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.dataset import GeneratorDataset
 from mindspore.ops.auto_generate import SiLU, SplitWithSize
 from mindspore.ops import operations as P

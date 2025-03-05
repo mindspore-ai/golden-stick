@@ -26,27 +26,53 @@ from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.core.parallel_config import build_parallel_config
 from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 
+from mindspore_gs.ptq import PTQ
+from mindspore_gs.common import BackendTarget
+from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery
+
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
 
 input_questions = [['介绍下北京故宫']]
-def create_ptq():
-    '''create_ptq'''
+
+
+def create_ptq(quant_type: str):
+    """create_ptq"""
+    if quant_type.lower() == 'dsquant':
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                        act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS,
+                        opname_blacklist=['lkv2kv', 'lm_head'], precision_recovery=PrecisionRecovery.NONE,
+                        act_quant_granularity=QuantGranularity.PER_TENSOR,
+                        weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+        ffn_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                               act_quant_dtype=msdtype.int8,
+                               outliers_suppression=OutliersSuppressionType.NONE,
+                               precision_recovery=PrecisionRecovery.NONE,
+                               act_quant_granularity=QuantGranularity.PER_TOKEN,
+                               weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+        layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
+    elif quant_type.lower() == 'awq':
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+                        act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
+                        opname_blacklist=['lm_head', 'lkv2kv'], weight_quant_granularity=QuantGranularity.PER_GROUP,
+                        group_size=128)
+        layer_policies = OrderedDict()
+    elif quant_type.lower() == 'smoothquant':
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        opname_blacklist=['lm_head', 'lkv2kv', 'w2'])
+        layer_policies = OrderedDict()
+    else:
+        raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
+    ptq = PTQ(config=cfg, layer_policies=layer_policies)
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
-    from mindspore_gs.ptq import PTQ
-    from mindspore_gs.common import BackendTarget
-    from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity
-    cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
-                    act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
-                    opname_blacklist=['lkv2kv', 'lm_head'], weight_quant_granularity=QuantGranularity.PER_GROUP,
-                    group_size=128)
-    ptq = PTQ(config=cfg)
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
     return ptq
 
 
-def infer(yaml_file):
-    '''infer'''
+def infer(yaml_file, quant_type):
+    """infer"""
     config = MindFormerConfig(yaml_file)
     build_context(config)
     build_parallel_config(config)
@@ -64,7 +90,7 @@ def infer(yaml_file):
     tokenizer.pad_token = tokenizer.eos_token
 
     network = DeepseekV3ForCausalLM(model_config)
-    ptq = create_ptq()
+    ptq = create_ptq(quant_type)
     ptq.apply(network)
     ptq.convert(network)
     ptq.summary(network)
@@ -84,9 +110,10 @@ def infer(yaml_file):
         answer = tokenizer.decode(output)
         print("answer:", answer)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--yaml_file', default=None, type=str)
+    parser.add_argument('--config', required=True, type=str)
+    parser.add_argument('--approach', required=True, type=str, help="awq, smoothquant, dsquant")
     args = parser.parse_args()
-    infer(args.yaml_file)
+    infer(args.yaml_file, args.approach)
