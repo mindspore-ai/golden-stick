@@ -199,11 +199,14 @@ class CompAlgo(abc.ABC):
 
     def summary(self, network):
         """
-        Print a summary of the quantization algorithms used by each target layer of the network.
-        For example: A8pertensor-W8perchannel.
+        Print a summary of the quantization policy used by each target layer of the network such as
+        W8-perchannel-A8-pertensor.
 
         Args:
             network (Cell): input network to summary.
+
+        Raises:
+            TypeError: If `network` type is not Cell.
         """
         if not isinstance(network, Cell):
             raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")

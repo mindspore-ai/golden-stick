@@ -74,7 +74,7 @@ class PTQ(CompAlgo):
 
     Args:
         config(:class:`mindspore_gs.ptq.PTQConfig`, optional): config for PTQ, default is ``None``.
-        layer_policies(dict, optional): quantization strategy for layers, default is ``None``.
+        layer_policies(OrderedDict, optional): quantization strategy for layers, default is ``None``.
             The key of `layer_policies` is regular string to match the layer name,
             the value of `layer_policies` is :class:`mindspore_gs.ptq.PTQConfig`.
 
@@ -83,6 +83,7 @@ class PTQ(CompAlgo):
         TypeError: If any value in `layer_policies` type is not PTQConfig when it's not ``None``.
         ValueError: If not PYNATIVE mode when mode in config is PTQMode.QUANTIZE.
         ValueError: If act_quant_dtype is int8 and weight_quant_dtype is None.
+        TypeError: If layer_policies is not an OrderedDict.
 
     Examples:
         >>> import mindspore_gs
@@ -121,19 +122,12 @@ class PTQ(CompAlgo):
         if layer_policies is None:
             self.layer_policies = OrderedDict()
         else:
-            if not isinstance(layer_policies, OrderedDict):
-                raise TypeError(f'layer_policies should be an OrderedDict, bug got {type(layer_policies)}.')
             self.layer_policies = layer_policies
-        if any(not isinstance(key, str) for key in self.layer_policies.keys()):
-            raise TypeError(f'all key of layer_policies should be a string.')
         # convert PTQConfig to InnerConfig to add inner parameters
         self._config = InnerPTQConfig().inner_config(self._config, approach=PTQApproach.PTQ)
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
-        for key, config_ in self.layer_policies.items():
-            if config_:
-                self.layer_policies[key] = InnerPTQConfig().inner_config(config_, approach=PTQApproach.PTQ)
-                PTQ._ptq_config_check(self.layer_policies[key])
+        self._layer_policies_check()
         self.pipeline: List[Algorithm] = []
         self.decoder_layers: list[Cell] = []
         self.decoder_layer_types: list = []
@@ -213,8 +207,39 @@ class PTQ(CompAlgo):
             raise ValueError("PTQ algorithm only support quant weight in int4 alone."
                              "Please not to use with a8 or c8 at the same time.")
 
+    def _layer_policies_check(self):
+        """_layer_policies_check"""
+        import re
+        if not isinstance(self.layer_policies, OrderedDict):
+            raise TypeError(f'layer_policies should be an OrderedDict, bug got {type(self.layer_policies)}.')
+        if any(not isinstance(key, str) for key in self.layer_policies.keys()):
+            raise TypeError(f'all key of layer_policies should be a string.')
+        try:
+            for key, config_ in self.layer_policies.items():
+                if config_:
+                    re.compile(key)
+                    if not isinstance(config_, PTQConfig):
+                        raise TypeError(f'The type of value in layer_policies should be PTQConfig,'
+                                        f'but got {type(config_)}')
+                    if config_.mode != self._config.mode:
+                        logger.warning(f'The mode={config_.mode} in {key} layer policy different from '
+                                       f'mode={self._config.mode} in network policy, PTQ algorithm use network policy '
+                                       f'mode to quant.')
+                        config_.mode = self._config.mode
+                    if config_.backend != self._config.backend:
+                        logger.warning(f'The backend={config_.backend} in {key} layer policy different from '
+                                       f'backend={self._config.backend} in network policy, PTQ algorithm use network '
+                                       f'policy backend to quant.')
+                        config_.backend = self._config.backend
+                    self.layer_policies[key] = InnerPTQConfig().inner_config(config_, approach=PTQApproach.PTQ)
+                    PTQ._ptq_config_check(self.layer_policies[key])
+        except re.error:
+            raise TypeError('The regular string of layer_policies not correct, please check and try again.')
+
     # pylint: disable=arguments-differ
-    def apply(self, network: Cell, network_helper: NetworkHelper = None, datasets=None, **kwargs) -> Cell:
+    def apply(self, network: Cell,
+              network_helper: NetworkHelper = None,
+              datasets=None, **kwargs) -> Cell:
         """
         Define how to add fake quantizer to `network`.
 

@@ -70,6 +70,7 @@ class Algorithm:
                 found = name
                 layer_policy = config
         if not found:
+            logger.debug(f"{layer_name} does not find available layer_policy, use network config.")
             layer_policy = self.net_config
         logger.debug(f"{layer_name} layer policy: {layer_policy}.")
         return layer_policy
