@@ -86,8 +86,7 @@ choices = ["A", "B", "C", "D"]
 
 def format_example(subject, line, include_answer=True):
     """format_example"""
-    example = f"以下是中国关于{TASK2DESC.get(subject, '')}考试的单项选择题，请不要分析过程，\
-        直接在A、B、C、D四个选项中选出正确答案。\n\n"
+    example = f"以下是中国关于{TASK2DESC.get(subject, '')}考试的单项选择题，请不要分析过程，直接在A、B、C、D四个选项中选出正确答案。\n\n"
     example = example + line["question"]
     for choice in choices:
         example += f'\n{choice}. {line[f"{choice}"]}'
