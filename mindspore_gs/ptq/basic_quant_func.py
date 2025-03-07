@@ -81,6 +81,24 @@ def cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetri
         zp = np.round(zp_double).astype(np.float64)
     return scale, zp
 
+def get_float_max_min(rank, tensor, min_op, max_op, quant_axis):
+    """get_float_max_min"""
+    if rank not in (2, 3):
+        raise ValueError(f"Only support rank of tensor being 2 and 3, but got {rank}")
+    if rank == 2:
+        minmax_axis = 1 if quant_axis == 0 else 0
+        float_max = max_op(tensor, minmax_axis, keepdims=True)[0].asnumpy()
+        float_min = min_op(tensor, minmax_axis, keepdims=True)[0].asnumpy()
+    else:
+        float_max, float_min = [], []
+        minmax_axis = 1 if quant_axis == 1 else 0
+        for i in range(tensor.shape[0]):
+            float_max.append(max_op(tensor[i], minmax_axis, keepdims=True)[0].asnumpy())
+            float_min.append(min_op(tensor[i], minmax_axis, keepdims=True)[0].asnumpy())
+        float_max = np.array(float_max)
+        float_min = np.array(float_min)
+
+    return float_max, float_min
 
 def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_group, group_size,
                  quant_dtype=msdtype.int8, quant_axis=-1, if_quant_data: bool = True, if_pesudo_quant: bool = False):
@@ -100,14 +118,9 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_g
         float_min = min_op(tensor)[0].reshape(-1)
     else:
         rank = len(tensor.shape)
-        if rank != 2:
-            raise ValueError(f"Only support rank of tensor being 2, but got {rank}")
-        minmax_axis = 1 if quant_axis == 0 else 0
-        float_max = max_op(tensor, minmax_axis, keepdims=True)[0]
-        float_min = min_op(tensor, minmax_axis, keepdims=True)[0]
+        float_max, float_min = get_float_max_min(rank, tensor, min_op, max_op, quant_axis)
     quant_min, quant_max = get_quant_min_max(num_bits=num_bits, signed=signed, narrow_range=narrow_range)
-    scale, zp = cal_quantization_params(float_min.asnumpy(), float_max.asnumpy(), quant_min, quant_max,
-                                        symmetric=symmetric)
+    scale, zp = cal_quantization_params(float_min, float_max, quant_min, quant_max, symmetric=symmetric)
 
     if if_quant_data:
         qtensor = quant_tensor_data(tensor, scale, zp, quant_min, quant_max, quant_axis,

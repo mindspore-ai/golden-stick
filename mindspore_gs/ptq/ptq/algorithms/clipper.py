@@ -61,6 +61,8 @@ class LinearClipper(Algorithm):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if not LinearClipper.linear_map.get(type(cell)):
+                    return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 if (not layer_policy or layer_policy.outliers_suppression != OutliersSuppressionType.AWQ or
                         any(opname in cell_name for opname in layer_policy.opname_blacklist) or
