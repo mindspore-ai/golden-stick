@@ -57,6 +57,9 @@ class Algorithm:
             raise ValueError("Only support fallback layer quantization algorithm to A16w8 Now.")
         return new_config
 
+    def target_layer_type(self) -> tuple:
+        raise NotImplementedError
+
     def get_layer_policy(self, layer_name) -> InnerPTQConfig:
         """get_layer_policy"""
         layer_policy = None

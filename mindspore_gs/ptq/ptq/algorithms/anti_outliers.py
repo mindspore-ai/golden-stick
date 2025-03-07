@@ -39,6 +39,9 @@ class LinearSmoothQuant(LinearSmoother):
 
     linear_map = {}
 
+    def target_layer_type(self) -> tuple:
+        return tuple(self.linear_map.keys())
+
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
         if not issubclass(quant_layer_type, WrapperCell):
@@ -101,6 +104,9 @@ class LinearAWQ(LinearSmoother):
 
     linear_map = {}
 
+    def target_layer_type(self) -> tuple:
+        return tuple(self.linear_map.keys())
+
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
         if not issubclass(quant_layer_type, WrapperCell):
@@ -160,6 +166,9 @@ class LinearAutoSmoother(LinearSmoother):
     """LinearAutoSmoother"""
 
     linear_map = {}
+
+    def target_layer_type(self) -> tuple:
+        return tuple(self.linear_map.keys())
 
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):

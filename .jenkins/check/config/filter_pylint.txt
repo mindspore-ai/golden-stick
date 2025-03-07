@@ -3,6 +3,9 @@
 "golden-stick/mindspore_gs/comp_algo.py"                                                                                 "assignment-from-none"
 "golden-stick/mindspore_gs/net_transform.py"                                                                             "protected-access"
 
+# example
+"golden-stick/example/deepseekv3/infer.py"                                                                               "line-too-long"
+
 # expriments
 "golden-stick/mindspore_gs/experimental/trace/llama2.py"                                                                  "redefined-outer-name"
 "golden-stick/mindspore_gs/experimental/trace/trace.py"                                                                   "redefined-outer-name"

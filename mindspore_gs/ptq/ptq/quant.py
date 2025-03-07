@@ -132,24 +132,30 @@ class PTQ(CompAlgo):
         self.pipeline: List[Algorithm] = []
         self.decoder_layers: list[Cell] = []
         self.decoder_layer_types: list = []
+        self.context_mode = get_context("mode")
+        self._target_layer_type = ()
         self._build_pipeline()
         self._load_mindformers_plugin()
-        self.context_mode = get_context("mode")
+
+    def _append_algorithm(self, name, algorithm: Algorithm):
+        logger.info(f"append {name} to pipeline.")
+        self.pipeline.append(algorithm)
 
     def _build_pipeline(self):
         """build pipline"""
-        logger.info("Adding LinearSmoothQuant to pipeline.")
-        self.pipeline.append(LinearSmoothQuant(self._config, self.layer_policies))
-        logger.info("Adding LinearCliper to pipeline.")
-        self.pipeline.append(LinearClipper(self._config, self.layer_policies))
-        logger.info("Adding LinearAutoSmoother to pipeline.")
-        self.pipeline.append(LinearAutoSmoother(self._config, self.layer_policies))
-        logger.info("Adding Quantizer to pipeline.")
-        self.pipeline.append(Quantizer(self._config, self.layer_policies))
+        smoothquant = LinearSmoothQuant(self._config, self.layer_policies)
+        clipper = LinearClipper(self._config, self.layer_policies)
+        awq = LinearAutoSmoother(self._config, self.layer_policies)
+        quantizer = Quantizer(self._config, self.layer_policies)
+        self._append_algorithm('LinearSmoothQuant', smoothquant)
+        self._append_algorithm('LinearAutoSmoother', awq)
+        self._append_algorithm('LinearClipper', clipper)
+        self._append_algorithm('Quantizer', quantizer)
 
     def _load_mindformers_plugin(self):
         for algorithm in self.pipeline:
             algorithm.load_mindformers_plugin()
+            self._target_layer_type += algorithm.target_layer_type()
         from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
         from mindformers.experimental.infer.core.transformer import ParallelTransformerLayer
         self.decoder_layer_types.append(LLamaDecodeLayer)
@@ -379,8 +385,13 @@ class PTQ(CompAlgo):
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
         return net_opt
 
+    def _summary_target_layer_type(self) -> tuple:
+        return self._target_layer_type
+
     def _summary_layer(self, layer_name, layer: Cell) -> Optional[str]:
         info = self._config.layer_quant_info_collect.get(layer_name)
+        if not info and layer_name.endswith('_layer'):
+            info = self._config.layer_quant_info_collect.get(layer_name[:-7])
         return info
 
     def _summary_title(self):

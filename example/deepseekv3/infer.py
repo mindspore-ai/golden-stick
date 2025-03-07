@@ -33,7 +33,7 @@ from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantG
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
 
-input_questions = [['介绍下北京故宫']]
+input_questions = ['介绍下北京故宫', 'I love Beijing, because']
 
 
 def create_ptq(quant_type: str):
@@ -105,7 +105,11 @@ def infer(yaml_file, quant_type):
 
     multi_inputs = []
     for question in input_questions:
-        input_ids = tokenizer.apply_chat_template(question, tokenize=False, add_generation_prompt=True, max_length=64)
+        message = [
+            {'role': 'system', 'content': 'You are a helpful assistant.'},
+            {'role': 'user', 'content': question}
+        ]
+        input_ids = tokenizer.apply_chat_template(message, tokenize=True, add_generation_prompt=True, max_length=64)
         multi_inputs.append(input_ids)
     for batch_input in multi_inputs:
         output = network.generate(batch_input, max_length=1024, do_sample=False, top_k=5, top_p=1, max_new_tokens=1024)

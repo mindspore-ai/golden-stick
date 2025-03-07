@@ -158,12 +158,12 @@ class SmoothLinearCell(WrapperLinearCell):
         """_apply_act_smooth_by_insert_op_for_deploy"""
         self._layer.matmul = SmoothMatmulForDeploy.create(self._layer_name, self._layer.matmul, ic=ic,
                                                           compute_dtype=compute_dtype)
+        logger.info(f"apply smooth scale by infer mul op in {self._layer.matmul}.")
 
     def deploy(self):
         """deploy"""
         if self.cfg.mode == PTQMode.QUANTIZE or self.cfg.outliers_suppression == OutliersSuppressionType.NONE:
             return self.layer
-        logger.info("insert ops for smooth quant.")
         ic = self._layer.weight.shape[1] if self._layer.transpose_b else self._layer.weight.shape[1]
         self._apply_act_smooth_for_deploy(ic, self.compute_type)
         if self.is_colparallel:
