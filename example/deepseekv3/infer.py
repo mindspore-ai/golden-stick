@@ -118,4 +118,4 @@ if __name__ == "__main__":
     parser.add_argument('--config', required=True, type=str)
     parser.add_argument('--approach', required=True, type=str, help="awq, smoothquant, dsquant")
     args = parser.parse_args()
-    infer(args.yaml_file, args.approach)
+    infer(args.config, args.approach)
