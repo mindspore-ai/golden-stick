@@ -17,10 +17,8 @@
 import os
 import time
 import argparse
-from collections import OrderedDict
 
 import mindspore as ms
-from mindspore import dtype as msdtype
 from mindspore.communication import get_rank
 from mindspore import Model, Tensor
 from mindspore.common import initializer
@@ -33,9 +31,7 @@ from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
-from mindspore_gs.ptq import PTQ
-from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery
+from utils import create_ptq
 
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
@@ -46,7 +42,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--approach', '-q', type=str, required=True,
-                        help="Available: awq, smoothquant, dsquant")
+                        help="Available: awq, smoothquant, dsquant, w8a16, w8a8-dyn")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
 
@@ -54,43 +50,6 @@ def get_args():
     logger.info(f"quant args: {args}")
     return args
 
-
-def create_ptq(quant_type: str):
-    """create_ptq"""
-    if quant_type.lower() == 'dsquant':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                        act_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS,
-                        opname_blacklist=['lkv2kv', 'lm_head'], precision_recovery=PrecisionRecovery.NONE,
-                        act_quant_granularity=QuantGranularity.PER_TENSOR,
-                        weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-        ffn_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                               act_quant_dtype=msdtype.int8,
-                               outliers_suppression=OutliersSuppressionType.NONE,
-                               precision_recovery=PrecisionRecovery.NONE,
-                               act_quant_granularity=QuantGranularity.PER_TOKEN,
-                               weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-        layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
-    elif quant_type.lower() == 'awq':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
-                        act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
-                        opname_blacklist=['lm_head', 'lkv2kv'], weight_quant_granularity=QuantGranularity.PER_GROUP,
-                        group_size=128)
-        layer_policies = OrderedDict()
-    elif quant_type.lower() == 'smoothquant':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                        opname_blacklist=['lm_head', 'lkv2kv', 'w2'])
-        layer_policies = OrderedDict()
-    else:
-        raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
-    ptq = PTQ(config=cfg, layer_policies=layer_policies)
-    if quant_type.lower() == 'awq':
-        # pylint: disable=protected-access
-        ptq._config.weight_symmetric = False
-    from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
-    ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
-    return ptq
 
 def create_ds(network_helper, ds_path, ds_type, approach):
     """Create datasets."""

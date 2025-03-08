@@ -25,19 +25,19 @@ from mindspore_gs.common.utils import offload_network, value_check
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.quant import InputCatcher
-from infer import create_network
+from utils import create_network
 from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
 from mindformers.experimental.infer.core.norm import RMSNorm
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear
 
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']
 
-def get_decoder_layers(network: Cell):
+def get_network_layers(network: Cell):
     """
-    Get decoder layers from network.
+    Get network layers from network.
 
     Args:
-        network (nn.Cell): Network to get decoder layers.
+        network (nn.Cell): Network to get network layers.
 
     Returns:
         A list of tuples (cell_name, `Cell`) of network.
@@ -57,17 +57,18 @@ def get_decoder_layers(network: Cell):
     walker = NetworkWalker()
     walker.process(network)
     if walker.layers:
-        decoder_layers = walker.layers
+        layers = walker.layers
     else:
-        decoder_layers = [("network", network)]
+        layers = [("network", network)]
         logger.warning("No decoder layer found in network.")
 
-    return decoder_layers
+    return layers
 
-def get_first_layer_input(network: Cell, decoder_layers, input_ids=None):
+
+def get_first_layer_input(network: Cell, layers, input_ids=None):
     """get first layer input"""
     catcher = InputCatcher()
-    catcher.patch(decoder_layers[0][1])
+    catcher.patch(layers[0][1])
     try:
         network.generate(input_ids, max_new_tokens=1)
     except GeneratorExit:
@@ -77,31 +78,29 @@ def get_first_layer_input(network: Cell, decoder_layers, input_ids=None):
     offload_network(network)
     return catcher, network
 
+
 def generate_input_id(network, layers, input_ids):
     '''generate_input_id'''
     start_time = time.time()
     catcher, network = get_first_layer_input(network, layers, input_ids)
     logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
-    all_args = catcher.args
-    all_kwargs = catcher.kwargs
+    arg = catcher.args[0]
+    kwargs = catcher.kwargs[0]
     output = None
     for i in tqdm.tqdm(range(len(layers)), desc="each layer infer..."):
         layer_name, layer = layers[i]
         logger.info(f"{i}th layer {layer_name} start infer...")
-        index = 0
         start_time = time.time()
-        for arg, kwargs in zip(all_args, all_kwargs):
-            if isinstance(layer, DeepseekV3DecodeLayer):
-                output = layer(*arg, **kwargs)
-            elif isinstance(layer, RMSNorm):
-                output = layer(arg[0])
-                batch_valid_length = kwargs["batch_valid_length"]
-                batch_valid_length = mint.cumsum(batch_valid_length, 0)
-                output = ops.gather(output, ops.sub(batch_valid_length, 1), 1)
-            else:
-                output = layer(arg[0])
-            all_args[index][0] = output[0] if isinstance(output, tuple) else output
-            index += 1
+        if isinstance(layer, DeepseekV3DecodeLayer):
+            output = layer(*arg, **kwargs)
+        elif isinstance(layer, RMSNorm):
+            output = layer(arg[0])
+            batch_valid_length = kwargs["batch_valid_length"]
+            batch_valid_length = mint.cumsum(batch_valid_length, 0)
+            output = ops.gather(output, ops.sub(batch_valid_length, 1), 1)
+        else:
+            output = layer(arg[0])
+        arg[0] = output[0] if isinstance(output, tuple) else output
         end_time = time.time()
         logger.info(f"{i}th layer infer time cost {end_time - end_time}")
         offload_network(layer)
@@ -109,10 +108,10 @@ def generate_input_id(network, layers, input_ids):
     return output
 
 
-def pynative_generate(yaml_file):
+def pynative_generate(yaml_file, auto_online_trans):
     '''pynative_generate'''
-    tokenizer, network = create_network(yaml_file, False)
-    decoder_layers = get_decoder_layers(network)
+    tokenizer, network = create_network(yaml_file, auto_online_trans, False)
+    layers = get_network_layers(network)
     multi_inputs = []
     for question in input_questions:
         message = [
@@ -122,7 +121,7 @@ def pynative_generate(yaml_file):
         input_ids = tokenizer.apply_chat_template(message, tokenize=True, add_generation_prompt=True, max_length=64)
         multi_inputs.append(input_ids)
     for batch_input in multi_inputs:
-        output = generate_input_id(network, decoder_layers, batch_input)
+        output = generate_input_id(network, layers, batch_input)
         output = Tensor(output.reshape((-1, output.shape[2])))
         output = mint.argmax(output, -1)
         answer = tokenizer.decode(output)
@@ -131,5 +130,6 @@ def pynative_generate(yaml_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True, type=str)
+    parser.add_argument('--auto_online_trans', default=True, type=str)
     args = parser.parse_args()
-    pynative_generate(args.config)
+    pynative_generate(args.config, args.auto_online_trans)
