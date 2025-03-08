@@ -101,7 +101,8 @@ def get_float_max_min(rank, tensor, min_op, max_op, quant_axis):
     return float_max, float_min
 
 def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_group, group_size,
-                 quant_dtype=msdtype.int8, quant_axis=-1, if_quant_data: bool = True, if_pesudo_quant: bool = False):
+                 quant_dtype=msdtype.int8, quant_axis=-1, if_quant_data: bool = True, if_pesudo_quant: bool = False,
+                 is_transpose: bool = True):
     """quant_tensor"""
     if quant_dtype not in QUANT_DTYPE_NUM_BITS.keys():
         raise ValueError(f"Only support quant to {QUANT_DTYPE_NUM_BITS.keys()}, but got {quant_dtype}")
@@ -111,7 +112,11 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_g
 
     org_shape = tensor.shape
     if need_group and group_size > 0:
-        tensor = tensor.reshape(-1, group_size)
+        if len(tensor.shape) == 3:
+            tensor_shape = (org_shape[0], -1, group_size) if is_transpose else (org_shape[0], group_size, -1)
+        else:
+            tensor_shape = (-1, group_size) if is_transpose else (group_size, -1)
+        tensor = tensor.reshape(tensor_shape)
 
     if quant_axis == -1:
         float_max = max_op(tensor)[0].reshape(-1)
@@ -133,8 +138,17 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_g
     else:
         qtensor = None
     if need_group and quant_axis != -1:
-        scale = scale.reshape(org_shape[quant_axis], -1).T
-        zp = zp.reshape(org_shape[quant_axis], -1).T
+        if len(tensor.shape) == 3:
+            scale_zp_shape = (org_shape[0], org_shape[quant_axis], -1) if is_transpose \
+                else (org_shape[0], -1, org_shape[quant_axis])
+            scale = scale.reshape(scale_zp_shape).transpose((0, 2, 1)) if is_transpose \
+                else scale.reshape(scale_zp_shape)
+            zp = zp.reshape(scale_zp_shape).transpose((0, 2, 1)) if is_transpose \
+                else zp.reshape(scale_zp_shape)
+        else:
+            scale_zp_shape = (org_shape[quant_axis], -1) if is_transpose else (-1, org_shape[quant_axis])
+            scale = scale.reshape(scale_zp_shape).T if is_transpose else scale.reshape(scale_zp_shape)
+            zp = zp.reshape(scale_zp_shape).T if is_transpose else zp.reshape(scale_zp_shape)
     return scale, zp, qtensor
 
 

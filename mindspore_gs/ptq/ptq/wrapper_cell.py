@@ -47,6 +47,7 @@ class WrapperCell(abc.ABC, Cell):
         self.net_helper = network_helper
         self.samples = []
         self.cat_samples = None
+        self.group_list = None
         context.report_quant_info(layer_name, self._quant_info())
 
     def _quant_info(self) -> str:

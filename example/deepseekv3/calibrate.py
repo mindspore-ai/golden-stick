@@ -42,7 +42,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', '-c', type=str, required=True)
     parser.add_argument('--approach', '-q', type=str, required=True,
-                        help="Available: awq, smoothquant, dsquant, w8a16, w8a8-dyn")
+                        help="Available: awq-a16w8, awq-a16w4, smoothquant, dsquant, w8a16, w8a8-dyn")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
 
@@ -53,7 +53,7 @@ def get_args():
 
 def create_ds(network_helper, ds_path, ds_type, approach):
     """Create datasets."""
-    if approach in ['awq', 'smoothquant', 'dsquant']:
+    if approach in ['awq-a16w8', 'awq-a16w4', 'smoothquant', 'dsquant']:
         start_time = time.time()
         if not ds_path:
             raise ValueError(f"Please provide dataset_path when approach is {approach}.")

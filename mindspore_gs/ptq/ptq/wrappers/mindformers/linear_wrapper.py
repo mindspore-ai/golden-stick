@@ -41,6 +41,7 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
             self.samples.append(msops.squeeze(x))
         def hook_fn_gmm(_, inps):
             x = inps[0][0]
+            self.group_list = inps[8]
             self.samples.append(msops.squeeze(x))
         # mindspore can only hook cell.
         last_mm = (self._layer, 'matmul')
@@ -53,7 +54,8 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
                                                                     hook_fn_gmm)
                 break
             if isinstance(cur_mm, MatmulCellForHook):
-                self.hook_handle = cur_mm.register_forward_pre_hook(hook_fn)
+                self.hook_handle = cur_mm.register_forward_pre_hook(hook_fn if isinstance(cur_mm.mm, msops.MatMul) else
+                                                                    hook_fn_gmm)
                 break
             last_mm = (cur_mm, 'mm')
             cur_mm = cur_mm.mm
