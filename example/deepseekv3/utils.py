@@ -35,16 +35,16 @@ from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
 
 
-def create_ptq(quant_type: str):
+def create_ptq(quant_type: str, quant_mode: PTQMode):
     """create_ptq"""
     if quant_type.lower() == 'dsquant':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8,
                         outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS,
                         opname_blacklist=['lkv2kv', 'lm_head'], precision_recovery=PrecisionRecovery.NONE,
                         act_quant_granularity=QuantGranularity.PER_TENSOR,
                         weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-        ffn_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+        ffn_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                                act_quant_dtype=msdtype.int8,
                                outliers_suppression=OutliersSuppressionType.NONE,
                                precision_recovery=PrecisionRecovery.NONE,
@@ -63,16 +63,16 @@ def create_ptq(quant_type: str):
                         opname_blacklist=['lm_head', 'lkv2kv'])
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'smoothquant':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
                         opname_blacklist=['lm_head', 'lkv2kv', 'w2'])
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'w8a16':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         opname_blacklist=['lm_head', 'lkv2kv'])
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'w8a8-dyn':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
                         opname_blacklist=['lm_head', 'lkv2kv'])
         layer_policies = OrderedDict()
@@ -87,7 +87,7 @@ def create_ptq(quant_type: str):
     return ptq
 
 
-def create_network(yaml_file, auto_online_trans=False, is_quant=True, quant_type=None):
+def create_network(yaml_file, is_quant=True, quant_type=None, auto_online_trans=False, quant_mode=PTQMode.QUANTIZE):
     '''create_tokenizer'''
     config = MindFormerConfig(yaml_file)
     build_context(config)
@@ -99,7 +99,7 @@ def create_network(yaml_file, auto_online_trans=False, is_quant=True, quant_type
 
     network = DeepseekV3ForCausalLM(model_config)
     if is_quant:
-        ptq = create_ptq(quant_type)
+        ptq = create_ptq(quant_type, quant_mode)
         ptq.apply(network)
         ptq.convert(network)
         ptq.summary(network)

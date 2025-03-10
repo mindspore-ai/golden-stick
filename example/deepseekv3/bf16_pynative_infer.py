@@ -102,7 +102,7 @@ def generate_input_id(network, layers, input_ids):
             output = layer(arg[0])
         arg[0] = output[0] if isinstance(output, tuple) else output
         end_time = time.time()
-        logger.info(f"{i}th layer infer time cost {end_time - end_time}")
+        logger.info(f"{i}th layer infer time cost {end_time - start_time}")
         offload_network(layer)
         logger.info(f"{i}th layer offload network time cost {time.time() - end_time}")
     return output
@@ -110,7 +110,7 @@ def generate_input_id(network, layers, input_ids):
 
 def pynative_generate(yaml_file, auto_online_trans):
     '''pynative_generate'''
-    tokenizer, network = create_network(yaml_file, auto_online_trans, False)
+    tokenizer, network = create_network(yaml_file, is_quant=False, auto_online_trans=auto_online_trans)
     layers = get_network_layers(network)
     multi_inputs = []
     for question in input_questions:

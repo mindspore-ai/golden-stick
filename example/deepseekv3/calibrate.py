@@ -31,6 +31,7 @@ from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
+from mindspore_gs.ptq import PTQMode
 from utils import create_ptq
 
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
@@ -53,7 +54,7 @@ def get_args():
 
 def create_ds(network_helper, ds_path, ds_type, approach):
     """Create datasets."""
-    if approach in ['awq-a16w8', 'awq-a16w4', 'smoothquant', 'dsquant']:
+    if approach in ['awq-a16w8', 'awq-a16w4', 'smoothquant', 'dsquant', 'w8a16', 'w8a8-dyn']:
         start_time = time.time()
         if not ds_path:
             raise ValueError(f"Please provide dataset_path when approach is {approach}.")
@@ -118,7 +119,7 @@ if __name__ == "__main__":
     start = time.time()
     print('Creating network...', flush=True)
     network = helper.create_network()
-    algo = create_ptq(uargs.approach)
+    algo = create_ptq(uargs.approach, PTQMode.QUANTIZE)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     print('Quanting network...', flush=True)
