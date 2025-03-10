@@ -40,6 +40,10 @@ def compare_ckpt(correct_ckpt_file, new_ckpt_file):
 
     for name in sorted(corr_param.keys()):
         print(f"start compare {name}-----")
+        if name not in new_param:
+            print(f'{name} in corr_param but not in new_param', flush=True)
+            print(f"compare {name} error!-----")
+            continue
         corr_dtype = corr_param[name].dtype
         new_dtype = new_param[name].dtype
         corr_shape = corr_param[name].dtype
@@ -47,10 +51,6 @@ def compare_ckpt(correct_ckpt_file, new_ckpt_file):
         if corr_dtype != new_dtype or corr_shape != new_shape:
             print(f'compared {name} corr_dtype:{corr_dtype}, new_dtype:{new_dtype},' \
                   f'corr_shape:{corr_shape}, new_shape:{new_shape} not equal.', flush=True)
-            print(f"compare {name} error!-----")
-            continue
-        if name not in new_param:
-            print(f'{name} in corr_param but not in new_param', flush=True)
             print(f"compare {name} error!-----")
             continue
         if corr_dtype == dtype.bfloat16:

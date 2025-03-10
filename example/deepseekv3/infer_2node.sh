@@ -18,4 +18,4 @@ master_ip=$5
 export HCCL_IF_IP=${cur_ip}
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
-bash ${mf_path}/scripts/msrun_launcher.sh "infer.py --config ${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml --approach ${quant_type}" 16 8 ${master_ip} 8432 ${node_id} output/msrun_log False 300
+bash ${mf_path}/scripts/msrun_launcher.sh "quant_infer.py --config ${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml --approach ${quant_type}" 16 8 ${master_ip} 8432 ${node_id} output/msrun_log False 300

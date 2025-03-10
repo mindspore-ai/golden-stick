@@ -14,4 +14,4 @@ quant_type=$2
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
-bash ${mf_path}/scripts/msrun_launcher.sh "infer.py --config ${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml --approach ${quant_type}" 16
+bash ${mf_path}/scripts/msrun_launcher.sh "quant_infer.py --config ${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml --approach ${quant_type}" 16
