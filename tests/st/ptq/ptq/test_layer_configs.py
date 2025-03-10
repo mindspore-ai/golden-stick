@@ -185,7 +185,7 @@ def test_quant_summary():
             'SmoothQuant-W8-per_channel-A8-per_tensor')
     assert ptq._config.layer_quant_info_collect['network.layers.0.attention.k'] == 'W8-per_channel-A8-per_tensor'
     assert ptq._config.layer_quant_info_collect['network.layers.0.ffn.w1'] == 'W8-per_channel-A8-per_token'
-    assert ptq._config.layer_quant_info_collect['network.layers.4.moe.w1'] == 'AWQ-W4-per_group'
+    assert ptq._config.layer_quant_info_collect['network.layers.4.moe.w1'] == 'AWQ-wclip-W4-per_group'
 
 
 @pytest.mark.level0

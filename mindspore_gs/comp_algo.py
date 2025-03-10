@@ -188,6 +188,9 @@ class CompAlgo(abc.ABC):
 
         return net_opt
 
+    def _summary_target_layer_type(self) -> tuple:
+        return ()
+
     def _summary_layer(self, layer_name: str, layer: Cell) -> Optional[str]:
         return None
 
@@ -208,6 +211,7 @@ class CompAlgo(abc.ABC):
         Raises:
             TypeError: If `network` type is not Cell.
         """
+        target_layer_types = self._summary_target_layer_type()
         if not isinstance(network, Cell):
             raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")
         results = []
@@ -217,11 +221,14 @@ class CompAlgo(abc.ABC):
                 return
             for name, cell in root.name_cells().items():
                 full_cell_name = f"{name_prefix}.{name}"
+                if not isinstance(cell, target_layer_types):
+                    process(cell, full_cell_name)
+                    continue
                 info = self._summary_layer(full_cell_name, cell)
                 if info:
                     results.append((full_cell_name, info))
                 else:
-                    process(cell, full_cell_name)
+                    results.append((full_cell_name, 'NA'))
         process(network, 'network')
         if results:
             print_table(self._summary_title(), self._summary_desc_name(), results)

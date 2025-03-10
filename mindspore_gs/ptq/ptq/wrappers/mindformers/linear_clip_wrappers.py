@@ -44,7 +44,7 @@ class ClipLinearCell(WrapperLinearCell):
         LinearClipper.reg_layer_map(RowParallelLinear, ClipLinearCell, AutoClipChecker())
 
     def _quant_info(self):
-        return ""
+        return "wclip"
 
     def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
         super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
