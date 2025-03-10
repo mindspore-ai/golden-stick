@@ -383,6 +383,7 @@ class PTQ(CompAlgo):
             else:
                 raise ValueError(
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
+        self.summary(net_opt)
         return net_opt
 
     def _summary_target_layer_type(self) -> tuple:

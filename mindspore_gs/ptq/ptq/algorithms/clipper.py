@@ -1,4 +1,4 @@
-# Copyright 2024 Huawei Technologies Co., Ltd
+# Copyright 2024-2025 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,8 +69,9 @@ class LinearClipper(Algorithm):
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 is_satisfied = layer_policy.outliers_suppression == OutliersSuppressionType.AWQ or \
                     layer_policy.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID
-                if (not layer_policy or not is_satisfied or
-                        any(opname in cell_name for opname in layer_policy.opname_blacklist) or
+                if not layer_policy or not is_satisfied:
+                    return cell, False
+                if (any(opname in cell_name for opname in layer_policy.opname_blacklist) or
                         any(opname in cell_name for opname in clip_skip_layer)):
                     logger.info(f"{cell_name} is in blacklist, keep not being clip.")
                     return cell, False
@@ -84,13 +85,7 @@ class LinearClipper(Algorithm):
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         clip_skip_layer = ["wq", "wk", "w_qkv"]
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to clip, please check network and opname_blacklist."
-            logger.warning(warn_str)

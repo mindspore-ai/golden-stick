@@ -1,4 +1,4 @@
-# Copyright 2024 Huawei Technologies Co., Ltd
+# Copyright 2024-2025 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,8 +74,9 @@ class LinearSmoothQuant(LinearSmoother):
                 if not LinearSmoothQuant.linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if (not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE or
-                        any(opname in cell_name for opname in layer_policy.opname_blacklist)):
+                if not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE:
+                    return cell, False
+                if any(opname in cell_name for opname in layer_policy.opname_blacklist):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
@@ -88,15 +89,9 @@ class LinearSmoothQuant(LinearSmoother):
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and ptq-config."
-            logger.warning(warn_str)
 
 
 class LinearAWQ(LinearSmoother):
@@ -137,8 +132,9 @@ class LinearAWQ(LinearSmoother):
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if (not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE or
-                        any(opname in cell_name for opname in layer_policy.opname_blacklist)):
+                if not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE:
+                    return cell, False
+                if any(opname in cell_name for opname in layer_policy.opname_blacklist):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, True
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
@@ -151,15 +147,9 @@ class LinearAWQ(LinearSmoother):
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and ptq-config."
-            logger.warning(warn_str)
 
 
 class LinearAutoSmoother(LinearSmoother):
@@ -208,8 +198,9 @@ class LinearAutoSmoother(LinearSmoother):
                 if not LinearAutoSmoother.linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if (not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE or
-                        any(opname in cell_name for opname in layer_policy.opname_blacklist)):
+                if not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE:
+                    return cell, False
+                if any(opname in cell_name for opname in layer_policy.opname_blacklist):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
@@ -223,12 +214,6 @@ class LinearAutoSmoother(LinearSmoother):
                                                  network_helper=network_helper, decoder_layer=search_layer,
                                                  layer_args=search_args, layer_kwargs=search_kwargs)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and ptq-config."
-            logger.warning(warn_str)

@@ -21,14 +21,18 @@ import tqdm
 from mindspore.nn import Cell
 from mindspore import Tensor, mint, ops
 
+from mindspore_gs import PTQMode
 from mindspore_gs.common.utils import offload_network, value_check
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.quant import InputCatcher
-from utils import create_network
-from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
+
 from mindformers.experimental.infer.core.norm import RMSNorm
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear
+
+from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
+
+from utils import create_network
 
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']
 
@@ -80,7 +84,7 @@ def get_first_layer_input(network: Cell, layers, input_ids=None):
 
 
 def generate_input_id(network, layers, input_ids):
-    '''generate_input_id'''
+    """generate_input_id"""
     start_time = time.time()
     catcher, network = get_first_layer_input(network, layers, input_ids)
     logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
@@ -108,9 +112,10 @@ def generate_input_id(network, layers, input_ids):
     return output
 
 
-def pynative_generate(yaml_file, auto_online_trans):
-    '''pynative_generate'''
-    tokenizer, network = create_network(yaml_file, is_quant=False, auto_online_trans=auto_online_trans)
+def pynative_generate(yaml_file, quant_type, auto_online_trans):
+    """pynative_generate"""
+    tokenizer, network = create_network(yaml_file, quant_type=quant_type, quant_mode=PTQMode.DEPLOY,
+                                        auto_online_trans=auto_online_trans)
     layers = get_network_layers(network)
     multi_inputs = []
     for question in input_questions:
@@ -127,9 +132,14 @@ def pynative_generate(yaml_file, auto_online_trans):
         answer = tokenizer.decode(output)
         print("answer:", answer)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True, type=str)
     parser.add_argument('--auto_online_trans', default=True, type=str)
+    parser.add_argument('--quant_type', default=None, type=str)
     args = parser.parse_args()
-    pynative_generate(args.config, args.auto_online_trans)
+    if args.quant_type:
+        print("------------------ set args.auto_online_trans to False because of quant_type", flush=True)
+        args.auto_online_trans = False
+    pynative_generate(args.config, args.quant_type, args.auto_online_trans)

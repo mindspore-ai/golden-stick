@@ -43,7 +43,8 @@ Post-training quantization algorithms have many kinds of classification dimensio
 This subsection describes the capabilities of the PTQ algorithm in terms of common quantization algorithm paradigms in the industry, before giving some limitations on other categorization dimensions:
 
 - Only MinMax quantization is supported.
-- Only static quantization is supported, where activation quantization only supports per-tensor quantization and weight quantization only supports per-channel quantization.
+- Support static per-tensor activation quantization and per-channel weight quantization. Support dynamic per-token activation quantization.
+- Support static per-channel KVCache quantization and dynamic per-token KVCache quantization.
 - Limited by hardware and operator support, for full quantization, activation does not support per-channel quantization and weights do not support quantization with zero point.
 - The hardware supports weight quantization with zero point, but the current PTQ algorithm does not open this capability and only supports weight quantization without zero point.
 - The PTQ algorithm has done a layered design, and the current underlying quantization operator only supports some Layers of MindFormers, because the PTQ algorithm only supports doing weight quantization and activation quantization for [Linear Layer of MindFormers](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/layers.py#L363 ) to do weight quantization and activation quantization, and for [MindFormers' PageAttention layer](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26 ) to do KVCache quantization. If the user needs to quantize the network that is not based on MindFormers, the user is required to provide the relevant quantization operator implementation, the current customization capability in this regard does not form a clear interface, will be provided in the future.

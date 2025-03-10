@@ -43,7 +43,8 @@
 本小节从业界常见的量化算法范式来介绍PTQ算法的能力，在此之前先给出其他分类维度上的一些限制：
 
 - 仅支持MinMax量化。
-- 仅支持静态量化，其中激活量化只支持per-tensor量化，权重量化只支持per-channel量化。
+- 静态激活量化只支持per-tensor量化，权重量化只支持per-channel量化。支持激活per-token的动态量化。
+- 支持KVCache静态per-channel量化和动态per-token量化。
 - 受限于硬件和算子支持，对于全量化，激活不支持per-channel的量化，权重不支持带zero point的量化。
 - 硬件支持带zero point的权重量化，但当前PTQ算法没有开放这方面能力，仅支持不带zero point的权重量化。
 - PTQ算法做了分层设计，当前底层量化算子仅对MindFormers的一些Layer做了支持，因为PTQ算法仅支持对[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/layers.py#L363)做权重量化和激活量化，对[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26)做KVCache量化。如果用户需要量化不基于MindFormers的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。

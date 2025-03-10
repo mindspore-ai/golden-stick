@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """ds infer."""
+
 from collections import OrderedDict
 
 import mindspore as ms
@@ -67,11 +68,11 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
                         opname_blacklist=['lm_head', 'lkv2kv', 'w2'])
         layer_policies = OrderedDict()
-    elif quant_type.lower() == 'w8a16':
+    elif quant_type.lower() == 'a16w8':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         opname_blacklist=['lm_head', 'lkv2kv'])
         layer_policies = OrderedDict()
-    elif quant_type.lower() == 'w8a8-dyn':
+    elif quant_type.lower() == 'a8dynw8':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
                         opname_blacklist=['lm_head', 'lkv2kv'])
@@ -87,7 +88,7 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     return ptq
 
 
-def create_network(yaml_file, is_quant=True, quant_type=None, auto_online_trans=False, quant_mode=PTQMode.QUANTIZE):
+def create_network(yaml_file, quant_type=None, auto_online_trans=False, quant_mode=PTQMode.QUANTIZE):
     '''create_tokenizer'''
     config = MindFormerConfig(yaml_file)
     build_context(config)
@@ -98,12 +99,11 @@ def create_network(yaml_file, is_quant=True, quant_type=None, auto_online_trans=
     model_config = DeepseekV3Config(**model_config)
 
     network = DeepseekV3ForCausalLM(model_config)
-    if is_quant:
+    if quant_type:
         ptq = create_ptq(quant_type, quant_mode)
         ptq.apply(network)
         ptq.convert(network)
-        ptq.summary(network)
-    if is_quant and auto_online_trans:
+    if quant_type and auto_online_trans:
         raise ValueError("quant model not support ckpt from Hugging Face.")
 
     if config.load_checkpoint:
