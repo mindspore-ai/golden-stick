@@ -286,25 +286,46 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
 - 8bit权重量化组合8bit KVCache量化：
 
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+  ```python
+  from mindspore import dtype as msdtype
+  from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-```
+  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
+                          outliers_suppression=OutliersSuppressionType.NONE)
+  ```
 
 - SmoothQuant量化组合8bit KVCache量化：
 
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+  ```python
+  from mindspore import dtype as msdtype
+  from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-```
+  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+                          outliers_suppression=OutliersSuppressionType.NONE)
+  ```
 
-后续我们还将基于此支持层间混合精度量化，根据不同层对于量化的敏感程度，应用8bit权重量化、8bit全量化等。
+- 层间混合精度量化
+
+  支持层间混合精度量化，根据不同层对于量化的敏感程度，应用a16w8、a8w8等量化算法。例如，通过layer_policies配置，支持feed_forward模块中的层使用a16w8量化，其他层使用a8w8量化。
+
+  ```python
+  from mindspore import dtype as msdtype
+  from mindspore_gs.ptq import PTQ, PTQConfig, OutliersSuppressionType
+
+  net_policy = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
+                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=[])
+  ffn_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=None,
+                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=['w2'])
+  layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
+
+  ptq = PTQ(config=net_policy, layer_policies=layer_policies)
+  ```
+
+  备注：
+
+  1) layer_policies中参数配置的优先级高于net_policy，当某层匹配到layer_policies配置，优先使用该策略。否则，使用net_policy策略。
+
+  2) PTQConfig中的mode和backend参数，以net_policy为准。
 
 ## 示例
 

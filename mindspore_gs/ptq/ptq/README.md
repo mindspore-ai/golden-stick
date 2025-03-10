@@ -285,25 +285,46 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
 
 - 8bit weight quantization combined with 8bit KVCache quantization:
 
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-```
+    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
+                            outliers_suppression=OutliersSuppressionType.NONE)
+    ```
 
 - SmoothQuant quantization combined with 8bit KVCache quantization:
 
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-```
+    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+                            outliers_suppression=OutliersSuppressionType.NONE)
+    ```
 
-In the future, we will also support inter-layer mixed-precision quantization based on this, applying 8bit weight quantization, 8bit full quantization, etc. according to the sensitivity of different layers to quantization.
+- inter-layer mixed-precision quantization
+
+    Support inter-layer mixed-precision quantization, and apply quantization algorithms, such as 8bit weight and 8bit full quantization, according to the sensitivity of different layers to quantization. For example, the layer_policies configuration supports a16w8 quantization for layers in the feed_forward module and a8w8 quantization for other layers.
+
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq import PTQ, PTQConfig, OutliersSuppressionType
+
+    net_policy = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
+                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=[])
+    ffn_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=None,
+                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=['w2'])
+    layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
+
+    ptq = PTQ(config=net_policy, layer_policies=layer_policies)
+    ```
+
+    Note:
+
+    1) The priority of parameter configurations in layer_policies is higher than that of net_policy. If a layer matches the layer_policies configuration, this policy is used preferentially. Otherwise, use the net_policy policy.
+
+    2) The mode and backend parameters in PTQConfig are subject to net_policy.
 
 ## Samples
 
