@@ -282,7 +282,7 @@ class MFDSV3Helper(MFNetworkHelper):
         self._decoder_infos = OrderedDict()
 
     def create_network(self):
-        from research.deepseek3.deepseek3_model import DeepseekV3ForCausalLM
+        from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
         from research.deepseek3.deepseek3_config import DeepseekV3Config
         build_context(self.mf_config)
         model_config = DeepseekV3Config(**self.mf_config.model.model_config)

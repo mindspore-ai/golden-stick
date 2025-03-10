@@ -54,12 +54,6 @@ class ClipLinearCell(WrapperLinearCell):
         if not self.is_rowparallel and not self.is_colparallel and not self.is_linear:
             raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
                              f"but {linear_name} type is {type(linear)}.")
-        if len(self._layer.weight.shape) != 2:
-            raise ValueError(f"auto clip only support weight_dim=2 now,"
-                             f"but got {len(self._layer.weight.shape)}.")
-        rank = len(linear.weight.shape)
-        self.ic_axis = rank - 1 if linear.transpose_b else rank - 2
-        self.oc_axis = rank - 2 if linear.transpose_b else rank - 1
         self.compute_type = self.layer.dtype if self.is_linear else self.layer.compute_dtype
 
         self.w_obs_max, _ = get_min_max_op(cfg.tp_size, self.is_colparallel)
@@ -152,6 +146,7 @@ class ClipLinearCell(WrapperLinearCell):
                                          self.cfg.weight_quant_dtype,
                                          self.oc_axis,
                                          True,
+                                         True,
                                          True)
                 logger.debug(f"ClipLinearCell: search iter {i_b}, weight_clip_ratio {i_s}, "
                              f"pesudo weight of Layer({self._layer_name}) is {{{q_w.shape}, "
@@ -183,6 +178,17 @@ class ClipLinearCell(WrapperLinearCell):
 
     def process(self):
         super(ClipLinearCell, self).process()
+        org_shape = self._layer.weight.shape
+        if len(org_shape) == 3:
+            if self._layer.transpose_b:
+                # [num_experts, oc, ic] -> [num_experts * oc, ic]
+                weight = self._layer.weight.data.reshape((-1, org_shape[-1]))
+            else:
+                # [num_experts, ic, oc] -> [ic, num_experts * oc] -> [num_experts * oc, ic]
+                weight = self._layer.weight.data.transpose((1, 0, 2)).reshape(org_shape[1], -1).transpose((1, 0))
+            self._layer.weight.set_data(weight)
+        # clip weight be [oc, ic] dims
+        self.ic_axis, self.oc_axis = 1, 0
         weight_clip_ratio = self.cfg.algo_args.get("weight_clip_ratio", [1 - i/20 for i in range(10)])
         if isinstance(weight_clip_ratio, list):
             clip_val = self._search_best_clip(weight_clip_ratio)
@@ -194,6 +200,15 @@ class ClipLinearCell(WrapperLinearCell):
                      f"{clip_val.dtype}, {clip_val.asnumpy()}}}")
         self.cfg.dumper.dump_data(self.layer_name, "|awq_clip_val", clip_val)
         self._apply_clip(clip_val)
+
+        if len(org_shape) == 3:
+            if self.layer.transpose_b:
+                weight = self._layer.weight.reshape(org_shape)
+            else:
+                weight = self._layer.weight.transpose((1, 0)).reshape((org_shape[1],
+                                                                       org_shape[0],
+                                                                       org_shape[2])).transpose((1, 0, 2))
+            self._layer.weight.set_data(weight)
 
     def deploy(self):
         """deploy"""

@@ -51,11 +51,16 @@ def create_ptq(quant_type: str):
                                act_quant_granularity=QuantGranularity.PER_TOKEN,
                                weight_quant_granularity=QuantGranularity.PER_CHANNEL)
         layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
-    elif quant_type.lower() == 'awq':
-        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+    elif quant_type.lower() == 'awq-a16w4':
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
                         act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
                         opname_blacklist=['lm_head', 'lkv2kv'], weight_quant_granularity=QuantGranularity.PER_GROUP,
                         group_size=128)
+        layer_policies = OrderedDict()
+    elif quant_type.lower() == 'awq-a16w8':
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                        act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
+                        opname_blacklist=['lm_head', 'lkv2kv'])
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'smoothquant':
         cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,

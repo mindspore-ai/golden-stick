@@ -140,6 +140,34 @@ class SmoothLinearCell(WrapperLinearCell):
         logger.debug(f"SmoothLinearCell: smoothed_weight of Layer({self._layer_name}) is {{{self._layer.weight.shape}, "
                      f"{self._layer.weight.dtype}, {self._layer.weight.asnumpy()}}}")
 
+    def _apply_group_weight_smooth(self, smooth_scale: Tensor):
+        """_apply_weight_smooth"""
+        org_shape = self._layer.weight.shape
+        # weight * scale
+        weight_scale = msops.expand_dims(smooth_scale, 0)
+        if not self._layer.transpose_b:
+            weight_scale = weight_scale.transpose()
+            # [num_experts, ic, oc] -> [ic, num_experts * oc]
+            weight = self._layer.weight.data.transpose((1, 0, 2)).reshape((org_shape[1], -1))
+        else:
+            # [num_experts, oc, ic] -> [num_experts * oc, ic]
+            weight = self._layer.weight.data.reshape((-1, org_shape[-1]))
+
+        orin_dtype = self._layer.weight.dtype
+        weight = msops.mul(self._layer.weight, weight_scale)
+        weight = self._layer.cast(weight, orin_dtype)
+
+        if not self._layer.transpose_b:
+            # [ic, num_experts * oc] -> [num_experts, ic, oc]
+            weight = weight.reshape((org_shape[1], org_shape[0], org_shape[2])).transpose((1, 0, 2))
+        else:
+            # [num_experts * oc, ic] -> [num_experts, oc, ic]
+            weight = weight.reshape(org_shape)
+        self._layer.weight.set_data(weight)
+        logger.debug(f"SmoothLinearCell: smoothed_group_weight of Layer({self._layer_name})"
+                     f"is {{{self._layer.weight.shape}, "
+                     f"{self._layer.weight.dtype}, {self._layer.weight.asnumpy()}}}")
+
     def _apply_act_smooth(self, smooth_scale: Tensor):
         """_apply_act_smooth"""
         if isinstance(self._layer.matmul, SmoothMatmul):
@@ -573,7 +601,10 @@ class AWQSmoothLinearCell(AWQLinearCell):
 
         for ratio in alpha:
             scales = self._calc_smooth_scale(ratio)
-            self._apply_weight_smooth(scales)
+            if len(self._layer.weight.shape) == 3:
+                self._apply_group_weight_smooth(scales)
+            else:
+                self._apply_weight_smooth(scales)
             _, _, pesudo_weight = quant_tensor(self._layer.weight.data,
                                                self.w_quant_min,
                                                self.w_quant_max,
@@ -584,7 +615,8 @@ class AWQSmoothLinearCell(AWQLinearCell):
                                                self.cfg.weight_quant_dtype,
                                                self.oc_axis,
                                                True,
-                                               True)
+                                               True,
+                                               self._layer.transpose_b)
             logger.debug(f"AWQSmoothLinearCell: search scale alpha {ratio}, pesudo weight of Layer({self._layer_name}) "
                          f"is {{{pesudo_weight.shape}, {pesudo_weight.dtype}, {pesudo_weight.asnumpy()}}}")
             weight_scales = msops.expand_dims(scales, 0)
@@ -618,9 +650,37 @@ class AWQSmoothLinearCell(AWQLinearCell):
         return msops.cat(tuple(outputs), axis=0)
 
     def _module_forward(self):
+        """_module_forward"""
+        if "routed_experts.ffn.w_gate_hidden" in self._layer_name:
+            self.forward_module = self.decoder.feed_forward.routed_experts
+            return self.forward_module(self.cat_samples.expand_dims(0))
+
+        if "routed_experts.ffn.w1" in self._layer_name:
+            return self._layer(self.cat_samples.expand_dims(0), group_list=self.group_list)
+
+        if "routed_experts.ffn.w3" in self._layer_name:
+            return self._layer(self.cat_samples.expand_dims(0), group_list=self.group_list)
+
+        if "routed_experts.ffn.w2" in self._layer_name:
+            return self._layer(self.cat_samples.expand_dims(0), group_list=self.group_list)
+
+        if "shared_experts.w_gate_hidden" in self._layer_name:
+            self.forward_module = self.decoder.feed_forward.shared_experts
+            return self.forward_module(self.cat_samples.expand_dims(0))
+
+        if "shared_experts.w1" in self._layer_name:
+            return self._layer(self.cat_samples.expand_dims(0))
+
+        if "shared_experts.w3" in self._layer_name:
+            return self._layer(self.cat_samples.expand_dims(0))
+
+        if "shared_experts.w2" in self._layer_name:
+            return self._layer(self.cat_samples.expand_dims(0))
+
         if "w_qkv" in self._layer_name:
             self.forward_module = self.decoder.attention
             return self._attn_forward(self.samples)
+
         if "w_gate_hidden" in self._layer_name:
             self.forward_module = self.decoder.feed_forward
         else:
@@ -629,7 +689,30 @@ class AWQSmoothLinearCell(AWQLinearCell):
 
     def smooth(self):
         """smooth"""
+        org_shape = self._layer.weight.shape
+        if len(org_shape) == 3:
+            if self._layer.transpose_b:
+                # [num_experts, oc, ic] -> [num_experts * oc, ic]
+                weight = self._layer.weight.data.reshape((-1, org_shape[-1]))
+                self.ic_axis, self.oc_axis = 1, 0
+            else:
+                # [num_experts, ic, oc] -> [ic, num_experts * oc]
+                weight = self._layer.weight.data.transpose((1, 0, 2)).reshape(org_shape[1], -1)
+                self.ic_axis, self.oc_axis = 0, 1
+                self.oc = weight.shape[1]
+            self._layer.weight.set_data(weight)
         self._get_statistic_data()
+        if len(org_shape) == 3:
+            if self._layer.transpose_b:
+                # [num_experts * oc, ic] -> [num_experts, oc, ic]
+                weight = self._layer.weight.reshape(org_shape)
+                self.ic_axis, self.oc_axis = 2, 1
+            else:
+                # [ic, num_experts * oc] -> [num_experts, ic, oc]
+                weight = self._layer.weight.reshape((org_shape[1], org_shape[0],
+                                                     org_shape[2])).transpose((1, 0, 2))
+                self.ic_axis, self.oc_axis = 1, 2
+            self._layer.weight.set_data(weight)
         smooth_alpha = self.cfg.algo_args.get('smooth_alpha', [i/20 for i in range(20)])
         if isinstance(smooth_alpha, list):
             smooth_scale = self._search_best_scale(smooth_alpha)

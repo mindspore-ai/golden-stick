@@ -15,7 +15,7 @@
 """ptq wrapper cells for mindformers."""
 
 import numpy as np
-from mindspore import Parameter, Tensor, dtype, ops
+from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 
 from mindformers.modules.layers import Linear
@@ -83,11 +83,21 @@ class WeightQuantLinearCell(WrapperLinearCell):
                 raise ValueError(f"input channel {self.ic} can not divide group_size {self.cfg.group_size}.")
             if self.ic == self.cfg.group_size:
                 raise ValueError(f"input channel {self.ic} can not equal to group_size {self.cfg.group_size}.")
-            scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
+            if rank == 2:
+                scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
+            elif rank == 3:
+                scale_zp_shape = (linear.weight.shape[0],
+                                  linear.weight.shape[1] // self.cfg.group_size,
+                                  linear.weight.shape[2])
+            else:
+                raise ValueError(f"Only support rank of weight is 2 or 3, but got {rank}.")
         else:
-            scale_zp_shape = (self.oc,)
-        if isinstance(linear.matmul, ops.auto_generate.GroupedMatmulV4):
-            scale_zp_shape = (linear.weight.shape[0], linear.weight.shape[2])
+            if rank == 2:
+                scale_zp_shape = (self.oc,)
+            elif rank == 3:
+                scale_zp_shape = (linear.weight.shape[0], linear.weight.shape[2])
+            else:
+                raise ValueError(f"Only support rank of weight is 2 or 3, but got {rank}.")
         self.w_scale = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
         self.w_zp = Parameter(initializer('zeros', scale_zp_shape, dtype=dtype.float64))
 
@@ -105,7 +115,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
                                                self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                                self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                                self.cfg.group_size, self.cfg.weight_quant_dtype,
-                                               self.weight_quantizer_axis)
+                                               self.weight_quantizer_axis,
+                                               is_transpose=self._layer.transpose_b)
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_CHANNEL:
             w_scale = np.squeeze(w_scale)
             w_zp = np.squeeze(w_zp)
