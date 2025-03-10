@@ -187,7 +187,7 @@ def create_ds(network_helper, ds_path, ds_type, approach):
         ignore_token_id = network_helper.get_spec('ignore_token_id')
         tokenizer = network_helper.create_tokenizer()
         ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
-                          False, n_samples=200)
+                          False, n_samples=100)
         logger.info(f'Create datasets cost time is {time.time() - start_time} s.')
         return ds
     return None

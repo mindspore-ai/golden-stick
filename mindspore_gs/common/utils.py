@@ -19,6 +19,7 @@ util functions for golden-stick
 import types
 import warnings
 from functools import wraps
+import numpy as np
 from mindspore import nn
 
 
@@ -112,3 +113,9 @@ def deprecated(version, substitute=None):
         return target
 
     return decorate
+
+
+def check_nan_inf(arr: np.ndarray):
+    has_nan = np.any(np.isnan(arr))
+    has_inf = np.any(np.isinf(arr))
+    return has_nan, has_inf

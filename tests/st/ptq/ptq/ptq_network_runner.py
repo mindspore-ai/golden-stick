@@ -159,6 +159,15 @@ def create_cfg(quant_algo_, mode):
                             backend=BackendTarget.ASCEND,
                             opname_blacklist=["lm_head"],
                             outliers_suppression=OutliersSuppressionType.SMOOTH)
+    elif quant_algo_ == 'OmniQuant_A8W8':
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        weight_quant_dtype=dtype.int8, act_quant_dtype=dtype.int8,
+                        outliers_suppression=OutliersSuppressionType.OMNIQUANT_GRID,
+                        act_quant_granularity=QuantGranularity.PER_TENSOR,
+                        weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+                        kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_algo_}")
     return cfg
@@ -299,6 +308,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
         elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
             ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
+        elif quant_algo_ == 'OmniQuant_A8W8':
+            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         else:
             assert False
         if not ret:
@@ -326,6 +337,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         ret = np.allclose(qoutput[:, :58], foutput[:, :58], 0, 0)
     elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
         ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
+    elif quant_algo_ == 'OmniQuant_A8W8':
+        ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     else:
         assert False
     if not ret:

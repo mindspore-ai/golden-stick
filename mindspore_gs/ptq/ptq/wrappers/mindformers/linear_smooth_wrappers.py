@@ -18,9 +18,11 @@ import copy
 import enum
 from types import MethodType
 from typing import Optional
+import numpy as np
 
 from mindspore import Tensor, nn
 from mindspore import ops as msops
+from mindspore import dtype as msdtype
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
@@ -140,7 +142,10 @@ class SmoothLinearCell(WrapperLinearCell):
 
     def _apply_act_smooth(self, smooth_scale: Tensor):
         """_apply_act_smooth"""
-        self._layer.matmul = SmoothMatmul.create(self._layer_name, self._layer.matmul, smooth_scale=smooth_scale)
+        if isinstance(self._layer.matmul, SmoothMatmul):
+            self._layer.matmul.update(self._layer_name, self._layer.matmul.mm, smooth_scale)
+        else:
+            self._layer.matmul = SmoothMatmul.create(self._layer_name, self._layer.matmul, smooth_scale=smooth_scale)
 
     def _apply_smooth(self, smooth_scale):
         """_apply_smooth"""
@@ -278,6 +283,189 @@ class SearchLinearCell(nn.Cell):
         if not best_hyper_param:
             raise RuntimeError(f"No search space found.")
         self._settle_best(best_hyper_param)
+
+
+class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
+    """SearchOmniQuantLinearCell"""
+
+    @staticmethod
+    def reg_self():
+        class SearchOmniQuantChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID
+
+        LinearAutoSmoother.reg_layer_map(Linear, SearchOmniQuantLinearCell, SearchOmniQuantChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, SearchOmniQuantLinearCell, SearchOmniQuantChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOmniQuantLinearCell, SearchOmniQuantChecker())
+
+    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+        if self.layer.has_bias:
+            raise ValueError(f"Only cell without bias is supported, but {linear_name} has bias.")
+        if isinstance(self.layer, Linear) and self.layer.activation_flag:
+            raise ValueError(f"Only cell without activation is supported, but {linear_name} has activation.")
+
+        if cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
+            self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, False)
+        else:
+            self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, self.is_rowparallel)
+        self.x_quant_max, self.x_quant_min = get_min_max_op(cfg.tp_size, self.is_rowparallel)
+        self.w_sum = get_w_sum_op(cfg.tp_size, self.is_colparallel)
+        self.scale_max, self.scale_min = get_min_max_op(cfg.tp_size, self.is_rowparallel)
+
+        rank = len(linear.weight.shape)
+        self.ic_axis = rank - 1 if linear.transpose_b else rank - 2
+        self.oc_axis = rank - 2 if linear.transpose_b else rank - 1
+        self.oc = linear.weight.shape[self.oc_axis]
+        self.fp16_weight = copy.deepcopy(self._layer.weight)
+
+        self.decoder = kwargs.get("decoder_layer", None)
+        self.args = kwargs.get("layer_args", None)
+        self.kwargs = kwargs.get("layer_kwargs", None)
+
+        self.x_scale_fast = None
+        self.x_zp = None
+        self.deq_scale = None
+        self.quant_forward = False
+
+    def _search_best_scale(self, alpha):
+        """search best scale"""
+        best_scale = self._compute_best_scale(alpha)
+        # pylint: disable=protected-access
+        self.fp16_weight._offload()
+        return best_scale
+
+    def construct(self, x, *args, **kwargs):
+        if self.quant_forward:
+            x = x * self.x_scale_fast + self.x_zp
+            x = msops.round(x)
+            x = msops.clip(x, -128., 127.)
+        self._layer.compute_dtype = msdtype.float32
+        y = self._layer(x, *args, **kwargs)
+        self._layer.compute_dtype = self.compute_type
+        if self.quant_forward:
+            y_zp = (self.x_zp.astype("int32") * self._layer.weight.data.astype("int32")) \
+                .sum(axis=1 if self._layer.transpose_b else 0) \
+                .astype("int32")
+
+            y = (y - y_zp) * self.deq_scale
+            y = msops.cast(y, self.compute_type)
+        return y
+
+    @staticmethod
+    def _x_var_mean(x):
+        return msops.ReduceStd()(x)
+
+    def xrange(self, x, minop, maxop):
+        xmax = msops.abs(maxop(x)[0].reshape(-1)).asnumpy()
+        xmin = msops.abs(minop(x)[0].reshape(-1)).asnumpy()
+        norm = np.maximum(xmax, xmin)
+        std = self._x_var_mean(x)
+        return norm / std
+
+    def check_xrange(self, xold, xnew):
+        range_old = self.xrange(xold, self.x_quant_min, self.x_quant_max)
+        range_new = self.xrange(xnew, self.x_quant_min, self.x_quant_max)
+        logger.error(f"Range of {self.layer_name} before {range_old}, after {range_new}")
+
+    def _compute_best_scale(self, alpha):
+        """compute best scale"""
+        history = []
+        best_ratio = -1
+        best_scale = 0
+        best_error = float("inf")
+
+        group_size = self.cfg.group_size if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP \
+              else self._layer.weight.shape[self.ic_axis]
+
+        fp16_output = self._module_forward(False)
+
+        for ratio in alpha:
+            scales = self._calc_smooth_scale(ratio)
+            self._apply_weight_smooth(scales)
+            xs = self.cat_samples / scales
+            x_scale, x_zp, _ = quant_tensor(xs,
+                                            self.x_quant_min,
+                                            self.x_quant_max,
+                                            self.cfg.act_narrow_range,
+                                            self.cfg.act_symmetric,
+                                            False,
+                                            group_size,
+                                            self.cfg.act_quant_dtype,
+                                            -1,
+                                            False,
+                                            False)
+            w_scale, _, q_weight = quant_tensor(self._layer.weight.data,
+                                                self.w_quant_min,
+                                                self.w_quant_max,
+                                                self.cfg.weight_narrow_range,
+                                                self.cfg.weight_symmetric,
+                                                False,
+                                                group_size,
+                                                self.cfg.weight_quant_dtype,
+                                                self.oc_axis,
+                                                True,
+                                                False)
+            t_w_scale = Tensor(w_scale)
+            if self._layer.transpose_b:
+                t_w_scale = msops.transpose(t_w_scale, (1, 0))
+            self.x_scale_fast = Tensor(x_scale)
+            self.deq_scale = msops.cast((self.x_scale_fast * t_w_scale), msdtype.float32)
+            self.x_scale_fast = msops.cast(1 / (self.x_scale_fast * Tensor(scales)), msdtype.float32)
+            self.x_zp = Tensor(x_zp)
+
+            logger.debug(f"OmniSmoothLinearCell: search scale alpha {ratio}, pesudo weight of Layer({self._layer_name})"
+                         f" is {{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+            self._layer.weight.set_data(msops.cast(q_weight, self.compute_type))
+            quant_output = self._module_forward(True)
+            self._layer.weight.set_data(Tensor(self.fp16_weight.asnumpy(), dtype=self.compute_type))
+
+            loss = self._loss(fp16_output, quant_output)
+            logger.info(f"OmniSmoothLinearCell: search scale alpha {ratio}, scale loss of Layer({self._layer_name}) "
+                        f"is {{{loss.shape}, {loss.dtype}, {loss}}}")
+            history.append(loss)
+            if loss < best_error:
+                best_error = loss
+                best_ratio = ratio
+                best_scale = scales
+        if best_ratio == -1:
+            raise RuntimeError(f"Found no suitablt ratio, please check history of loss: {history}.")
+        logger.info(f"OmniSmoothLinearCell: best scale alpha {best_ratio}, best_error of Layer({self._layer_name}) "
+                    f"is {best_error}")
+        return best_scale
+
+    def _module_forward(self, is_quant=False):
+        self.quant_forward = is_quant
+        results = []
+        for args, kwargs in zip(self.args, self.kwargs):
+            results.append(self.decoder(*args, **kwargs))
+        return results
+
+    def _loss(self, preds, grounds):
+        total_loss = np.array(0.0, np.float64)
+        for pred, ground in zip(preds, grounds):
+            ground = msops.cast(ground, msdtype.float32)
+            pred = msops.cast(pred, msdtype.float32)
+            total_loss += msops.mse_loss(ground, pred, reduction='mean')
+        return total_loss / len(grounds)
+
+    def smooth(self):
+        """smooth"""
+        smooth_alpha = [i/20 for i in range(21)]
+        smooth_scale = self._search_best_scale(smooth_alpha)
+        xs = self.cat_samples * smooth_scale
+        self.check_xrange(self.cat_samples, xs)
+        self._apply_smooth(smooth_scale)
+
+    def process(self):
+        if not self.samples:
+            raise RuntimeError("Please catch matmul inputs before quantization.")
+        self.cat_samples = msops.cat(tuple(self.samples), axis=0)
+        self.smooth()
+        # pylint: disable=protected-access
+        self.layer.weight._offload()
+        self.cat_samples = None
+        self.samples.clear()
 
 
 class AWQSmoothLinearCell(AWQLinearCell):

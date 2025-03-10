@@ -48,6 +48,7 @@ class OutliersSuppressionType(Enum):
     SMOOTH = 'smooth'
     AWQ = 'awq'
     OUTLIER_SUPPRESSION_PLUS = 'outlier-suppression+'
+    OMNIQUANT_GRID = 'omniquant-grid'
     NONE = 'none'
 
     @classmethod
@@ -64,6 +65,8 @@ class OutliersSuppressionType(Enum):
             return OutliersSuppressionType.AWQ
         if name.lower() == 'outlier-suppression+':
             return OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS
+        if name.lower() == 'omniquant-grid':
+            return OutliersSuppressionType.OMNIQUANT_GRID
         return OutliersSuppressionType.NONE
 
 
