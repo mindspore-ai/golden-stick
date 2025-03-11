@@ -16,7 +16,7 @@
 
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
-
+from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 
@@ -24,7 +24,7 @@ from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType, KernelType
+from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType, KernelType, OutlierSuppressionPlusSmoothMatmul
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
@@ -92,9 +92,21 @@ class AllQuantLinearInferCell(LinearInferCell):
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
         use_aclnn_quant = any(opname in layer_name for opname in cfg.aclnn_quant_list)
+        bias_osp = None
+        if isinstance(self.layer.matmul, OutlierSuppressionPlusSmoothMatmul):
+            origin_weight = msops.mul(self._layer.weight, linear.matmul.smooth_scale)
+            bias_osp = msops.matmul(
+                msops.expand_dims(-linear.matmul.beta_osp, 0),
+                (
+                    origin_weight.astype("float32").transpose()
+                    if self._layer.transpose_b
+                    else self._layer.weight.astype("float32")
+                ),
+            )
+            bias_osp = bias_osp.squeeze()
         quant, qmm = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam, is_deploy,
                                            cfg.tp_size, compute_type,
-                                           KernelType.ACLNN if use_aclnn_quant else KernelType.INTERNAL)
+                                           KernelType.ACLNN if use_aclnn_quant else KernelType.INTERNAL, bias_osp)
         if not is_deploy:
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
             logger.debug(f"AllQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")

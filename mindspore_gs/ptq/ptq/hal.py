@@ -17,6 +17,7 @@ import abc
 import dataclasses
 import enum
 from typing import Optional
+import warnings
 
 import numpy as np
 from mindspore import Tensor, dtype
@@ -28,6 +29,7 @@ from mindspore.common.initializer import initializer
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt, GroupedMatmulV4
+from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQMode
@@ -324,6 +326,160 @@ class QuantWithOutlierSuppressionPlusHighPerformance(QuantWithOutlierSuppression
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
 
 
+# for osp of omniquant
+class QuantWithOutlierSuppressionPlusSmooth(QuantUnitCell):
+    """QuantWithOutlierSuppressionPlus"""
+    def __init__(self, layer_name, parallel_type: ParallelType):
+        super().__init__(layer_name)
+        self.parallel_type = parallel_type
+        self.input_scale = None
+        self.input_zp = None
+        self.smooth_scale = None
+        self.beta_osp = None
+
+    @staticmethod
+    def create(
+        layer_name,
+        x_qparam: QuantParam,
+        ic,
+        dst_dtype,
+        is_deploy,
+        parallel_type: ParallelType,
+        smooth_scale,
+        beta_osp,
+        kernel_type: KernelType = KernelType.ASD,
+    ):
+        """create"""
+        if kernel_type in (KernelType.ASD, KernelType.INTERNAL):
+            return QuantWithOutlierSuppressionPlusHighPerformanceSmooth(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, dtype.int8
+            )
+        if kernel_type is KernelType.ACLNN:
+            return QuantWithOutlierSuppressionPlusHighPerformanceSmooth(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, dtype.float16
+            )
+        if kernel_type is KernelType.HIGH_PRECISION:
+            return QuantWithOutlierSuppressionPlusHighPrecisionSmooth(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp
+            )
+        raise RuntimeError(f"Not supported kernel type: {kernel_type}")
+
+    def param_shard_state(self, tensor_parallel_num=1, **kwargs) -> dict:
+        if self.input_scale.shape == (1,) or self.parallel_type == ParallelType.COL_PARALLEL:
+            input_scale_shard = (1,)
+            input_zp_shard = (1,)
+            beta_shard = (1,)
+            smooth_scale_shard = (1,)
+        elif self.parallel_type == ParallelType.ROW_PARALLEL:
+            input_scale_shard = (tensor_parallel_num,)
+            input_zp_shard = (tensor_parallel_num,)
+            beta_shard = (tensor_parallel_num,)
+            smooth_scale_shard = (tensor_parallel_num,)
+        else:
+            return {}
+        return {self.input_scale.name: {'shape': self.input_scale.shape, 'shard': input_scale_shard},
+                self.input_zp.name: {'shape': self.input_zp.shape, 'shard': input_zp_shard},
+                self.smooth_scale.name: {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard},
+                self.beta_osp.name: {'shape': self.beta_osp.shape, 'shard': beta_shard}}
+
+
+class QuantWithOutlierSuppressionPlusHighPrecisionSmooth(QuantWithOutlierSuppressionPlusSmooth):
+    """QuantWithOutlierSuppressionPlusHighPrecisionSmooth"""
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
+                 smooth_scale, beta_osp):
+        super().__init__(layer_name, parallel_type)
+        self.beta_osp = beta_osp
+        self.smooth_scale = smooth_scale.asnumpy()
+        self.dst_dtype = dst_dtype
+        if is_deploy:
+            self.input_scale = Parameter(initializer('ones', (ic,), dtype.float64))
+            self.input_zp = Parameter(initializer('zeros', (ic,), dtype.float64))
+            return
+        # fuse smooth.mul and quant
+        input_scale_np = x_qparam.scale.asnumpy().astype(np.float64)
+        if smooth_scale is not None:
+            final_scale_np = input_scale_np / smooth_scale.astype(np.float64)
+            logger.debug(f"QuantWithSmoothHighPrecision: input scale with smooth scale of Layer({parallel_type}:"
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+        else:
+            if input_scale_np.shape == (1,):  # aclnn quant op not support pertensor
+                final_scale_np = np.tile(input_scale_np, ic)
+                logger.debug(f"QuantWithSmoothHighPrecision: input scale from vector of Layer({parallel_type}:"
+                             f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+            else:
+                final_scale_np = input_scale_np
+                logger.debug(f"QuantWithSmoothHighPrecision: input scale of Layer({parallel_type}:{layer_name}) is "
+                             f"{{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+        self.input_scale = Parameter(Tensor(final_scale_np, dtype=dtype.float64))
+
+        if self.input_scale.shape != x_qparam.zero_point.shape:
+            if isinstance(x_qparam.zero_point, np.number):
+                raise RuntimeError("Shape of scale and zero point are not compatible.")
+            self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.float64), dtype=dtype.float64))
+            logger.debug(f"QuantWithSmoothHighPrecision: input zp from vector of Layer({parallel_type}:{layer_name}) is"
+                         f" {{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp}}}")
+        else:
+            self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=dtype.float64))
+            logger.debug(f"QuantWithSmoothHighPrecision: input zp of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
+
+    def construct(self, x):
+        x = msops.add(x, self.beta_osp)
+        out = x / self.input_scale
+        out = msops.round(out)
+        out = msops.clip(out, -128., 127.)
+        return msops.cast(out, self.dst_dtype)
+
+class QuantWithOutlierSuppressionPlusHighPerformanceSmooth(QuantWithOutlierSuppressionPlusSmooth):
+    """QuantWithOutlierSuppressionPlusHighPerformanceSmooth"""
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
+                 smooth_scale, beta_osp, zp_dtype=dtype.int8):
+        super().__init__(layer_name, parallel_type)
+        self.smooth_scale = smooth_scale.asnumpy()
+        self.quant = QuantV2()
+        self.beta_osp = beta_osp
+        self.is_perchannel = smooth_scale is not None
+        if is_deploy:
+            if not self.is_perchannel:
+                self.input_scale = Parameter(initializer('ones', (1,), dst_dtype))
+                self.input_zp = Parameter(initializer('zeros', (1,), zp_dtype))
+            else:
+                self.input_scale = Parameter(initializer('ones', (ic,), dst_dtype))
+                self.input_zp = Parameter(initializer('zeros', (ic,), zp_dtype))
+            return
+        # fuse smooth.mul and quant
+        input_scale_np = x_qparam.scale.asnumpy().astype(np.float16)
+        if self.is_perchannel:
+            final_scale_np = input_scale_np / smooth_scale.astype(np.float16)
+            logger.debug(f"QuantWithSmoothHighPerformance: input scale with smooth scale of Layer({parallel_type}:"
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+        else:
+            final_scale_np = input_scale_np
+            logger.debug(f"QuantWithSmoothHighPerformance: input scale from vector of Layer({parallel_type}:"
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+        if zp_dtype != dtype.int8: # input_scale need divide 1 for aclnn quant ops
+            self.input_scale = Parameter(Tensor(1 / final_scale_np, dtype=dst_dtype))
+        else:
+            self.input_scale = Parameter(Tensor(final_scale_np, dtype=dst_dtype))
+
+
+        if self.input_scale.shape != x_qparam.zero_point.shape:
+            if isinstance(x_qparam.zero_point, np.number):
+                raise RuntimeError("Shape of scale and zero point are not compatible.")
+            self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.float16), dtype=zp_dtype))
+            logger.debug(f"QuantWithSmoothHighPerformance: input zp from vector of Layer({parallel_type}:{layer_name})"
+                         f" is {{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp}}}")
+        else:
+            self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=zp_dtype))
+            logger.debug(f"QuantWithSmoothHighPerformance: input zp of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
+
+    def construct(self, x):
+        x = msops.add(x, self.beta_osp)
+        return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
+
 class SmoothMatmul(QuantUnitCell):
     """SmoothMatmul"""
     def __init__(self, layer_name, mm, smooth_scale_):
@@ -402,7 +558,6 @@ class SmoothMatmulForDeploy(QuantUnitCell):
             return {}
         return {self.smooth_scale.name: {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}}
 
-
 class OutlierSuppressionPlusMatmulForDeploy(QuantUnitCell):
     """OutlierSuppressionPlusMatmulForDeploy"""
     def __init__(self, layer_name, mm, ic_, compute_dtype_):
@@ -430,6 +585,103 @@ class OutlierSuppressionPlusMatmulForDeploy(QuantUnitCell):
             return {}
         return {self.beta.name: {'shape': self.beta.shape, 'shard': beta_shard}}
 
+class OutlierSuppressionPlusSmoothMatmul(QuantUnitCell):
+    """OutlierSuppressionPlusSmoothMatmul"""
+    def __init__(self, layer_name, mm, smooth_scale_, beta_osp_):
+        super().__init__(layer_name)
+        self.mm = mm
+        self.smooth_scale = Parameter(msops.div(1, smooth_scale_))
+        self.beta_osp = Parameter(beta_osp_)
+        self.is_group_mm = isinstance(mm, GroupedMatmulV4)
+        logger.debug(
+            f"OSPSmoothMatmul: smooth_scale for act of Layer({layer_name}) is {{{self.smooth_scale.shape}, "
+            f"{self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}"
+        )
+
+    def update(self, layer_name, mm, smooth_scale_, beta_):
+        self.layer_name = layer_name
+        self.mm = mm
+        self.smooth_scale.set_data(msops.div(1, smooth_scale_))
+        self.beta_.set_data(beta_)
+
+    @staticmethod
+    def create(layer_name, src, smooth_scale, beta_osp):
+        if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
+            return OutlierSuppressionPlusSmoothMatmul(layer_name, src, smooth_scale, beta_osp)
+        raise ValueError(f"Not support creating OutlierSuppressionPlusSmoothMatmul from {src}.")
+
+    def construct(self, *args, **kwargs):
+        '''
+        adapt operators for beta_osp int osp
+        '''
+        args = list(args)
+        x = args[0][0] if self.is_group_mm else args[0]
+        smooth_scale = msops.cast(self.smooth_scale, x.dtype)
+        beta_osp = msops.cast(self.beta_osp, x.dtype)
+        x = msops.mul(msops.add(x, beta_osp), smooth_scale)
+        if self.is_group_mm:
+            args[0][0] = x
+        else:
+            args[0] = x
+        return self.mm(*args, **kwargs)
+
+    # pylint: disable=arguments-differ
+    def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        if parallel_type == ParallelType.COL_PARALLEL:
+            smooth_scale_shard = (1,)
+            beta_shared = (1,)
+        elif parallel_type == ParallelType.ROW_PARALLEL:
+            smooth_scale_shard = (tensor_parallel_num,)
+            beta_shared = (tensor_parallel_num,)
+        else:
+            return {}
+        shard_state = {self.smooth_scale.name: {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}}
+        shard_state[self.beta_osp.name] = {'shape': self.beta_osp.shape, 'shard': beta_shared}
+        return shard_state
+
+class OutlierSuppressionPlusSmoothMatmulForDeploy(QuantUnitCell):
+    """OutlierSuppressionPlusSmoothMatmulForDeploy"""
+    def __init__(self, layer_name, mm, ic_, compute_dtype_):
+        super().__init__(layer_name)
+        self.mm = mm
+        self.smooth_scale = Parameter(initializer('ones', (ic_,), dtype=compute_dtype_))
+        self.beta_osp = Parameter(initializer('zeros', (ic_,), dtype=compute_dtype_))
+        self.is_group_mm = isinstance(mm, GroupedMatmulV4)
+
+    @staticmethod
+    def create(layer_name, src, ic, compute_dtype):
+        if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
+            return OutlierSuppressionPlusSmoothMatmulForDeploy(layer_name, src, ic, compute_dtype)
+        raise ValueError(f"Not support creating OutlierSuppressionPlusSmoothMatmulForDeploy from {src}.")
+
+    def construct(self, *args, **kwargs):
+        '''
+        adapt operators for beta_osp int osp
+        '''
+        args = list(args)
+        x = args[0][0] if self.is_group_mm else args[0]
+        smooth_scale = msops.cast(self.smooth_scale, x.dtype)
+        beta_osp = msops.cast(self.beta_osp, x.dtype)
+        x = msops.mul(msops.add(x, beta_osp), smooth_scale)
+        if self.is_group_mm:
+            args[0][0] = x
+        else:
+            args[0] = x
+        return self.mm(*args, **kwargs)
+
+    # pylint: disable=arguments-differ
+    def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        if parallel_type == ParallelType.COL_PARALLEL:
+            smooth_scale_shard = (1,)
+            beta_shared = (1,)
+        elif parallel_type == ParallelType.ROW_PARALLEL:
+            smooth_scale_shard = (tensor_parallel_num,)
+            beta_shared = (tensor_parallel_num,)
+        else:
+            return {}
+        shard_state = {self.smooth_scale.name: {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}}
+        shard_state[self.beta_osp.name] = {'shape': self.beta_osp.shape, 'shard': beta_shared}
+        return shard_state
 
 class DynamicQuantMatmul(QuantUnitCell):
     """dynamic quant"""
@@ -848,6 +1100,36 @@ class AllQuantMatmul(QuantUnitCell):
         return q_correction_t
 
     @staticmethod
+    def _correction_into_bias_for_osp_into_bias(
+        linear_mm,
+        quant_weight: Parameter,
+        x_qparam: QuantParam,
+        w_qparam: QuantParam,
+        trans_b,
+        new_bias_need_allreduce,
+        beta_correction,
+    ) -> Tensor:
+        """compute fused bias"""
+        value_check("deploy class name", linear_mm, OutlierSuppressionPlusSmoothMatmul)
+        if quant_weight is None:
+            raise ValueError("quant_weight is None.")
+        x_zp = x_qparam.zero_point.asnumpy()
+        q_correction = -np.sum(x_zp.astype(np.int32) * quant_weight.asnumpy().astype(np.int32),
+                               axis=1 if trans_b else 0).astype(np.int32)
+        dequant_scale = Tensor(np.squeeze(x_qparam.scale.asnumpy() * w_qparam.scale.asnumpy()).astype(np.float64))
+        beta_correction_s = beta_correction / dequant_scale
+        beta_correction = msops.round(beta_correction_s).astype("int32")
+        # add warning  for reduce
+        mean_ratio = msops.ReduceMean()(beta_correction_s / (beta_correction+1e-6))
+        if mean_ratio > 1.1:
+            warn_str = "Bias for osp error is too big!"
+            warnings.warn(warn_str, RuntimeWarning)
+        correction_t = Tensor(q_correction) + beta_correction
+        if new_bias_need_allreduce:
+            correction_t = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(correction_t)
+        return correction_t
+
+    @staticmethod
     def _from_matmul_prim(layer_name, mm, x_qparam: QuantParam, w_qparam: QuantParam, is_deploy, transpose_a=False,
                           transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
                           kernel_type: KernelType = KernelType.ASD):
@@ -898,6 +1180,72 @@ class AllQuantMatmul(QuantUnitCell):
             f'but got {src.mm}.')
 
     @staticmethod
+    def _from_outlier_suppression_plus_smooth_matmul(
+        layer_name,
+        src: OutlierSuppressionPlusSmoothMatmul,
+        x_qparam: QuantParam,
+        w_qparam: QuantParam,
+        is_deploy,
+        transpose_a=False,
+        transpose_b=False,
+        quant_bias=None,
+        dst_dtype=dtype.float16,
+        kernel_type: KernelType = KernelType.ASD,
+    ):
+        """from outlier suppression plus smooth"""
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
+            qmm = AllQuantMatmul.create_self(
+                layer_name,
+                src.mm,
+                is_deploy,
+                x_qparam,
+                w_qparam,
+                transpose_a,
+                transpose_b,
+                quant_bias,
+                dst_dtype,
+                kernel_type,
+            )
+            return qmm, src.smooth_scale, src.beta_osp
+        raise ValueError(
+            f"matmul of OSPSmoothMatmul should be an instance of {msops.MatMul} or {GroupedMatmulV4}, "
+            f"but got {src.mm}."
+        )
+
+    @staticmethod
+    def _from_outlier_suppression_plus_smooth_matmul_for_deploy(
+        layer_name,
+        src: OutlierSuppressionPlusSmoothMatmulForDeploy,
+        x_qparam: QuantParam,
+        w_qparam: QuantParam,
+        is_deploy,
+        transpose_a=False,
+        transpose_b=False,
+        quant_bias=None,
+        dst_dtype=dtype.float16,
+        kernel_type: KernelType = KernelType.ASD,
+    ):
+        """from outlier suppression plus smooth for deploy"""
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
+            qmm = AllQuantMatmul.create_self(
+                layer_name,
+                src.mm,
+                is_deploy,
+                x_qparam,
+                w_qparam,
+                transpose_a,
+                transpose_b,
+                quant_bias,
+                dst_dtype,
+                kernel_type,
+            )
+            return qmm, src.smooth_scale, src.beta_osp
+        raise ValueError(
+            f"matmul of OSPSmoothMatmulForDeploy should be an instance of {msops.MatMul} or {GroupedMatmulV4}, "
+            f"but got {src.mm}."
+        )
+
+    @staticmethod
     def create_self(layer_name, mm, is_deploy, x_qparam: QuantParam, w_qparam: QuantParam, transpose_a=False,
                     transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
                     kernel_type: KernelType = KernelType.ASD):
@@ -911,10 +1259,23 @@ class AllQuantMatmul(QuantUnitCell):
         raise RuntimeError(f"Not supported kernel type: {kernel_type}")
 
     @staticmethod
-    def create(layer_name, linear, parallel_type: ParallelType, q_weight, x_qparam: QuantParam, w_qparam: QuantParam,
-               is_deploy, tp_size, dst_dtype=dtype.float16,
-               kernel_type: KernelType = KernelType.ASD) -> (QuantWithSmooth, 'AllQuantMatmul', Parameter):
-        """create"""
+    def create(
+        layer_name,
+        linear,
+        parallel_type: ParallelType,
+        q_weight,
+        x_qparam: QuantParam,
+        w_qparam: QuantParam,
+        is_deploy,
+        tp_size,
+        dst_dtype=dtype.float16,
+        kernel_type: KernelType = KernelType.ASD,
+        bias_osp=None,
+    ) -> (QuantWithSmooth, "AllQuantMatmul", Parameter):
+        "AllQuantMatmul create"
+        is_osp = isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul)
+        if bias_osp is None and is_osp:
+            raise ValueError("Use OSP but bias_osp is None.")
         trans_a = False
         trans_b = linear.transpose_b
         rank = len(q_weight.shape)
@@ -930,10 +1291,23 @@ class AllQuantMatmul(QuantUnitCell):
         else:
             # fuse bias
             if parallel_type is ParallelType.ROW_PARALLEL:
-                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, tp_size > 1,
-                                                              dst_dtype)
+                if not is_osp:
+                    t_bias = AllQuantMatmul._correction_into_bias(
+                        q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
+                    )
+                else:
+                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                        linear.matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, bias_osp
+                    )
             else:
-                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype)
+                if not is_osp:
+                    t_bias = AllQuantMatmul._correction_into_bias(
+                        q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype
+                    )
+                else:
+                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                        linear.matmul, q_weight, x_qparam, w_qparam, trans_b, False, bias_osp
+                    )
             quant_bias = Parameter(t_bias, name=bias_name)
 
         # create qmm
@@ -962,6 +1336,39 @@ class AllQuantMatmul(QuantUnitCell):
                                                                                         dst_dtype, kernel_type)
             quant = QuantWithOutlierSuppressionPlus.create(layer_name, x_qparam, ic, dst_dtype, is_deploy,
                                                            parallel_type, beta, kernel_type)
+        # for osp of omniquant
+        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul):
+            qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul(
+                layer_name,
+                linear.matmul,
+                x_qparam,
+                w_qparam,
+                is_deploy,
+                trans_a,
+                trans_b,
+                quant_bias,
+                dst_dtype,
+                kernel_type,
+            )
+            quant = QuantWithOutlierSuppressionPlusSmooth.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, kernel_type
+            )
+        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmulForDeploy):
+            qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul_for_deploy(
+                layer_name,
+                linear.matmul,
+                x_qparam,
+                w_qparam,
+                is_deploy,
+                trans_a,
+                trans_b,
+                quant_bias,
+                dst_dtype,
+                kernel_type,
+            )
+            quant = QuantWithOutlierSuppressionPlusSmooth.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, kernel_type
+            )
         else:
             raise ValueError(f"Not support creating AllQuantMatmul from {linear.matmul}.")
         return quant, qmm

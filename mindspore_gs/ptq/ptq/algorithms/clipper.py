@@ -67,8 +67,11 @@ class LinearClipper(Algorithm):
                 if not LinearClipper.linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
+                is_inner_osp = layer_policy.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS \
+                            and layer_policy.use_inner_osp
                 is_satisfied = layer_policy.outliers_suppression == OutliersSuppressionType.AWQ or \
-                    layer_policy.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE
+                    layer_policy.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE or \
+                        is_inner_osp
                 if not layer_policy or not is_satisfied:
                     return cell, False
                 if (any(opname in cell_name for opname in layer_policy.opname_blacklist) or

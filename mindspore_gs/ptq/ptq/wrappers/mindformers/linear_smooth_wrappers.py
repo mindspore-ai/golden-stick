@@ -22,18 +22,19 @@ from types import MethodType
 from typing import Optional
 import numpy as np
 
-from mindspore import Tensor, nn
+from mindspore.common.initializer import initializer
+from mindspore import Tensor, nn, Parameter
 from mindspore import ops as msops
 from mindspore import dtype as msdtype
-from mindspore.communication.management import GlobalComm
 from mindspore.ops.operations.comm_ops import ReduceOp
+from mindspore.communication.management import GlobalComm
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy, OutlierSuppressionPlusMatmulForDeploy
+from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy, OutlierSuppressionPlusMatmulForDeploy, OutlierSuppressionPlusSmoothMatmulForDeploy, OutlierSuppressionPlusSmoothMatmul
 from mindspore_gs.ptq.ptq.algorithms.anti_outliers import LinearSmoothQuant, LinearAutoSmoother
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker, SearchInputs
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
@@ -49,7 +50,7 @@ class SmoothMethod(enum.Enum):
     SMOOTH_QUANT = 1
     AWQ = 2
     AUTO = 3
-    OSP = 4
+    OUTLIER_SUPPRESSION_PLUS = 4
 
 
 class SmoothLinearCell(WrapperLinearCell):
@@ -73,20 +74,26 @@ class SmoothLinearCell(WrapperLinearCell):
     def _get_smooth_method(self):
         raise NotImplementedError
 
-    def _calc_smooth_scale(self, alpha):
+    def _calc_smooth_scale(self, alpha, shift_values=None):
         if self.smooth_method is SmoothMethod.SMOOTH_QUANT:
-            return self._calc_smooth_quant_smooth_scale(alpha)
+            return self._calc_smooth_quant_smooth_scale(alpha, shift_values)
         if self.smooth_method is SmoothMethod.AWQ:
             return self._calc_awq_smooth_scale(alpha)
         raise RuntimeError(f"Unsupported SmoothMethod: {self.smooth_method}")
 
-    def _calc_smooth_quant_smooth_scale(self, alpha):
+    def _calc_smooth_quant_smooth_scale(self, alpha, shift_values=None):
         """_calc_smooth_scale"""
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|input0_alpha", Tensor(alpha))
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|input1_activation_inputs",
                                   self.cat_samples)
-        act_max = msops.maximum(msops.abs(self.x_obs_max(self.cat_samples, 0)[0]),
-                                msops.abs(self.x_obs_min(self.cat_samples, 0)[0]))
+        act_max = msops.maximum(
+            msops.abs(
+                self.x_obs_max(self.cat_samples - shift_values if shift_values is not None else self.cat_samples, 0)[0]
+            ),
+            msops.abs(
+                self.x_obs_min(self.cat_samples - shift_values if shift_values is not None else self.cat_samples, 0)[0]
+            ),
+        )
         logger.debug(f"SmoothLinearCell: act_max of Layer({self._layer_name}) is {{{act_max.shape}, {act_max.dtype}}}")
         input_max_pow = msops.pow(act_max, alpha)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|output0_activation_minmax_pow",
@@ -228,7 +235,7 @@ class SmoothLinearCell(WrapperLinearCell):
         return state_dict
 
     @staticmethod
-    #pylint: disable=W0211
+    # pylint: disable=W0211
     def row_sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
         w_shard = (1, self.tensor_parallel_group_size) if self.transpose_b else (self.tensor_parallel_group_size, 1)
@@ -554,7 +561,6 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         self.cat_samples = None
         self.samples.clear()
 
-
 class AWQSmoothLinearCell(AWQLinearCell):
     """AWQLinearCell"""
 
@@ -784,6 +790,221 @@ class AWQSmoothLinearCell(AWQLinearCell):
         gc.collect()
 
 
+class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearCell):
+    """OutlierSuppressionPlusSmoothLinearCell"""
+
+    @staticmethod
+    def reg_self():
+        class OutlierSuppressionPlusSmoothChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS and \
+                    config.use_inner_osp
+
+        LinearAutoSmoother.reg_layer_map(
+            Linear, OutlierSuppressionPlusSmoothLinearCell, OutlierSuppressionPlusSmoothChecker()
+        )
+        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear,
+                                         OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelLinear,
+                                         OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
+
+    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+        if linear.expert_num and linear.expert_num > 1:
+            self.is_moe = True
+        else:
+            self.is_moe = False
+        self.linear_name = linear_name.split('.')[-1] if not self.is_moe else 'moe|' + linear_name.split('.')[-1]
+        self.ic = linear.weight.shape[self.ic_axis]
+        self.shift_values = Parameter(initializer('ones', (1, self.ic), dtype=msdtype.float32))
+        self.all_bias = None
+        self.osp_bias_t = None
+        self.is_replaced = False
+        if context.algorithm_cache_path:
+            self.enable_cache = True
+        else:
+            self.enable_cache = False
+
+    def _quant_info(self):
+        return "OutlierSuppressionPlus"
+
+    def _get_smooth_method(self):
+        return SmoothMethod.SMOOTH_QUANT
+
+    def construct(self, x, *args, **kwargs):
+        if self.quant_forward:
+            x = (x - self.shift_values) * self.x_scale_fast + self.x_zp
+            x = msops.round(x)
+            x = msops.clip(x, -128., 127.)
+        self._layer.compute_dtype = msdtype.float32
+        y = self._layer(x, *args, **kwargs)
+        self._layer.compute_dtype = self.compute_type
+        if self.is_replaced:
+            y = y + self.osp_bias_t
+        if self.quant_forward:
+            y = y * self.deq_scale + self.all_bias
+            y = msops.cast(y, self.compute_type)
+        return y
+
+    def get_shift_values_for_channel(self, x):
+        max_values = msops.ReduceMax()(x, axis=0)
+        min_values = msops.ReduceMin()(x, axis=0)
+        return (max_values + min_values) / 2
+
+    def _cache_key(self):
+        best_alpha_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|best_alpha'
+        shift_values_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|shift_values'
+        return best_alpha_name, shift_values_name
+
+    def _search_best_scale(self, alpha):
+        """search best scale"""
+        best_alpha_name, shift_values_name = self._cache_key()
+        best_alpha = self.cache.get(best_alpha_name)
+        shift_values = self.cache.get(shift_values_name)
+
+        if best_alpha is not None and shift_values is not None:
+            logger.info(f'layer {self.layer_name} using cached alpha: {best_alpha} and shift values.')
+            self.shift_values.set_data(Tensor(shift_values, dtype=msdtype.float32))
+            best_scale = self._calc_smooth_scale(best_alpha, self.shift_values)
+            logger.info(
+                f"OSPSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name})"
+            )
+        else:
+            best_scale, best_alpha = self._compute_best_scale(alpha)
+            if self.enable_cache:
+                self.cache.put(best_alpha_name, best_alpha)
+                self.cache.put(shift_values_name, self.shift_values.asnumpy())
+        return best_scale
+
+    def _compute_best_scale(self, alpha):
+        """compute best scale"""
+        history = []
+        best_ratio = -1
+        best_scale = 0
+        best_error = float("inf")
+        fp16_weight = copy.deepcopy(self._layer.weight).astype(self.compute_type)
+        # calculate shift_values for cat_samples
+        self.shift_values = self.get_shift_values_for_channel(self.cat_samples)
+        # beta * origin_weight
+        self.osp_bias_t = msops.matmul(
+            msops.expand_dims(self.shift_values, 0),
+            (
+                self._layer.weight.astype("float32").transpose()
+                if self._layer.transpose_b
+                else self._layer.weight.astype("float32")
+            ),
+        )
+        if isinstance(self._layer, RowParallelLinear):
+            self.osp_bias_t = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(self.osp_bias_t)
+
+        group_size = self.cfg.group_size if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP \
+              else self._layer.weight.shape[self.ic_axis]
+        fp16_output = self._module_forward(False)
+        for ratio in alpha:
+            scales = self._calc_smooth_scale(ratio, self.shift_values)
+            self._apply_weight_smooth(scales)
+            xs = (self.cat_samples - self.shift_values) / scales
+            x_scale, x_zp, _ = quant_tensor(xs,
+                                            self.x_quant_min,
+                                            self.x_quant_max,
+                                            self.cfg.act_narrow_range,
+                                            self.cfg.act_symmetric,
+                                            False,
+                                            group_size,
+                                            self.cfg.act_quant_dtype,
+                                            -1,
+                                            False,
+                                            False)
+            w_scale, _, q_weight = quant_tensor(self._layer.weight.data,
+                                                self.w_quant_min,
+                                                self.w_quant_max,
+                                                self.cfg.weight_narrow_range,
+                                                self.cfg.weight_symmetric,
+                                                False,
+                                                group_size,
+                                                self.cfg.weight_quant_dtype,
+                                                self.oc_axis,
+                                                True,
+                                                False)
+            t_w_scale = Tensor(w_scale)
+            if self._layer.transpose_b:
+                t_w_scale = msops.transpose(t_w_scale, (1, 0))
+            self.x_scale_fast = Tensor(x_scale)
+            self.deq_scale = msops.cast((self.x_scale_fast * t_w_scale), msdtype.float32)
+            self.x_scale_fast = msops.cast(1 / (self.x_scale_fast * Tensor(scales)), msdtype.float32)
+            self.x_zp = Tensor(x_zp)
+
+            logger.debug(
+                f"SearchOSPSmoothLinearCell: search scale alpha {ratio}, pesudo weight of Layer({self._layer_name})"
+            )
+            self._layer.weight.set_data(msops.cast(q_weight, self.compute_type))
+            y_zp = q_weight.sum(axis=self.ic_axis, dtype=msdtype.int32) * self.x_zp.astype(msdtype.int32)
+            y_zp_with_deq = y_zp * self.deq_scale
+            if isinstance(self._layer, RowParallelLinear):
+                y_zp_with_deq = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(y_zp_with_deq)
+            self.all_bias = -y_zp_with_deq + self.osp_bias_t
+            quant_output = self._module_forward(True)
+            msops.assign(self._layer.weight, fp16_weight.astype(self.compute_type))
+
+            loss = self._loss(fp16_output, quant_output)
+            logger.info(
+                f"SearchOSPSmoothLinearCell: search alpha {ratio}, loss of Layer({self._layer_name}) is {loss}"
+            )
+            history.append(loss)
+            if loss < best_error:
+                best_error = loss
+                best_ratio = ratio
+                best_scale = scales
+            self.x_scale_fast = None
+            self.deq_scale = None
+            self.x_zp = None
+            self.y_zp = None
+            self.all_bias = None
+            gc.collect()
+
+        del fp16_weight
+        del fp16_output
+        del scales
+        del xs
+        del x_scale
+        del x_zp
+        del w_scale
+        del q_weight
+        del t_w_scale
+        del quant_output
+        gc.collect()
+        if best_ratio == -1:
+            raise RuntimeError(f"Found no suitablt ratio, please check history of loss: {history}.")
+        logger.info(f"SearchOSPSmoothLinearCell: best scale alpha {best_ratio},best_error of Layer({self._layer_name})"
+                    f"is {best_error}")
+        return best_scale, best_ratio
+
+    def _apply_act_smooth(self, smooth_scale: Tensor):
+        """_apply_act_smooth"""
+        if isinstance(self._layer.matmul, OutlierSuppressionPlusSmoothMatmul):
+            self._layer.matmul.update(self._layer_name, self._layer.matmul.mm, smooth_scale, -self.shift_values)
+        else:
+            self._layer.matmul = OutlierSuppressionPlusSmoothMatmul.create(
+                self._layer_name, self._layer.matmul, smooth_scale=smooth_scale, beta_osp=-self.shift_values
+            )
+        self.is_replaced = True
+
+    def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
+        """_apply_act_smooth_by_insert_op_for_deploy"""
+        self._layer.matmul = OutlierSuppressionPlusSmoothMatmulForDeploy.create(
+            self._layer_name, self._layer.matmul, ic=ic, compute_dtype=compute_dtype
+        )
+
+    def smooth(self):
+        """smooth"""
+        smooth_alpha = [i/20 for i in range(21)]
+        smooth_scale = self._search_best_scale(smooth_alpha)
+        xs = self.cat_samples * smooth_scale
+        self.check_xrange(self.cat_samples, xs)
+        self._apply_smooth(smooth_scale)
+
 class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
     """SmoothQuantPlusLinearCell"""
 
@@ -791,7 +1012,8 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
     def reg_self():
         class OutlierSuppressionPlusChecker(Checker):
             def check(self, config: InnerPTQConfig):
-                return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS
+                return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS and \
+                    not config.use_inner_osp
 
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusLinearCell, OutlierSuppressionPlusChecker())
         LinearAutoSmoother.reg_layer_map(ColumnParallelLinear,
@@ -804,7 +1026,7 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
         return "OutlierSuppressionPlus"
 
     def _get_smooth_method(self):
-        return SmoothMethod.OSP
+        return SmoothMethod.OUTLIER_SUPPRESSION_PLUS
 
     def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
         """_apply_act_smooth_by_insert_op_for_deploy"""
