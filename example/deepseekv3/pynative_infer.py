@@ -21,7 +21,6 @@ import tqdm
 from mindspore.nn import Cell
 from mindspore import Tensor, mint, ops
 
-from mindspore_gs import PTQMode
 from mindspore_gs.common.utils import offload_network, value_check
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.common import logger
@@ -29,12 +28,12 @@ from mindspore_gs.ptq.ptq.quant import InputCatcher
 
 from mindformers.experimental.infer.core.norm import RMSNorm
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear
-
 from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
-
 from utils import create_network
 
+
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']
+
 
 def get_network_layers(network: Cell):
     """
@@ -114,8 +113,7 @@ def generate_input_id(network, layers, input_ids):
 
 def pynative_generate(yaml_file, quant_type, auto_online_trans):
     """pynative_generate"""
-    tokenizer, network = create_network(yaml_file, quant_type=quant_type, quant_mode=PTQMode.DEPLOY,
-                                        auto_online_trans=auto_online_trans)
+    tokenizer, network = create_network(yaml_file, quant_type=quant_type, auto_online_trans=auto_online_trans)
     layers = get_network_layers(network)
     multi_inputs = []
     for question in input_questions:

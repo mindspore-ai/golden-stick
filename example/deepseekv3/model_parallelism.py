@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-
 """
 transform huggingface safetensor.
 """
+
 from safetensors import safe_open
 from mindspore.communication.management import get_rank, get_group_size
 
@@ -35,7 +35,7 @@ class BaseModelParallelism:
         self.is_quant = is_quant
 
     def get_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map, is_split_param=False, split_axis=0):
-        '''get_safetensor_from_file'''
+        """get_safetensor_from_file"""
         tp_group_size = get_group_size()
         rank_id = get_rank()
         safetensor_file = hf_weight_map[hf_param_name]
@@ -61,7 +61,7 @@ class BaseModelParallelism:
             return split_data
 
     def split_weight_by_rank(self, weight, split_axis=0):
-        '''split_weight_by_rank'''
+        """split_weight_by_rank"""
         tp_group_size = get_group_size()
         rank_id = get_rank()
         shape = weight.shape

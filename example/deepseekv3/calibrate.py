@@ -20,19 +20,12 @@ import argparse
 
 import mindspore as ms
 from mindspore.communication import get_rank
-from mindformers import MindFormerConfig
-from mindformers import build_context
-from mindformers.core.parallel_config import build_parallel_config
-from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq import PTQMode
-
-from research.deepseek3.deepseek3_config import DeepseekV3Config
-
-from utils import create_network, create_ptq
+from utils import create_ptq, create_network
 
 
 def get_args():
@@ -86,23 +79,6 @@ def quant_net(net, network_helper, ptq, ds):
 
 if __name__ == "__main__":
     uargs = get_args()
-    mfconfig = MindFormerConfig(uargs.config)
-    build_context(mfconfig)
-    build_parallel_config(mfconfig)
-    model_config = mfconfig.model.model_config
-    model_config.parallel_config = mfconfig.parallel_config
-    model_config.moe_config = mfconfig.moe_config
-    model_config = DeepseekV3Config(**model_config)
-
-    tokenizer = LlamaTokenizerFast(mfconfig.processor.tokenizer.vocab_file,
-                                   mfconfig.processor.tokenizer.tokenizer_file,
-                                   unk_token=mfconfig.processor.tokenizer.unk_token,
-                                   bos_token=mfconfig.processor.tokenizer.bos_token,
-                                   eos_token=mfconfig.processor.tokenizer.eos_token,
-                                   fast_tokenizer=True, trust_remote_code=True)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    model_name = mfconfig.trainer.model_name
     helper = MFDSV3Helper(uargs.config)
     start = time.time()
     print('Creating network...', flush=True)
@@ -119,7 +95,7 @@ if __name__ == "__main__":
     except RuntimeError:
         rank_id = 0
 
-    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{model_name}_{uargs.approach}_safetensors")
+    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"DeepseekV3_{uargs.approach}_safetensors")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}"),

@@ -17,6 +17,7 @@ from functools import partial
 from typing import List, Union, Tuple, Optional
 from collections import OrderedDict
 import time
+import gc
 import os
 import copy
 import tqdm
@@ -321,6 +322,9 @@ class PTQ(CompAlgo):
                 processor.deploy(layer_name, layer)
                 network.update_parameters_name()
                 logger.info(f"{i}th layer do {type(processor)} time cost {time.time() - start_time}")
+                start_time = time.time()
+                gc.collect()
+                logger.info(f"{i}th layer do {type(processor)} gc time cost {time.time() - start_time}")
             if self._config.reflash_inputs_after_each_processor:
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):

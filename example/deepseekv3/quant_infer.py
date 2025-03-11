@@ -13,16 +13,17 @@
 # limitations under the License.
 # ============================================================================
 """ds infer."""
+
 import argparse
 from utils import create_network
-from mindspore_gs.ptq import PTQMode
+
 
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']
 
+
 def infer(yaml_file, quant_type):
     """infer"""
-    tokenizer, network = create_network(yaml_file, auto_online_trans=False, quant_type=quant_type,
-                                        quant_mode=PTQMode.DEPLOY)
+    tokenizer, network = create_network(yaml_file, auto_online_trans=False, quant_type=quant_type)
     multi_inputs = []
     for question in input_questions:
         message = [
