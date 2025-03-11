@@ -20,11 +20,8 @@ import argparse
 
 import mindspore as ms
 from mindspore.communication import get_rank
-from mindspore import Model, Tensor
-from mindspore.common import initializer
 from mindformers import MindFormerConfig
 from mindformers import build_context
-from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.core.parallel_config import build_parallel_config
 from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 
@@ -32,16 +29,16 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq import PTQMode
-from utils import create_ptq
 
-from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
+
+from utils import create_network, create_ptq
 
 
 def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', '-c', type=str, required=True)
+    parser.add_argument('--config', '-c', type=str, required=True)
     parser.add_argument('--approach', '-q', type=str, required=True,
                         help="Available: awq-a16w8, awq-a16w4, smoothquant, dsquant, w8a16, w8a8-dyn")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
@@ -84,13 +81,12 @@ def quant_net(net, network_helper, ptq, ds):
     ptq.convert(net)
     logger.info(f'Convert to real quantize cost time is {time.time() - start_time} s.')
     logger.info(f'Quant Network cost total time is {time.time() - quant_start} s.')
-    ptq.summary(net)
     return net
 
 
 if __name__ == "__main__":
     uargs = get_args()
-    mfconfig = MindFormerConfig(uargs.config_path)
+    mfconfig = MindFormerConfig(uargs.config)
     build_context(mfconfig)
     build_parallel_config(mfconfig)
     model_config = mfconfig.model.model_config
@@ -106,19 +102,11 @@ if __name__ == "__main__":
                                    fast_tokenizer=True, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
 
-    network = DeepseekV3ForCausalLM(model_config)
-    ms_model = Model(network)
-    if mfconfig.load_checkpoint:
-        seq_length = model_config.seq_length
-        input_ids = Tensor(shape=(model_config.batch_size, seq_length), dtype=ms.int32, init=initializer.One())
-        infer_data = network.prepare_inputs_for_predict_layout(input_ids)
-        transform_and_load_checkpoint(mfconfig, ms_model, network, infer_data, do_predict=True)
-
     model_name = mfconfig.trainer.model_name
-    helper = MFDSV3Helper(uargs.config_path)
+    helper = MFDSV3Helper(uargs.config)
     start = time.time()
     print('Creating network...', flush=True)
-    network = helper.create_network()
+    _, network = create_network(uargs.config, auto_online_trans=True)
     algo = create_ptq(uargs.approach, PTQMode.QUANTIZE)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     logger.info(f'Create Network cost time is {time.time() - start} s.')

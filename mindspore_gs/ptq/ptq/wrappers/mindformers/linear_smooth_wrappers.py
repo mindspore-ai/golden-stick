@@ -94,8 +94,12 @@ class SmoothLinearCell(WrapperLinearCell):
                                   Tensor(weight_smooth_minmax_axis))
         weight_max = msops.maximum(msops.abs(self.w_obs_max(self.layer.weight, weight_smooth_minmax_axis)[0]),
                                    msops.abs(self.w_obs_min(self.layer.weight, weight_smooth_minmax_axis)[0]))
+        if len(weight_max.shape) == 2:
+            weight_max = self.w_obs_max(weight_max, 0)[0]
+        elif len(weight_max.shape) > 2:
+            raise RuntimeError(f'Not support rank of weight bigger than 3, got {len(weight_max.shape)}.')
         logger.debug(f"SmoothLinearCell: weight_max of Layer({self._layer_name}) is {{{weight_max.shape}, "
-                     f"{act_max.dtype}, {weight_max.asnumpy()}}}")
+                     f"{weight_max.dtype}, {weight_max.asnumpy()}}}")
         weight_max_pow = msops.pow(weight_max, 1 - alpha)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|output0_weight_max_pow", weight_max_pow)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|input0_input_max_pow", input_max_pow)

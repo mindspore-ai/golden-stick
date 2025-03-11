@@ -14,7 +14,6 @@
 # ============================================================================
 """Algorithm base class."""
 import re
-import warnings
 import copy
 from typing import Tuple
 
@@ -108,13 +107,6 @@ class Algorithm:
                     return cell, False
                 deploy_cell = cell.deploy()
                 logger.info(f"convert {cell_name} to real-quant cell({type(deploy_cell)}).")
-                nonlocal changed
-                changed = True
                 return deploy_cell, True
 
-        changed = False
         Deployer().process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = "No layer found in network is suitable for quantization, please check network and " \
-                       "opname_blacklist, and make sure call apply before convert."
-            warnings.warn(warn_str, RuntimeWarning)

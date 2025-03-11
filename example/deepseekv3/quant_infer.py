@@ -21,7 +21,7 @@ input_questions = ['介绍下北京故宫', 'I love Beijing, because']
 
 def infer(yaml_file, quant_type):
     """infer"""
-    tokenizer, network = create_network(yaml_file, is_quant=True, auto_online_trans=False, quant_type=quant_type,
+    tokenizer, network = create_network(yaml_file, auto_online_trans=False, quant_type=quant_type,
                                         quant_mode=PTQMode.DEPLOY)
     multi_inputs = []
     for question in input_questions:

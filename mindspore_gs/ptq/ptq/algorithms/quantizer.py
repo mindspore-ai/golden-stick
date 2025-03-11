@@ -1,4 +1,4 @@
-# Copyright 2024 Huawei Technologies Co., Ltd
+# Copyright 2024-2025 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,8 +78,9 @@ class Quantizer(Algorithm):
                 if not Quantizer.layer_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if (not layer_policy or not self._is_quant(layer_policy) or
-                        any(opname in cell_name for opname in layer_policy.opname_blacklist)):
+                if not layer_policy or not self._is_quant(layer_policy):
+                    return cell, False
+                if any(opname in cell_name for opname in layer_policy.opname_blacklist):
                     logger.info(f"{cell_name} is in blacklist, keep not being quant.")
                     return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
@@ -89,15 +90,9 @@ class Quantizer(Algorithm):
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                nonlocal changed
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with quant cell {wrapper_cell_type}.")
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to quantize, please check network and opname_blacklist."
-            logger.warning(warn_str)

@@ -354,6 +354,7 @@ class SmoothMatmulForDeploy(QuantUnitCell):
         super().__init__(layer_name)
         self.mm = mm
         self.smooth_scale = Parameter(initializer('ones', (ic_,), dtype=compute_dtype_))
+        self.is_group_mm = isinstance(mm, GroupedMatmulV4)
 
     @staticmethod
     def _from_matmul_prim(layer_name, src: msops.MatMul, ic, compute_dtype):
