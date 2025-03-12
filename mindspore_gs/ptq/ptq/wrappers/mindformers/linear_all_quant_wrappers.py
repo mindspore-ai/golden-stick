@@ -14,7 +14,6 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 
-from mindspore import ops as msops
 from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 
@@ -25,8 +24,7 @@ from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq.hal import (QuantParam, AllQuantMatmul, ParallelType, KernelType,
-                                      OutlierSuppressionPlusMatmulForDeploy)
+from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType, KernelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
@@ -93,25 +91,13 @@ class AllQuantLinearInferCell(LinearInferCell):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
-        quant, qmm, bias = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam,
-                                                 is_deploy, cfg.tp_size, compute_type, KernelType.INTERNAL)
+        quant, qmm = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam, is_deploy,
+                                           cfg.tp_size, compute_type, KernelType.INTERNAL)
         if not is_deploy:
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
             logger.debug(f"AllQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"AllQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-            logger.debug(f"AllQuantLinearInferCell: bias with correction of Layer("
-                         f"{parallel_type}:{layer_name}) is {{{bias.shape}, {bias.dtype}, {bias.asnumpy()}}}")
         self._set_act_quant(quant)
-        if linear.has_bias is False:
-            self.layer.has_bias = True
-            self.layer.has_quant_bias = False
-            self.layer.bias_add = msops.Add()
-        if isinstance(self.layer.matmul, OutlierSuppressionPlusMatmulForDeploy):
-            self.layer.has_bias = False
-            self.layer.has_quant_bias = True
-            qmm.quant_bias = bias
-        else:
-            self.layer.bias = bias
         self.layer.matmul = qmm
         self.layer.weight = q_weight

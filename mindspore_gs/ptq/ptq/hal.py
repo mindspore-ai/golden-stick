@@ -734,52 +734,58 @@ class AllQuantMatmul(QuantUnitCell):
 
     @staticmethod
     def _correction_into_bias(quant_weight: Parameter, x_qparam: QuantParam, w_qparam: QuantParam, trans_b,
-                              new_bias_need_allreduce, dst_dtype, origin_bias: Optional[Parameter] = None) -> Tensor:
+                              new_bias_need_allreduce, dst_dtype) -> Tensor:
         """compute fused bias"""
         if quant_weight is None:
             raise ValueError("quant_weight is None.")
         x_zp = x_qparam.zero_point.asnumpy()
         q_correction = -np.sum(x_zp.astype(np.int32) * quant_weight.asnumpy().astype(np.int32),
-                               axis=1 if trans_b else 0).astype(np.int32)
+                               axis=-1 if trans_b else -2).astype(np.int32)
         if new_bias_need_allreduce:
             t_q_correction = Tensor(q_correction)
             t_q_correction = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(t_q_correction)
             q_correction = t_q_correction.asnumpy()
-        dequant_scale = np.squeeze(x_qparam.scale.asnumpy() * w_qparam.scale.asnumpy()).astype(np.float64)
-        correction = q_correction.astype(np.float64) * dequant_scale
-        if origin_bias is not None:
-            return Tensor(origin_bias.asnumpy().astype(np.float64) + correction, dtype=dst_dtype)
-        return Tensor(correction, dtype=dst_dtype)
+
+        # for align precision
+        deq_scale_np = (x_qparam.scale.asnumpy() * w_qparam.scale.asnumpy()).astype(np.float64)
+        q_correction = q_correction.astype(np.float64) * deq_scale_np
+        q_correction_t = Tensor(q_correction, dtype=dst_dtype)
+        deq_scale_t = x_qparam.scale.astype(np.float32) * w_qparam.scale.astype(np.float32)
+        q_correction_t = msops.round(q_correction_t / deq_scale_t).astype(dtype.int32)
+
+        return q_correction_t
 
     @staticmethod
-    def _from_matmul_prim(layer_name, x_qparam: QuantParam, w_qparam: QuantParam, is_deploy, transpose_a=False,
-                          transpose_b=False, dst_dtype=dtype.float16, kernel_type: KernelType = KernelType.ASD):
-        return AllQuantMatmul.create_self(layer_name, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                          dst_dtype, kernel_type), None
+    def _from_matmul_prim(layer_name, mm, x_qparam: QuantParam, w_qparam: QuantParam, is_deploy, transpose_a=False,
+                          transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
+                          kernel_type: KernelType = KernelType.ASD):
+        return AllQuantMatmul.create_self(layer_name, mm, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
+                                          quant_bias, dst_dtype, kernel_type), None
 
     @staticmethod
     def _from_matmul_cell(layer_name, src: MatmulCellForHook, x_qparam: QuantParam, w_qparam: QuantParam, is_deploy,
-                          transpose_a=False, transpose_b=False, dst_dtype=dtype.float16,
+                          transpose_a=False, transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
                           kernel_type: KernelType = KernelType.ASD):
-        if not isinstance(src.mm, msops.MatMul):
+        if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             raise ValueError(
-                f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        return AllQuantMatmul.create_self(layer_name, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                          dst_dtype, kernel_type), None
+                f'matmul of MatmulCellForHook should be an instance of {msops.MatMul} or {GroupedMatmulV4}, '
+                f'but got {src.mm}.')
+        return AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
+                                          quant_bias, dst_dtype, kernel_type), None
 
     @staticmethod
     def _from_smooth_matmul(layer_name, src: SmoothMatmul, x_qparam: QuantParam, w_qparam: QuantParam, is_deploy,
-                            transpose_a=False, transpose_b=False, dst_dtype=dtype.float16,
+                            transpose_a=False, transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
                             kernel_type: KernelType = KernelType.ASD):
         """_from_smooth_matmul"""
         smooth_scale = src.smooth_scale.asnumpy()
         if isinstance(src.mm, msops.MatMul):
-            qmm = AllQuantMatmul.create_self(layer_name, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                             dst_dtype, kernel_type)
+            qmm = AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a,
+                                             transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, smooth_scale
         if isinstance(src.mm, MatmulCellForHook):
             qmm, _ = AllQuantMatmul._from_matmul_cell(layer_name, src.mm, x_qparam, w_qparam, is_deploy, transpose_a,
-                                                      transpose_b, dst_dtype, kernel_type)
+                                                      transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, smooth_scale
         raise ValueError(
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
@@ -787,16 +793,17 @@ class AllQuantMatmul(QuantUnitCell):
     @staticmethod
     def _from_smooth_matmul_for_deploy(layer_name, src: SmoothMatmulForDeploy, x_qparam: QuantParam,
                                        w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
-                                       dst_dtype=dtype.float16, kernel_type: KernelType = KernelType.ASD):
+                                       quant_bias=None, dst_dtype=dtype.float16,
+                                       kernel_type: KernelType = KernelType.ASD):
         """_from_smooth_matmul_for_deploy"""
         smooth_scale = src.smooth_scale.asnumpy()
-        if isinstance(src.mm, msops.MatMul):
-            qmm = AllQuantMatmul.create_self(layer_name, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                             dst_dtype, kernel_type)
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
+            qmm = AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a,
+                                             transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, smooth_scale
         if isinstance(src.mm, MatmulCellForHook):
             qmm, _ = AllQuantMatmul._from_matmul_cell(layer_name, src.mm, x_qparam, w_qparam, is_deploy, transpose_a,
-                                                      transpose_b, dst_dtype, kernel_type)
+                                                      transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, smooth_scale
         raise ValueError(
             f'matmul of SmoothMatmulForDeploy should be an instance of {msops.MatMul} or {MatmulCellForHook}, '
@@ -805,30 +812,33 @@ class AllQuantMatmul(QuantUnitCell):
     @staticmethod
     def _from_outlier_suppression_plus_matmul_for_deploy(layer_name, src: OutlierSuppressionPlusMatmulForDeploy,
                                                          x_qparam: QuantParam, w_qparam: QuantParam, is_deploy,
-                                                         transpose_a=False, transpose_b=False, dst_dtype=dtype.float16,
+                                                         transpose_a=False, transpose_b=False, quant_bias=None,
+                                                         dst_dtype=dtype.float16,
                                                          kernel_type: KernelType = KernelType.ASD):
         """from outlier suppression plus for deploy"""
         if isinstance(src.mm, msops.MatMul):
-            qmm = AllQuantMatmul.create_self(layer_name, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                             dst_dtype, kernel_type)
+            qmm = AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a,
+                                             transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, src.beta
         if isinstance(src.mm, MatmulCellForHook):
             qmm, _ = AllQuantMatmul._from_matmul_cell(layer_name, src.mm, x_qparam, w_qparam, is_deploy, transpose_a,
-                                                      transpose_b, dst_dtype, kernel_type)
+                                                      transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, src.beta
         raise ValueError(
             f'matmul of SmoothMatmulForDeploy should be an instance of {msops.MatMul} or {MatmulCellForHook}, '
             f'but got {src.mm}.')
 
     @staticmethod
-    def create_self(layer_name, is_deploy, x_qparam: QuantParam, w_qparam: QuantParam, transpose_a=False,
-                    transpose_b=False, dst_dtype=dtype.float16, kernel_type: KernelType = KernelType.ASD):
+    def create_self(layer_name, mm, is_deploy, x_qparam: QuantParam, w_qparam: QuantParam, transpose_a=False,
+                    transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
+                    kernel_type: KernelType = KernelType.ASD):
+        """create_self"""
         if kernel_type in (KernelType.ASD, KernelType.ACLNN, KernelType.INTERNAL):
-            return AllQuantMatmulHighPerformance(layer_name, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                                 dst_dtype)
+            return AllQuantMatmulHighPerformance(layer_name, mm, is_deploy, x_qparam, w_qparam, transpose_a,
+                                                 transpose_b, quant_bias, dst_dtype)
         if kernel_type is KernelType.HIGH_PRECISION:
-            return AllQuantMatmulHighPrecision(layer_name, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                               dst_dtype)
+            return AllQuantMatmulHighPrecision(layer_name, mm, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
+                                               quant_bias, dst_dtype)
         raise RuntimeError(f"Not supported kernel type: {kernel_type}")
 
     @staticmethod
@@ -841,56 +851,57 @@ class AllQuantMatmul(QuantUnitCell):
         rank = len(q_weight.shape)
         ic_idx, oc_idx = (rank - 1, rank - 2) if trans_b else (rank - 2, rank - 1)
         ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
+
+        # dequant offset
+        bias_name = linear.bias.name if linear.has_bias else q_weight.name + "_bias"
+        if is_deploy:
+            export_num = q_weight.shape[0] if len(q_weight.shape) == 3 else None
+            bias_shape = (export_num, oc) if export_num else (oc,)
+            quant_bias = Parameter(initializer("zeros", bias_shape, dtype.int32), name=bias_name)
+        else:
+            # fuse bias
+            if parallel_type is ParallelType.ROW_PARALLEL:
+                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, tp_size > 1,
+                                                              dst_dtype)
+            else:
+                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype)
+            quant_bias = Parameter(t_bias, name=bias_name)
+
         # create qmm
         if isinstance(linear.matmul, msops.MatMul):
-            qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(layer_name, x_qparam, w_qparam, is_deploy, trans_a,
-                                                                 trans_b, dst_dtype, kernel_type)
+            qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(layer_name, linear.matmul, x_qparam, w_qparam,
+                                                                 is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
+                                                                 kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
                                            kernel_type)
         elif isinstance(linear.matmul, MatmulCellForHook):
             qmm, smooth_scale = AllQuantMatmul._from_matmul_cell(layer_name, linear.matmul, x_qparam, w_qparam,
-                                                                 is_deploy, trans_a, trans_b, dst_dtype, kernel_type)
+                                                                 is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
+                                                                 kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
                                            kernel_type)
         elif isinstance(linear.matmul, SmoothMatmul):
             qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul(layer_name, linear.matmul, x_qparam, w_qparam,
-                                                                   is_deploy, trans_a, trans_b, dst_dtype, kernel_type)
+                                                                   is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
+                                                                   kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
                                            kernel_type)
         elif isinstance(linear.matmul, SmoothMatmulForDeploy):
             qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, x_qparam,
                                                                               w_qparam, is_deploy, trans_a, trans_b,
-                                                                              dst_dtype, kernel_type)
+                                                                              quant_bias, dst_dtype, kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
                                            kernel_type)
         elif isinstance(linear.matmul, OutlierSuppressionPlusMatmulForDeploy):
             qmm, beta = AllQuantMatmul._from_outlier_suppression_plus_matmul_for_deploy(layer_name, linear.matmul,
                                                                                         x_qparam, w_qparam, is_deploy,
-                                                                                        trans_a, trans_b,
+                                                                                        trans_a, trans_b, quant_bias,
                                                                                         dst_dtype, kernel_type)
             quant = QuantWithOutlierSuppressionPlus.create(layer_name, x_qparam, ic, dst_dtype, is_deploy,
                                                            parallel_type, beta, kernel_type)
         else:
             raise ValueError(f"Not support creating AllQuantMatmul from {linear.matmul}.")
-
-        # correction into bias
-        bias_name = linear.bias.name if linear.has_bias else q_weight.name + "_bias"
-        if is_deploy:
-            if not isinstance(linear.matmul, OutlierSuppressionPlusMatmulForDeploy):
-                bias = Parameter(initializer("zeros", (oc,), dst_dtype), name=bias_name)
-            else:
-                bias = Parameter(initializer("zeros", (oc,), dtype.int32), name=bias_name)
-        else:
-            # fuse bias
-            origin_bias = linear.bias if linear.has_bias else None
-            if parallel_type is ParallelType.ROW_PARALLEL:
-                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, tp_size > 1,
-                                                              dst_dtype, origin_bias)
-            else:
-                t_bias = AllQuantMatmul._correction_into_bias(q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype,
-                                                              origin_bias)
-            bias = Parameter(t_bias, name=bias_name)
-        return quant, qmm, bias
+        return quant, qmm
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
@@ -903,15 +914,21 @@ class AllQuantMatmul(QuantUnitCell):
         shard_state = {self.dequant_scale.name: {'shape': self.dequant_scale.shape, 'shard': q_shard}}
         if self.offset is not None:
             shard_state[self.offset.name] = {'shape': self.offset.shape, 'shard': q_shard}
+        if self.quant_bias is not None:
+            shard_state[self.quant_bias.name] = {'shape': self.quant_bias.shape, 'shard': q_shard}
+
         return shard_state
 
 
 class AllQuantMatmulHighPrecision(AllQuantMatmul):
     """AllQuantMatmulHighPrecision"""
 
-    def __init__(self, layer_name, is_deploy, x_qparam: QuantParam, w_qparam: QuantParam, transpose_a=False,
-                 transpose_b=False, dst_dtype=dtype.float16):
+    def __init__(self, layer_name, mm, is_deploy, x_qparam: QuantParam, w_qparam: QuantParam, transpose_a=False,
+                 transpose_b=False, quant_bias=None, dst_dtype=dtype.float16):
         super().__init__(layer_name, transpose_b, dst_dtype)
+        if not isinstance(mm, msops.MatMul):
+            raise RuntimeError(f"AllQuantMatmulHighPrecision only support mm in linear with type {msops.MatMul}, "
+                               f"but got {type(mm)}.")
         self.transpose_a = transpose_a
         if is_deploy:
             self.dequant_scale = Parameter(initializer('ones', w_qparam.scale.shape, dtype.float64))
@@ -931,6 +948,8 @@ class AllQuantMatmulHighPrecision(AllQuantMatmul):
                 logger.debug(f"AllQuantMatmulHighPrecision: offset of Layer({layer_name}) is {{{self.offset.shape}, "
                              f"{self.offset.dtype}, {self.offset.asnumpy()}}}")
 
+        self.quant_bias = quant_bias
+
     def construct(self, qx, quant_weight):
         """construct"""
         qx = msops.cast(qx, dtype.float64)
@@ -940,6 +959,8 @@ class AllQuantMatmulHighPrecision(AllQuantMatmul):
         if self.transpose_b:
             quant_weight = msops.transpose(quant_weight, (1, 0))
         mm = msops.matmul(qx, quant_weight)
+        if self.quant_bias:
+            mm = mm + msops.cast(self.quant_bias, dtype.float64)
         output = mm * self.dequant_scale
         if self.has_offset:
             output = output + self.offset
@@ -949,10 +970,22 @@ class AllQuantMatmulHighPrecision(AllQuantMatmul):
 class AllQuantMatmulHighPerformance(AllQuantMatmul):
     """AllQuantMatmulHighPerformance"""
 
-    def __init__(self, layer_name, is_deploy, x_qparam: QuantParam, w_qparam: QuantParam, transpose_a=False,
-                 transpose_b=False, dst_dtype=dtype.float16):
+    def __init__(self, layer_name, mm, is_deploy, x_qparam: QuantParam, w_qparam: QuantParam, transpose_a=False,
+                 transpose_b=False, quant_bias=None, dst_dtype=dtype.float16):
         super().__init__(layer_name, transpose_b, dst_dtype)
-        scale_dtype = dtype.float32 if self.dst_dtype == dtype.bfloat16 else dtype.int64
+        if isinstance(mm, GroupedMatmulV4):
+            self.is_group_mm = True
+        elif isinstance(mm, msops.MatMul):
+            self.is_group_mm = False
+        else:
+            raise RuntimeError(f'Not supported mm type: {type(mm)}.')
+        self.quant_bias = quant_bias
+
+        if self.is_group_mm:
+            scale_dtype = dtype.bfloat16 if self.dst_dtype == dtype.bfloat16 else dtype.int64
+        else:
+            scale_dtype = dtype.float32 if self.dst_dtype == dtype.bfloat16 else dtype.int64
+
         if is_deploy:
             self.dequant_scale = Parameter(initializer('ones', w_qparam.scale.shape, scale_dtype))
         else:
@@ -962,14 +995,16 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
             logger.debug(f"AllQuantMatmul: dequant_scale of Layer({layer_name}) is "
                          f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}, {self.dequant_scale.asnumpy()}}}")
 
-        self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=self.dst_dtype)
-        if w_qparam.zero_point is None:
-            self.offset = None
+        if self.is_group_mm:
+            self.gmm = GroupedMatmulV4()
         else:
-            self.offset = Parameter(Tensor(w_qparam.zero_point, dtype=dtype.float32))
-            if not is_deploy:
-                logger.debug(f"AllQuantMatmul: offset of Layer({layer_name}) is {{{self.offset.shape}, "
-                             f"{self.offset.dtype}, {self.offset.asnumpy()}}}")
+            self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=self.dst_dtype)
+
+        self.offset = None
+
+        if self.is_group_mm:
+            self.g_offset = [self.offset] if self.offset is not None else None
+            self.g_quant_bias = [self.quant_bias] if self.quant_bias is not None else None
 
     @staticmethod
     def _compute_dequant_scale(input_scale, weight_scale, dst_dtype):
@@ -982,9 +1017,13 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
         scale_i64 = NumpyQuantOps.trans_fp32_to_i64(dequant_scale)
         return scale_i64
 
-    def construct(self, qx, quant_weight):
+    def construct(self, qx, quant_weight, group_list=None):
         # x: fp16 quant_weight: int8
-        output = self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, self.quant_bias)
+        if self.is_group_mm:
+            output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,
+                               None, None, None, group_list, split_item=3, group_type=0, group_list_type=1)[0]
+        else:
+            output = self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, self.quant_bias, None)
         return output.astype(self.dst_dtype)
 
 

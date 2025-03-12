@@ -28,7 +28,7 @@ quant_type=$2
 worker_num=${3:-16}
 yaml=${4:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
 
-export PYTHONPATH=${mf_path}:${PYTHONPATH}
+export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 
 msrun --worker_num=${worker_num} \
       --local_worker_num=${worker_num} \

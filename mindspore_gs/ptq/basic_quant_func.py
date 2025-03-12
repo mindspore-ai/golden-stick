@@ -209,21 +209,13 @@ def quant_tensor_data(tensor: Tensor, scale, zero_point, quant_min, quant_max, d
         raise ValueError("`data_axis` out of range of `data`'s shape.")
 
     t_scale = Tensor(scale)
-    t_scale.asnumpy()
     t_zp = Tensor(zero_point)
-    t_zp.asnumpy()
     t_scale = ms.ops.cast(t_scale, tensor.dtype)
-    t_scale.asnumpy()
     t_zp = ms.ops.cast(t_zp, tensor.dtype)
-    t_zp.asnumpy()
     quanted_data = tensor / t_scale
-    quanted_data.asnumpy()
     quanted_data = quanted_data + t_zp
-    quanted_data.asnumpy()
     quanted_data = ms.ops.round(quanted_data)
-    quanted_data.asnumpy()
     quanted_data = ms.ops.clamp(quanted_data, quant_min, quant_max)
-    quanted_data.asnumpy()
     quanted_data = ms.ops.cast(quanted_data, dtype)
     quanted_data.asnumpy()
     return quanted_data

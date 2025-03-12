@@ -30,7 +30,7 @@ yaml=${4:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671
 base_path=$(cd "$(dirname $0)"; pwd)
 boolq_path=${base_path}/../../tests/data/boolq-dataset/dev.jsonl
 
-export PYTHONPATH=${mf_path}:${PYTHONPATH}
+export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 
 msrun --worker_num=${worker_num} \
       --local_worker_num=${worker_num} \
