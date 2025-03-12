@@ -17,6 +17,7 @@
 export GSLOG=1
 export MS_ENABLE_LCCL=off
 export HCCL_OP_EXPANSION_MODE=AIV
+export MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST=AddRmsNormDynamicQuant,PagedAttention
 export MS_DEV_RUNTIME_CONF="parallel_dispatch_kernel:True"
 export HCCL_RDMA_PCIE_DIRECT_POST_NOSTRICT=TRUE
 export MS_ALLOC_CONF="enable_vmm:False"
@@ -24,9 +25,11 @@ export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
 mf_path=$1
-quant_type=$2
-worker_num=${3:-16}
-yaml=${4:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
+worker_num=${2:-16}
+export DEVICE_NUM_PER_NODE=${worker_num}
+base_path=$(cd "$(dirname $0)"; pwd)
+yaml=${3:-${base_path}/predict_deepseek_r1_671b_a8dynw8.yaml}
+quant_infer_path=${base_path}/../quant_infer.py
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
@@ -36,6 +39,6 @@ msrun --worker_num=${worker_num} \
       --cluster_time_out=300 \
       --join=False \
       --log_dir=quant_infer_log \
-      python quant_infer.py \
+      python ${quant_infer_path} \
              --config ${yaml} \
-             --approach ${quant_type} > log_quant_infer 2>&1 &
+             --approach a8dynw8 > log_quant_infer 2>&1 &

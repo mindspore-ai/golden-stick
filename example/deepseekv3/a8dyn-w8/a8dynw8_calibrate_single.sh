@@ -24,9 +24,11 @@ export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
 mf_path=$1
-quant_type=$2
-worker_num=${3:-16}
-yaml=${4:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
+worker_num=${2:-16}
+base_path=$(cd "$(dirname $0)"; pwd)
+yaml=${3:-${base_path}/predict_deepseek_r1_671b.yaml}
+boolq_path=${base_path}/../../../tests/data/boolq-dataset/dev.jsonl
+calibrate_path=${base_path}/../calibrate.py
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
@@ -35,7 +37,9 @@ msrun --worker_num=${worker_num} \
       --master_port=8188 \
       --cluster_time_out=300 \
       --join=False \
-      --log_dir=quant_infer_log \
-      python quant_infer.py \
-             --config ${yaml} \
-             --approach ${quant_type} > log_quant_infer 2>&1 &
+      --log_dir=calibrate_a8dynw8_log \
+      python ${calibrate_path} \
+            --config ${yaml} \
+            --approach=a8dynw8 \
+            -t boolq \
+            -s ${boolq_path} > log_calibrate_a8dynw8 2>&1 &
