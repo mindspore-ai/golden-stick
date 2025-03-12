@@ -693,12 +693,12 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         elif isinstance(linear.matmul, SmoothMatmul):
             wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy,
                                                               transpose_a, transpose_b, dst_dtype)
-            if isinstance(linear.matmul.mm, GroupedMatmulV4):
+            if linear.matmul.is_group_mm:
                 num_experts = q_weight.shape[0]
         elif isinstance(linear.matmul, SmoothMatmulForDeploy):
             wqbmm = WeightQuantInt4Matmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, w_qparam, is_deploy,
                                                                          transpose_a, transpose_b, dst_dtype)
-            if isinstance(linear.matmul.mm, GroupedMatmulV4):
+            if linear.matmul.is_group_mm:
                 num_experts = q_weight.shape[0]
         else:
             raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")

@@ -19,6 +19,7 @@ util functions for golden-stick
 import types
 import warnings
 from functools import wraps
+import psutil
 import numpy as np
 from mindspore import nn
 
@@ -119,3 +120,10 @@ def check_nan_inf(arr: np.ndarray):
     has_nan = np.any(np.isnan(arr))
     has_inf = np.any(np.isinf(arr))
     return has_nan, has_inf
+
+
+def get_memory_info():
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    print(f"RSS (Resident Set Size): {memory_info.rss / 1024 / 1024:.2f} MB") # 物理内存
+    print(f"VMS (Virtual Memory Size): {memory_info.vms / 1024 / 1024:.2f} MB") # 虚拟内存

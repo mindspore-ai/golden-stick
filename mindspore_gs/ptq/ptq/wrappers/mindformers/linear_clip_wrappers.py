@@ -15,6 +15,7 @@
 """ptq wrapper cells for mindformers."""
 
 import copy
+import gc
 from types import MethodType
 
 from mindspore import ops as msops
@@ -164,6 +165,9 @@ class ClipLinearCell(WrapperLinearCell):
                 best_max_val[cur_best_idx] = max_val[cur_best_idx]
             best_max_val_all.append(best_max_val)
         best_max_val = msops.cat(best_max_val_all, axis=0)
+        del org_out
+        del input_feat
+        gc.collect()
         return best_max_val.squeeze(1)
 
     def _apply_clip(self, clip_val):
@@ -185,7 +189,8 @@ class ClipLinearCell(WrapperLinearCell):
                 weight = self._layer.weight.data.reshape((-1, org_shape[-1]))
             else:
                 # [num_experts, ic, oc] -> [ic, num_experts * oc] -> [num_experts * oc, ic]
-                weight = self._layer.weight.data.transpose((1, 0, 2)).reshape(org_shape[1], -1).transpose((1, 0))
+                weight = msops.transpose(self._layer.weight.data, (1, 0, 2)).reshape(org_shape[1], -1)
+                weight = msops.transpose(weight, (1, 0))
             self._layer.weight.set_data(weight)
         # clip weight be [oc, ic] dims
         self.ic_axis, self.oc_axis = 1, 0
@@ -205,9 +210,9 @@ class ClipLinearCell(WrapperLinearCell):
             if self.layer.transpose_b:
                 weight = self._layer.weight.reshape(org_shape)
             else:
-                weight = self._layer.weight.transpose((1, 0)).reshape((org_shape[1],
-                                                                       org_shape[0],
-                                                                       org_shape[2])).transpose((1, 0, 2))
+                weight = msops.transpose(self._layer.weight.data, (1, 0))
+                weight = weight.reshape((org_shape[1], org_shape[0], org_shape[2]))
+                weight = msops.transpose(weight, (1, 0, 2))
             self._layer.weight.set_data(weight)
 
     def deploy(self):
