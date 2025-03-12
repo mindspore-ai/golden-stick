@@ -33,7 +33,10 @@ from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.convert_utils import AntiQuantCell
-from mindspore_gs.ptq.basic_quant_func import np_int4data_pack_to_int8, convert_fp32_to_int64
+from mindspore_gs.ptq.basic_quant_func import (
+    np_int4data_pack_to_int8,
+    np_int4data_pack_to_int8_3d,
+    convert_fp32_to_int64)
 
 
 class KernelType(enum.Enum):
@@ -707,9 +710,10 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         else:
             if num_experts != 0:
                 q_weight = q_weight.transpose((0, 2, 1)).asnumpy() if trans_b else q_weight.asnumpy()
+                q_weight_pack = np_int4data_pack_to_int8_3d(q_weight)
             else:
                 q_weight = q_weight.asnumpy().T if trans_b else q_weight.asnumpy()
-            q_weight_pack = np_int4data_pack_to_int8(q_weight)
+                q_weight_pack = np_int4data_pack_to_int8(q_weight)
             logger.debug(f"WeightQuantInt4Matmul: pack q_weight of Layer({layer_name}) is "
                          f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
             q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)

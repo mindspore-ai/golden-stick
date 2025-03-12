@@ -36,6 +36,15 @@ def np_int4data_pack_to_int8(np_data):
     return np_int4_data
 
 
+def np_int4data_pack_to_int8_3d(np_data):
+    np_data = np_data.astype(np.int8)
+    np_data &= 0x000F
+    np_data[::, ::, 0::2] <<= 0
+    np_data[::, ::, 1::2] <<= 4
+    np_int4_data = np_data[::, ::, 0::2] | np_data[::, ::, 1::2]
+    return np_int4_data
+
+
 def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
     if 0 <= quant_dtype.value() <= 15:
         return quant_dtype.value() + 1
