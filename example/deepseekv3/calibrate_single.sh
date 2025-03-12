@@ -17,7 +17,6 @@
 export GSLOG=1
 export MS_ENABLE_LCCL=off
 export HCCL_OP_EXPANSION_MODE=AIV
-export MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST=AddRmsNormDynamicQuant,PagedAttention
 export MS_DEV_RUNTIME_CONF="parallel_dispatch_kernel:True"
 export HCCL_RDMA_PCIE_DIRECT_POST_NOSTRICT=TRUE
 export MS_ALLOC_CONF="enable_vmm:False"

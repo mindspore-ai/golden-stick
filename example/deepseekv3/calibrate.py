@@ -21,6 +21,7 @@ import argparse
 import mindspore as ms
 from mindspore.communication import get_rank
 
+from mindformers import MindFormerConfig
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
@@ -33,7 +34,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', '-c', type=str, required=True)
     parser.add_argument('--approach', '-q', type=str, required=True,
-                        help="Available: awq-a16w8, awq-a16w4, smoothquant, dsquant, w8a16, w8a8-dyn")
+                        help="Available: awq-a16w8, awq-a16w4, smoothquant, dsquant, a16w8, a8dynw8")
     parser.add_argument('--dataset_type', '-t', type=str, required=False)
     parser.add_argument('--dataset_path', '-s', type=str, required=False)
 
@@ -44,7 +45,7 @@ def get_args():
 
 def create_ds(network_helper, ds_path, ds_type, approach):
     """Create datasets."""
-    if approach in ['awq-a16w8', 'awq-a16w4', 'smoothquant', 'dsquant', 'w8a16', 'w8a8-dyn']:
+    if approach in ['awq-a16w8', 'awq-a16w4', 'smoothquant', 'dsquant', 'a16w8', 'a8dynw8']:
         start_time = time.time()
         if not ds_path:
             raise ValueError(f"Please provide dataset_path when approach is {approach}.")
@@ -79,6 +80,8 @@ def quant_net(net, network_helper, ptq, ds):
 
 if __name__ == "__main__":
     uargs = get_args()
+    mfconfig = MindFormerConfig(uargs.config)
+    model_name = mfconfig.trainer.model_name
     helper = MFDSV3Helper(uargs.config)
     start = time.time()
     print('Creating network...', flush=True)
@@ -95,7 +98,7 @@ if __name__ == "__main__":
     except RuntimeError:
         rank_id = 0
 
-    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"DeepseekV3_{uargs.approach}_safetensors")
+    save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{model_name}_{uargs.approach}_safetensors")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}"),

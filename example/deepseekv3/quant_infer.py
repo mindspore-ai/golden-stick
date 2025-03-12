@@ -42,6 +42,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True, type=str)
     parser.add_argument('--approach', required=True, type=str,
-                        help="awq, smoothquant, dsquant, w8a16, w8a8-dyn")
+                        help="awq, smoothquant, dsquant, a16w8, a8dynw8")
     args = parser.parse_args()
     infer(args.config, args.approach)
