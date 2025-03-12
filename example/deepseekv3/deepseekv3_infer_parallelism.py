@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-
 """
 transform huggingface model to mindspore safetensor.
 """
+
 import os
 import json
 import numpy as np

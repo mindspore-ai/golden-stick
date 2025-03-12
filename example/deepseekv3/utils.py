@@ -88,7 +88,7 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     return ptq
 
 
-def create_network(yaml_file, quant_type=None, auto_online_trans=False, quant_mode=PTQMode.QUANTIZE):
+def create_network(yaml_file, quant_type=None, auto_online_trans=False):
     '''create_tokenizer'''
     config = MindFormerConfig(yaml_file)
     build_context(config)
@@ -100,7 +100,7 @@ def create_network(yaml_file, quant_type=None, auto_online_trans=False, quant_mo
 
     network = DeepseekV3ForCausalLM(model_config)
     if quant_type:
-        ptq = create_ptq(quant_type, quant_mode)
+        ptq = create_ptq(quant_type, PTQMode.DEPLOY)
         ptq.apply(network)
         ptq.convert(network)
     if quant_type and auto_online_trans:
