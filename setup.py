@@ -94,7 +94,7 @@ class BuildPy(build_py):
 
 setup(
     name='mindspore_gs',
-    version='1.0.0',
+    version='1.1.0',
     author='The MindSpore Authors',
     author_email='contact@mindspore.cn',
     description='A MindSpore model optimization algorithm set..',
