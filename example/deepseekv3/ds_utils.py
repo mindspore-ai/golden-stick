@@ -103,12 +103,12 @@ def create_network(yaml_file, quant_type=None, auto_online_trans=False):
         ptq = create_ptq(quant_type, PTQMode.DEPLOY)
         ptq.apply(network)
         ptq.convert(network)
-    if quant_type and auto_online_trans:
-        raise ValueError("quant model not support ckpt from Hugging Face.")
+    if auto_online_trans and quant_type is not None and quant_type != "dsquant":
+        raise ValueError("only dsquant quant model support auto online trans.")
 
     if config.load_checkpoint:
         if auto_online_trans:
-            model_parallelism = DeepseekInferParallelism(config, network, False)
+            model_parallelism = DeepseekInferParallelism(config, network, quant_type is not None)
             model_parallelism.infer_convert_and_parallelism(config.load_checkpoint)
             barrier()
         else:

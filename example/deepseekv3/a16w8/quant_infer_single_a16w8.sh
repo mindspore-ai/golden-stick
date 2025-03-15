@@ -17,7 +17,6 @@
 export GSLOG=1
 export MS_ENABLE_LCCL=off
 export HCCL_OP_EXPANSION_MODE=AIV
-export MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST=AddRmsNormDynamicQuant,PagedAttention
 export MS_DEV_RUNTIME_CONF="parallel_dispatch_kernel:True"
 export HCCL_RDMA_PCIE_DIRECT_POST_NOSTRICT=TRUE
 export MS_ALLOC_CONF="enable_vmm:False"
@@ -38,7 +37,7 @@ msrun --worker_num=${worker_num} \
       --master_port=8188 \
       --cluster_time_out=300 \
       --join=False \
-      --log_dir=quant_infer_log \
+      --log_dir=quant_infer_a16w8_log \
       python ${quant_infer_path} \
              --config ${yaml} \
-             --approach a16w8 > log_quant_infer 2>&1 &
+             --approach a16w8 > log_quant_infer_a16w8 2>&1 &
