@@ -26,7 +26,7 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq import PTQMode
-from utils import create_ptq, create_network
+from ds_utils import create_ptq, create_network
 
 
 def get_args():

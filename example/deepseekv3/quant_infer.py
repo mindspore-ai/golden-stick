@@ -15,7 +15,7 @@
 """ds infer."""
 
 import argparse
-from utils import create_network
+from ds_utils import create_network
 
 
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']
