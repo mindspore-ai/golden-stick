@@ -376,11 +376,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         y = self._layer(x, *args, **kwargs)
         self._layer.compute_dtype = self.compute_type
         if self.quant_forward:
-            y_zp = (self.x_zp.astype("int32") * self._layer.weight.data.astype("int32")) \
-                .sum(axis=1 if self._layer.transpose_b else 0) \
-                .astype("int32")
-
-            y = (y - y_zp) * self.deq_scale
+            y = (y - self.y_zp) * self.deq_scale
             y = msops.cast(y, self.compute_type)
         return y
 
@@ -426,7 +422,8 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
                                             self.cfg.act_quant_dtype,
                                             -1,
                                             False,
-                                            False)
+                                            False,
+                                            high_precision_params=False)
             w_scale, _, q_weight = quant_tensor(self._layer.weight.data,
                                                 self.w_quant_min,
                                                 self.w_quant_max,
@@ -437,7 +434,8 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
                                                 self.cfg.weight_quant_dtype,
                                                 self.oc_axis,
                                                 True,
-                                                False)
+                                                False,
+                                                high_precision_params=False)
             t_w_scale = Tensor(w_scale)
             if self._layer.transpose_b:
                 t_w_scale = msops.transpose(t_w_scale, (1, 0))
@@ -445,16 +443,15 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
             self.deq_scale = msops.cast((self.x_scale_fast * t_w_scale), msdtype.float32)
             self.x_scale_fast = msops.cast(1 / (self.x_scale_fast * Tensor(scales)), msdtype.float32)
             self.x_zp = Tensor(x_zp)
-
-            logger.debug(f"OmniSmoothLinearCell: search scale alpha {ratio}, pesudo weight of Layer({self._layer_name})"
-                         f" is {{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
             self._layer.weight.set_data(msops.cast(q_weight, self.compute_type))
+            self.y_zp = (self.x_zp.astype("int32") * self._layer.weight.data.astype("int32")) \
+                .sum(axis=1 if self._layer.transpose_b else 0) \
+                .astype("int32")
             quant_output = self._module_forward(True)
-            self._layer.weight.set_data(Tensor(self.fp16_weight.asnumpy(), dtype=self.compute_type))
+            msops.assign(self._layer.weight, self.fp16_weight.astype(self.compute_type))
 
             loss = self._loss(fp16_output, quant_output)
-            logger.info(f"OmniSmoothLinearCell: search scale alpha {ratio}, scale loss of Layer({self._layer_name}) "
-                        f"is {{{loss.shape}, {loss.dtype}, {loss}}}")
+            logger.info(f"OmniSmoothLinearCell: search alpha {ratio}, loss of Layer({self._layer_name}) is {loss}")
             history.append(loss)
             if loss < best_error:
                 best_error = loss
@@ -474,11 +471,11 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         return results
 
     def _loss(self, preds, grounds):
-        total_loss = np.array(0.0, np.float64)
+        total_loss = 0
         for pred, ground in zip(preds, grounds):
             ground = msops.cast(ground, msdtype.float32)
             pred = msops.cast(pred, msdtype.float32)
-            total_loss += msops.mse_loss(ground, pred, reduction='mean')
+            total_loss += float(msops.mse_loss(ground, pred, reduction='mean'))
         return total_loss / len(grounds)
 
     def smooth(self):
