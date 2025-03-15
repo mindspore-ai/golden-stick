@@ -1,5 +1,13 @@
 # DeepSeekR1网络A8DYN-W8量化算法指南
 
+**A8DYN-W8量化数据集评测结果**
+
+| 数据集 | ceval | boolq | squad |
+| ---- | ---- | ---- | ---- |
+| 评测结果 |    |    |  |
+上述评测结果基于**mindspore**:br_infer_deepseek_os分支(commit_id:**4011116**)，**mindformers**:dev分支(commit_id:**74579f4**)，**golden-stick**:master分支 (commit_id:**d4cf885**)。
+---
+
 本指南基于单机16卡，如果使用双机16卡，请将msrun命令替换为双机16卡形式。
 
 运行前请检查yaml配置中的tp并行数，load_checkpoint配置，tokenizer配置是否合理。
