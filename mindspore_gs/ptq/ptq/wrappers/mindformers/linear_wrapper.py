@@ -77,7 +77,6 @@ class LinearInferCell(Cell):
     def __init__(self, linear: Linear, parallel_type: ParallelType):
         super().__init__()
         self._layer = linear
-        self._layer.has_quant_bias = False
         self.parallel_type = parallel_type
 
         self.has_act_quant = False
@@ -109,9 +108,8 @@ class LinearInferCell(Cell):
                                             self._layer.in_channels))
         # apply gmm to the inference of moe structural models when use_past=True.
         if self._layer.use_gmm:
-            x = self._layer.matmul(x, self._layer.weight, group_list)
-        else:
-            x = self._layer.matmul(x, self.layer.weight)
+            raise RuntimeError(f"{type(Linear)} not support GroupedMatmul.")
+        x = self._layer.matmul(x, self.layer.weight)
         if self._layer.has_bias:
             x = self._layer.bias_add(x, self._layer.cast(self._layer.bias, self._layer.dtype))
         if self._layer.activation_flag:
@@ -131,8 +129,6 @@ class LinearInferCell(Cell):
                              " weight should be passed to construct(), but got None.")
 
         origin_dtype = F.dtype(input_parallel)
-        if not self._layer.skip_weight_param_allocation:
-            weight = self._layer.weight
         input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
 
         if self._layer.sequence_parallel:
@@ -222,9 +218,6 @@ class LinearInferCell(Cell):
             if self.layer.has_bias:
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape,
                                                     'shard': (tensor_parallel_num,)}
-            if self.layer.has_quant_bias:
-                state_dict[self.layer.matmul.quant_bias.name] = {'shape': self.layer.matmul.quant_bias.shape,
-                                                                 'shard': (tensor_parallel_num,)}
         elif self.parallel_type == ParallelType.ROW_PARALLEL:
             if self._layer.is_expert and self._layer.expert_num > 1:
                 w_shard = (1, 1, tensor_parallel_num) if self.layer.transpose_b else (1, tensor_parallel_num, 1)
@@ -232,9 +225,6 @@ class LinearInferCell(Cell):
                 w_shard = (1, tensor_parallel_num) if self.layer.transpose_b else (tensor_parallel_num, 1)
             if self.layer.has_bias:
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape, 'shard': (1,)}
-            if self.layer.has_quant_bias:
-                state_dict[self.layer.matmul.quant_bias.name] = {'shape': self.layer.matmul.quant_bias.shape,
-                                                                 'shard': (1,)}
         else:
             return {}
         state_dict[self.layer.weight.name] = {'shape': self.layer.weight.shape, 'shard': w_shard}

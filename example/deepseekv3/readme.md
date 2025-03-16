@@ -34,7 +34,7 @@ ASCEND_RT_VISIBLE_DEVICES=xxx bash calibrate_single.sh /path/to/mindformers a16w
 
 ## 2. 使用动态图测试量化网络对话精度
 
-首先测试在动态图下，量化后的网络是否对话ok，命令如下：
+首先测试在动态图下，量化后的网络是否对话ok，不过部分算法的算子在动态图下先不到internal库，如Quant算子，可以跳过此步骤。
 
 ```bash
 ASCEND_RT_VISIBLE_DEVICES=xxx bash pynative_infer_single.sh /path/to/mindformers a16w8/a8dynw8/smoothquant/awq-a16w4/awq-a16w8/dsquant worker_num /path/to/yaml

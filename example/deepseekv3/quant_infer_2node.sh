@@ -31,6 +31,6 @@ master_ip=$5
 yaml=${6:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
 
 export HCCL_IF_IP=${cur_ip}
-export PYTHONPATH=${mf_path}:${PYTHONPATH}
+export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 
 bash ${mf_path}/scripts/msrun_launcher.sh "quant_infer.py --config ${yaml} --approach ${quant_type}" 16 8 ${master_ip} 8432 ${node_id} quant_infer_log False 300
