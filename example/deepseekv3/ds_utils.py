@@ -66,8 +66,14 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     elif quant_type.lower() == 'smoothquant':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                        opname_blacklist=['lm_head', 'lkv2kv', 'w2'])
-        layer_policies = OrderedDict()
+                        opname_blacklist=['lm_head', 'lkv2kv'])
+        w2_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                              act_quant_dtype=msdtype.int8,
+                              outliers_suppression=OutliersSuppressionType.NONE,
+                              precision_recovery=PrecisionRecovery.NONE,
+                              act_quant_granularity=QuantGranularity.PER_TOKEN,
+                              weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+        layer_policies = OrderedDict({r'.*\.w2.*': w2_config})
     elif quant_type.lower() == 'a16w8':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         opname_blacklist=['lm_head', 'lkv2kv'])
@@ -88,14 +94,16 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     return ptq
 
 
-def create_network(yaml_file, quant_type=None, auto_online_trans=False):
-    '''create_tokenizer'''
+def create_network(yaml_file, quant_type=None):
+    """create_tokenizer"""
     config = MindFormerConfig(yaml_file)
     build_context(config)
     build_parallel_config(config)
     model_config = config.model.model_config
     model_config.parallel_config = config.parallel_config
     model_config.moe_config = config.moe_config
+    auto_online_trans = config.auto_trans_ckpt
+    print('='*50, f"if using auto_online_trans: {auto_online_trans}", flush=True)
     model_config = DeepseekV3Config(**model_config)
 
     network = DeepseekV3ForCausalLM(model_config)
@@ -103,8 +111,6 @@ def create_network(yaml_file, quant_type=None, auto_online_trans=False):
         ptq = create_ptq(quant_type, PTQMode.DEPLOY)
         ptq.apply(network)
         ptq.convert(network)
-    if auto_online_trans and quant_type is not None and quant_type != "dsquant":
-        raise ValueError("only dsquant quant model support auto online trans.")
 
     if config.load_checkpoint:
         if auto_online_trans:

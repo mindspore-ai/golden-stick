@@ -18,20 +18,28 @@ export GSLOG=1
 export MS_ENABLE_LCCL=off
 export HCCL_OP_EXPANSION_MODE=AIV
 export MS_DEV_RUNTIME_CONF="parallel_dispatch_kernel:True"
-export MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST=AddRmsNormQuantV2
 export HCCL_RDMA_PCIE_DIRECT_POST_NOSTRICT=TRUE
 export MS_ALLOC_CONF="enable_vmm:True"
 export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
 mf_path=$1
-quant_type=$2
-node_id=$3
-cur_ip=$4
-master_ip=$5
-yaml=${6:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
+worker_num=${2:-16}
+base_path=$(cd "$(dirname $0)"; pwd)
+yaml=${base_path}/predict_deepseek_r1_671b_calibrate.yaml
+ceval_path=${base_path}/../../../tests/data/ceval-dataset/dev/
+calibrate_path=${base_path}/../calibrate.py
 
-export HCCL_IF_IP=${cur_ip}
-export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
+export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
-bash ${mf_path}/scripts/msrun_launcher.sh "quant_infer.py --config ${yaml} --approach ${quant_type}" 16 8 ${master_ip} 8432 ${node_id} quant_infer_log False 300
+msrun --worker_num=${worker_num} \
+      --local_worker_num=${worker_num} \
+      --master_port=8188 \
+      --cluster_time_out=300 \
+      --join=False \
+      --log_dir=calibrate_smoothquant_log \
+      python ${calibrate_path} \
+            --config ${yaml} \
+            --approach smoothquant \
+            -t ceval \
+            -s ${ceval_path} > log_calibrate_smoothquant 2>&1 &
