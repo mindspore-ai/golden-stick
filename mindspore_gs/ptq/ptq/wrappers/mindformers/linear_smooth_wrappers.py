@@ -471,6 +471,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         results = []
         for args, kwargs in zip(self.args, self.kwargs):
             results.append(self.decoder(*args, **kwargs))
+        self.quant_forward = False
         return results
 
     def _loss(self, preds, grounds):
