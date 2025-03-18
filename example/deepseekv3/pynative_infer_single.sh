@@ -19,7 +19,7 @@ export MS_ENABLE_LCCL=off
 export HCCL_OP_EXPANSION_MODE=AIV
 export MS_DEV_RUNTIME_CONF="parallel_dispatch_kernel:True"
 export HCCL_RDMA_PCIE_DIRECT_POST_NOSTRICT=TRUE
-export MS_ALLOC_CONF="enable_vmm:False"
+export MS_ALLOC_CONF="enable_vmm:True"
 export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
@@ -38,5 +38,4 @@ msrun --worker_num=${worker_num} \
       --log_dir=pynative_infer_log \
       python pynative_infer.py \
           --config ${yaml} \
-          --auto_online_trans=True \
           --quant_type=${quant_type} > log_pynative_log 2>&1 &

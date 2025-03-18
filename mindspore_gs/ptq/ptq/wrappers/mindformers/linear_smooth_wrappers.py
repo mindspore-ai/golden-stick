@@ -360,6 +360,9 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         self.deq_scale = None
         self.quant_forward = False
 
+    def _quant_info(self):
+        return "OMNIQuant"
+
     def _search_best_scale(self, alpha):
         """search best scale"""
         best_scale = self._compute_best_scale(alpha)
@@ -398,7 +401,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
     def check_xrange(self, xold, xnew):
         range_old = self.xrange(xold, self.x_quant_min, self.x_quant_max)
         range_new = self.xrange(xnew, self.x_quant_min, self.x_quant_max)
-        logger.error(f"Range of {self.layer_name} before {range_old}, after {range_new}")
+        logger.info(f"Range of {self.layer_name} before {range_old}, after {range_new}")
 
     def _compute_best_scale(self, alpha):
         """compute best scale"""
@@ -486,8 +489,6 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         """smooth"""
         smooth_alpha = [i/20 for i in range(21)]
         smooth_scale = self._search_best_scale(smooth_alpha)
-        xs = self.cat_samples * smooth_scale
-        self.check_xrange(self.cat_samples, xs)
         self._apply_smooth(smooth_scale)
 
     def process(self):

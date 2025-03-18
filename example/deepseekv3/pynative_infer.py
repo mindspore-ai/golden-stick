@@ -111,9 +111,9 @@ def generate_input_id(network, layers, input_ids):
     return output
 
 
-def pynative_generate(yaml_file, quant_type, auto_online_trans):
+def pynative_generate(yaml_file, quant_type):
     """pynative_generate"""
-    tokenizer, network = create_network(yaml_file, quant_type=quant_type, auto_online_trans=auto_online_trans)
+    tokenizer, network = create_network(yaml_file, quant_type=quant_type)
     layers = get_network_layers(network)
     multi_inputs = []
     for question in input_questions:
@@ -134,10 +134,6 @@ def pynative_generate(yaml_file, quant_type, auto_online_trans):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True, type=str)
-    parser.add_argument('--auto_online_trans', default=True, type=str)
     parser.add_argument('--quant_type', default=None, type=str)
     args = parser.parse_args()
-    if args.quant_type:
-        print("------------------ set args.auto_online_trans to False because of quant_type", flush=True)
-        args.auto_online_trans = False
-    pynative_generate(args.config, args.quant_type, args.auto_online_trans)
+    pynative_generate(args.config, args.quant_type)

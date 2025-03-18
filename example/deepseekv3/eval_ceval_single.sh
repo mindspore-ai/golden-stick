@@ -26,12 +26,19 @@ export MS_ENABLE_SYNC_COPY_INPUT=1
 
 mf_path=$1
 quant_type=$2
-node_id=$3
-cur_ip=$4
-master_ip=$5
-yaml=${6:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
+worker_num=${3:-16}
+yaml=${4:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
+ceval_path=$5
 
-export HCCL_IF_IP=${cur_ip}
 export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 
-bash ${mf_path}/scripts/msrun_launcher.sh "quant_infer.py --config ${yaml} --approach ${quant_type}" 16 8 ${master_ip} 8432 ${node_id} quant_infer_log False 300
+msrun --worker_num=${worker_num} \
+      --local_worker_num=${worker_num} \
+      --master_port=8188 \
+      --cluster_time_out=300 \
+      --join=False \
+      --log_dir=quant_infer_log \
+      python eval_ceval.py \
+             --config ${yaml} \
+             --approach ${quant_type} \
+             -s ${ceval_path} > log_quant_infer 2>&1 &

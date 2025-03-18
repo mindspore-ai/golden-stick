@@ -85,7 +85,7 @@ if __name__ == "__main__":
     helper = MFDSV3Helper(uargs.config)
     start = time.time()
     print('Creating network...', flush=True)
-    _, network = create_network(uargs.config, auto_online_trans=True)
+    _, network = create_network(uargs.config)
     algo = create_ptq(uargs.approach, PTQMode.QUANTIZE)
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     logger.info(f'Create Network cost time is {time.time() - start} s.')
@@ -103,6 +103,6 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x,
-                       format="safetensors")
+                       format="ckpt")
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-    print(f'Checkpoint saved to {save_ckpt_path}', flush=True)
+    print(f'Checkpoint saved to {save_path}', flush=True)

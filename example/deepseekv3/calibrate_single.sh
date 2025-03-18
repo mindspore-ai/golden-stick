@@ -19,7 +19,7 @@ export MS_ENABLE_LCCL=off
 export HCCL_OP_EXPANSION_MODE=AIV
 export MS_DEV_RUNTIME_CONF="parallel_dispatch_kernel:True"
 export HCCL_RDMA_PCIE_DIRECT_POST_NOSTRICT=TRUE
-export MS_ALLOC_CONF="enable_vmm:False"
+export MS_ALLOC_CONF="enable_vmm:True"
 export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
@@ -28,7 +28,7 @@ quant_type=$2
 worker_num=${3:-16}
 yaml=${4:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
 base_path=$(cd "$(dirname $0)"; pwd)
-boolq_path=${base_path}/../../tests/data/boolq-dataset/dev.jsonl
+ceval_path=${base_path}/../../tests/data/ceval-dataset/dev/
 
 export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 
@@ -41,5 +41,5 @@ msrun --worker_num=${worker_num} \
       python calibrate.py \
             --config ${yaml} \
             --approach=${quant_type} \
-            -t boolq \
-            -s ${boolq_path} > log_calibrate_${quant_type} 2>&1 &
+            -t ceval \
+            -s ${ceval_path} > log_calibrate_${quant_type} 2>&1 &

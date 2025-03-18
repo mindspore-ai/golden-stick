@@ -98,5 +98,6 @@ if __name__ == "__main__":
     logger.info('Creating network...')
     helper = MFDSV3Helper(uargs.config)
     logger.info(f'Create Network cost time is {time.time() - start} s.')
+    auto_online_trans = helper.mf_config.auto_trans_ckpt
     ds_tokenizer, network = create_network(uargs.config, quant_type=uargs.approach)
     evaluate(network, uargs.dataset_path, ds_tokenizer, helper, uargs.n_samples)
