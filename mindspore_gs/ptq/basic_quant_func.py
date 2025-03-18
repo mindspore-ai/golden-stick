@@ -53,7 +53,7 @@ def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
     raise ValueError("Unsupported QuantDtype.")
 
 
-def cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=False):
+def cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=False, high_precision=True):
     r"""
     Calculate quantization params for scale and zero point.
 
@@ -63,31 +63,38 @@ def cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetri
         quant_min (int): The minimum quantization integer.
         quant_max (int): The maximum quantization integer.
         symmetric (bool): Whether the quantization algorithm is symmetric or not. Default: False.
+        high_precision(bool): Whether to use high float precision while calculating. Default: True.
 
     Returns:
         scale (numpy.ndarray): quantization param.
         zero point (numpy.ndarray): quantization param.
     """
+    if not isinstance(input_min, Tensor):
+        input_min = Tensor(input_min)
+    if not isinstance(input_max, Tensor):
+        input_max = Tensor(input_max)
 
     if input_min.shape != input_max.shape:
         raise ValueError("input min shape should be equal to input max.")
     if (input_max == input_min).all():
-        return np.ones(input_min.shape), np.zeros(input_min.shape)
+        return ms.ops.ones(input_min.shape), ms.ops.zeros(input_min.shape)
 
     # calculate scale
     if symmetric:
-        input_max = np.maximum(np.abs(input_min), np.abs(input_max))
+        input_max = ms.ops.maximum(ms.ops.abs(input_min), ms.ops.abs(input_max))
         input_min = -input_max
-    input_min = input_min.astype(np.float64)
-    input_max = input_max.astype(np.float64)
+    input_min = input_min.astype(msdtype.float64)
+    input_max = input_max.astype(msdtype.float64)
     scale = (input_max - input_min) / (quant_max - quant_min)
 
     # calculate zero point
     zp_double = quant_min - input_min / scale
+    if not high_precision:
+        scale = scale.astype(msdtype.float32)
     if symmetric:
-        zp = np.zeros_like(zp_double).astype(np.float64)
+        zp = ms.ops.zeros_like(zp_double).astype(msdtype.float64 if high_precision else msdtype.float32)
     else:
-        zp = np.round(zp_double).astype(np.float64)
+        zp = ms.ops.round(zp_double).astype(msdtype.float64 if high_precision else msdtype.float32)
     return scale, zp
 
 def get_float_max_min(rank, tensor, min_op, max_op, quant_axis):
@@ -111,7 +118,7 @@ def get_float_max_min(rank, tensor, min_op, max_op, quant_axis):
 
 def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_group, group_size,
                  quant_dtype=msdtype.int8, quant_axis=-1, if_quant_data: bool = True, if_pesudo_quant: bool = False,
-                 is_transpose: bool = True):
+                 is_transpose: bool = True, high_precision_params=True):
     """quant_tensor"""
     if quant_dtype not in QUANT_DTYPE_NUM_BITS.keys():
         raise ValueError(f"Only support quant to {QUANT_DTYPE_NUM_BITS.keys()}, but got {quant_dtype}")
@@ -134,7 +141,8 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_g
         rank = len(tensor.shape)
         float_max, float_min = get_float_max_min(rank, tensor, min_op, max_op, quant_axis)
     quant_min, quant_max = get_quant_min_max(num_bits=num_bits, signed=signed, narrow_range=narrow_range)
-    scale, zp = cal_quantization_params(float_min, float_max, quant_min, quant_max, symmetric=symmetric)
+    scale, zp = cal_quantization_params(float_min, float_max, quant_min, quant_max, symmetric=symmetric,
+                                        high_precision=high_precision_params)
 
     if if_quant_data:
         qtensor = quant_tensor_data(tensor, scale, zp, quant_min, quant_max, quant_axis,
@@ -208,16 +216,13 @@ def quant_tensor_data(tensor: Tensor, scale, zero_point, quant_min, quant_max, d
     if data_axis >= len(tensor.shape):
         raise ValueError("`data_axis` out of range of `data`'s shape.")
 
-    t_scale = Tensor(scale)
-    t_zp = Tensor(zero_point)
-    t_scale = ms.ops.cast(t_scale, tensor.dtype)
-    t_zp = ms.ops.cast(t_zp, tensor.dtype)
+    t_scale = Tensor(scale, dtype=tensor.dtype)
+    t_zp = Tensor(zero_point, dtype=tensor.dtype)
     quanted_data = tensor / t_scale
     quanted_data = quanted_data + t_zp
     quanted_data = ms.ops.round(quanted_data)
     quanted_data = ms.ops.clamp(quanted_data, quant_min, quant_max)
     quanted_data = ms.ops.cast(quanted_data, dtype)
-    quanted_data.asnumpy()
     return quanted_data
 
 
