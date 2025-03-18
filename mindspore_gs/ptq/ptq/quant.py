@@ -299,6 +299,11 @@ class PTQ(CompAlgo):
             logger.info(f"Quantize {i}th decoder layer.")
             layer_name, layer = self.decoder_layers[i]
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
+            if self._config.always_use_fp_input_in_processer:
+                for index, (args, kwargs) in enumerate(zip(cur_args, cur_kwargs)):
+                    output = layer(*args, **kwargs)
+                    if len(self.decoder_layers) > 1:
+                        all_args[index][0] = output[0] if isinstance(output, tuple) else output
             for processor in self.pipeline:
                 processor.replace(layer_name, layer, network_helper,
                                   search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
@@ -310,7 +315,11 @@ class PTQ(CompAlgo):
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):
                     output = layer(*args, **kwargs)
-                    if len(self.decoder_layers) > 1:
+                    if len(self.decoder_layers) > 1 and not self._config.always_use_fp_input_in_processer:
+                        # FIXME: 'always_use_fp_input_in_processer' is a temporary switch for fixing activation between
+                        # layers. This branch may introduces error to the next layer, because previous processors in the
+                        # pipeline changes the layer, and thus, gives a inaccurate output. Set the switch to True to
+                        # avoid this issue. The switch should be removed after the issue is fixed. -- @tongl2
                         all_args[index][0] = output[0] if isinstance(output, tuple) else output
                     index += 1
 
