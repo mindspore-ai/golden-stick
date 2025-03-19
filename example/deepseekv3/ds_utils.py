@@ -29,7 +29,8 @@ from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 
 from mindspore_gs.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery
+from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery, \
+    GPTQQuantConfig
 from deepseekv3_infer_parallelism import DeepseekInferParallelism
 
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
@@ -62,6 +63,18 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
                         opname_blacklist=['lm_head', 'lkv2kv'])
+    elif quant_type.lower() == 'gptq-perchannel':
+        gptq_config = GPTQQuantConfig()
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+                        act_quant_dtype=None, precision_recovery=PrecisionRecovery.GPTQ, algo_args=gptq_config,
+                        opname_blacklist=['lm_head', 'lkv2kv'])
+        layer_policies = OrderedDict()
+    elif quant_type.lower() == 'gptq-pergroup':
+        gptq_config = GPTQQuantConfig()
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+                        algo_args=gptq_config, act_quant_dtype=None, precision_recovery=PrecisionRecovery.GPTQ,
+                        weight_quant_granularity=QuantGranularity.PER_GROUP, opname_blacklist=['lm_head', 'lkv2kv'],
+                        group_size=128)
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'smoothquant':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,

@@ -584,7 +584,8 @@ class WeightQuantMatmul(QuantUnitCell):
         if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             raise ValueError(
                 f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, None)
+        return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, None,
+                   isinstance(src.mm, GroupedMatmulV4))
 
     @classmethod
     def _from_smooth_matmul(cls, layer_name, src: SmoothMatmul, w_qparam: QuantParam, is_deploy,
