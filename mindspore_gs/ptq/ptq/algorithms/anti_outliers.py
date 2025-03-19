@@ -74,7 +74,7 @@ class LinearSmoothQuant(LinearSmoother):
                 if not LinearSmoothQuant.linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE:
+                if not layer_policy or layer_policy.outliers_suppression != OutliersSuppressionType.SMOOTH:
                     return cell, False
                 if any(opname in cell_name for opname in layer_policy.opname_blacklist):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
@@ -132,7 +132,7 @@ class LinearAWQ(LinearSmoother):
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE:
+                if not layer_policy or layer_policy.outliers_suppression != OutliersSuppressionType.AWQ:
                     return cell, False
                 if any(opname in cell_name for opname in layer_policy.opname_blacklist):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
@@ -198,7 +198,10 @@ class LinearAutoSmoother(LinearSmoother):
                 if not LinearAutoSmoother.linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
-                if not layer_policy or layer_policy.outliers_suppression == OutliersSuppressionType.NONE:
+                if (not layer_policy or
+                        layer_policy.outliers_suppression not in (OutliersSuppressionType.AWQ,
+                                                                  OutliersSuppressionType.OMNIQUANT_GRID,
+                                                                  OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS)):
                     return cell, False
                 if any(opname in cell_name for opname in layer_policy.opname_blacklist):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
