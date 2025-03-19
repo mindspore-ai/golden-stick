@@ -14,6 +14,7 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 
+import os
 import copy
 import enum
 from types import MethodType
@@ -26,6 +27,7 @@ from mindspore import dtype as msdtype
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
+from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.hal import SmoothMatmul, SmoothMatmulForDeploy, OutlierSuppressionPlusMatmulForDeploy
@@ -536,6 +538,12 @@ class AWQSmoothLinearCell(AWQLinearCell):
         self.w_mean = None
         self.x_mean = None
 
+        if context.algorithm_cache_path:
+            cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', 'awq.json')
+        else:
+            cache_file_path = ''
+        self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
+
     def _quant_info(self):
         return "AWQ"
 
@@ -585,7 +593,16 @@ class AWQSmoothLinearCell(AWQLinearCell):
 
     def _search_best_scale(self, alpha):
         """search best scale"""
-        best_scale = self._compute_best_scale(alpha)
+        best_alpha = self.cache.get(self.layer_name)
+        if best_alpha:
+            logger.info(f'layer {self.layer_name} using cached alpha: {best_alpha}')
+            best_scale = self._calc_smooth_scale(best_alpha)
+            logger.info(
+                f"AWQSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
+                f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+        else:
+            best_scale, best_ratio = self._compute_best_scale(alpha)
+            self.cache.put(self.layer_name, best_ratio)
         # pylint: disable=protected-access
         self.fp16_weight._offload()
         return best_scale
@@ -641,7 +658,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
                     f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
         if best_ratio == -1:
             raise ValueError(f"best_ratio=-1 is not correct, please check history of loss: {history}.")
-        return best_scale
+        return best_scale, best_ratio
 
     def _attn_forward(self, samples):
         outputs = []

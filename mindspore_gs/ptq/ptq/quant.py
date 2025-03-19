@@ -265,7 +265,7 @@ class PTQ(CompAlgo):
             ValueError: If input `network_helper` is None when mode is `PTQMode.DEPLOY`.
             ValueError: If input datasets is None.
         """
-        self._config.update_tp_size()
+        self._config.update_comm_info()
         self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
