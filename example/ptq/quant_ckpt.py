@@ -217,6 +217,8 @@ def ckpt_name(model_name_, uargs_):
         name += "_smooth"
     elif uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
         name += "_awq"
+    elif uargs_.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID:
+        name += "_omniquant"
     elif uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS:
         name += "_outlier_suppression+"
     else:

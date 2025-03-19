@@ -207,10 +207,10 @@ class PTQ(CompAlgo):
             raise ValueError("PTQ algorithm do not support only quant activation.")
         if config.weight_quant_dtype == dtype.int8 and \
                 config.act_quant_dtype == dtype.int8 and \
-                (config.outliers_suppression == OutliersSuppressionType.AWQ or \
+                (config.outliers_suppression == OutliersSuppressionType.AWQ or
                  config.precision_recovery == PrecisionRecovery.GPTQ):
             raise ValueError("AWQ algorithm and GPTQ algorithm do not support quant activation.")
-        if config.weight_quant_dtype == dtype.qint4x2 and (config.act_quant_dtype == dtype.int8 or \
+        if config.weight_quant_dtype == dtype.qint4x2 and (config.act_quant_dtype == dtype.int8 or
                                                            config.kvcache_quant_dtype == dtype.int8):
             raise ValueError("PTQ algorithm only support quant weight in int4 alone."
                              "Please not to use with a8 or c8 at the same time.")
@@ -317,14 +317,10 @@ class PTQ(CompAlgo):
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook())
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
-                start_time = time.time()
                 processor.process(layer_name, layer)
                 processor.deploy(layer_name, layer)
                 network.update_parameters_name()
-                logger.info(f"{i}th layer do {type(processor)} time cost {time.time() - start_time}")
-                start_time = time.time()
                 gc.collect()
-                logger.info(f"{i}th layer do {type(processor)} gc time cost {time.time() - start_time}")
             if self._config.reflash_inputs_after_each_processor:
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):

@@ -76,6 +76,13 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                                                                          signed=self.cfg.weight_symmetric,
                                                                          narrow_range=self.cfg.weight_narrow_range)
 
+    def _quant_info(self):
+        if self.cfg.weight_quant_dtype == dtype.int8:
+            return f'GPTQ-W8-{str(self.cfg.weight_quant_granularity)}'
+        if self.cfg.weight_quant_dtype == dtype.qint4x2:
+            return f'GPTQ-W4-{str(self.cfg.weight_quant_granularity)}'
+        raise RuntimeError(f"Unexpected weight_quant_dtype: {self.cfg.weight_quant_dtype}.")
+
     def _hessian_compute(self):
         """compute Hessian Matrix"""
         for i in range(len(self.samples)):
