@@ -616,9 +616,14 @@ class AWQSmoothLinearCell(AWQLinearCell):
         if best_alpha:
             logger.info(f'layer {self.layer_name} using cached alpha: {best_alpha}')
             best_scale = self._calc_smooth_scale(best_alpha)
-            logger.info(
-                f"AWQSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
-                f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+            if isinstance(best_scale, Tensor):
+                logger.info(
+                    f"AWQSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
+                    f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+            else:
+                logger.info(
+                    f"AWQSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
+                    f"is {best_scale}")
         else:
             best_scale, best_ratio = self._compute_best_scale(alpha)
             self.cache.put(self.layer_name, best_ratio)
@@ -674,8 +679,12 @@ class AWQSmoothLinearCell(AWQLinearCell):
                 best_error = loss
                 best_ratio = ratio
                 best_scale = scales
-        logger.info(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
-                    f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+        if isinstance(best_scale, Tensor):
+            logger.info(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
+                        f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+        else:
+            logger.info(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
+                        f"is {best_scale}")
         if best_ratio == -1:
             raise ValueError(f"best_ratio=-1 is not correct, please check history of loss: {history}.")
         return best_scale, best_ratio

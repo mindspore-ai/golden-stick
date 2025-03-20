@@ -17,59 +17,8 @@
 import warnings
 from typing import Union, List
 
-import enum
-from dataclasses import dataclass
 import numpy as np
 from mindspore.nn import Cell
-
-from mindspore_gs.common.utils import value_check
-
-
-class LayerType(enum.Enum):
-    """
-    Pre layer type Enum.
-
-    - ``UNKNOWN`` : pre layer type is unknown.
-    - ``NORM_LAYER`` : pre layer type is norm layer.
-    - ``LINEAR_LAYER`` : pre layer type is linear layer.
-    - ``CONCAT_LINEAR_LAYER`` : pre layer type is qkv concat linear layer.
-    """
-    UNKNOWN = 0
-    NORM_LAYER = 1
-    LINEAR_LAYER = 2
-    CONCAT_LINEAR_LAYER = 3
-
-
-@dataclass
-class LayerInfo:
-    """
-    Dataclass for recording layer information.
-
-    Args:
-        name (str) - name of layer。
-        layer (Cell) - layer。
-        type_ (LayerType) - type of layer, ``NORM_LAYER``is norm layer,
-            ``LINEAR_LAYER`` is linear,``CONCAT_LINEAR_LAYER``is qkv concat linear layer,
-            ``UNKNOWN``is unknown type.
-
-    Raises:
-        TypeError: `name` is not str.
-        TypeError: `layer` type is not Cell.
-        TypeError: `type_` not in [LayerType.UNKNOWN, LayerType.NORM_LAYER, LayerType.LINEAR_LAYER,
-            LayerType.CONCAT_LINEAR_LAYER].
-
-    Example:
-        >>> from mindspore_gs.ptq.network_helpers import LayerInfo, LayerType
-        >>> LayerInfo(name='model.layers.0.w_qkv', layer=layer, type=LayerType.CONCAT_LINEAR_LAYER)
-    """
-    name: str = ""
-    layer: Cell = None
-    type_: LayerType = LayerType.UNKNOWN
-
-    def __post_init__(self):
-        value_check('name', self.name, str)
-        value_check('layer', self.layer, Cell)
-        value_check('type', self.type_, LayerType)
 
 
 class NetworkHelper:

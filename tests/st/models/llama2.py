@@ -26,6 +26,7 @@ def llama2(batch_size: int = 32,
            hidden_size: int = 8192,
            num_layers: int = 80,
            num_heads: int = 64,
+           qkv_concat: bool = True,
            checkpoint_name_or_path="",
            use_past=False):
     """Create a Llama2 network for test from mindformers."""
@@ -58,6 +59,7 @@ def llama2(batch_size: int = 32,
     llama2_config.max_decode_length = 512
     llama2_config.top_k = 3
     llama2_config.top_p = 1
+    llama2_config.qkv_concat = qkv_concat
     return LlamaForCausalLM(llama2_config)
 
 

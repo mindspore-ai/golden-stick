@@ -38,12 +38,12 @@ prepare_env()
   mkdir -p ws || exit 1
   echo "enter test workspace."
   cd ws || exit 1
-  rm -rf gs *.whl *log* *yaml output graph *json kernel_meta *py
+  rm -rf gs *log* *yaml output graph *json kernel_meta *py
   cp ../*.yaml ./
   echo "download mf pkg ${MF_PKG_LINK}."
-  wget --no-check-certificate $MF_PKG_LINK || exit 1
+  wget --no-check-certificate -c $MF_PKG_LINK || exit 1
   echo "download ms pkg ${MS_PKG_LINK}."
-  wget --no-check-certificate $MS_PKG_LINK || exit 1
+  wget --no-check-certificate -c $MS_PKG_LINK || exit 1
   echo "clone gs repo."
   git clone https://gitee.com/mindspore/golden-stick.git gs || exit 1
   cd gs || exit 1
