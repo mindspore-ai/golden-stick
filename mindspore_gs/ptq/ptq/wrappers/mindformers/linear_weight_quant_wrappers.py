@@ -162,4 +162,5 @@ class WeightQuantLinearInferCell(LinearInferCell):
         else:
             raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
         self.layer.matmul = qmm
+        del self.layer.weight
         self.layer.weight = q_weight

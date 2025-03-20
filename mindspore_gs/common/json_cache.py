@@ -95,6 +95,7 @@ class JSONCache:
         return self._data.get(key, None)
 
     def put(self, key: str, value: float) -> None:
+        """push key and value to cache and save data"""
         if not isinstance(key, str):
             raise TypeError("Key must be a string")
         try:
