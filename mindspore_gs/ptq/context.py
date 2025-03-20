@@ -18,7 +18,7 @@ from dataclasses import dataclass, field, is_dataclass, asdict
 from enum import Enum
 
 from mindspore import dtype as msdtype
-from mindspore.communication import get_group_size
+from mindspore.communication import get_group_size, get_rank
 
 from mindspore_gs.common.config import GSBaseConfig
 from mindspore_gs.common.dumper import Dumper
@@ -110,8 +110,11 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     kvcache_calibrate_max_new_tokens: int = 10
     reflash_inputs_after_each_processor: bool = False
     fallback_blacklist: dict = field(default_factory=dict)
+
     tp_size: int = 1
+    rank_id: int = 0
     layer_quant_info_collect: dict = field(default_factory=dict)
+    algorithm_cache_path: str = ''
 
     dump_path: str = ""
     dumper: Dumper = Dumper()
@@ -124,17 +127,21 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             info = quant_type
         self.layer_quant_info_collect[layer_name] = info
 
-    def update_tp_size(self):
+    def update_comm_info(self):
         try:
             self.tp_size = get_group_size()
         except RuntimeError:
-            pass
+            self.tp_size = 1
+        try:
+            self.rank_id = get_rank()
+        except RuntimeError:
+            self.rank_id = 0
 
     def set_dump_path(self, dump_path: str):
         self.dumper.set_dump_path(dump_path)
 
     def __post_init__(self):
-        self.update_tp_size()
+        self.update_comm_info()
         value_check('act_per_channel', self.act_per_channel, bool)
         value_check('weight_per_channel', self.weight_per_channel, bool)
         value_check('kvcache_per_head', self.kvcache_per_head, bool)

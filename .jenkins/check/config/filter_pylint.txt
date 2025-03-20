@@ -57,6 +57,8 @@
 "golden-stick/mindspore_gs/ptq/context.py"                                                               "line-too-long"
 "golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_wrapper.py"                               "unused-argument"
 "golden-stick/mindspore_gs/ptq/ptq/hal.py"                                                               "bad-continuation"
+"golden-stick/mindspore_gs/common/json_cache.py"                                                         "protected-access"
+"golden-stick/mindspore_gs/common/json_cache.py"                                                         "unused-argument"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
@@ -80,6 +82,7 @@
 "golden-stick/tests/st/quantization/sim_qat/ops/test_minmax_update_perchannel_aot.py"                    "unused-argument"
 "golden-stick/tests/st/quantization/sim_qat/ops/test_minmax_update_perlayer_aot.py"                      "unused-argument"
 "golden-stick/example/ptq/round_to_nearest/networks/network.py"                                          "unused-argument"
+"golden-stick/tests/st/golden_stick/test_json_cache.py"                                                  "protected-access"
 
 # for version check
 "golden-stick/mindspore_gs/__init__.py"                           "wrong-import-position"
