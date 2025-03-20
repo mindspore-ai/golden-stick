@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Eval c-eval."""
+"""Eval with boolq datasets."""
 
 import argparse
 import time
 import numpy as np
 from mindspore_gs.common import logger
-from mindspore_gs.datasets import create_ceval_dataset
+from mindspore_gs.datasets import create_boolq_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from ds_utils import create_network
 
@@ -32,17 +32,13 @@ def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
     seq_length = network_helper.get_spec("seq_length")
     ignore_token_id = network_helper.get_spec("ignore_token_id")
     pad_token_id = network_helper.get_spec("pad_token_id")
-    ds = create_ceval_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
+    ds = create_boolq_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
                               n_samples=n_samples)
 
-    total_score = {}
+    correct = 0
     data_count = 0
     total_count = ds.get_dataset_size()
     for _, ds_item in enumerate(ds.create_dict_iterator()):
-        subject = ds_item['subjects'].asnumpy()[0]
-        if subject not in total_score.keys():
-            total_score[subject] = {"correct nums": 0, "total nums": 0}
-
         data_count += 1
         print(f"Dataset count: {data_count}/{total_count}", flush=True)
         input_ids = ds_item['input_ids'].asnumpy()
@@ -53,9 +49,8 @@ def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
             # As the nonzero returns the index and we need length
             batch_valid_length.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
         batch_valid_length = np.array(batch_valid_length)
-
-        outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length,
-                               top_p=top_p, top_k=top_k, max_new_tokens=5)
+        outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length, top_k=top_k, top_p=top_p,
+                               max_new_tokens=5)
         output_ids = []
         for j in range(input_ids.shape[0]):
             output_ids.append(outputs[j][int(batch_valid_length[j]):])
@@ -65,28 +60,23 @@ def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
 
         if labels_str[0].lower() in pres_str[0].lower():
-            total_score[subject]["correct nums"] = total_score[subject]["correct nums"] + 1
-            print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}。回答正确", flush=True)
+            correct += 1
+            print(f"question: {question}\n predict: {pres_str} answer: {labels_str}. correct!", flush=True)
         else:
-            print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}。回答错误", flush=True)
-        total_score[subject]["total nums"] = total_score[subject]["total nums"] + 1
-
-    print("各个科目成绩:", flush=True)
-    total_correct = 0
-    for subject, score in total_score.items():
-        total_correct += score["correct nums"]
-        print(f"科目: {subject} -- 成绩: {(score['correct nums'] / score['total nums']):.4f}", flush=True)
-    print(f"总成绩: {(total_correct / data_count):.4f}", flush=True)
-    print('评测完成!', flush=True)
+            print(f"question: {question}\n predict: {pres_str} answer: {labels_str}. not correct!", flush=True)
+        if data_count % 100 == 0:
+            print(f"acc: {correct / data_count}", flush=True)
+    print(f"total acc: {correct / data_count}", flush=True)
+    print('Evaluate Over!', flush=True)
 
 
 def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', '-c', type=str, required=True)
+    parser.add_argument('--approach', '-a', type=str, required=True)
     parser.add_argument('--dataset_path', '-s', type=str, required=True)
     parser.add_argument('--n_samples', '-n', type=int, default=-1)
-    parser.add_argument('--approach', '-a', type=str, required=True)
     args = parser.parse_args()
     logger.info(f"evaluate args: {args}")
     return args
@@ -97,7 +87,6 @@ if __name__ == "__main__":
     uargs = get_args()
     logger.info('Creating network...')
     helper = MFDSV3Helper(uargs.config)
-    logger.info(f'Create Network cost time is {time.time() - start} s.')
-    auto_online_trans = helper.mf_config.auto_trans_ckpt
     ds_tokenizer, network = create_network(uargs.config, quant_type=uargs.approach)
+    logger.info(f'Create Network cost time is {time.time() - start} s.')
     evaluate(network, uargs.dataset_path, ds_tokenizer, helper, uargs.n_samples)
