@@ -93,11 +93,11 @@ class LinearInferCell(Cell):
 
     def linear_forward(self, x, group_list=None):
         """Forward process, x should be a tensor"""
-        out_shape = self._layer.shape(x)[:-1] + (self._layer.out_channels,)
         ori_dtype = F.dtype(x)
         x = self._layer.cast(x, self._layer.dtype)
         if self.has_act_quant:
             x = self.quant_op(x)
+        out_shape = self._layer.shape(x)[:-1] + (self._layer.out_channels,)
         x = self._layer.reshape(x, (-1, self._layer.in_channels))
         if self._layer.expert_flag and not self._layer.use_gmm:
             if self._layer.use_expert_group_size is True:
