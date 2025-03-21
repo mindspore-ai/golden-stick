@@ -28,7 +28,7 @@ from mindspore_gs.ptq.ptq.quant import InputCatcher
 
 from mindformers.experimental.infer.core.norm import RMSNorm
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear
-from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
+from deepseek3_model_infer import DeepseekV3DecodeLayer
 from ds_utils import create_network
 
 
@@ -134,6 +134,6 @@ def pynative_generate(yaml_file, quant_type):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True, type=str)
-    parser.add_argument('--quant_type', default=None, type=str)
+    parser.add_argument('--quant_type', default=None, type=lambda x: str(x) if x != '' else None)
     args = parser.parse_args()
     pynative_generate(args.config, args.quant_type)
