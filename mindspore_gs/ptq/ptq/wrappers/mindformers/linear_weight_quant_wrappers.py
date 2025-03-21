@@ -79,7 +79,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
 
         self.q_weight = Parameter(initializer("ones", self.layer.weight.shape, dtype.int8), name=self.layer.weight.name)
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
-            if self.ic % (self.cfg.group_size * cfg.tp_size) != 0:
+            if self.ic % self.cfg.group_size != 0:
                 raise ValueError(f"input channel {self.ic} can not divide group_size {self.cfg.group_size}.")
             if self.ic == self.cfg.group_size:
                 raise ValueError(f"input channel {self.ic} can not equal to group_size {self.cfg.group_size}.")
@@ -120,7 +120,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_CHANNEL:
             w_scale = np.squeeze(w_scale)
             w_zp = np.squeeze(w_zp)
-        self.q_weight.set_data(Tensor(q_weight.asnumpy(), dtype=dtype.int8))
+        self.q_weight.set_data(q_weight.astype(dtype=dtype.int8))
         self.w_scale.set_data(Tensor(w_scale, dtype=dtype.float64))
         self.w_zp.set_data(Tensor(w_zp, dtype=dtype.float64))
         self.cfg.dumper.dump_data(self.layer_name, "|weight_params|input0_weight", self.layer.weight)
@@ -162,4 +162,5 @@ class WeightQuantLinearInferCell(LinearInferCell):
         else:
             raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
         self.layer.matmul = qmm
+        del self.layer.weight
         self.layer.weight = q_weight

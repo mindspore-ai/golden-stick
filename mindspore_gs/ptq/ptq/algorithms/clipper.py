@@ -87,5 +87,5 @@ class LinearClipper(Algorithm):
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 return wrapper_cell, True
 
-        clip_skip_layer = ["wq", "wk", "w_qkv"]
+        clip_skip_layer = ["wq", "wk", "w_qkv", "routed_experts.ffn.w2"]
         Replacer(self).process(decoder_layer, decoder_layer_name)

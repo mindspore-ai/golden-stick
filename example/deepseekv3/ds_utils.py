@@ -54,13 +54,13 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
                                weight_quant_granularity=QuantGranularity.PER_CHANNEL)
         layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
     elif quant_type.lower() == 'awq-a16w4':
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
                         act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
                         opname_blacklist=['lm_head', 'lkv2kv'], weight_quant_granularity=QuantGranularity.PER_GROUP,
                         group_size=128)
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'awq-a16w8':
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
                         opname_blacklist=['lm_head', 'lkv2kv'])
     elif quant_type.lower() == 'gptq-perchannel':
@@ -99,7 +99,7 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     else:
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
     ptq = PTQ(config=cfg, layer_policies=layer_policies)
-    if quant_type.lower() == 'awq':
+    if 'awq' in quant_type.lower():
         # pylint: disable=protected-access
         ptq._config.weight_symmetric = False
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
