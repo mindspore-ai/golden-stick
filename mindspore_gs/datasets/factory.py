@@ -24,7 +24,7 @@ from .calibrate import create_calibrate_dataset
 
 
 def get_datasets(ds_type: str, ds_path: str, mode, batch_size, seq_length, max_new_tokens, tokenizer,
-                 ignore_token_id, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True) -> Dataset:
+                 ignore_token_id, repeat=1, need_pad=False, n_samples=-1, add_special_tokens=True) -> Dataset:
     """get_datasets."""
     if ds_type.lower() == 'wikitext2':
         return create_wikitext_dataset(ds_path, batch_size, seq_length, max_new_tokens, tokenizer, repeat, need_pad,

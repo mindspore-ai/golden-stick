@@ -25,7 +25,7 @@ from mindspore_gs.datasets import create_wikitext_dataset
 def check_ds_pt(ds_path: str, bs: int, seq_length: int, max_decode_len: int, vocab_file: str, repeat):
     """Create and check wikitext-2-parquet dataset."""
     tokenizer = LlamaTokenizer(vocab_file=vocab_file)
-    ds = create_wikitext_dataset(ds_path, bs, seq_length, max_decode_len, tokenizer, repeat)
+    ds = create_wikitext_dataset(ds_path, bs, seq_length, max_decode_len, tokenizer, repeat, need_pad=True)
 
     wiki_len = 343668
     wiki_items = wiki_len // (seq_length - max_decode_len)

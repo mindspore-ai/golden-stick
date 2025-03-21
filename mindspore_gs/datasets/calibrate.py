@@ -28,7 +28,7 @@ from mindspore_gs.datasets.base import BaseDataset
 class CalibrateDataset(BaseDataset):
     """calibrate dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
-                 need_pad=True, n_samples=-1, add_special_tokens=True):
+                 need_pad=False, n_samples=-1, add_special_tokens=True):
         super().__init__(path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
                          add_special_tokens)
         self._load()
@@ -52,7 +52,7 @@ class CalibrateDataset(BaseDataset):
 
 
 def create_calibrate_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
-                             ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
+                             ignore_token_id=-100, repeat=1, need_pad=False, n_samples=-1, add_special_tokens=True):
     """create squad dataset"""
     ds = CalibrateDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
                           add_special_tokens)

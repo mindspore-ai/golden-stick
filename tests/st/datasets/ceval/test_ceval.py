@@ -25,7 +25,16 @@ from mindspore_gs.datasets import create_ceval_dataset
 def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
     """Create and check squad dataset."""
     tokenizer = LlamaTokenizer(vocab_file=vocab_file)
-    ds = create_ceval_dataset(ds_path, "eval", bs, seq_length, tokenizer, repeat=repeat)
+    if bs == 1:
+        ds = create_ceval_dataset(ds_path, "eval", bs, seq_length, tokenizer, repeat=repeat)
+        samples = 260
+        assert ds.get_repeat_count() == repeat
+        assert ds.output_types()[1] == np.int32
+        assert ds.output_types()[2] == np.int32
+        assert ds.output_shapes()[1] == [bs, 124]
+        assert ds.output_shapes()[2] == [bs, 1]
+        assert ds.get_dataset_size() == samples // bs * repeat
+    ds = create_ceval_dataset(ds_path, "eval", bs, seq_length, tokenizer, repeat=repeat, need_pad=True)
     samples = 260
     assert ds.get_repeat_count() == repeat
     assert ds.output_types()[1] == np.int32
