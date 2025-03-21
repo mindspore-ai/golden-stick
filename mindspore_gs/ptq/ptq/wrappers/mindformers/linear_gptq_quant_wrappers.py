@@ -287,11 +287,13 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                                                                                         self.group_zero, weight_shape,
                                                                                         scale_shape)
         self.q_weight.set_data(Tensor(self.qweight.asnumpy(), dtype=dtype.int8))
-        self.w_scale.set_data(Tensor(self.group_scale.asnumpy(), dtype=dtype.float64))
-        self.w_zp.set_data(Tensor(self.group_zero.asnumpy(), dtype=dtype.float64))
-        self.group_scale = None
-        self.group_zero = None
-        self.qweight = None
+        self.w_scale.set_data(Tensor(self.group_scale, dtype=dtype.float64))
+        self.w_zp.set_data(Tensor(self.group_zero, dtype=dtype.float64))
+        del weight
+        del hinv
+        del self.group_scale
+        del self.group_zero
+        del self.qweight
 
     def process(self):
         self.quant()
