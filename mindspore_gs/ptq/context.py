@@ -115,6 +115,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     rank_id: int = 0
     layer_quant_info_collect: dict = field(default_factory=dict)
     algorithm_cache_path: str = ''
+    always_use_fp_input_in_processer: bool = False
 
     dump_path: str = ""
     dumper: Dumper = Dumper()
