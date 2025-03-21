@@ -23,7 +23,9 @@ import pandas as pd
 from mindspore import dtype, Tensor
 import mindspore.dataset.transforms as C
 from mindspore.dataset import GeneratorDataset
+
 from mindspore_gs.common import logger
+from mindspore_gs.datasets.base import BaseDataset
 
 
 TASK2DESC = {
@@ -81,6 +83,7 @@ TASK2DESC = {
     "physician": "医师资格",
 }
 
+
 choices = ["A", "B", "C", "D"]
 
 
@@ -98,41 +101,17 @@ def format_example(subject, line, include_answer=True):
     return example
 
 
-class CEvalDataset:
+class CEvalDataset(BaseDataset):
     """boolQ dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
                  need_pad=True, n_samples=-1, add_special_tokens=True):
-        self.path = os.path.join(path)
-        if mode not in ("eval", "train", "test"):
-            raise ValueError("Input `mode` should be 'eval', 'test' or 'train', got: ", mode)
-        self.mode = mode
-        self.seq_len = seq_length
-        self.ignore_token_id = ignore_token_id
-        self.add_special_tokens = add_special_tokens
-        self.tokenizer = tokenizer
-        self.need_pad = need_pad
-        if mode in ("eval", "test"):
-            if hasattr(self.tokenizer, 'add_bos_token'):
-                self.tokenizer.add_bos_token = True
-            if hasattr(self.tokenizer, 'add_eos_token'):
-                self.tokenizer.add_eos_token = False
-        else:
-            if hasattr(tokenizer, 'add_bos_token'):
-                tokenizer.add_bos_token = True
-            if hasattr(tokenizer, 'add_eos_token'):
-                tokenizer.add_eos_token = True
+        super().__init__(path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
+                         add_special_tokens)
         self.subjects = []
-        self.input_ids = []
-        self.labels = []
-        self._load(n_samples)
         self.iter_subjects = None
-        self.iter_input_ids = None
-        self.iter_labels = None
+        self._load()
 
-    def __len__(self):
-        return len(self.input_ids)
-
-    def _load(self, n_samples=-1):
+    def _load(self):
         """Load and preprocess squad dataset."""
         subjects = []
         sources = []
@@ -149,15 +128,16 @@ class CEvalDataset:
                 subjects.append(TASK2DESC.get(subject_name, ""))
                 sources.append(input_str)
                 targets.append(row["answer"])
-                if (0 < int(n_samples / len(TASK2DESC.keys())) < idx) or (0 < n_samples <= len(sources)):
+                if (0 < int(self.n_samples / len(TASK2DESC.keys())) < idx) or (0 < self.n_samples <= len(sources)):
                     break
-            if 0 < n_samples <= len(sources):
+            if 0 < self.n_samples <= len(sources):
                 break
 
         total_items = 0
         total_items = self._dataset_based_on_mode(subjects, sources, targets, total_items)
         logger.info("Find %d total data items", total_items)
 
+    # pylint: disable=arguments-differ
     def _dataset_based_on_mode(self, subjects, sources, targets, total_items):
         """create dataset based on mode"""
         self.subjects.clear()

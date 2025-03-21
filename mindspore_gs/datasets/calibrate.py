@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""BoolQ dataset."""
+"""calibrate dataset for quantization algorithm."""
 
-
-import json
 import pathlib
+import json
+
 from mindspore import dtype
 import mindspore.dataset.transforms as C
 from mindspore.dataset import GeneratorDataset
@@ -25,8 +25,8 @@ from mindspore_gs.common import logger
 from mindspore_gs.datasets.base import BaseDataset
 
 
-class BoolQDataset(BaseDataset):
-    """boolQ dataset."""
+class CalibrateDataset(BaseDataset):
+    """calibrate dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
                  need_pad=True, n_samples=-1, add_special_tokens=True):
         super().__init__(path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
@@ -34,23 +34,16 @@ class BoolQDataset(BaseDataset):
         self._load()
 
     def _load(self):
-        """Load and preprocess squad dataset."""
+        """Load and preprocess calibrate dataset."""
         sources = []
         targets = []
         input_file = pathlib.Path(self.path)
         with open(input_file, encoding='utf-8') as f:
             for line in f:
                 data = json.loads(line)
-                passage = data["passage"]
-                query = data["question"]
-                answer = 'yes' if data["answer"] else 'no'
-                title = data["title"]
-
-                input_str = f"Please read the following passage and answer the question directly with either 'yes' or" \
-                            f" 'no' without analysis process.\n\n ### " \
-                            f"Passage:\n{title} -- {passage}\n### Question:\n{query}\n### Answer:"
-                sources.append(input_str)
-                targets.append(answer)
+                prompt = data["prompt"]
+                sources.append(prompt)
+                targets.append("NULL")
                 if 0 < self.n_samples <= len(sources):
                     break
         total_items = 0
@@ -58,10 +51,11 @@ class BoolQDataset(BaseDataset):
         logger.info("Find %d total data items", total_items)
 
 
-def create_boolq_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
-                         ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
+def create_calibrate_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
+                             ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
     """create squad dataset"""
-    ds = BoolQDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples, add_special_tokens)
+    ds = CalibrateDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
+                          add_special_tokens)
     ds = GeneratorDataset(source=ds, column_names=["input_ids", "labels"])
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
