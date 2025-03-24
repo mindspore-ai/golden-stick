@@ -13,10 +13,10 @@
 # limitations under the License.
 # ============================================================================
 """ptq wrapper cells for mindformers."""
-
+import os
 import math
 import time
-
+from typing import Optional
 from mindspore import Tensor, dtype, numpy
 from mindspore import ops as msops
 from mindspore.communication import get_rank
@@ -25,6 +25,7 @@ from mindspore.ops import sub as aclnn_sub, add as aclnn_add
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
+from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor, get_quant_min_max
@@ -55,6 +56,12 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             self.is_moe = True
         else:
             self.is_moe = False
+        self.linear_name = linear_name.split('.')[-1] if not self.is_moe else 'moe|' + linear_name.split('.')[-1]
+        if context.algorithm_cache_path:
+            cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', 'gptq.json')
+        else:
+            cache_file_path = ''
+        self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
         self.bits = 4 if self.cfg.weight_quant_dtype == dtype.qint4x2 else 8
         self.nsamples = 0
         self.cfg.reflash_inputs_after_each_processor = True
@@ -295,7 +302,26 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         del self.group_zero
         del self.qweight
 
+    def _cache_key(self):
+        qweight_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|qweight'
+        scale_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|scale'
+        zero_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|zero'
+        return qweight_name, scale_name, zero_name
+
     def process(self):
-        self.quant()
+        qweight_name, scale_name, zero_name = self._cache_key()
+        scale = self.cache.get(scale_name)
+        zero = self.cache.get(zero_name)
+        qweight = self.cache.get(qweight_name)
+        if scale is not None and zero is not None and qweight is not None:
+            logger.info(f'layer {self.layer_name} use cache for qweight, scale and zero.')
+            self.q_weight.set_data(Tensor(qweight, dtype=dtype.int8))
+            self.w_scale.set_data(Tensor(scale, dtype=dtype.float64))
+            self.w_zp.set_data(Tensor(zero, dtype=dtype.float64))
+        else:
+            self.quant()
+            self.cache.put(qweight_name, self.q_weight.asnumpy())
+            self.cache.put(scale_name, self.w_scale.asnumpy())
+            self.cache.put(zero_name, self.w_zp.asnumpy())
         # pylint: disable=protected-access
         self.layer.weight._offload()
