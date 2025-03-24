@@ -1,7 +1,7 @@
 mindspore_gs.ptq.PTQ
 ============================================================
 
-.. py:class:: mindspore_gs.ptq.PTQ(config: Union[dict, PTQConfig] = None, layer_policies: dict = None)
+.. py:class:: mindspore_gs.ptq.PTQ(config: Union[dict, PTQConfig] = None, layer_policies=None)
 
     量化算法PTQ的基本实现，支持激活、权重和kvcache的组合量化。
 
@@ -50,7 +50,7 @@ mindspore_gs.ptq.PTQ
             - **TypeError** - `ckpt_path` 数据类型不是str。
             - **ValueError** - `ckpt_path` 非空但不是有效路径。
 
-    .. py:method:: summary(network: Cell)
+    .. py:method:: summary(network)
 
         总结并打印网络中每一层的使用的模型压缩策略，如某一个线性层的量化策略为：W8-perchannel-A8-pertensor。
 

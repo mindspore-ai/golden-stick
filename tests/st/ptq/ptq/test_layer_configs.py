@@ -114,6 +114,8 @@ def test_type():
     ptq = PTQ(cfg)
     with pytest.raises(TypeError):
         ptq.summary(1)
+    with pytest.raises(TypeError):
+        ptq.summary('test')
 
 
 @pytest.mark.level0
@@ -135,9 +137,9 @@ def test_empty_summary():
                     weight_quant_granularity=QuantGranularity.PER_CHANNEL)
     ptq = PTQ(config=cfg)
     ptq.decoder_layer_types.append(DecoderLayer)
-    ptq.apply(net)
     ptq.summary(net)
-    assert len(ptq._config.layer_quant_info_collect) == 36
+    assert isinstance(ptq._config.layer_quant_info_collect, dict) and not ptq._config.layer_quant_info_collect
+    assert ptq._target_layer_type
 
 
 @pytest.mark.level0
@@ -166,7 +168,8 @@ def test_quant_summary():
                            outliers_suppression=OutliersSuppressionType.NONE,
                            precision_recovery=PrecisionRecovery.NONE,
                            act_quant_granularity=QuantGranularity.PER_TOKEN,
-                           weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+                           weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+                           opname_blacklist=['lkv2kv', 'lm_head', 'w2'])
     awq_config = PTQConfig(weight_quant_dtype=dtype.qint4x2,
                            outliers_suppression=OutliersSuppressionType.AWQ,
                            precision_recovery=PrecisionRecovery.NONE,
@@ -180,13 +183,13 @@ def test_quant_summary():
     ptq.decoder_layer_types.append(DecoderLayer)
     ptq.apply(net)
     ptq.summary(net)
-    assert len(ptq._config.layer_quant_info_collect) == 36
+    assert len(ptq._config.layer_quant_info_collect) == 31
     assert (ptq._config.layer_quant_info_collect['network.layers.0.attention.q'] ==
             'SmoothQuant-W8-per_channel-A8-per_tensor')
     assert ptq._config.layer_quant_info_collect['network.layers.0.attention.k'] == 'W8-per_channel-A8-per_tensor'
     assert ptq._config.layer_quant_info_collect['network.layers.0.ffn.w1'] == 'W8-per_channel-A8-per_token'
     assert ptq._config.layer_quant_info_collect['network.layers.4.moe.w1'] == 'AWQ-wclip-W4-per_group'
-
+    assert 'network.layers.5.moe.w2' not in ptq._config.layer_quant_info_collect
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training

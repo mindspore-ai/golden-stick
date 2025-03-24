@@ -77,7 +77,7 @@ $$X_{float} = (X_{int} - offset) \times scale$$
 
 After inverse quantization of weights to floating point, the inference process of the network is no different from the general floating point network inference process. Weight quantization does not bring about a reduction in computation, on the contrary, inverse quantization will bring about additional computation, so the operation of inverse quantization is usually fused with the subsequent floating point computation process, which can effectively reduce the memory overhead in the deployment phase, and at the same time alleviate the Memory Bound in the incremental inference phase of the large language model, which both can improve the throughput of the large language model when deployed.
 
-PTQ currently supports only 8bit weight quantization capability, which can be enabled by the following configuration item:
+PTQ RoundToNearest Algorithm currently supports only 8bit weight quantization capability, which can be enabled by the following configuration item:
 
 ```python
 from mindspore import dtype as msdtype
@@ -204,7 +204,7 @@ from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecove
 from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
 
 algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
-ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
                        weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0,
                        precision_recovery = PrecisionRecovery.GPTQ)
@@ -218,7 +218,7 @@ from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecove
 from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
 
 algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
-ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128,
                        precision_recovery = PrecisionRecovery.GPTQ)

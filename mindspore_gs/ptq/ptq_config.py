@@ -229,6 +229,8 @@ class QuantGranularity(Enum):
 @dataclass
 class PTQConfig:
     """
+    PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=<class 'list'>, algo_args=<class 'dict'>, weight_quant_dtype=Int8, kvcache_quant_dtype=None, act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.NONE, precision_recovery=PrecisionRecovery.NONE, weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0, act_quant_granularity=QuantGranularity.PER_TENSOR, kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
+
     Config for post trainning quantization.
 
     Args:
