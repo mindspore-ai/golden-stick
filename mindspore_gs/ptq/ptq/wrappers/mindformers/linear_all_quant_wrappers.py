@@ -91,8 +91,10 @@ class AllQuantLinearInferCell(LinearInferCell):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
+        use_aclnn_quant = any(opname in layer_name for opname in cfg.aclnn_quant_list)
         quant, qmm = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam, is_deploy,
-                                           cfg.tp_size, compute_type, KernelType.INTERNAL)
+                                           cfg.tp_size, compute_type,
+                                           KernelType.ACLNN if use_aclnn_quant else KernelType.INTERNAL)
         if not is_deploy:
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
             logger.debug(f"AllQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
