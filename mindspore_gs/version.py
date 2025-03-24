@@ -20,6 +20,9 @@ import time
 __version__ = '1.1.0'
 
 
+__checked__ = False
+
+
 def mindspore_version_check():
     """
     Do the MindSpore version check for MindSpore Golden Stick. If the MindSpore can not be imported, it will raise
@@ -29,6 +32,10 @@ def mindspore_version_check():
     Raise:
         ImportError: If the MindSpore can not be imported.
     """
+    global __checked__
+    if __checked__:
+        return
+    __checked__ = True
 
     try:
         import mindspore as ms
