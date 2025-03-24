@@ -721,6 +721,26 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
             q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
         return wqbmm, q_weight
 
+    # pylint: disable=arguments-differ
+    def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        if parallel_type == ParallelType.COL_PARALLEL:
+            smooth_scale_shard = (1,)
+            t_scale_shard = (1, 1, tensor_parallel_num) if self.is_grouped_mm else (1, tensor_parallel_num)
+            t_zp_shard = (1, 1, tensor_parallel_num) if self.is_grouped_mm else (1, tensor_parallel_num)
+        elif parallel_type == ParallelType.ROW_PARALLEL:
+            smooth_scale_shard = (tensor_parallel_num,)
+            t_scale_shard = (1, tensor_parallel_num, 1) if self.is_grouped_mm else (tensor_parallel_num, 1)
+            t_zp_shard = (1, tensor_parallel_num, 1) if self.is_grouped_mm else (tensor_parallel_num, 1)
+        else:
+            return {}
+        shard_state = {
+            self.weight_scale.name: {'shape': self.weight_scale.shape, 'shard': t_scale_shard},
+            self.weight_zp.name: {'shape': self.weight_zp.shape, 'shard': t_zp_shard},
+        }
+        if self.has_smooth:
+            shard_state[self.smooth_scale.name] = {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}
+        return shard_state
+
 
 class AllQuantMatmul(QuantUnitCell):
     """all quant mm"""
