@@ -77,7 +77,7 @@ $$X_{float} = (X_{int} - offset) \times scale$$
 
 将权重反量化为浮点后，网络的推理过程就和一般的浮点网络推理过程无异。权重量化并不能带来计算量的减少，相反反量化会带来额外的计算量，所以通常将反量化的操作和后续的浮点计算过程进行融合，可以有效降低部署阶段的显存开销，同时可以缓解大语言模型增量推理阶段的Memory Bound，这两者都可以提升大语言模型部署时的吞吐量。
 
-PTQ当前仅支持8bit的权重量化能力，可以通过如下配置项使能：
+PTQ RoundToNearest算法当前支持8bit的权重量化能力，可以通过如下配置项使能：
 
 ```python
 from mindspore import dtype as msdtype
@@ -136,7 +136,7 @@ from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecove
 from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
 
 algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
-ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
                        weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0,
                        precision_recovery = PrecisionRecovery.GPTQ)
@@ -150,7 +150,7 @@ from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, PrecisionRecove
 from mindspore_gs.ptq.ptq_config import GPTQQuantConfig
 
 algorithm_config = GPTQQuantConfig(desc_act=False, static_groups=False, damp_percent=0.1, block_size=128)
-ptq_config = PTQConfig(weight_quant_dtype=qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE, algo_args=algorithm_config,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128,
                        precision_recovery = PrecisionRecovery.GPTQ)
