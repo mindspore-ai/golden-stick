@@ -16,25 +16,28 @@
 # ============================================================================
 """setup package."""
 import os
+import sys
 import stat
 import shutil
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
 
-commit_id = os.getenv('COMMIT_ID').replace("\n", "")
-build_path = os.getenv('BUILD_PATH')
-pkg_dir = os.path.join(build_path, 'lib')
 pwd = os.path.dirname(os.path.realpath(__file__))
+build_path = os.path.join(pwd, 'build')
+pkg_dir = os.path.join(build_path, 'lib')
 
 
 class BuildPy(build_py):
     """BuildPy."""
 
     @staticmethod
-    def _write_commit_file(file):
+    def _write_commit_file(path):
         """ Write commit info into `file`. """
-        file.write("__commit_id__ = '{}'\n".format(commit_id))
+        ret_code = os.system(f"git log --format='[sha1]:%h,[branch]:%d' --abbrev=8 -1 > {path}")
+        if ret_code != 0:
+            sys.stdout.write("Warning: Can not get commit id information. Please make sure git is available.")
+            os.system(f"echo 'git is not available while building.' > {path}")
 
     @staticmethod
     def _write_extra_info():
@@ -45,14 +48,10 @@ class BuildPy(build_py):
         BuildPy._update_permissions(mindspore_dir)
         mindspore_dir = os.path.join(pkg_dir, 'mindspore_gs', '.commit_id')
         BuildPy._update_permissions(mindspore_dir)
+        BuildPy._write_commit_file(mindspore_dir)
         mindspore_dir = os.path.join(pwd, 'mindspore_gs', '.commit_id')
         BuildPy._update_permissions(mindspore_dir)
-        commit_file = os.path.join(pkg_dir, 'mindspore_gs', '.commit_id')
-        with open(commit_file, 'w') as f:
-            BuildPy._write_commit_file(f)
-        commit_file = os.path.join(pwd, 'mindspore_gs', '.commit_id')
-        with open(commit_file, 'w') as f:
-            BuildPy._write_commit_file(f)
+        BuildPy._write_commit_file(mindspore_dir)
 
     @staticmethod
     def _update_permissions(path):
