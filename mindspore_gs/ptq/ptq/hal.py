@@ -708,7 +708,7 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
                 weight_shape = (num_experts, ic, oc // 2)
             else:
                 weight_shape = (ic, oc // 2)
-            q_weight = Parameter(Tensor(np.ones(weight_shape), w_qparam.quant_dtype), name=linear.weight.name)
+            q_weight = Parameter(initializer("ones", weight_shape, w_qparam.quant_dtype), name=linear.weight.name)
         else:
             if num_experts != 0:
                 q_weight = q_weight.transpose((0, 2, 1)).asnumpy() if trans_b else q_weight.asnumpy()
