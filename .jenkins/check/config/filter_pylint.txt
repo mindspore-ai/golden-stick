@@ -59,6 +59,7 @@
 "golden-stick/mindspore_gs/ptq/ptq/hal.py"                                                               "bad-continuation"
 "golden-stick/mindspore_gs/common/json_cache.py"                                                         "protected-access"
 "golden-stick/mindspore_gs/common/json_cache.py"                                                         "unused-argument"
+"golden-stick/mindspore_gs/common/logger.py"                                                             "unused-argument"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
