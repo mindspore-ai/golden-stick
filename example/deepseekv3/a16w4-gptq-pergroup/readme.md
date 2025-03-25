@@ -28,3 +28,16 @@ ASCEND_RT_VISIBLE_DEVICES=xxx bash quant_infer.sh /path/to/mindformers
 ASCEND_RT_VISIBLE_DEVICES=xxx bash eval_ceval.sh /path/to/mindformers /path/to/ceval_dataset_path
 ```
 
+## 4. 生成的safetensors合一
+
+首先生成策略文件，生成的策略文件ckpt_strategy.ckpt在当前目录下:
+
+```bash
+ASCEND_RT_VISIBLE_DEVICES=xxx bash gen_strategy.sh /path/to/mindformers
+```
+
+然后进行合一，需要传入原始safetensors目录和目标safetensors目录。
+
+```bash
+bash unify_safetensors.sh /path/to/src_safetensors /path/to/dst_safetensors
+```
