@@ -58,8 +58,10 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             self.is_moe = False
         self.linear_name = linear_name.split('.')[-1] if not self.is_moe else 'moe|' + linear_name.split('.')[-1]
         if context.algorithm_cache_path:
+            self.enable_cache = True
             cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', 'gptq.json')
         else:
+            self.enable_cache = False
             cache_file_path = ''
         self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
         self.bits = 4 if self.cfg.weight_quant_dtype == dtype.qint4x2 else 8
@@ -320,8 +322,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             self.w_zp.set_data(Tensor(zero, dtype=dtype.float64))
         else:
             self.quant()
-            self.cache.put(qweight_name, self.q_weight.asnumpy())
-            self.cache.put(scale_name, self.w_scale.asnumpy())
-            self.cache.put(zero_name, self.w_zp.asnumpy())
+            if self.enable_cache:
+                self.cache.put(qweight_name, self.q_weight.asnumpy())
+                self.cache.put(scale_name, self.w_scale.asnumpy())
+                self.cache.put(zero_name, self.w_zp.asnumpy())
         # pylint: disable=protected-access
         self.layer.weight._offload()
