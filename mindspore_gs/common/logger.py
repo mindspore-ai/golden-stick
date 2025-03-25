@@ -16,74 +16,39 @@
 
 import os
 import sys
-import traceback
-import io
 import logging
+import inspect
+import threading
+import atexit
 
 
-if hasattr(sys, '_getframe'):
-    # pylint: disable=protected-access
-    currentframe = lambda: sys._getframe(4)
-else: #pragma: no cover
-    def currentframe():
-        """Return the frame object for the caller's stack frame."""
-        try:
-            raise Exception
-        # pylint: disable=broad-except
-        except Exception:
-            return sys.exc_info()[2].tb_frame.f_back
-
-
-# pylint: disable=unused-argument
-def _find_real_caller(stack_info=False, stacklevel=1):
+def _find_real_caller():
     """
     Find the stack frame of the caller so that we can note the source
     file name, line number and function name.
     """
-    f = currentframe()
-    log_file = os.path.normcase(f.f_code.co_filename)
-    if f is not None:
-        f = f.f_back
-    rv = "(unknown file)", 0, "(unknown function)", None
-    while hasattr(f, "f_code"):
-        co = f.f_code
-        filename = os.path.normcase(co.co_filename)
-        if filename == log_file:
-            f = f.f_back
+    current_file = os.path.normcase(__file__)
+    stack = inspect.stack()
+    for frame_info in stack:
+        frame = frame_info.frame
+        filename = os.path.normcase(frame.f_code.co_filename)
+        if filename == current_file:
             continue
-        sinfo = None
-        if stack_info:
-            sio = io.StringIO()
-            sio.write('Stack (most recent call last):\n')
-            traceback.print_stack(f, file=sio)
-            sinfo = sio.getvalue()
-            if sinfo[-1] == '\n':
-                sinfo = sinfo[:-1]
-            sio.close()
-        rv = (co.co_filename, f.f_lineno, co.co_name, sinfo)
-        break
-    return rv
+        return (
+            filename,
+            frame.f_lineno,
+            frame.f_code.co_name,
+            None
+        )
+    return "unknown", 0, "unknown", None
 
 
 class GSLogFormatter(logging.Formatter):
     """_GSLogFormatter"""
     def format(self, record):
-        """format"""
-        # handle pathname
-        ms_install_home_path = 'mindspore_gs'
-        idx = record.pathname.rfind(ms_install_home_path)
-        if idx >= 0:
-            # Get the relative path of the file
-            record.filepath = record.pathname[idx:]
-        else:
-            record.filepath = record.pathname
-
-        # handle funcName
-        if record.funcName == "<module>":
-            record.funcname = ""
-        else:
-            record.funcname = record.funcName
-
+        idx = record.pathname.rfind('mindspore_gs')
+        record.filepath = record.pathname[idx:] if idx >= 0 else record.pathname
+        record.funcname = record.funcName if record.funcName != "<module>" else ""
         return super().format(record)
 
 
@@ -91,52 +56,119 @@ class Logger:
     """Logger for GoldenStick."""
     def __init__(self):
         self.logger = logging.getLogger("GoldenStick")
-        self.logger.findCaller = _find_real_caller
-        log_level = Logger._get_init_log_level()
+        log_level = self._get_init_log_level()
+
+        # Initialize handlers if not exist
         if not self.logger.hasHandlers():
             console = logging.StreamHandler(sys.stdout)
-            console.setLevel(level=log_level)
-            format_str = '[%(levelname)s] %(name)s(%(process)s):%(asctime)s [%(filepath)s:%(lineno)d %(funcname)s] - ' \
-                         '%(message)s'
-            console.setFormatter(GSLogFormatter(format_str))
+            console.setLevel(log_level)
+            formatter = GSLogFormatter(
+                '[%(levelname)s] %(name)s(%(process)s):%(asctime)s '
+                '[%(filepath)s:%(lineno)d %(funcname)s] - %(message)s'
+            )
+            console.setFormatter(formatter)
             self.logger.addHandler(console)
+
         self.logger.setLevel(log_level)
         self.logger.propagate = False
 
+        # Log merging mechanism
+        self._lock = threading.RLock()
+        self.last_signature = None  # (msg, level, file, line, func)
+        self.repeat_count = 0
+        self.last_exc_info = None
+        self.last_extra = None
+        self.last_sinfo = None
+        self.last_msg = None
+        self.last_level = None
+        self.first_occurrence = None
+
+        # Ensure final flush on exit
+        atexit.register(self._flush)
+
+
     @staticmethod
     def _get_init_log_level():
-        """_get_init_log_level"""
-        log_level_num = os.environ.get("GSLOG", 2)
-        if log_level_num == '0':
-            return logging.DEBUG
-        if log_level_num == '1':
-            return logging.INFO
-        if log_level_num == '2':
-            return logging.WARN
-        if log_level_num == '3':
-            return logging.ERROR
-        return logging.WARN
+        level_map = {
+            '0': logging.DEBUG,
+            '1': logging.INFO,
+            '2': logging.WARNING,
+            '3': logging.ERROR
+        }
+        return level_map.get(os.environ.get("GSLOG", "2"), logging.WARNING)
 
     def set_level(self, level):
         self.logger.setLevel(level)
         for handler in self.logger.handlers:
             handler.setLevel(level)
 
-    def debug(self, *args, **kwargs):
-        """Add debug level log."""
-        self.logger.debug(*args, **kwargs)
+    def _flush(self):
+        """_flush"""
+        if self.last_msg is None:
+            return
 
-    def info(self, *args, **kwargs):
-        """Add info level log."""
-        self.logger.info(*args, **kwargs)
+        # use first log location
+        filename, lineno, funcname = self.first_occurrence
+        merged_msg = f"{self.last_msg} (repeated {self.repeat_count} times)" if self.repeat_count > 1 else self.last_msg
 
-    def warning(self, *args, **kwargs):
-        """Add warning level log."""
-        self.logger.warning(*args, **kwargs)
+        record = self.logger.makeRecord(
+            name=self.logger.name,
+            level=self.last_level,
+            fn=filename,
+            lno=lineno,
+            msg=merged_msg,
+            args=(),
+            exc_info=self.last_exc_info,
+            func=funcname,
+            sinfo=self.last_sinfo,
+            extra=self.last_extra
+        )
+        self.logger.handle(record)
 
-    def error(self, *args, **kwargs):
-        """Add error level log."""
-        self.logger.error(*args, **kwargs)
+        # reset state
+        self.last_msg = None
+        self.last_level = None
+        self.first_occurrence = None
+        self.repeat_count = 0
+
+    def _log(self, level, msg, *args, **kwargs):
+        """_log"""
+        with self._lock:
+            filename, lineno, funcname, sinfo = _find_real_caller()
+
+            # if same log, increment repeat_count
+            if msg == self.last_msg and level == self.last_level:
+                self.repeat_count += 1
+                # save first raise info
+                if 'exc_info' in kwargs and kwargs['exc_info'] and not self.last_exc_info:
+                    self.last_exc_info = kwargs.get('exc_info')
+                return
+            # if not same log, output buffered log
+            self._flush()
+
+            # record new msg info
+            self.repeat_count = 1
+            self.last_msg = msg
+            self.last_level = level
+
+            self.first_occurrence = (filename, lineno, funcname)
+
+            self.last_exc_info = kwargs.get('exc_info')
+            self.last_extra = kwargs.get('extra')
+            self.last_sinfo = sinfo
+
+    # Public logging methods
+    def debug(self, msg, *args, **kwargs):
+        self._log(logging.DEBUG, msg, *args, **kwargs)
+
+    def info(self, msg, *args, **kwargs):
+        self._log(logging.INFO, msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        self._log(logging.WARNING, msg, *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        self._log(logging.ERROR, msg, *args, **kwargs)
 
 
 logger = Logger()
