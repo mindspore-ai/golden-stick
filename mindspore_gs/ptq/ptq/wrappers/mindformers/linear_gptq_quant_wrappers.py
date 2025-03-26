@@ -103,9 +103,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             self.samples[i] = sqr * self.samples[i]
             self.h *= sqe
             if self.weight_need_allgather:
-                inp = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(self.samples[i].T)
-                inp = Tensor(inp.T, dtype=dtype.float32)
-                self.h += msops.matmul(inp.T, inp)
+                inp = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(self.samples[i].transpose(1, 0))
+                inp = Tensor(inp.transpose(1, 0), dtype=dtype.float32)
+                self.h += msops.matmul(inp.transpose(1, 0), inp)
             else:
                 samples = self.samples[i].astype(dtype.float32)
                 self.h += msops.matmul(samples.transpose(1, 0), samples)
@@ -159,15 +159,15 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                             scale = Tensor(scale, dtype.float32)
                             zero = Tensor(zero, dtype.float32)
                         if ((i1 + i) // group_size) - now_idx == -1:
-                            self.group_scale.append(scale.T)
-                            self.group_zero.append(zero.T)
+                            self.group_scale.append(scale.transpose(1, 0))
+                            self.group_zero.append(zero.transpose(1, 0))
                             now_idx += 1
                     else:
                         idx = i1
                         if self.cfg.algo_args["desc_act"]:
                             idx = perm[idx]
-                        scale = self.group_scale[idx // group_size].T
-                        zero = self.group_zero[idx // group_size].T
+                        scale = self.group_scale[idx // group_size].transpose(1, 0)
+                        zero = self.group_zero[idx // group_size].transpose(1, 0)
                 q0 = msops.clip_by_value(aclnn_add(msops.round(w0.unsqueeze(1) / scale), zero),
                                          Tensor(self.weight_quant_min), Tensor(self.weight_quant_max))
                 self.qweight.append(q0)
@@ -225,14 +225,14 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
     def _qweight_reshape(self, qweight, scale, zero, weight_shape, scale_shape):
         """reshape quant weight and quant params"""
         qweight = qweight.reshape(weight_shape)
-        qweight = qweight.transpose(0, 2, 1)
+        qweight = msops.transpose(qweight, (0, 2, 1))
         if self.cfg.group_size != 0:
             scale = scale.transpose(1, 0)
             zero = zero.transpose(1, 0)
             scale = scale.reshape(scale_shape)
             zero = zero.reshape(scale_shape)
-            scale = scale.transpose(0, 2, 1)
-            zero = zero.transpose(0, 2, 1)
+            scale = msops.transpose(scale, (0, 2, 1))
+            zero = msops.transpose(zero, (0, 2, 1))
         else:
             scale = scale.reshape(scale_shape)
             zero = zero.reshape(scale_shape)
@@ -255,13 +255,13 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 weight = weight.transpose(1, 0)
             self._apply_gptq(weight, scale, zp, dead, perm, invperm, hinv)
         else:
-            weight = weight.transpose(0, 2, 1)
+            weight = msops.transpose(weight, (0, 2, 1))
             weight_shape = weight.shape
             weight = weight.reshape(-1, weight.shape[-1])
-            scale = scale.transpose(0, 2, 1)
+            scale = msops.transpose(scale, (0, 2, 1))
             scale_shape = scale.shape
             scale = scale.reshape(-1, weight_shape[1])
-            zp = zp.transpose(0, 2, 1)
+            zp = msops.transpose(zp, (0, 2, 1))
             zp = zp.reshape(-1, weight_shape[1])
             if self.weight_need_allgather:
                 block_size = 32 * weight_shape[1]

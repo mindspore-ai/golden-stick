@@ -21,6 +21,7 @@ from mindspore.communication.comm_func import barrier
 from mindspore import dtype as msdtype
 from mindspore import Model, Tensor
 from mindspore.common import initializer
+from mindspore.nn.utils import no_init_parameters
 from mindformers import MindFormerConfig
 from mindformers import build_context
 from mindformers.trainer.utils import transform_and_load_checkpoint
@@ -105,6 +106,7 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     if 'smoothquant' in quant_type.lower():
         # pylint: disable=protected-access
         ptq._config.aclnn_quant_list = ["routed_experts.ffn.w_gate_hidden"]
+    ptq._config.algorithm_cache_path = ""
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
     return ptq
@@ -122,7 +124,8 @@ def create_network(yaml_file, quant_type=None):
     print('='*50, f"if using auto_online_trans: {auto_online_trans}", flush=True)
     model_config = DeepseekV3Config(**model_config)
 
-    network = DeepseekV3ForCausalLM(model_config)
+    with no_init_parameters():
+        network = DeepseekV3ForCausalLM(model_config)
     if quant_type:
         ptq = create_ptq(quant_type, PTQMode.DEPLOY)
         ptq.apply(network)

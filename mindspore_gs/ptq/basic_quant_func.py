@@ -164,8 +164,8 @@ def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_g
                 else zp.reshape(scale_zp_shape)
         else:
             scale_zp_shape = (org_shape[quant_axis], -1) if is_transpose else (-1, org_shape[quant_axis])
-            scale = scale.reshape(scale_zp_shape).T if is_transpose else scale.reshape(scale_zp_shape)
-            zp = zp.reshape(scale_zp_shape).T if is_transpose else zp.reshape(scale_zp_shape)
+            scale = scale.reshape(scale_zp_shape).transpose(1, 0) if is_transpose else scale.reshape(scale_zp_shape)
+            zp = zp.reshape(scale_zp_shape).transpose(1, 0) if is_transpose else zp.reshape(scale_zp_shape)
     return scale, zp, qtensor
 
 

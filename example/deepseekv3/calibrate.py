@@ -20,7 +20,7 @@ import argparse
 
 import mindspore as ms
 from mindspore.communication import get_rank
-
+from mindspore import dataset
 from mindformers import MindFormerConfig
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
@@ -44,7 +44,7 @@ def get_args():
     return args
 
 
-def create_ds(network_helper, ds_path, ds_type, approach):
+def create_ds(network_helper, ds_path, ds_type, approach, tokenizer_):
     """Create datasets."""
     if approach in ['awq-a16w8', 'awq-a16w4', 'smoothquant', 'dsquant', 'a16w8', 'a8dynw8', 'gptq-prechannel',
                     'gptq-pergroup']:
@@ -57,7 +57,6 @@ def create_ds(network_helper, ds_path, ds_type, approach):
         seq_ = network_helper.get_spec('seq_length')
         max_decode_length = network_helper.get_spec('max_decode_length')
         ignore_token_id = network_helper.get_spec('ignore_token_id')
-        tokenizer_ = network_helper.create_tokenizer()
         ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer_, ignore_token_id,
                           1, False, n_samples=200)
         logger.info(f'Create datasets cost time is {time.time() - start_time} s.')
@@ -87,9 +86,10 @@ if __name__ == "__main__":
     helper = MFDSV3Helper(uargs.config)
     start = time.time()
     print('Creating network...', flush=True)
-    _, network = create_network(uargs.config)
+    tokenizer, network = create_network(uargs.config)
     algo = create_ptq(uargs.approach, PTQMode.QUANTIZE)
-    datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
+    dataset.config.set_numa_enable(False)
+    datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach, tokenizer_=tokenizer)
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     print('Quanting network...', flush=True)
     network = quant_net(network, helper, algo, datasets)
@@ -105,6 +105,6 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x,
-                       format="ckpt")
+                       format="safetensors")
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
     print(f'Checkpoint saved to {save_path}', flush=True)
