@@ -365,12 +365,28 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         self.deq_scale = None
         self.quant_forward = False
 
+        if context.algorithm_cache_path:
+            cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', \
+                                           'omniquant_smooth.json')
+        else:
+            cache_file_path = ''
+        self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
+
     def _quant_info(self):
         return "OMNIQuant"
 
     def _search_best_scale(self, alpha):
         """search best scale"""
-        best_scale = self._compute_best_scale(alpha)
+        best_alpha = self.cache.get(self.layer_name)
+        if best_alpha:
+            logger.info(f'layer {self.layer_name} using cached alpha: {best_alpha}')
+            best_scale = self._calc_smooth_scale(best_alpha)
+            logger.info(
+                f"OmniSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
+                f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+        else:
+            best_scale, best_alpha = self._compute_best_scale(alpha)
+            self.cache.put(self.layer_name, best_alpha)
         # pylint: disable=protected-access
         self.fp16_weight._offload()
         return best_scale
@@ -469,7 +485,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
             raise RuntimeError(f"Found no suitablt ratio, please check history of loss: {history}.")
         logger.info(f"OmniSmoothLinearCell: best scale alpha {best_ratio}, best_error of Layer({self._layer_name}) "
                     f"is {best_error}")
-        return best_scale
+        return best_scale, best_ratio
 
     def _module_forward(self, is_quant=False):
         self.quant_forward = is_quant
