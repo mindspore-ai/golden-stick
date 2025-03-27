@@ -99,7 +99,7 @@ class AllQuantLinearInferCell(LinearInferCell):
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
             logger.debug(f"AllQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"AllQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
-                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+                         f"{{{q_weight.shape}, {q_weight.dtype}}}")
         self._set_act_quant(quant)
         self.layer.matmul = qmm
         self.layer.weight = q_weight

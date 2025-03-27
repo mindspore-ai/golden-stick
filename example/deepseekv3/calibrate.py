@@ -47,7 +47,7 @@ def get_args():
 def create_ds(network_helper, ds_path, ds_type, approach, tokenizer_):
     """Create datasets."""
     if approach in ['awq-a16w8', 'awq-a16w4', 'smoothquant', 'dsquant', 'a16w8', 'a8dynw8', 'gptq-prechannel',
-                    'gptq-pergroup']:
+                    'gptq-pergroup', 'omniquant']:
         start_time = time.time()
         if not ds_path:
             raise ValueError(f"Please provide dataset_path when approach is {approach}.")

@@ -26,6 +26,7 @@ from mindspore import Tensor, nn
 from mindspore import ops as msops
 from mindspore import dtype as msdtype
 from mindspore.communication.management import GlobalComm
+from mindspore.ops.operations.comm_ops import ReduceOp
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
@@ -86,8 +87,7 @@ class SmoothLinearCell(WrapperLinearCell):
                                   self.cat_samples)
         act_max = msops.maximum(msops.abs(self.x_obs_max(self.cat_samples, 0)[0]),
                                 msops.abs(self.x_obs_min(self.cat_samples, 0)[0]))
-        logger.debug(f"SmoothLinearCell: act_max of Layer({self._layer_name}) is {{{act_max.shape}, {act_max.dtype}, "
-                     f"{act_max.asnumpy()}}}")
+        logger.debug(f"SmoothLinearCell: act_max of Layer({self._layer_name}) is {{{act_max.shape}, {act_max.dtype}}}")
         input_max_pow = msops.pow(act_max, alpha)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|output0_activation_minmax_pow",
                                   input_max_pow)
@@ -103,7 +103,7 @@ class SmoothLinearCell(WrapperLinearCell):
         elif len(weight_max.shape) > 2:
             raise RuntimeError(f'Not support rank of weight bigger than 3, got {len(weight_max.shape)}.')
         logger.debug(f"SmoothLinearCell: weight_max of Layer({self._layer_name}) is {{{weight_max.shape}, "
-                     f"{weight_max.dtype}, {weight_max.asnumpy()}}}")
+                     f"{weight_max.dtype}}}")
         weight_max_pow = msops.pow(weight_max, 1 - alpha)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|output0_weight_max_pow", weight_max_pow)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|input0_input_max_pow", input_max_pow)
@@ -146,7 +146,7 @@ class SmoothLinearCell(WrapperLinearCell):
         weight = self._layer.cast(weight, orin_dtype)
         msops.assign(self._layer.weight, weight)
         logger.debug(f"SmoothLinearCell: smoothed_weight of Layer({self._layer_name}) is {{{self._layer.weight.shape}, "
-                     f"{self._layer.weight.dtype}, {self._layer.weight.asnumpy()}}}")
+                     f"{self._layer.weight.dtype}}}")
 
     def _apply_group_weight_smooth(self, smooth_scale: Tensor):
         """_apply_weight_smooth"""
@@ -354,7 +354,8 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         self.ic_axis = rank - 1 if linear.transpose_b else rank - 2
         self.oc_axis = rank - 2 if linear.transpose_b else rank - 1
         self.oc = linear.weight.shape[self.oc_axis]
-        self.fp16_weight = copy.deepcopy(self._layer.weight)
+        self.is_expert = (rank == 3)
+        self.expert_num = linear.weight.shape[0] if self.is_expert else -1
 
         self.decoder = kwargs.get("decoder_layer", None)
         self.args = kwargs.get("layer_args", None)
@@ -362,6 +363,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
 
         self.x_scale_fast = None
         self.x_zp = None
+        self.y_zp = None
         self.deq_scale = None
         self.quant_forward = False
 
@@ -381,15 +383,18 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         if best_alpha:
             logger.info(f'layer {self.layer_name} using cached alpha: {best_alpha}')
             best_scale = self._calc_smooth_scale(best_alpha)
-            logger.info(
-                f"OmniSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
-                f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+            logger.info(f'OmniSmoothLinearCell: best scale alpha {best_alpha} of Layer({self._layer_name}).'
+                        ' Used cache.')
         else:
             best_scale, best_alpha = self._compute_best_scale(alpha)
             self.cache.put(self.layer_name, best_alpha)
-        # pylint: disable=protected-access
-        self.fp16_weight._offload()
         return best_scale
+
+    def _expertwise_to_tokenwise(self, expertwise, group_list):
+        indices = msops.arange(0, self.expert_num, dtype=msdtype.int32)
+        indices = msops.repeat_interleave(indices, group_list)
+        indices = msops.broadcast_to(indices, (self.oc, indices.shape[0])).t()
+        return msops.gather_elements(expertwise, 0, indices)
 
     def construct(self, x, *args, **kwargs):
         if self.quant_forward:
@@ -400,7 +405,15 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         y = self._layer(x, *args, **kwargs)
         self._layer.compute_dtype = self.compute_type
         if self.quant_forward:
-            y = (y - self.y_zp) * self.deq_scale
+            y_zp = self.y_zp
+            deq_scale = self.deq_scale
+            if self.is_expert:
+                group_list = kwargs.get('group_list', None)
+                if group_list is None:
+                    group_list = args[0]
+                y_zp = self._expertwise_to_tokenwise(y_zp, group_list)
+                deq_scale = self._expertwise_to_tokenwise(deq_scale.squeeze(), group_list)
+            y = (y - y_zp) * deq_scale
             y = msops.cast(y, self.compute_type)
         return y
 
@@ -426,6 +439,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         best_ratio = -1
         best_scale = 0
         best_error = float("inf")
+        fp16_weight = copy.deepcopy(self._layer.weight).astype(self.compute_type)
 
         group_size = self.cfg.group_size if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP \
               else self._layer.weight.shape[self.ic_axis]
@@ -447,7 +461,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
                                             -1,
                                             False,
                                             False,
-                                            high_precision_params=False)
+                                            high_precision_params=True)
             w_scale, _, q_weight = quant_tensor(self._layer.weight.data,
                                                 self.w_quant_min,
                                                 self.w_quant_max,
@@ -459,7 +473,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
                                                 self.oc_axis,
                                                 True,
                                                 False,
-                                                high_precision_params=False)
+                                                high_precision_params=True)
             t_w_scale = Tensor(w_scale)
             if self._layer.transpose_b:
                 t_w_scale = msops.transpose(t_w_scale, (1, 0))
@@ -468,11 +482,11 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
             self.x_scale_fast = msops.cast(1 / (self.x_scale_fast * Tensor(scales)), msdtype.float32)
             self.x_zp = Tensor(x_zp)
             self._layer.weight.set_data(msops.cast(q_weight, self.compute_type))
-            self.y_zp = (self.x_zp.astype("int32") * self._layer.weight.data.astype("int32")) \
-                .sum(axis=1 if self._layer.transpose_b else 0) \
-                .astype("int32")
+            self.y_zp = q_weight.sum(axis=self.ic_axis, dtype=msdtype.int32) * self.x_zp.astype(msdtype.int32)
+            if isinstance(self._layer, RowParallelLinear):
+                self.y_zp = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(self.y_zp)
             quant_output = self._module_forward(True)
-            msops.assign(self._layer.weight, self.fp16_weight.astype(self.compute_type))
+            msops.assign(self._layer.weight, fp16_weight)
 
             loss = self._loss(fp16_output, quant_output)
             logger.info(f"OmniSmoothLinearCell: search alpha {ratio}, loss of Layer({self._layer_name}) is {loss}")
@@ -481,6 +495,24 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
                 best_error = loss
                 best_ratio = ratio
                 best_scale = scales
+
+            self.x_scale_fast = None
+            self.deq_scale = None
+            self.x_zp = None
+            self.y_zp = None
+            gc.collect()
+
+        del fp16_weight
+        del fp16_output
+        del scales
+        del xs
+        del x_scale
+        del x_zp
+        del w_scale
+        del q_weight
+        del t_w_scale
+        del quant_output
+        gc.collect()
         if best_ratio == -1:
             raise RuntimeError(f"Found no suitablt ratio, please check history of loss: {history}.")
         logger.info(f"OmniSmoothLinearCell: best scale alpha {best_ratio}, best_error of Layer({self._layer_name}) "
@@ -498,14 +530,14 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
     def _loss(self, preds, grounds):
         total_loss = 0
         for pred, ground in zip(preds, grounds):
-            ground = msops.cast(ground, msdtype.float32)
-            pred = msops.cast(pred, msdtype.float32)
+            ground = msops.cast(ground, msdtype.float64)
+            pred = msops.cast(pred, msdtype.float64)
             total_loss += float(msops.mse_loss(ground, pred, reduction='mean'))
         return total_loss / len(grounds)
 
     def smooth(self):
         """smooth"""
-        smooth_alpha = [i/20 for i in range(21)]
+        smooth_alpha = [0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
         smooth_scale = self._search_best_scale(smooth_alpha)
         self._apply_smooth(smooth_scale)
 
