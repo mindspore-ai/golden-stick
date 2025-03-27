@@ -195,6 +195,7 @@ def quant_simple_swiglu_net(non_decoder, quant_type):
     Expectation: correct quant simplenet.
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['FORCE_EAGER'] = "true"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -233,6 +234,7 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -275,6 +277,7 @@ def quant_simple_gmm_net(non_decoder, linear_type):
     Expectation: correct quant simplenet.
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['FORCE_EAGER'] = "true"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -308,6 +311,7 @@ def eval_simple_gmm_net(non_decoder, linear_type):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -450,6 +454,7 @@ def test_input_catcher(device):
     Expectation: Inputs being caught correctly.
     """
     from mindspore_gs.ptq.ptq.quant import InputCatcher
+    os.environ['FORCE_EAGER'] = "true"
     context.set_context(mode=context.PYNATIVE_MODE, device_target=device, max_device_memory="8GB")
 
     net = SimpleNet()
@@ -490,6 +495,7 @@ def test_ptq_config_error():
     Description: Feed invalid value of PTQConfig to _ptq_config_check function.
     Expectation: Except ValueError.
     """
+    os.environ['FORCE_EAGER'] = "true"
     set_context(device_target="CPU")
     config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None)
     with pytest.raises(ValueError):
@@ -579,7 +585,8 @@ def test_awq_config_error():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-def test_context_mode_error():
+@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
+def test_context_mode_error(mode):
     """
     Feature: set GRAPH mode to QUANTIZE.
     Description:set GRAPH mode to QUANTIZE when using PTQ alogrith to quant network.
@@ -593,10 +600,11 @@ def test_context_mode_error():
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_1p.yaml")
     helper = MFLlama2Helper(config_path_)
-    set_context(mode=GRAPH_MODE, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"},
+    set_context(mode=mode, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"},
                 max_device_memory=helper.mf_config.context.max_device_memory)
     network = helper.create_network()
-    with pytest.raises(ValueError, match="Quantization phase only support PYNATIVE MODE."):
+    with pytest.raises(ValueError, match="In quantization phase, please set mode=PYNATIVE_MODE and"
+                       "set FORCE_EAGER=true."):
         ptq.apply(network, helper)
 
 
@@ -608,6 +616,7 @@ def quant_simplenet(non_decoder):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    os.environ['FORCE_EAGER'] = "true"
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
 
@@ -641,6 +650,7 @@ def eval_simplenet(non_decoder):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"

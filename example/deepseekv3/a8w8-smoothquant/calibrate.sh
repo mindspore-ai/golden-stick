@@ -32,6 +32,8 @@ calibrate_path=${base_path}/../calibrate.py
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
+export MS_JIT="0"
+export FORCE_EAGER="true"
 msrun --worker_num=${worker_num} \
       --local_worker_num=${worker_num} \
       --master_port=8188 \

@@ -32,6 +32,8 @@ ceval_path=${base_path}/../../tests/data/ceval-dataset/dev/
 
 export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 
+export MS_JIT="0"
+export FORCE_EAGER="true"
 msrun --worker_num=${worker_num} \
       --local_worker_num=${worker_num} \
       --master_port=8188 \

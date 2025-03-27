@@ -137,6 +137,7 @@ class PTQ(CompAlgo):
         self._target_layer_type = ()
         self._build_pipeline()
         self._load_mindformers_plugin()
+        logger.warning(f"PTQ quantization algorithm only support in pynative mode.")
 
     def _append_algorithm(self, name, algorithm: Algorithm):
         logger.info(f"append {name} to pipeline.")
@@ -276,8 +277,10 @@ class PTQ(CompAlgo):
                         processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
-        if self._config.mode == PTQMode.QUANTIZE and get_context("mode") != PYNATIVE_MODE:
-            raise ValueError("Quantization phase only support PYNATIVE MODE.")
+        if self._config.mode == PTQMode.QUANTIZE:
+            if get_context("mode") != PYNATIVE_MODE or os.getenv("FORCE_EAGER", "false").lower() != "true":
+                raise ValueError("In quantization phase, please set mode=PYNATIVE_MODE and"
+                                 "set FORCE_EAGER=true.")
         if not network_helper:
             raise ValueError("Please provide network_helper when PTQ in apply phase.")
         if not datasets:

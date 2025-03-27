@@ -176,6 +176,7 @@ def create_cfg(quant_algo_, mode):
 def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     """omni quant to quant llama2"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['FORCE_EAGER'] = "true"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -235,6 +236,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     ms.set_context(mode=0)
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
