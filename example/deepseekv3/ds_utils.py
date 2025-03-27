@@ -102,6 +102,9 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     if 'awq' in quant_type.lower():
         # pylint: disable=protected-access
         ptq._config.weight_symmetric = False
+    if 'smoothquant' in quant_type.lower():
+        # pylint: disable=protected-access
+        ptq._config.aclnn_quant_list = ["routed_experts.ffn.w_gate_hidden"]
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
     return ptq

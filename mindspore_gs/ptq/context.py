@@ -17,6 +17,7 @@
 from dataclasses import dataclass, field, is_dataclass, asdict
 from enum import Enum
 
+from typing import List
 from mindspore import dtype as msdtype
 from mindspore.communication import get_group_size, get_rank
 
@@ -110,7 +111,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     kvcache_calibrate_max_new_tokens: int = 10
     reflash_inputs_after_each_processor: bool = False
     fallback_blacklist: dict = field(default_factory=dict)
-
+    aclnn_quant_list: List[str] = field(default_factory=list)
     tp_size: int = 1
     rank_id: int = 0
     layer_quant_info_collect: dict = field(default_factory=dict)

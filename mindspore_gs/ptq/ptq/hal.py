@@ -100,7 +100,7 @@ class QuantWithSmooth(QuantUnitCell):
                                                   smooth_scale, dtype.int8)
         if kernel_type is KernelType.ACLNN:
             return QuantWithSmoothHighPerformance(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
-                                                  smooth_scale, dtype.float16)
+                                                  smooth_scale, dst_dtype)
         if kernel_type is KernelType.HIGH_PRECISION:
             return QuantWithSmoothHighPrecision(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
                                                 smooth_scale)
@@ -193,7 +193,10 @@ class QuantWithSmoothHighPerformance(QuantWithSmooth):
             final_scale_np = input_scale_np
             logger.debug(f"QuantWithSmoothHighPerformance: input scale from vector of Layer({parallel_type}:"
                          f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
-        self.input_scale = Parameter(Tensor(final_scale_np, dtype=dst_dtype))
+        if zp_dtype != dtype.int8: # input_scale need divide 1 for aclnn quant ops
+            self.input_scale = Parameter(Tensor(1 / final_scale_np, dtype=dst_dtype))
+        else:
+            self.input_scale = Parameter(Tensor(final_scale_np, dtype=dst_dtype))
 
         if self.input_scale.shape != x_qparam.zero_point.shape:
             if isinstance(x_qparam.zero_point, np.number):
