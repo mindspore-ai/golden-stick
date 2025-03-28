@@ -5,6 +5,7 @@
 
 # example
 "golden-stick/example/deepseekv3/infer.py"                                                                               "line-too-long"
+"golden-stick/example/deepseekv3/ds_utils.py"                                                                            "protected-access"
 
 # expriments
 "golden-stick/mindspore_gs/experimental/trace/llama2.py"                                                                  "redefined-outer-name"

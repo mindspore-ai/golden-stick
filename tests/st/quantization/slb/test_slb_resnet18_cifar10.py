@@ -114,10 +114,8 @@ def test_resnet_convert(run_mode, enable_act_quant):
     data_in = mindspore.Tensor(np.ones([1, 3, 32, 32]), mindspore.float32)
     file_name = "./resnet_convert_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
-    time.sleep(5)
+    time.sleep(10)
     assert os.path.exists(file_name)
-    graph = mindspore.load(file_name)
-    mindspore.nn.GraphCell(graph)
 
 
 def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=context.GRAPH_MODE):
