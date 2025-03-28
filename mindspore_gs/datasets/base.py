@@ -24,7 +24,7 @@ from mindspore import dtype, Tensor
 class BaseDataset:
     """base dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
-                 need_pad=True, n_samples=-1, add_special_tokens=True):
+                 need_pad=False, n_samples=-1, add_special_tokens=True):
         self.path = os.path.join(path)
         if mode not in ("eval", "train", "test"):
             raise ValueError("Input `mode` should be 'eval', 'test' or 'train', got: ", mode)

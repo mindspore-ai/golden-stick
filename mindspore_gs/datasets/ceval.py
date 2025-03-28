@@ -104,7 +104,7 @@ def format_example(subject, line, include_answer=True):
 class CEvalDataset(BaseDataset):
     """boolQ dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
-                 need_pad=True, n_samples=-1, add_special_tokens=True):
+                 need_pad=False, n_samples=-1, add_special_tokens=True):
         super().__init__(path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
                          add_special_tokens)
         self.subjects = []
@@ -201,7 +201,7 @@ class CEvalDataset(BaseDataset):
 
 
 def create_ceval_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
-                         ignore_token_id=-100, repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
+                         ignore_token_id=-100, repeat=1, need_pad=False, n_samples=-1, add_special_tokens=True):
     """create squad dataset"""
     ds = CEvalDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples, add_special_tokens)
     ds = GeneratorDataset(source=ds, column_names=["subjects", "input_ids", "labels"])

@@ -24,7 +24,7 @@ from mindspore.dataset import GeneratorDataset
 
 class WikiText2Dataset:
     """Wikitext-2 dataset."""
-    def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable, need_pad=True,
+    def __init__(self, path: str, seq_length: int, max_new_tokens: int, tokenizer: callable, need_pad=False,
                  n_samples=-1, add_special_tokens=True):
         self.path = os.path.join(path)
         self.data_type = os.path.basename(self.path).split('.')[-1]
@@ -130,7 +130,7 @@ class WikiText2Dataset:
 
 
 def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, max_new_tokens: int, tokenizer: callable,
-                            repeat=1, need_pad=True, n_samples=-1, add_special_tokens=True):
+                            repeat=1, need_pad=False, n_samples=-1, add_special_tokens=True):
     """ create wikitext dataset"""
     if max_new_tokens >= seq_length:
         raise RuntimeError(f"max_decode_len should less than seq_length, but got max_new_tokens: {max_new_tokens}, "

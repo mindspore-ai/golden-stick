@@ -25,9 +25,9 @@ from mindspore_gs.datasets import create_wikitext_dataset
 def check_ds(ds_path: str, bs: int, seq_length: int, max_decode_len: int, vocab_file: str, repeat):
     """Create and check wikitext-2 dataset."""
     tokenizer = LlamaTokenizer(vocab_file=vocab_file)
-    ds = create_wikitext_dataset(ds_path, bs, seq_length, max_decode_len, tokenizer, repeat)
+    ds = create_wikitext_dataset(ds_path, bs, seq_length, max_decode_len, tokenizer, repeat, need_pad=True)
 
-    wiki_len = 311980
+    wiki_len = 15599 * 20
     wiki_items = wiki_len // (seq_length - max_decode_len)
 
     assert ds.get_repeat_count() == repeat
