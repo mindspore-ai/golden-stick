@@ -19,4 +19,4 @@ dst_dir=$2
 base_path=$(cd "$(dirname $0)"; pwd)
 src_strategy_file=${base_path}/ckpt_strategy.ckpt
 quant_infer_path=${base_path}/../unify_safetensors.py
-python ${quant_infer_path} --src_dir ${src_dir} --src_strategy_file ${src_strategy_file} --dst_dir ${dst_dir} --int4_trans True
+python ${quant_infer_path} --src_dir ${src_dir} --src_strategy_file ${src_strategy_file} --dst_dir ${dst_dir}

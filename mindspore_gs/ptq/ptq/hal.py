@@ -1050,6 +1050,21 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
             output = self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, self.quant_bias, None)
         return output.astype(self.dst_dtype)
 
+    # pylint: disable=arguments-differ
+    def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        if parallel_type == ParallelType.COL_PARALLEL:
+            q_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
+        elif parallel_type == ParallelType.ROW_PARALLEL:
+            q_shard = (1, 1) if self.is_group_mm else (1,)
+        else:
+            return {}
+        shard_state = {self.dequant_scale.name: {'shape': self.dequant_scale.shape, 'shard': q_shard}}
+        if self.offset is not None:
+            shard_state[self.offset.name] = {'shape': self.offset.shape, 'shard': q_shard}
+        if self.quant_bias is not None:
+            shard_state[self.quant_bias.name] = {'shape': self.quant_bias.shape, 'shard': q_shard}
+
+        return shard_state
 
 class C8PagedAttentionCell(QuantUnitCell):
     """C8PagedAttentionMgrCell"""
