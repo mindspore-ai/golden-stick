@@ -884,7 +884,8 @@ def test_ptq_llama2_predict_2stage_2p_run_per_group(quant_algo):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A8W8_Dynamic', 'C8_Dynamic', 'Quant_A8W16_Deploy_A8W8_Dynamic'])
+@pytest.mark.parametrize("quant_algo", ['A8W8_Dynamic', 'C8_Dynamic'])
+#FIXME: Quant_A8W16_Deploy_A8W8_Dynamic wait test_case for smooth_scale fusion to rmsnorm
 def test_ptq_dynamic_llama2_predict_2stage_2p_run(quant_algo):
     """
     Feature: test dynamic quant adjust parameter in two stages with two cards.

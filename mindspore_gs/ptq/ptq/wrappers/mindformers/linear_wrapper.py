@@ -25,7 +25,7 @@ from mindformers.modules.layers import Linear
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType, QuantWithSmooth
+from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType, QuantWithSmooth, DynamicQuantCell
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
@@ -81,10 +81,17 @@ class LinearInferCell(Cell):
 
         self.has_act_quant = False
         self.quant_op: Optional[QuantWithSmooth] = None
+        self.has_act_dynamic_quant = False
+        self.dyn_quant_op: Optional[DynamicQuantCell] = None
+
 
     def _set_act_quant(self, quant_op: QuantWithSmooth):
         self.has_act_quant = True
         self.quant_op = quant_op
+
+    def _set_act_dynamic_quant(self, quant_op: DynamicQuantCell):
+        self.has_act_dynamic_quant = True
+        self.dyn_quant_op = quant_op
 
     @property
     def layer(self):
@@ -97,6 +104,9 @@ class LinearInferCell(Cell):
         x = self._layer.cast(x, self._layer.dtype)
         if self.has_act_quant:
             x = self.quant_op(x)
+        if self.has_act_dynamic_quant:
+            x, x_scale = self.dyn_quant_op(x)
+            x_scale = self._layer.reshape(x_scale, (-1,))
         out_shape = self._layer.shape(x)[:-1] + (self._layer.out_channels,)
         x = self._layer.reshape(x, (-1, self._layer.in_channels))
         if self._layer.expert_flag and not self._layer.use_gmm:
@@ -109,7 +119,10 @@ class LinearInferCell(Cell):
         # apply gmm to the inference of moe structural models when use_past=True.
         if self._layer.use_gmm:
             raise RuntimeError(f"{type(Linear)} not support GroupedMatmul.")
-        x = self._layer.matmul(x, self.layer.weight)
+        if self.has_act_dynamic_quant:
+            x = self._layer.matmul(x, self.layer.weight, None, x_scale)
+        else:
+            x = self._layer.matmul(x, self.layer.weight)
         if self._layer.has_bias:
             x = self._layer.bias_add(x, self._layer.cast(self._layer.bias, self._layer.dtype))
         if self._layer.activation_flag:
@@ -137,12 +150,21 @@ class LinearInferCell(Cell):
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
         if self.has_act_quant:
             input_parallel = self.quant_op(input_parallel)
+        if self.has_act_dynamic_quant:
+            input_parallel, x_scale = self.dyn_quant_op(input_parallel)
+            x_scale = self._layer.reshape(x_scale, (-1,))
         output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size_per_partition,)
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size))
         if self._layer.is_expert and self._layer.expert_num > 1:
-            output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
+            if self.has_act_dynamic_quant:
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, group_list, x_scale)
+            else:
+                output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
         else:
-            output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
+            if self.has_act_dynamic_quant:
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, None, x_scale)
+            else:
+                output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
         if self._layer.has_bias:
             output_parallel = self._layer.bias_add(
                 output_parallel, self._layer.cast(self._layer.bias, self._layer.compute_dtype)
@@ -171,12 +193,21 @@ class LinearInferCell(Cell):
         input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
         if self.has_act_quant:
             input_parallel = self.quant_op(input_parallel)
+        if self.has_act_dynamic_quant:
+            input_parallel, x_scale = self.dyn_quant_op(input_parallel)
+            x_scale = self._layer.reshape(x_scale, (-1,))
         output_shape = self._layer.shape(input_parallel)[:-1] + (self._layer.output_size,)
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size_per_partition))
         if self._layer.is_expert and self._layer.expert_num > 1:
-            output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
+            if self.has_act_dynamic_quant:
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, group_list, x_scale)
+            else:
+                output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
         else:
-            output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
+            if self.has_act_dynamic_quant:
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, None, x_scale)
+            else:
+                output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
 
         if self._layer.sequence_parallel:
             output_parallel = output_parallel.swapaxes(0, 1).contiguous()
