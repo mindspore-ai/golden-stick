@@ -302,7 +302,7 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
   from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
   ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                         outliers_suppression=OutliersSuppressionType.NONE)
+                         outliers_suppression=OutliersSuppressionType.SMOOTH)
   ```
 
 - 层间混合精度量化

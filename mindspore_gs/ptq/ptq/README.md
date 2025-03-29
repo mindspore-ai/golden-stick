@@ -301,7 +301,7 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                           outliers_suppression=OutliersSuppressionType.NONE)
+                           outliers_suppression=OutliersSuppressionType.SMOOTH)
     ```
 
 - inter-layer mixed-precision quantization
