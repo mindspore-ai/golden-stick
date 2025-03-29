@@ -243,11 +243,11 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
     def _get_quant_params(self, weight):
         """get quant params, scale and zp"""
         if self.weight_need_allgather:
-            weight = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(weight.transpose(1, 0))
-            weight = weight.transpose(1, 0)
+            weight = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(msops.transpose(weight, (1, 0)))
+            weight = msops.transpose(weight, (1, 0))
         if self.is_moe:
             weight = weight.reshape(self.layer.weight.shape[0], -1, weight.shape[-1])
-            weight = weight.transpose(0, 2, 1)
+            weight = msops.transpose(weight, (0, 2, 1))
         scale, zp, _ = quant_tensor(weight, self.w_quant_min, self.w_quant_max,
                                     self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                     self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,

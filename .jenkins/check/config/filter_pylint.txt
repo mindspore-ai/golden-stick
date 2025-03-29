@@ -6,6 +6,12 @@
 # example
 "golden-stick/example/deepseekv3/infer.py"                                                                               "line-too-long"
 "golden-stick/example/deepseekv3/ds_utils.py"                                                                            "protected-access"
+"golden-stick/example/deepseekv3/deepseekv3_weight_processor.py"                                                         "bad-continuation"
+"golden-stick/example/deepseekv3/deepseekv3_weight_processor.py"                                                         "missing-docstring"
+"golden-stick/example/deepseekv3/deepseekv3_weight_processor.py"                                                         "unused-variable"
+"golden-stick/example/deepseekv3/deepseekv3_weight_processor.py"                                                         "arguments-differ"
+"golden-stick/example/deepseekv3/deepseekv3_weight_processor.py"                                                         "consider-using-in"
+"golden-stick/example/deepseekv3/weight_processor.py"                                                                    "missing-docstring"
 
 # expriments
 "golden-stick/mindspore_gs/experimental/trace/llama2.py"                                                                  "redefined-outer-name"

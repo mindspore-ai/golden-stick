@@ -74,8 +74,8 @@ prepare_env()
 
   echo "cp quant ckpt script"
   cp ./example/deepseekv3/calibrate.py ../daily_quant_ckpt.py || exit 1
-  cp ./example/deepseekv3/deepseekv3_infer_parallelism.py ../ || exit 1
-  cp ./example/deepseekv3/model_parallelism.py ../ || exit 1
+  cp ./example/deepseekv3/deepseekv3_weight_processor.py ../ || exit 1
+  cp ./example/deepseekv3/weight_processor.py ../ || exit 1
   echo "cp eval script"
   cp ./example/deepseekv3/ds_utils.py ../ || exit 1
   cp ./example/deepseekv3/eval_ceval.py ../daily_eval.py || exit 1
