@@ -670,58 +670,55 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
                          is_grouped_mm=is_grouped_mm)
         self.is_grouped_mm = is_grouped_mm
         if not is_grouped_mm:
-            self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, False, w_qparam.group_size)
+            self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
 
     @staticmethod
     def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
                dst_dtype=dtype.float16):
         """create"""
-        trans_b = linear.transpose_b
-        rank = len(q_weight.shape)
-        ic_idx, oc_idx = (rank - 1, rank - 2) if trans_b else (rank - 2, rank - 1)
-        ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
-        num_experts = 0
-        if isinstance(linear.matmul, msops.MatMul):
-            wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
-                                                            dst_dtype)
-        elif isinstance(linear.matmul, GroupedMatmulV4):
-            wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
-                                                            dst_dtype, True)
-            num_experts = q_weight.shape[0]
-        elif isinstance(linear.matmul, MatmulCellForHook):
-            wqbmm = WeightQuantInt4Matmul._from_matmul_cell(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
-                                                            transpose_b, dst_dtype)
-            if isinstance(linear.matmul.mm, GroupedMatmulV4):
-                num_experts = q_weight.shape[0]
-        elif isinstance(linear.matmul, SmoothMatmul):
-            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy,
-                                                              transpose_a, transpose_b, dst_dtype)
-            if linear.matmul.is_group_mm:
-                num_experts = q_weight.shape[0]
-        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
-            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, w_qparam, is_deploy,
-                                                                         transpose_a, transpose_b, dst_dtype)
-            if linear.matmul.is_group_mm:
-                num_experts = q_weight.shape[0]
+        # qbmm need transpose_b = False
+        if linear.expert_num > 1:
+            q_weight = msops.transpose(q_weight, (0, 2, 1)) if linear.transpose_b else q_weight
         else:
-            raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
+            q_weight = msops.transpose(q_weight, (1, 0)) if linear.transpose_b else q_weight
+        linear.transpose_b = False
+
+        rank = len(q_weight.shape)
+        ic_idx, oc_idx = (rank - 1, rank - 2) if linear.transpose_b else (rank - 2, rank - 1)
+        ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
 
         if is_deploy:
-            if num_experts != 0:
-                weight_shape = (num_experts, ic, oc // 2)
+            if linear.expert_num > 1:
+                weight_shape = (linear.expert_num, ic, oc // 2)
             else:
                 weight_shape = (ic, oc // 2)
             q_weight = Parameter(initializer("ones", weight_shape, w_qparam.quant_dtype), name=linear.weight.name)
         else:
-            if num_experts != 0:
-                q_weight = q_weight.transpose((0, 2, 1)).asnumpy() if trans_b else q_weight.asnumpy()
-                q_weight_pack = np_int4data_pack_to_int8_3d(q_weight)
+            if linear.expert_num > 1:
+                q_weight_pack = np_int4data_pack_to_int8_3d(q_weight.asnumpy())
             else:
-                q_weight = q_weight.asnumpy().T if trans_b else q_weight.asnumpy()
-                q_weight_pack = np_int4data_pack_to_int8(q_weight)
+                q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
             logger.debug(f"WeightQuantInt4Matmul: pack q_weight of Layer({layer_name}) is "
                          f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
             q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
+
+        if isinstance(linear.matmul, msops.MatMul):
+            wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
+                                                            linear.transpose_b, dst_dtype)
+        elif isinstance(linear.matmul, GroupedMatmulV4):
+            wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
+                                                            linear.transpose_b, dst_dtype, True)
+        elif isinstance(linear.matmul, MatmulCellForHook):
+            wqbmm = WeightQuantInt4Matmul._from_matmul_cell(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
+                                                            linear.transpose_b, dst_dtype)
+        elif isinstance(linear.matmul, SmoothMatmul):
+            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy,
+                                                              transpose_a, linear.transpose_b, dst_dtype)
+        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
+            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, w_qparam, is_deploy,
+                                                                         transpose_a, linear.transpose_b, dst_dtype)
+        else:
+            raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
         return wqbmm, q_weight
 
     # pylint: disable=arguments-differ
