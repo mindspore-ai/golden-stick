@@ -114,15 +114,15 @@ The RTN algorithm needs to run on Ascend hardware, and the environment configura
 
 #### 1.2. MindSpore Environment
 
-Golden Stick relies on MindSpore, and you need to install the proper MindSpore in advance. You can download the pre-compiled [v2.3.1 version installer](https://www.mindspore.cn/versions) from the MindSpore official website and install it.
+Golden Stick relies on MindSpore, and you need to install the proper MindSpore in advance. You can download the pre-compiled [version installer](https://www.mindspore.cn/versions) from the MindSpore official website and install it.
 
 #### 1.3. MindFormers Environment
 
-Golden Stick relies on MindFormers, and you need to install the proper MindFormers in advance. You can download the pre-compiled MindFormers [v1.2.0 installer](https://www.mindspore.cn/versions) from the MindSpore website and install it.
+Golden Stick relies on MindFormers, and you need to install the proper MindFormers in advance. You can download the pre-compiled MindFormers [installer](https://www.mindspore.cn/versions) from the MindSpore website and install it.
 
 #### 1.4. Golden Stick Environment
 
-Download the pre-compiled [MindSpore GoldenStick v0.5.0 version installer](https://www.mindspore.cn/versions) from the MindSpore website and install it.
+Download the pre-compiled [version installer](https://www.mindspore.cn/versions) from the MindSpore website and install it.
 
 #### 1.5. Preparation of Relevant Documents
 
