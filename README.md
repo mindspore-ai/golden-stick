@@ -46,7 +46,7 @@ In addition to providing rich model compression algorithms, an important design 
 
 > - For details about how to apply the MindSpore Golden Stick, see the detailed description and sample code in each algorithm section.
 > - For details about the "ms.export" step in the process, see [Exporting MINDIR Model](https://www.mindspore.cn/tutorials/en/master/beginner/save_load.html#saving-and-loading-mindir).
-> - For details about the "MindSpore infer" step in the process, see [MindSpore Inference Runtime](https://www.mindspore.cn/docs/en/master/model_infer/ms_infer/llm_inference_overview.html).
+> - For details about the "MindSpore infer" step in the process, see [MindSpore Inference Runtime](https://www.mindspore.cn/tutorials/en/master/model_infer/ms_infer/llm_inference_overview.html).
 
 ## Documents
 
