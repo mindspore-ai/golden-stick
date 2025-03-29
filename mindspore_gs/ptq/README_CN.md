@@ -1,6 +1,6 @@
 # 训练后量化算法概述
 
-[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/mindspore_gs/ptq/README_CN.md)
+[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/README_CN.md)
 
 [View English](./README.md)
 
@@ -34,6 +34,6 @@
 
 ## 示例
 
-- [PTQ算法示例](./ptq/README_CN.md)：基于MindSpore动态图能力构建的后量化算法，支持权重量化，全量化，KVCache量化，
+- [PTQ算法示例](./ptq/README_CN.md)：基于MindSpore动态图能力构建的后量化算法，支持权重量化，全量化，KVCache量化。
 - [RTN算法示例](./round_to_nearest/README_CN.md)：基于MinMax的基础后量化算法，仅支持8bit权重量化和8bit KVCache量化。
 

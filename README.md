@@ -81,7 +81,7 @@ Take [Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quant
   </thead>
   <thead>
     <tr>
-      <th colspan="8"><a href="mindspore_gs/ptq/README_CN.md"><div align="center">Post-Training Quantization</div></a></th>
+      <th colspan="8"><a href="mindspore_gs/ptq/README.md"><div align="center">Post-Training Quantization</div></a></th>
     </tr>
   </thead>
   <tbody>
