@@ -16,7 +16,8 @@
 
 src_dir=$1
 dst_dir=$2
+rank_num=${3:-16}
 base_path=$(cd "$(dirname $0)"; pwd)
 src_strategy_file=${base_path}/ckpt_strategy.ckpt
 quant_infer_path=${base_path}/../unify_safetensors.py
-python ${quant_infer_path} --src_dir ${src_dir} --src_strategy_file ${src_strategy_file} --dst_dir ${dst_dir}
+python ${quant_infer_path} --src_dir ${src_dir} --src_strategy_file ${src_strategy_file} --dst_dir ${dst_dir} --ffn_split True --qkv_split True --rank_num ${rank_num} --approach "smoothquant"
