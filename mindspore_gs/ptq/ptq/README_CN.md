@@ -172,7 +172,7 @@ AWQ同时支持PerChannel量化和PerGroup量化，可以通过如下配置项�
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ)
 ```
 
@@ -182,7 +182,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none,
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ,
                        weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0)
 ```
@@ -193,7 +193,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none,
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128)
 ```
@@ -207,7 +207,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity, AWQConfig
 
 awq_config = AWQConfig(duo_scaling=False, smooth_alpha=[0.5, 0.7, 0.9], weight_clip_ratio=[0.90, 0.95, 0.99])
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128, algo_args=awq_config)
 ```
@@ -231,7 +231,7 @@ per-token动态量化算法是在推理过程中对激活/KVcache进行per-token
   from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
   ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
-  outliers_suppression=OutliersSuppressionType.SMOOTH)
+                         outliers_suppression=OutliersSuppressionType.SMOOTH)
   ```
 
   此时激活对应的计算公式如下：
@@ -249,8 +249,8 @@ per-token动态量化算法是在推理过程中对激活/KVcache进行per-token
   from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
   ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-  weight_quant_granularity=QuantGranularity.PER_TOKEN,
-  outliers_suppression=OutliersSuppressionType.NONE)
+                         weight_quant_granularity=QuantGranularity.PER_TOKEN,
+                         outliers_suppression=OutliersSuppressionType.NONE)
   ```
 
   此时激活对应的计算公式如下：
@@ -270,9 +270,9 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
 ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
-kvcache_quant_dtype=msdtype.int8,
-kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
-outliers_suppression=OutliersSuppressionType.NONE)
+                       kvcache_quant_dtype=msdtype.int8,
+                       kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+                       outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
 此时KVCache对应的计算公式如下：
@@ -292,7 +292,7 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
   from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
   ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                          outliers_suppression=OutliersSuppressionType.NONE)
+                         outliers_suppression=OutliersSuppressionType.NONE)
   ```
 
 - SmoothQuant量化组合8bit KVCache量化：
@@ -302,7 +302,7 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
   from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
   ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                          outliers_suppression=OutliersSuppressionType.NONE)
+                         outliers_suppression=OutliersSuppressionType.NONE)
   ```
 
 - 层间混合精度量化
@@ -310,13 +310,14 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
   支持层间混合精度量化，根据不同层对于量化的敏感程度，应用a16w8、a8w8等量化算法。例如，通过layer_policies配置，支持feed_forward模块中的层使用a16w8量化，其他层使用a8w8量化。
 
   ```python
+  from collections import OrderedDict
   from mindspore import dtype as msdtype
   from mindspore_gs.ptq import PTQ, PTQConfig, OutliersSuppressionType
 
   net_policy = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=[])
+                         outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=[])
   ffn_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=['w2'])
+                         outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=['w2'])
   layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
 
   ptq = PTQ(config=net_policy, layer_policies=layer_policies)
@@ -486,7 +487,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
 ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
-                    outliers_suppression=OutliersSuppressionType.SMOOTH)
+                       outliers_suppression=OutliersSuppressionType.SMOOTH)
 ```
 
 有了PTQConfig以后，接下来构造PTQ算法了，代码如下：
@@ -494,9 +495,10 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
 > 对于ParallelLlamaForCausalLM网络，某些层对于量化比较敏感，不适合量化，我们通常通过opname_blacklist字段来帮助跳过这些层的量化。
 
 ```python
+from mindspore import dtype as msdtype
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
+from mindspore_gs.ptq import PTQMode, PTQConfig
 
 ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8)
@@ -529,7 +531,6 @@ print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
 
 ```python
 import numpy as np
-import mindspore as ms
 from mindformers.core.metric import EmF1Metric
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.datasets import get_datasets
@@ -599,7 +600,7 @@ from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
+from mindspore_gs.ptq import PTQMode, PTQConfig
 
 
 config_path = '/path/to/workspace/predict_llama2_7b.yaml'

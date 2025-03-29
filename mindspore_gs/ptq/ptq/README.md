@@ -84,7 +84,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
 ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE)
+                       outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
 ##### 3. KVCache Quantization
@@ -98,7 +98,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
 ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
+                       outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
 #### SmoothQuant Algorithm
@@ -116,7 +116,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
 ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+                       outliers_suppression=OutliersSuppressionType.SMOOTH)
 ```
 
 #### Dynamic Quantization Algorithm
@@ -138,7 +138,7 @@ For activation per-token dynamic quantization, RoundToNearest quantization of we
     from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
-    outliers_suppression=OutliersSuppressionType.SMOOTH)
+                           outliers_suppression=OutliersSuppressionType.SMOOTH)
     ```
 
     At this time, the corresponding calculation formula for activation is as follows:
@@ -156,8 +156,8 @@ For activation per-token dynamic quantization, RoundToNearest quantization of we
     from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-    weight_quant_granularity=QuantGranularity.PER_TOKEN,
-    outliers_suppression=OutliersSuppressionType.NONE)
+                           weight_quant_granularity=QuantGranularity.PER_TOKEN,
+                           outliers_suppression=OutliersSuppressionType.NONE)
     ```
 
     At this time, the corresponding calculation formula for activation is as follows:
@@ -177,9 +177,9 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
 ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
-kvcache_quant_dtype=msdtype.int8,
-kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
-outliers_suppression=OutliersSuppressionType.NONE)
+                       kvcache_quant_dtype=msdtype.int8,
+                       kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+                       outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
 At this time, the corresponding calculation formula for KVCache is as follows:
@@ -240,7 +240,7 @@ AWQ algorithm supports both PerChannel quantization and PerGroup quantization, a
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ)
 ```
 
@@ -250,7 +250,7 @@ or：
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ,
                        weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0)
 ```
@@ -261,7 +261,7 @@ User can enable the PerGroup AWQ algorithm of PTQ by using the following configu
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128)
 ```
@@ -275,7 +275,7 @@ from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType, QuantGranularity, AWQConfig
 
 awq_config = AWQConfig(duo_scaling=False, smooth_alpha=[0.5, 0.7, 0.9], weight_clip_ratio=[0.90, 0.95, 0.99])
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=none, kvcache_quant_dtype=none,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None, kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128, algo_args=awq_config)
 ```
@@ -291,7 +291,7 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                            outliers_suppression=OutliersSuppressionType.NONE)
+                           outliers_suppression=OutliersSuppressionType.NONE)
     ```
 
 - SmoothQuant quantization combined with 8bit KVCache quantization:
@@ -301,7 +301,7 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                            outliers_suppression=OutliersSuppressionType.NONE)
+                           outliers_suppression=OutliersSuppressionType.NONE)
     ```
 
 - inter-layer mixed-precision quantization
@@ -309,13 +309,14 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
     Support inter-layer mixed-precision quantization, and apply quantization algorithms, such as 8bit weight and 8bit full quantization, according to the sensitivity of different layers to quantization. For example, the layer_policies configuration supports a16w8 quantization for layers in the feed_forward module and a8w8 quantization for other layers.
 
     ```python
+    from collections import OrderedDict
     from mindspore import dtype as msdtype
     from mindspore_gs.ptq import PTQ, PTQConfig, OutliersSuppressionType
 
     net_policy = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=[])
+                           outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=[])
     ffn_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=['w2'])
+                           outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=['w2'])
     layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
 
     ptq = PTQ(config=net_policy, layer_policies=layer_policies)
@@ -487,7 +488,7 @@ We can enable different quantization capabilities according to the PTQConfig con
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE)
+                           outliers_suppression=OutliersSuppressionType.NONE)
     ```
 
 - smooth-quant quantization
@@ -497,7 +498,7 @@ We can enable different quantization capabilities according to the PTQConfig con
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+                           outliers_suppression=OutliersSuppressionType.SMOOTH)
     ```
 
 - kvcache int8 quantization
@@ -507,7 +508,7 @@ We can enable different quantization capabilities according to the PTQConfig con
     from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
     ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
+                           outliers_suppression=OutliersSuppressionType.NONE)
     ```
 
 - a16w8 weight quantization combined kvcache int8 quantization
@@ -535,9 +536,10 @@ Once you have the PTQConfig, the next step is to construct the PTQ algorithm wit
 > For ParallelLlamaForCausalLM networks, certain layers are more sensitive to quantization and are not suitable for quantization, and we usually help to skip quantization of these layers by means of the opname_blacklist field.
 
 ```python
+from mindspore import dtype as msdtype
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
+from mindspore_gs.ptq import PTQMode, PTQConfig
 
 ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8)
@@ -570,7 +572,6 @@ Evaluation of F1EM metrics for the ParallelLlamaForCausalLM-7B network using the
 
 ```python
 import numpy as np
-import mindspore as ms
 from mindformers.core.metric import EmF1Metric
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.datasets import get_datasets
@@ -640,7 +641,7 @@ from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQMode, PTQConfig, OutliersSuppressionType
+from mindspore_gs.ptq import PTQMode, PTQConfig
 
 
 config_path = '/path/to/workspace/predict_llama2_7b.yaml'
