@@ -17,8 +17,9 @@ import os
 import math
 import time
 from typing import Optional
-from mindspore import Tensor, dtype, numpy
+from mindspore import Tensor, dtype, numpy, Parameter
 from mindspore import ops as msops
+from mindspore.common.initializer import initializer
 from mindspore.communication import get_rank
 from mindspore.communication.management import GlobalComm
 from mindspore.ops import sub as aclnn_sub, add as aclnn_add
@@ -81,6 +82,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             self.h = msops.zeros((self.ic * self.cfg.tp_size, self.ic * self.cfg.tp_size), dtype=dtype.float32)
         else:
             self.h = msops.zeros((self.ic, self.ic), dtype=dtype.float32)
+        self.perm = Parameter(initializer('ones', self.ic, dtype=dtype.int32))
         self.weight_quant_min, self.weight_quant_max = get_quant_min_max(num_bits=self.bits,
                                                                          signed=self.cfg.weight_symmetric,
                                                                          narrow_range=self.cfg.weight_narrow_range)
@@ -217,7 +219,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         quant_tick = time.time()
         self._gptq_precision_recovery(weight, hinv, scale, zero, perm)
         logger.info(f'[TIME]quant layers with time {time.time() - quant_tick}s')
-        if self.cfg.algo_args["desc_act"]:
+        if self.cfg.algo_args["desc_act"] and self.weight_need_allgather:
             self.qweight = self.qweight[:, invperm]
         if self.weight_need_allgather:
             self.qweight = self.qweight[:, self.rank_id * self.ic : self.rank_id * self.ic + self.ic]
@@ -298,8 +300,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         self.q_weight.set_data(Tensor(self.qweight.asnumpy(), dtype=dtype.int8))
         self.w_scale.set_data(Tensor(self.group_scale, dtype=dtype.float64))
         self.w_zp.set_data(Tensor(self.group_zero, dtype=dtype.float64))
-        del weight
-        del hinv
+        self.perm.set_data(Tensor(perm, dtype=dtype.int32))
         del self.group_scale
         del self.group_zero
         del self.qweight

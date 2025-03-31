@@ -211,10 +211,9 @@ class PTQ(CompAlgo):
                 (config.outliers_suppression == OutliersSuppressionType.AWQ or
                  config.precision_recovery == PrecisionRecovery.GPTQ):
             raise ValueError("AWQ algorithm and GPTQ algorithm do not support quant activation.")
-        if config.weight_quant_dtype == dtype.qint4x2 and (config.act_quant_dtype == dtype.int8 or
-                                                           config.kvcache_quant_dtype == dtype.int8):
+        if config.weight_quant_dtype == dtype.qint4x2 and config.kvcache_quant_dtype == dtype.int8:
             raise ValueError("PTQ algorithm only support quant weight in int4 alone."
-                             "Please not to use with a8 or c8 at the same time.")
+                             "Please not to use with c8 at the same time.")
 
     def _layer_policies_check(self):
         """_layer_policies_check"""
