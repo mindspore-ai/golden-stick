@@ -100,11 +100,11 @@ class PTQ(CompAlgo):
         >>> helper = MFLlama2Helper(mfconfig)
         >>> backend = BackendTarget.ASCEND
         >>> ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, opname_blacklist=["w2", "lm_head"],
-        ...             weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-        ...             outliers_suppression=OutliersSuppressionType.SMOOTH)
+        ...                        weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+        ...                        outliers_suppression=OutliersSuppressionType.SMOOTH)
         >>> attn_policy = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend,
-        ...             weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-        ...             outliers_suppression=OutliersSuppressionType.NONE)
+        ...                         weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+        ...                         outliers_suppression=OutliersSuppressionType.NONE)
         >>> layer_policy = OrderedDict({r'.*Attention.wo.*': attn_policy})
         >>> ptq = PTQ(ptq_config, layer_policy)
         >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
