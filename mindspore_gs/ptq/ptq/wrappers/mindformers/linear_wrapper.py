@@ -20,50 +20,56 @@ from mindspore import ops as msops
 from mindspore.ops import functional as F
 from mindspore.ops.auto_generate import GroupedMatmulV4
 from mindspore.nn import Cell
-from mindspore.common.hook_handle import HookHandle
 from mindformers.modules.layers import Linear
-from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
-from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.ptq.hal import MatmulCellForHook, ParallelType, QuantWithSmooth, DynamicQuantCell
+from mindspore_gs.ptq.ptq.hal import ParallelType, QuantWithSmooth, DynamicQuantCell
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
     """WrapperCell"""
-    def __init__(self, layer_name: str, layer, context: InnerPTQConfig, cfg: InnerPTQConfig,
-                 network_helper: NetworkHelper, **kwargs):
-        super().__init__(layer_name, layer, context, cfg, network_helper, **kwargs)
-        self.hook_handle: Optional[HookHandle] = None
-
     def add_hook(self):
-        def hook_fn(_, inps):
-            x = inps[0]
-            self.samples.append(msops.squeeze(x))
-        def hook_fn_gmm(_, inps):
-            x = inps[0][0]
-            self.group_list = inps[8]
-            self.samples.append(msops.squeeze(x))
-        # mindspore can only hook cell.
-        last_mm = (self._layer, 'matmul')
-        cur_mm = self._layer.matmul
-        while True:
-            if isinstance(cur_mm, (msops.MatMul, GroupedMatmulV4)):
-                target = MatmulCellForHook(self._layer_name, cur_mm)
-                setattr(last_mm[0], last_mm[1], target)
-                self.hook_handle = target.register_forward_pre_hook(hook_fn if isinstance(cur_mm, msops.MatMul) else
-                                                                    hook_fn_gmm)
-                break
-            if isinstance(cur_mm, MatmulCellForHook):
-                self.hook_handle = cur_mm.register_forward_pre_hook(hook_fn if isinstance(cur_mm.mm, msops.MatMul) else
-                                                                    hook_fn_gmm)
-                break
-            last_mm = (cur_mm, 'mm')
-            cur_mm = cur_mm.mm
+        class HookMatMul(msops.MatMul):
+            def __call__(self, *args, **kwargs):
+                x = args[0]
+                self.samples.append(msops.squeeze(x))
+                return msops.MatMul.__call__(self, *args, **kwargs)
+
+        class HookGroupedMatMul(GroupedMatmulV4):
+            def __call__(self, *args, **kwargs):
+                x = args[0][0]
+                self.samples.append(msops.squeeze(x))
+                return GroupedMatmulV4.__call__(self, *args, **kwargs)
+
+        if isinstance(self.layer.matmul, msops.MatMul):
+            self.layer.matmul.__class__ = HookMatMul
+            self.layer.matmul.layer_name = self.layer_name
+            self.layer.matmul.samples = self.samples
+        elif isinstance(self.layer.matmul, GroupedMatmulV4):
+            self.layer.matmul.__class__ = HookGroupedMatMul
+            self.layer.matmul.layer_name = self.layer_name
+            self.layer.matmul.samples = self.samples
+        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, msops.MatMul):
+            self.layer.matmul.mm.__class__ = HookMatMul
+            self.layer.matmul.mm.layer_name = self.layer_name
+            self.layer.matmul.mm.samples = self.samples
+        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, GroupedMatmulV4):
+            self.layer.matmul.mm.__class__ = HookGroupedMatMul
+            self.layer.matmul.mm.layer_name = self.layer_name
+            self.layer.matmul.mm.samples = self.samples
+        else:
+            raise RuntimeError(f"Unsupported matmul type for hook: {type(self.layer.matmul)}")
 
     def remove_hook(self):
-        if self.hook_handle:
-            self.hook_handle.remove()
-        # mindspore not support replace a cell with primitive, so MatmulCellForHook can not be removed here.
+        if isinstance(self.layer.matmul, msops.MatMul):
+            self.layer.matmul.__class__ = msops.MatMul
+        elif isinstance(self.layer.matmul, GroupedMatmulV4):
+            self.layer.matmul.__class__ = GroupedMatmulV4
+        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, msops.MatMul):
+            self.layer.matmul.mm.__class__ = msops.MatMul
+        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, GroupedMatmulV4):
+            self.layer.matmul.mm.__class__ = GroupedMatmulV4
+        else:
+            raise RuntimeError(f"Unsupported matmul type for hook: {type(self.layer.matmul)}")
 
     @abc.abstractmethod
     def deploy(self):

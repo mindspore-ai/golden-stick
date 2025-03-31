@@ -324,19 +324,6 @@ class QuantWithOutlierSuppressionPlusHighPerformance(QuantWithOutlierSuppression
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
 
 
-class MatmulCellForHook(QuantUnitCell):
-    """MatmulCellForHook"""
-    def __init__(self, layer_name, matmul):
-        super().__init__(layer_name)
-        self.mm = matmul
-
-    def construct(self, *args, **kwargs):
-        return self.mm(*args, **kwargs)
-
-    def param_shard_state(self, tensor_parallel_num=1, **kwargs):
-        return {}
-
-
 class SmoothMatmul(QuantUnitCell):
     """SmoothMatmul"""
     def __init__(self, layer_name, mm, smooth_scale_):
@@ -352,17 +339,10 @@ class SmoothMatmul(QuantUnitCell):
         self.mm = mm
         self.smooth_scale.set_data(msops.div(1, smooth_scale_))
 
-    @classmethod
-    def _from_matmul_cell(cls, layer_name, src: MatmulCellForHook, smooth_scale):
-        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
-            return cls(layer_name, src.mm, smooth_scale)
-        raise ValueError(f'matmul of MatmulCellForHook should be an instance of '
-                         f'{msops.MatMul} or {GroupedMatmulV4}, but got {src.mm}.')
-
     @staticmethod
     def create(layer_name, src, smooth_scale):
-        if isinstance(src, MatmulCellForHook):
-            return SmoothMatmul._from_matmul_cell(layer_name, src, smooth_scale)
+        if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
+            return SmoothMatmul(layer_name, src, smooth_scale)
         raise ValueError(f"Not support creating SmoothMatmul from {src}.")
 
     def construct(self, *args, **kwargs):
@@ -396,22 +376,9 @@ class SmoothMatmulForDeploy(QuantUnitCell):
         self.is_group_mm = isinstance(mm, GroupedMatmulV4)
 
     @staticmethod
-    def _from_matmul_prim(layer_name, src: msops.MatMul, ic, compute_dtype):
-        return SmoothMatmulForDeploy(layer_name, src, ic, compute_dtype)
-
-    @staticmethod
-    def _from_matmul_cell(layer_name, src: MatmulCellForHook, ic, compute_dtype):
-        if not isinstance(src.mm, msops.MatMul):
-            raise ValueError(
-                f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        return SmoothMatmulForDeploy(layer_name, src.mm, ic, compute_dtype)
-
-    @staticmethod
     def create(layer_name, src, ic, compute_dtype):
         if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
-            return SmoothMatmulForDeploy._from_matmul_prim(layer_name, src, ic, compute_dtype)
-        if isinstance(src, MatmulCellForHook):
-            return SmoothMatmulForDeploy._from_matmul_cell(layer_name, src, ic, compute_dtype)
+            return SmoothMatmulForDeploy(layer_name, src, ic, compute_dtype)
         raise ValueError(f"Not support creating SmoothMatmulForDeploy from {src}.")
 
     def construct(self, *args, **kwargs):
@@ -444,22 +411,9 @@ class OutlierSuppressionPlusMatmulForDeploy(QuantUnitCell):
         self.beta = Parameter(initializer('zeros', (ic_,), dtype=compute_dtype_))
 
     @staticmethod
-    def _from_matmul_prim(layer_name, src: msops.MatMul, ic, compute_dtype):
-        return OutlierSuppressionPlusMatmulForDeploy(layer_name, src, ic, compute_dtype)
-
-    @staticmethod
-    def _from_matmul_cell(layer_name, src: MatmulCellForHook, ic, compute_dtype):
-        if not isinstance(src.mm, msops.MatMul):
-            raise ValueError(
-                f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        return OutlierSuppressionPlusMatmulForDeploy(layer_name, src.mm, ic, compute_dtype)
-
-    @staticmethod
     def create(layer_name, src, ic, compute_dtype):
         if isinstance(src, msops.MatMul):
-            return OutlierSuppressionPlusMatmulForDeploy._from_matmul_prim(layer_name, src, ic, compute_dtype)
-        if isinstance(src, MatmulCellForHook):
-            return OutlierSuppressionPlusMatmulForDeploy._from_matmul_cell(layer_name, src, ic, compute_dtype)
+            return OutlierSuppressionPlusMatmulForDeploy(layer_name, src, ic, compute_dtype)
         raise ValueError(f"Not support creating OutlierSuppressionPlusMatmulForDeploy from {src}.")
 
     def construct(self, x, weight):
@@ -506,34 +460,24 @@ class DynamicQuantMatmul(QuantUnitCell):
         return qbmm, quant_op
 
     @staticmethod
-    def _from_matmul_cell(layer_name, is_deploy, src: MatmulCellForHook, w_qparam: QuantParam, transpose_a=False,
-                          transpose_b=False, dst_dtype=dtype.float16):
-        if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
-            raise ValueError(
-                f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
-        quant_op = DynamicQuantCell.create(layer_name, is_deploy, None)
-        return qbmm, quant_op
-
-    @staticmethod
     def _from_smooth_matmul(layer_name, is_deploy, src: SmoothMatmul, w_qparam: QuantParam, transpose_a=False,
                             transpose_b=False, dst_dtype=dtype.float16):
-        if isinstance(src.mm, (msops.MatMul, MatmulCellForHook)):
+        if isinstance(src.mm, msops.MatMul): # why not gmm
             qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
             quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
             return qbmm, quant_op
         raise ValueError(
-            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
+            f'matmul of SmoothMatmul should be an instance of {msops.MatMul}, but got {src.mm}.')
 
     @staticmethod
     def _from_smooth_matmul_for_deploy(layer_name, is_deploy, src: SmoothMatmulForDeploy, w_qparam: QuantParam,
                                        transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
-        if isinstance(src.mm, (msops.MatMul, MatmulCellForHook)):
+        if isinstance(src.mm, msops.MatMul): # why not gmm
             qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
             quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
             return qbmm, quant_op
         raise ValueError(
-            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
+            f'matmul of SmoothMatmul should be an instance of {msops.MatMul}, but got {src.mm}.')
 
     @staticmethod
     def create(layer_name, src, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
@@ -545,9 +489,6 @@ class DynamicQuantMatmul(QuantUnitCell):
         if isinstance(src, GroupedMatmulV4):
             return DynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam, transpose_a, transpose_b,
                                                         dst_dtype, True)
-        if isinstance(src, MatmulCellForHook):
-            return DynamicQuantMatmul._from_matmul_cell(layer_name, is_deploy, src, w_qparam, transpose_a, transpose_b,
-                                                        dst_dtype)
         if isinstance(src, SmoothMatmul):
             return DynamicQuantMatmul._from_smooth_matmul(layer_name, is_deploy, src, w_qparam, transpose_a,
                                                           transpose_b, dst_dtype)
@@ -610,31 +551,22 @@ class WeightQuantMatmul(QuantUnitCell):
         return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, None, is_grouped_mm)
 
     @classmethod
-    def _from_matmul_cell(cls, layer_name, src: MatmulCellForHook, w_qparam: QuantParam, is_deploy,
-                          transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
-        if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
-            raise ValueError(
-                f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, None,
-                   isinstance(src.mm, GroupedMatmulV4))
-
-    @classmethod
     def _from_smooth_matmul(cls, layer_name, src: SmoothMatmul, w_qparam: QuantParam, is_deploy,
                             transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
-        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4, MatmulCellForHook)):
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, src.smooth_scale)
         raise ValueError(
-            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
+            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {GroupedMatmulV4}, but got {src.mm}.')
 
     @classmethod
     def _from_smooth_matmul_for_deploy(cls, layer_name, src: SmoothMatmulForDeploy, w_qparam: QuantParam, is_deploy,
                                        transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
-        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4, MatmulCellForHook)):
-            if isinstance(src.mm, GroupedMatmulV4):
-                return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, src.smooth_scale, True)
-            return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, src.smooth_scale)
+        if isinstance(src.mm, GroupedMatmulV4):
+            return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, src.smooth_scale, True)
+        if isinstance(src.mm, msops.MatMul):
+            return cls(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype, src.smooth_scale, False)
         raise ValueError(
-            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
+            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {GroupedMatmulV4}, but got {src.mm}.')
 
     @staticmethod
     def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
@@ -642,13 +574,10 @@ class WeightQuantMatmul(QuantUnitCell):
         """create"""
         if isinstance(linear.matmul, msops.MatMul):
             return WeightQuantMatmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
-                                                       dst_dtype)
+                                                       dst_dtype, False)
         if isinstance(linear.matmul, GroupedMatmulV4):
             return WeightQuantMatmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
                                                        dst_dtype, True)
-        if isinstance(linear.matmul, MatmulCellForHook):
-            return WeightQuantMatmul._from_matmul_cell(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
-                                                       transpose_b, dst_dtype)
         if isinstance(linear.matmul, SmoothMatmul):
             return WeightQuantMatmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
                                                          transpose_b, dst_dtype)
@@ -732,13 +661,10 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
 
         if isinstance(linear.matmul, msops.MatMul):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
-                                                            linear.transpose_b, dst_dtype)
+                                                            linear.transpose_b, dst_dtype, False)
         elif isinstance(linear.matmul, GroupedMatmulV4):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
                                                             linear.transpose_b, dst_dtype, True)
-        elif isinstance(linear.matmul, MatmulCellForHook):
-            wqbmm = WeightQuantInt4Matmul._from_matmul_cell(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
-                                                            linear.transpose_b, dst_dtype)
         elif isinstance(linear.matmul, SmoothMatmul):
             wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy,
                                                               transpose_a, linear.transpose_b, dst_dtype)
@@ -812,32 +738,17 @@ class AllQuantMatmul(QuantUnitCell):
                                           quant_bias, dst_dtype, kernel_type), None
 
     @staticmethod
-    def _from_matmul_cell(layer_name, src: MatmulCellForHook, x_qparam: QuantParam, w_qparam: QuantParam, is_deploy,
-                          transpose_a=False, transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
-                          kernel_type: KernelType = KernelType.ASD):
-        if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
-            raise ValueError(
-                f'matmul of MatmulCellForHook should be an instance of {msops.MatMul} or {GroupedMatmulV4}, '
-                f'but got {src.mm}.')
-        return AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a, transpose_b,
-                                          quant_bias, dst_dtype, kernel_type), None
-
-    @staticmethod
     def _from_smooth_matmul(layer_name, src: SmoothMatmul, x_qparam: QuantParam, w_qparam: QuantParam, is_deploy,
                             transpose_a=False, transpose_b=False, quant_bias=None, dst_dtype=dtype.float16,
                             kernel_type: KernelType = KernelType.ASD):
         """_from_smooth_matmul"""
         smooth_scale = src.smooth_scale.asnumpy()
-        if isinstance(src.mm, msops.MatMul):
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             qmm = AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a,
                                              transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, smooth_scale
-        if isinstance(src.mm, MatmulCellForHook):
-            qmm, _ = AllQuantMatmul._from_matmul_cell(layer_name, src.mm, x_qparam, w_qparam, is_deploy, transpose_a,
-                                                      transpose_b, quant_bias, dst_dtype, kernel_type)
-            return qmm, smooth_scale
         raise ValueError(
-            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
+            f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {GroupedMatmulV4}, but got {src.mm}.')
 
     @staticmethod
     def _from_smooth_matmul_for_deploy(layer_name, src: SmoothMatmulForDeploy, x_qparam: QuantParam,
@@ -850,12 +761,8 @@ class AllQuantMatmul(QuantUnitCell):
             qmm = AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a,
                                              transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, smooth_scale
-        if isinstance(src.mm, MatmulCellForHook):
-            qmm, _ = AllQuantMatmul._from_matmul_cell(layer_name, src.mm, x_qparam, w_qparam, is_deploy, transpose_a,
-                                                      transpose_b, quant_bias, dst_dtype, kernel_type)
-            return qmm, smooth_scale
         raise ValueError(
-            f'matmul of SmoothMatmulForDeploy should be an instance of {msops.MatMul} or {MatmulCellForHook}, '
+            f'matmul of SmoothMatmulForDeploy should be an instance of {msops.MatMul} or {GroupedMatmulV4}, '
             f'but got {src.mm}.')
 
     @staticmethod
@@ -865,16 +772,12 @@ class AllQuantMatmul(QuantUnitCell):
                                                          dst_dtype=dtype.float16,
                                                          kernel_type: KernelType = KernelType.ASD):
         """from outlier suppression plus for deploy"""
-        if isinstance(src.mm, msops.MatMul):
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             qmm = AllQuantMatmul.create_self(layer_name, src.mm, is_deploy, x_qparam, w_qparam, transpose_a,
                                              transpose_b, quant_bias, dst_dtype, kernel_type)
             return qmm, src.beta
-        if isinstance(src.mm, MatmulCellForHook):
-            qmm, _ = AllQuantMatmul._from_matmul_cell(layer_name, src.mm, x_qparam, w_qparam, is_deploy, transpose_a,
-                                                      transpose_b, quant_bias, dst_dtype, kernel_type)
-            return qmm, src.beta
         raise ValueError(
-            f'matmul of SmoothMatmulForDeploy should be an instance of {msops.MatMul} or {MatmulCellForHook}, '
+            f'matmul of SmoothMatmulForDeploy should be an instance of {msops.MatMul} or {GroupedMatmulV4}, '
             f'but got {src.mm}.')
 
     @staticmethod
@@ -919,12 +822,6 @@ class AllQuantMatmul(QuantUnitCell):
         # create qmm
         if isinstance(linear.matmul, msops.MatMul):
             qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(layer_name, linear.matmul, x_qparam, w_qparam,
-                                                                 is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
-                                                                 kernel_type)
-            quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type)
-        elif isinstance(linear.matmul, MatmulCellForHook):
-            qmm, smooth_scale = AllQuantMatmul._from_matmul_cell(layer_name, linear.matmul, x_qparam, w_qparam,
                                                                  is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
                                                                  kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
