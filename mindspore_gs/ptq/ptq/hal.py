@@ -123,6 +123,39 @@ class QuantWithSmooth(QuantUnitCell):
                 self.input_zp.name: {'shape': self.input_zp.shape, 'shard': input_zp_shard}}
 
 
+class DynamicQuantCell(QuantUnitCell):
+    """DynamicQuantCell"""
+    def __init__(self, layer_name, is_deploy, smooth_scale=None):
+        super().__init__(layer_name)
+        self.smooth_scale = smooth_scale
+        if not is_deploy and smooth_scale is not None:
+            logger.debug(f"DynamicQuantCell: smooth scale of Layer("
+                         f"{layer_name}) is {{{smooth_scale.shape}, {smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
+        self.dynamic_quant = DynamicQuantExt()
+
+    @staticmethod
+    def create(layer_name, is_deploy, smooth_scale=None):
+        """create"""
+        return DynamicQuantCell(layer_name, is_deploy, smooth_scale)
+
+    def construct(self, x):
+        qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
+        return qx, x_scale
+
+    # pylint: disable=arguments-differ
+    def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        if parallel_type == ParallelType.COL_PARALLEL:
+            smooth_scale_shard = (1,)
+        elif parallel_type == ParallelType.ROW_PARALLEL:
+            smooth_scale_shard = (tensor_parallel_num,)
+        else:
+            return {}
+        shard_state = {}
+        if self.smooth_scale is not None:
+            shard_state[self.smooth_scale.name] = {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}
+        return shard_state
+
+
 class QuantWithSmoothHighPrecision(QuantWithSmooth):
     """QuantWithSmoothHighPrecision"""
     def __init__(self, layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
@@ -448,7 +481,7 @@ class DynamicQuantMatmul(QuantUnitCell):
     """dynamic quant"""
 
     def __init__(self, layer_name, is_deploy, weight_scale, transpose_a=False, transpose_b=False,
-                 dst_dtype=dtype.float16, smooth_scale=None, is_group_mm=False):
+                 dst_dtype=dtype.float16, is_group_mm=False):
         super().__init__(layer_name)
         self.dst_dtype = dst_dtype
         weight_scale_dtype = dtype.bfloat16 if dst_dtype == dtype.bfloat16 else dtype.float32
@@ -458,12 +491,6 @@ class DynamicQuantMatmul(QuantUnitCell):
             self.weight_scale = Parameter(weight_scale.astype(weight_scale_dtype))
             logger.debug(f"DynamicQuantMatmul: weight_scale of Layer({layer_name}) is {{{self.weight_scale.shape}, "
                          f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
-        self.smooth_scale = smooth_scale
-        self.has_smooth = smooth_scale is not None
-        if not is_deploy and smooth_scale is not None:
-            logger.debug(f"DynamicQuantMatmul: smooth_scale of Layer({layer_name}) is "
-                         f"{{{self.smooth_scale.shape}, {self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}")
-        self.dynamic_quant = DynamicQuantExt()
         self.is_group_mm = is_group_mm
         if is_group_mm:
             self.qbmm = GroupedMatmulV4()
@@ -473,8 +500,10 @@ class DynamicQuantMatmul(QuantUnitCell):
     @staticmethod
     def _from_matmul_prim(layer_name, is_deploy, w_qparam: QuantParam, transpose_a=False, transpose_b=False,
                           dst_dtype=dtype.float16, is_group_mm=False):
-        return DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype, None,
+        qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype,
                                   is_group_mm)
+        quant_op = DynamicQuantCell.create(layer_name, is_deploy, None)
+        return qbmm, quant_op
 
     @staticmethod
     def _from_matmul_cell(layer_name, is_deploy, src: MatmulCellForHook, w_qparam: QuantParam, transpose_a=False,
@@ -482,14 +511,17 @@ class DynamicQuantMatmul(QuantUnitCell):
         if not isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
             raise ValueError(
                 f'matmul of MatmulCellForHook should be an instance of {msops.MatMul}, but got {src.mm}.')
-        return DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype, None)
+        qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
+        quant_op = DynamicQuantCell.create(layer_name, is_deploy, None)
+        return qbmm, quant_op
 
     @staticmethod
     def _from_smooth_matmul(layer_name, is_deploy, src: SmoothMatmul, w_qparam: QuantParam, transpose_a=False,
                             transpose_b=False, dst_dtype=dtype.float16):
         if isinstance(src.mm, (msops.MatMul, MatmulCellForHook)):
-            return DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype,
-                                      src.smooth_scale)
+            qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
+            quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
+            return qbmm, quant_op
         raise ValueError(
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
 
@@ -497,8 +529,9 @@ class DynamicQuantMatmul(QuantUnitCell):
     def _from_smooth_matmul_for_deploy(layer_name, is_deploy, src: SmoothMatmulForDeploy, w_qparam: QuantParam,
                                        transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
         if isinstance(src.mm, (msops.MatMul, MatmulCellForHook)):
-            return DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype,
-                                      src.smooth_scale)
+            qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
+            quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
+            return qbmm, quant_op
         raise ValueError(
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul} or {MatmulCellForHook}, but got {src.mm}.')
 
@@ -523,8 +556,7 @@ class DynamicQuantMatmul(QuantUnitCell):
                                                                      transpose_b, dst_dtype)
         raise ValueError(f"Not support creating DynamicQuantMatmul from {src}.")
 
-    def construct(self, x, quant_weight, group_list=None):
-        qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
+    def construct(self, qx, quant_weight, group_list=None, x_scale=None):
         if self.is_group_mm:
             output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
                                group_list, split_item=3, group_type=0, group_list_type=1)[0]
@@ -535,16 +567,12 @@ class DynamicQuantMatmul(QuantUnitCell):
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
         if parallel_type == ParallelType.COL_PARALLEL:
-            smooth_scale_shard = (1,)
             weight_scale_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
-            smooth_scale_shard = (tensor_parallel_num,)
             weight_scale_shard = (1, 1) if self.is_group_mm else (1,)
         else:
             return {}
         shard_state = {self.weight_scale.name: {'shape': self.weight_scale.shape, 'shard': weight_scale_shard}}
-        if self.has_smooth:
-            shard_state[self.smooth_scale.name] = {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}
         return shard_state
 
 
