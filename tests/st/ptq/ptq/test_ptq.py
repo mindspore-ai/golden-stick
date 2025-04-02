@@ -235,6 +235,7 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
     os.environ.pop('FORCE_EAGER', None)
+    os.environ.pop('MS_JIT', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -585,8 +586,7 @@ def test_awq_config_error():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
-def test_context_mode_error(mode):
+def test_context_mode_error():
     """
     Feature: set GRAPH mode to QUANTIZE.
     Description:set GRAPH mode to QUANTIZE when using PTQ alogrith to quant network.
@@ -600,11 +600,10 @@ def test_context_mode_error(mode):
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir, "../../../data/test_llama2/predict_llama2_13b_1p.yaml")
     helper = MFLlama2Helper(config_path_)
-    set_context(mode=mode, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"},
+    set_context(mode=GRAPH_MODE, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"},
                 max_device_memory=helper.mf_config.context.max_device_memory)
     network = helper.create_network()
-    with pytest.raises(ValueError, match="In quantization phase, please set mode=PYNATIVE_MODE and"
-                       "set FORCE_EAGER=true."):
+    with pytest.raises(ValueError, match="In QUANTIZE phase, please set mode=PYNATIVE_MODE."):
         ptq.apply(network, helper)
 
 

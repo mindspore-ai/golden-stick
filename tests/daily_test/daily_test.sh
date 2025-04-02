@@ -23,8 +23,8 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_llama2_13b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202503/20250313/master_20250313010015_d4cd6b59a56606b73bcf59f1ab7ee2a33dcf63c3_newest/unified/aarch64/mindspore-2.6.0-cp310-cp310-linux_aarch64.whl"
-MF_PKG_LINK="https://repo.mindspore.cn/mindspore/mindformers/version/202503/20250313/dev_20250313010017_e8d2fec3c0b3c4ded22349e6a53720b0972d1c44_newest/any/mindformers-1.4.0b1-py3-none-any.whl"
+MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202504/20250408/master_20250408165037_b36b796c0103932053d48aa51a91c7751507cd1d/unified/aarch64/mindspore-2.6.0-cp310-cp310-linux_aarch64.whl"
+MF_PKG_LINK="https://repo.mindspore.cn/mindspore/mindformers/version/202504/20250408/r1.5.0_20250408160023_e905315ca35d49af4905a34a07ae7802fe6cfa9e_newest/any/mindformers-1.4.0b1-py3-none-any.whl"
 ds_type="boolq"
 dataset="${BASEPATH}/ws/gs/tests/data/boolq-dataset/dev.jsonl"
 eval_script="eval_boolq.py"
@@ -234,14 +234,14 @@ eval "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPA
 # quant ckpt gptq
 quant_gptq "quant llama2-13b-fp16 to gptq-pergroup" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
 # gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_no_smooth_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_no_smooth_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']" "per_channel"
 eval "eval gptq-pergroup llama2-13b-fp16" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->gptq-perchannel-a16w4 ############################
 # quant ckpt gptq
 quant_gptq "quant llama2-13b-fp16 to gptq-perchannel" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
 # gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_no_smooth_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_no_smooth_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']" "per_channel"
 eval "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 
