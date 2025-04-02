@@ -103,6 +103,8 @@ sed_qconfig()
 
 eval()
 {
+  unset FORCE_EAGER
+  unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_eval_log/"
@@ -120,6 +122,8 @@ eval()
 
 eval_wikitext2()
 {
+  unset FORCE_EAGER
+  unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_eval_log/"
@@ -137,6 +141,8 @@ eval_wikitext2()
 
 quant()
 {
+  export FORCE_EAGER=true
+  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -154,6 +160,8 @@ quant()
 
 quant_awq()
 {
+  export FORCE_EAGER=true
+  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -171,6 +179,8 @@ quant_awq()
 
 quant_gptq()
 {
+  export FORCE_EAGER=true
+  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -246,14 +256,14 @@ eval "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPA
 # quant ckpt gptq
 quant_gptq "quant llama2-13b-fp16 to gptq-pergroup" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
 # gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']" "False"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']" "per_channel" "False"
 eval_wikitext2 "eval gptq-pergroup llama2-13b-fp16" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->gptq-perchannel-a16w4 ############################
 # quant ckpt gptq
 quant_gptq "quant llama2-13b-fp16 to gptq-perchannel" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
 # gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']" "False"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']" "per_channel" "False"
 eval_wikitext2 "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 
