@@ -1041,6 +1041,8 @@ class DeepseekInferParallelism(BaseModelParallelism):
                 param_json_path = os.path.join(src_hf_dir, file)
                 with open(param_json_path, "r") as fp:
                     hf_weight_map = json.load(fp)
+                    if hf_weight_map.get('weight_map'):
+                        hf_weight_map = hf_weight_map['weight_map']
                 break
 
         if not param_json_path:
