@@ -405,6 +405,8 @@ class PTQ(CompAlgo):
         info = self._config.layer_quant_info_collect.get(layer_name)
         if not info and layer_name.endswith('_layer'):
             info = self._config.layer_quant_info_collect.get(layer_name[:-7])
+        if not info and layer_name.endswith('.layer'):
+            info = self._config.layer_quant_info_collect.get(layer_name[:-6])
         return info
 
     def _summary_title(self):
