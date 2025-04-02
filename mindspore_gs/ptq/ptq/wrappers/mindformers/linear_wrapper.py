@@ -40,6 +40,11 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
                 self.samples.append(msops.squeeze(x))
                 return GroupedMatmulV4.__call__(self, *args, **kwargs)
 
+        # what Python really does to __call__:
+        # type(a).__call__(a)
+        # as such, if I want to override the __call__ method, I must override the __call__ of a class
+        # but if I don't want to affect behaviour of other instances of the same class,
+        # I need to create a new class with the overridden __call__ method.
         if isinstance(self.layer.matmul, msops.MatMul):
             self.layer.matmul.__class__ = HookMatMul
             self.layer.matmul.layer_name = self.layer_name
