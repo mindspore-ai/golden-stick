@@ -86,7 +86,7 @@ model:
     theta: 10000.0
     do_sample: False
     is_dynamic: True
-    qkv_concat: False
+    qkv_concat: True
     ffn_concat: True
     auto_map:
       AutoConfig: deepseek3_config.DeepseekV3Config
