@@ -53,7 +53,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
         super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
-        if len(linear.weight.shape) == 3:
+        if linear.expert_num and linear.expert_num > 1:
             self.is_moe = True
         else:
             self.is_moe = False
@@ -240,26 +240,33 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             zero = zero.reshape(scale_shape)
         return qweight, scale, zero
 
-    def quant(self):
-        """quant"""
-        scale, zp, _ = quant_tensor(self.layer.weight, self.w_quant_min, self.w_quant_max,
+    def _get_quant_params(self, weight):
+        """get quant params, scale and zp"""
+        if self.weight_need_allgather:
+            weight = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(weight.transpose(1, 0))
+            weight = weight.transpose(1, 0)
+        if self.is_moe:
+            weight = weight.reshape(self.layer.weight[0], -1, weight.shape[-1])
+            weight = weight.transpose(0, 2, 1)
+        scale, zp, _ = quant_tensor(weight, self.w_quant_min, self.w_quant_max,
                                     self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                     self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                     self.cfg.group_size, self.cfg.weight_quant_dtype,
-                                    self.weight_quantizer_axis, False, False, self.layer.transpose_b)
-        scale = Tensor(scale, dtype=dtype.float32)
-        zp = Tensor(zp, dtype=dtype.float32)
+                                    self.weight_quantizer_axis, False, False, self.layer.transpose_b, False)
+        return weight, scale, zp
+
+    def quant(self):
+        """quant"""
         weight = self.layer.weight.value()
         dead, perm, invperm, hinv = self._hessian_compute()
-        if len(scale.shape) == 2:
-            if self.weight_need_allgather:
-                weight = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(weight.transpose(1, 0))
-                weight = weight.transpose(1, 0)
+        if not self.is_moe:
+            weight, scale, zp = self._get_quant_params(weight)
             self._apply_gptq(weight, scale, zp, dead, perm, invperm, hinv)
         else:
             weight = msops.transpose(weight, (0, 2, 1))
             weight_shape = weight.shape
             weight = weight.reshape(-1, weight.shape[-1])
+            _, scale, zp = self._get_quant_params(weight)
             scale = msops.transpose(scale, (0, 2, 1))
             scale_shape = scale.shape
             scale = scale.reshape(-1, weight_shape[1])
