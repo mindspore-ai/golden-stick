@@ -45,8 +45,8 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
         self.weight_need_allgather = False
         self.h = ops.zeros((self.ic, self.ic), dtype=dtype.float32)
-        if not self.cfg.algo_args["desc_act"]:
-            raise ValueError(f"When use a8w4 Dynamic quant algorithm, desc_act in GPTQConfig must be True.")
+        if self.cfg.mode == PTQMode.QUANTIZE and not self.cfg.algo_args["desc_act"]:
+            raise ValueError(f"When use GPTQ Dynamic quant algorithm, desc_act in GPTQConfig must be True.")
 
     def _quant_info(self):
         res = super()._quant_info()
