@@ -78,7 +78,7 @@ def create_cfg(quant_algo_, mode):
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["lm_head"])
     elif quant_algo_ == 'A16W4_GPTQ':
-        algorithm_config = GPTQQuantConfig(block_size=32, desc_act=True)
+        algorithm_config = GPTQQuantConfig(block_size=32)
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["w2", "lm_head"],
@@ -94,6 +94,16 @@ def create_cfg(quant_algo_, mode):
                         precision_recovery=PrecisionRecovery.GPTQ,
                         weight_quant_granularity=QuantGranularity.PER_GROUP,
                         group_size=128,
+                        algo_args=algorithm_config)
+    elif quant_algo_ == 'A8W4_GPTQ':
+        algorithm_config = GPTQQuantConfig(block_size=32, desc_act=True)
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        weight_quant_dtype=dtype.qint4x2,
+                        act_quant_dtype=dtype.int8,
+                        act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        precision_recovery=PrecisionRecovery.GPTQ,
                         algo_args=algorithm_config)
     elif quant_algo_ == 'A16W4_AWQ':
         algorithm_config = AWQConfig()
@@ -296,6 +306,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput, foutput, 0, 0)
         elif quant_algo_ == 'A16W4_GPTQ':
             ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
+        elif quant_algo_ == 'A8W4_GPTQ':
+            ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
         elif quant_algo_ == 'A16W4_GPTQ_per_group':
             ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         elif quant_algo_ == 'A16W4_AWQ':
@@ -323,6 +335,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         ret = np.allclose(qoutput, foutput, 0, 0)
     elif quant_algo_ == 'A16W4_GPTQ':
         ret = np.allclose(qoutput[:, :10], foutput[:, :10], 0, 0)
+    elif quant_algo_ == 'A8W4_GPTQ':
+        ret = np.allclose(qoutput[:, :9], foutput[:, :9], 0, 0)
     elif quant_algo_ == 'A16W4_GPTQ_per_group':
         ret = np.allclose(qoutput[:, :7], foutput[:, :7], 0, 0)
     elif quant_algo_ == 'A16W4_AWQ':

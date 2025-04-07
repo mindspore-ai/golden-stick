@@ -19,6 +19,7 @@ import sys
 import pytest
 from mindspore import dtype as msdtype
 
+from mindspore_gs.ptq import PrecisionRecovery
 from mindspore_gs.ptq.ptq_config import PTQConfig, SmoothQuantConfig, PTQMode, OutliersSuppressionType, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
 from mindspore_gs.common import BackendTarget
@@ -117,6 +118,9 @@ def test_ptq_config_construct():
                     kvcache_quant_dtype=msdtype.int8)
     cfg = PTQConfig(mode=PTQMode.DEPLOY, act_quant_granularity=QuantGranularity.PER_TOKEN,
                     weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8)
+    cfg = PTQConfig(mode=PTQMode.DEPLOY, act_quant_granularity=QuantGranularity.PER_TOKEN,
+                    weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
+                    precision_recovery=PrecisionRecovery.GPTQ)
 
 
 @pytest.mark.level0
