@@ -60,6 +60,6 @@ def create_calibrate_dataset(ds_path: str, mode: str, bs: int, seq_length: int, 
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.map(operations=type_cast_op, input_columns="labels")
-    ds = ds.batch(bs, drop_remainder=True)
+    ds = ds.batch(bs, drop_remainder=False)
     ds = ds.repeat(repeat)
     return ds

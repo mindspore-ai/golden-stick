@@ -139,6 +139,6 @@ def create_wikitext_dataset(ds_path: str, bs: int, seq_length: int, max_new_toke
     ds = GeneratorDataset(source=ds, column_names=["input_ids"])
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
-    ds = ds.batch(bs, drop_remainder=True)
+    ds = ds.batch(bs, drop_remainder=False)
     ds = ds.repeat(repeat)
     return ds
