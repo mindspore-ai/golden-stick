@@ -21,4 +21,5 @@ from .squad import create_squad_dataset
 from .boolq import create_boolq_dataset
 from .ceval import create_ceval_dataset
 from .calibrate import create_calibrate_dataset
+from .gsm8k import create_gsm8k_dataset
 from .factory import get_datasets
