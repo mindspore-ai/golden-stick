@@ -30,6 +30,14 @@ ASCEND_RT_VISIBLE_DEVICES=xxx bash eval_ceval.sh /path/to/mindformers /path/to/c
 
 实测ceval(acc)结果为：89.38%
 
+## 4. 量化网络gsm8k数据集评测
+
+命令如下，默认配置为单机16卡，需要传入gsm8k数据集路径，使用的yaml文件与第二步相同，为当前目录下的predict_deepseek_r1_671b_qinfer.yaml，load_checkpoint参数路径已设置为默认路径./output/DeepSeekR1-W8A8_smoothquant_safetensors，需要修改yaml文件的vocab_file、tokenizer_file参数：
+
+```bash
+ASCEND_RT_VISIBLE_DEVICES=xxx bash eval_gsm8k.sh /path/to/mindformers /path/to/ceval_dataset_path
+```
+
 ## 4. 生成的safetensors合一
 
 首先生成策略文件，生成的策略文件ckpt_strategy.ckpt在当前目录下:

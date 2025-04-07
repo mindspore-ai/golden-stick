@@ -20,6 +20,7 @@ from .wikitext2 import create_wikitext_dataset
 from .squad import create_squad_dataset
 from .boolq import create_boolq_dataset
 from .ceval import create_ceval_dataset
+from .gsm8k import create_gsm8k_dataset
 from .calibrate import create_calibrate_dataset
 
 
@@ -37,6 +38,9 @@ def get_datasets(ds_type: str, ds_path: str, mode, batch_size, seq_length, max_n
                                     need_pad, n_samples, add_special_tokens)
     if ds_type.lower() == 'ceval':
         return create_ceval_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat,
+                                    need_pad, n_samples, add_special_tokens)
+    if ds_type.lower() == 'gsm8k':
+        return create_gsm8k_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat,
                                     need_pad, n_samples, add_special_tokens)
     if ds_type.lower() == 'calibrate':
         return create_calibrate_dataset(ds_path, mode, batch_size, seq_length, tokenizer, ignore_token_id, repeat,
