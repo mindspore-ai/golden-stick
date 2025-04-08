@@ -17,7 +17,7 @@
 import time
 
 #pylint: disable=C0111
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 
 
 __checked__ = False
@@ -53,6 +53,7 @@ def mindspore_version_check():
                              '0.6': ('2.4.0',),
                              '1.0': ('2.4.1', '2.4.10', '2.5'),
                              '1.1': ('2.6',),
+                             '1.2': ('2.6',),
                              }
 
     required_mindspore_verisions = ms_msgs_version_match[__version__[:3]]

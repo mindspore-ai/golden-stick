@@ -30,6 +30,7 @@ dataset="${BASEPATH}/ws/gs/tests/data/boolq-dataset/dev.jsonl"
 eval_script="eval_boolq.py"
 export ASCEND_RT_VISIBLE_DEVICES=6,7
 export GSLOG=1
+port=33333
 sleep_time=10
 
 prepare_env()
@@ -107,8 +108,8 @@ eval()
   echo "${1}, save yaml to ${2}_eval_log/"
   mkdir -p "${2}_eval_log"
   cp "${3}" "${2}_eval_log/"
-  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir=${2}_eval_log --join=True --cluster_time_out=300 python daily_eval.py -c ${3} -s ${dataset} -n 2000 > eval_${2}_log 2>&1 &" > "${2}_eval_log/cmd.sh"
-  msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval.py -c "${3}" -s ${dataset} -n 2000 > "eval_${2}_log" 2>&1 &
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_eval_log --join=True --cluster_time_out=300 python daily_eval.py -c ${3} -s ${dataset} -n 2000 > eval_${2}_log 2>&1 &" > "${2}_eval_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval.py -c "${3}" -s ${dataset} -n 2000 > "eval_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_eval.py" | grep -v grep | awk -F ' ' '{print$2}')
   echo "waiting pid ${pid}"
@@ -126,8 +127,8 @@ quant()
   echo "${1}, save yaml to ${2}_quant_log/"
   mkdir -p "${2}_quant_log"
   cp "${3}" "${2}_quant_log/"
-  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a $4 -w $5 -k $6 -o $7 -b w2 lm_head -t ${ds_type} -s ${dataset} > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
-  msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a $4 -w $5 -k $6 -o $7 -b w2 lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a $4 -w $5 -k $6 -o $7 -b w2 lm_head -t ${ds_type} -s ${dataset} > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a $4 -w $5 -k $6 -o $7 -b w2 lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
   echo "waiting pid ${pid}"
@@ -145,8 +146,8 @@ quant_awq()
   echo "${1}, save yaml to ${2}_quant_log/"
   mkdir -p "${2}_quant_log"
   cp "${3}" "${2}_quant_log/"
-  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t ${ds_type} -s ${dataset} > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
-  msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t ${ds_type} -s ${dataset} > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
   echo "waiting pid ${pid}"
@@ -164,8 +165,8 @@ quant_gptq()
   echo "${1}, save yaml to ${2}_quant_log/"
   mkdir -p "${2}_quant_log"
   cp "${3}" "${2}_quant_log/"
-  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a none -w int4 -k none -p gptq -wg ${4} -g ${5} -b lm_head -t calibrate -s "${BASEPATH}/ws/gs/tests/data/calibrate-dataset/calibrate.jsonl" > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
-  msrun --worker_num=2 --local_worker_num=2 --master_port=33334 --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -p gptq -wg ${4} -g ${5} -b lm_head -t calibrate -s "${BASEPATH}/ws/gs/tests/data/calibrate-dataset/calibrate.jsonl" > "quant_${2}_log" 2>&1 &
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a none -w int4 -k none -p gptq -wg ${4} -g ${5} -b lm_head -t calibrate -s "${BASEPATH}/ws/gs/tests/data/calibrate-dataset/calibrate.jsonl" > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -p gptq -wg ${4} -g ${5} -b lm_head -t calibrate -s "${BASEPATH}/ws/gs/tests/data/calibrate-dataset/calibrate.jsonl" > "quant_${2}_log" 2>&1 &
   sleep ${sleep_time}
   pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
   echo "waiting pid ${pid}"
