@@ -88,15 +88,9 @@ class LinearSmoothQuant(LinearSmoother):
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and ptq-config."
-            logger.warning(warn_str)
 
 
 class LinearAWQ(LinearSmoother):
@@ -151,15 +145,9 @@ class LinearAWQ(LinearSmoother):
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and ptq-config."
-            logger.warning(warn_str)
 
 
 class LinearAutoSmoother(LinearSmoother):
@@ -223,12 +211,6 @@ class LinearAutoSmoother(LinearSmoother):
                                                  network_helper=network_helper, decoder_layer=search_layer,
                                                  layer_args=search_args, layer_kwargs=search_kwargs)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to suppress, please check network and ptq-config."
-            logger.warning(warn_str)

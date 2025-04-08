@@ -89,15 +89,9 @@ class Quantizer(Algorithm):
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                nonlocal changed
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with quant cell {wrapper_cell_type}.")
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to quantize, please check network and opname_blacklist."
-            logger.warning(warn_str)
