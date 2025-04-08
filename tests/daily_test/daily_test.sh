@@ -54,7 +54,6 @@ prepare_env()
   cp ./example/ptq/quant_ckpt.py ../daily_quant_ckpt.py || exit 1
   echo "cp eval script"
   cp "./example/ptq/${eval_script}" ../daily_eval.py || exit 1
-  cp "./example/ptq/eval_wikitext2.py" ../daily_eval_wikitext2.py || exit 1
   cd .. || exit 1
   echo "uninstall pkgs"
   pip uninstall mindspore mindformers mindspore-gs -y || exit 1
@@ -103,6 +102,8 @@ sed_qconfig()
 
 eval()
 {
+  unset FORCE_EAGER
+  unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_eval_log/"
@@ -118,25 +119,10 @@ eval()
   cd ..
 }
 
-eval_wikitext2()
-{
-  echo "enter test workspace."
-  cd ws || exit 1
-  echo "${1}, save yaml to ${2}_eval_log/"
-  mkdir -p "${2}_eval_log"
-  cp "${3}" "${2}_eval_log/"
-  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir=${2}_eval_log --join=True --cluster_time_out=300 python daily_eval_wikitext2.py -c ${3} -s "${BASEPATH}/ws/gs/tests/data/wikitext2-dataset/test-00000-of-00001.parquet" > eval_${2}_log 2>&1 &" > "${2}_eval_log/cmd.sh"
-  msrun --worker_num=2 --local_worker_num=2 --master_port=33333 --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval_wikitext2.py -c "${3}" -s "${BASEPATH}/ws/gs/tests/data/wikitext2-dataset/test-00000-of-00001.parquet" > "eval_${2}_log" 2>&1 &
-  sleep ${sleep_time}
-  pid=$(ps -u | grep msrun | grep "daily_eval_wikitext2.py" | grep -v grep | awk -F ' ' '{print$2}')
-  echo "waiting pid ${pid}"
-  tail --pid ${pid} -f "${2}_eval_log/worker_0.log"
-  sleep ${sleep_time}
-  cd ..
-}
-
 quant()
 {
+  export FORCE_EAGER=true
+  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -154,6 +140,8 @@ quant()
 
 quant_awq()
 {
+  export FORCE_EAGER=true
+  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -171,6 +159,8 @@ quant_awq()
 
 quant_gptq()
 {
+  export FORCE_EAGER=true
+  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -246,15 +236,15 @@ eval "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPA
 # quant ckpt gptq
 quant_gptq "quant llama2-13b-fp16 to gptq-pergroup" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
 # gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']" "False"
-eval_wikitext2 "eval gptq-pergroup llama2-13b-fp16" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_no_smooth_ptq_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']"
+eval "eval gptq-pergroup llama2-13b-fp16" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 ############################ fp16->gptq-perchannel-a16w4 ############################
 # quant ckpt gptq
 quant_gptq "quant llama2-13b-fp16 to gptq-perchannel" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
 # gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']" "False"
-eval_wikitext2 "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_no_smooth_ptq_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
+eval "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
 
 
 ############################ bf16 ############################
