@@ -82,13 +82,7 @@ class LinearClipper(Algorithm):
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
                                                  network_helper=network_helper)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
-                nonlocal changed
-                changed = True
                 return wrapper_cell, True
 
-        changed = False
         clip_skip_layer = ["wq", "wk", "w_qkv"]
         Replacer(self).process(decoder_layer, decoder_layer_name)
-        if not changed:
-            warn_str = f"No layer found in network is suitable to clip, please check network and opname_blacklist."
-            logger.warning(warn_str)
