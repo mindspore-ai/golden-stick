@@ -1,6 +1,6 @@
 # Applying the PTQ Algorithm
 
-[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/mindspore_gs/ptq/ptq/README.md)
+[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/ptq/README.md)
 
 [查看中文](./README_CN.md)
 
@@ -346,15 +346,15 @@ The PTQ algorithm needs to run on Ascend hardware, and the environment configura
 
 #### 1.2. MindSpore Environment
 
-Golden Stick relies on MindSpore, and you need to install the proper MindSpore in advance. You can download the pre-compiled [v2.4.0 installation package](https://www.mindspore.cn/versions/en) from the MindSpore official website and install it.
+Golden Stick relies on MindSpore, and you need to install the proper MindSpore in advance. You can download the pre-compiled package from the [MindSpore official website](https://www.mindspore.cn/versions/en) and install it.
 
 #### 1.3. MindFormers Environment
 
-This sample quantizes and reasons about networks in MindFormers, so you need to install the appropriate MindFormers in advance. You can download the pre-compiled [v1.3.0 installation package](https://www.mindspore.cn/versions/en) from the MindSpore official website and install it.
+This sample quantizes and reasons about networks in MindFormers, so you need to install the appropriate MindFormers in advance. You can download the pre-compiled package from the [MindSpore official website](https://www.mindspore.cn/versions/en) and install it.
 
 #### 1.4. Golden Stick Environment
 
-Download the pre-compiled [MindSpore GoldenStick v0.6.0 installation package](https://www.mindspore.cn/versions) from the MindSpore website and install it.
+Download the pre-compiled package from the [MindSpore official website](https://www.mindspore.cn/versions/en) and install it.
 
 #### 1.5. Preparation of Relevant Documents
 
@@ -417,7 +417,7 @@ Constructing the ParallelLlamaForCausalLM 7B network for the MindFormers bin fir
 
 4. Modify the model.arch.type field to ParallelLlamaForCausalLM.
 
-5. Modify use_parallel to False, parallel.parallel_mode to 'STAND_ALONE', and parallel_config.data_parallel to 1, and parallel.full_batch to False.
+5. Modify use_parallel to False, parallel.parallel_mode to 'STAND_ALONE', and parallel_config.data_parallel to 1, and parallel.full_batch to False. (This step is a modification of the parallel config, which is network-specific, and the current configuration is that of the ParallelLlamaForCausalLM 7B network)
 
 In the modified yaml configuration file, the parallel-related configuration should look like this:
 

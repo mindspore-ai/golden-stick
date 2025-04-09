@@ -20,7 +20,7 @@ Quantization is the process of approximating a 32-bit finite-range floating-poin
 
 Although quantization will lose accuracy because quantization is equivalent to introducing noise to the network, neural networks are generally less sensitive to noise, as long as the degree of quantization is well controlled, the impact on the accuracy of high-level tasks can be very small. Compared with the original network, the performance of the quantized network can be greatly improved by replacing the original FP32 computation with INT8 operation in the network inference.
 
-![](images/zh_cn/bit_define.png)
+![](images/en/bit_define.png)
 
 As shown above, low-precision data expression types such as FP16 and INT8 take up less space compared to FP32 types. Replacing high-precision data expression types with low-precision data expression types can significantly reduce storage space and transmission time. The inference performance of low bits is also higher, and the acceleration ratio of INT8 relative to FP32 can be 3 times or even higher. For the same computation, there is also a significant advantage in power consumption.
 
@@ -30,7 +30,7 @@ Currently, there are two main types of quantization schemes in the industry: **Q
 
 2. **Post-training Quantization** is simple to use and requires only a small amount of calibration data, making it suitable for scenarios that seek high ease of use and lack training resources.
 
-This chapter contains some **post-training quantization** algorithms, and **quantization-aware training** can be found in [Quantization-aware training chapter](.../quantization/README.md)
+This chapter contains some **post-training quantization** algorithms, and **quantization-aware training** can be found in [Quantization-aware training chapter](../quantization/README.md)
 
 ## Examples
 

@@ -1,6 +1,6 @@
 # 应用PTQ算法
 
-[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/mindspore_gs/ptq/ptq/README_CN.md)
+[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/ptq/README_CN.md)
 
 [View English](./README.md)
 
@@ -347,15 +347,15 @@ PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[Mind
 
 #### 1.2. MindSpore环境
 
-金箍棒依赖于MindSpore，需要提前安装合适的MindSpore。可以从MindSpore官网下载预编译好的[v2.4.0版本安装包](https://www.mindspore.cn/versions)并安装。
+金箍棒依赖于MindSpore，需要提前安装合适的MindSpore。可以从[MindSpore官网](https://www.mindspore.cn/versions)下载预编译好的安装包并安装。
 
 #### 1.3. MindFormers环境
 
-本样例对MindFormers中的网络进行量化并推理，所以需要提前安装合适的MindFormers。可以从MindSpore官网下载预编译好的[v1.3.0版本安装包](https://www.mindspore.cn/versions)并安装。
+本样例对MindFormers中的网络进行量化并推理，所以需要提前安装合适的MindFormers。可以从[MindSpore官网](https://www.mindspore.cn/versions)下载预编译好的安装包并安装。
 
 #### 1.4. 金箍棒环境
 
-从MindSpore官网下载预编译好的[MindSpore GoldenStick v0.6.0 版本安装包](https://www.mindspore.cn/versions)并安装。
+从[MindSpore官网](https://www.mindspore.cn/versions)下载预编译好的安装包并安装。
 
 #### 1.5. 相关文件准备
 
@@ -418,7 +418,7 @@ workspace
 
 4. 修改model.arch.type字段为ParallelLlamaForCausalLM。
 
-5. 修改use_parallel为False，parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。
+5. 修改use_parallel为False，parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。（此步骤是并行策略的修改，与具体网络有关，当前配置是ParallelLlamaForCausalLM 7B网络的配置）
 
 修改后的yaml配置文件中，并行相关的配置应该类似于这样：
 
