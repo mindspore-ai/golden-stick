@@ -17,8 +17,10 @@
 """setup package."""
 import os
 import sys
+import re
 import stat
 import shutil
+import time
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
@@ -91,9 +93,26 @@ class BuildPy(build_py):
         BuildPy._write_extra_info()
 
 
+def version_from_file():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    version_py_file = os.path.join(current_dir, 'mindspore_gs', 'version.py')
+    version_pattern = r"^__version__.*=.*'([0-9,.]+)'"
+    with open(version_py_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            match = re.match(version_pattern, line.strip())
+            if match:
+                return match.group(1)
+    raise ValueError(f"Version not found in {version_py_file}")
+
+
+version_num = version_from_file()
+date_str = time.strftime('%Y%m%d', time.localtime())
+version = f"{version_num}.dev{date_str}"
+
+
 setup(
     name='mindspore_gs',
-    version='1.1.0',
+    version=version,
     author='The MindSpore Authors',
     author_email='contact@mindspore.cn',
     description='A MindSpore model optimization algorithm set..',
@@ -116,6 +135,9 @@ setup(
         'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Programming Language :: C++',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
