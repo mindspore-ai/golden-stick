@@ -246,7 +246,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             weight = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(weight.transpose(1, 0))
             weight = weight.transpose(1, 0)
         if self.is_moe:
-            weight = weight.reshape(self.layer.weight[0], -1, weight.shape[-1])
+            weight = weight.reshape(self.layer.weight.shape[0], -1, weight.shape[-1])
             weight = weight.transpose(0, 2, 1)
         scale, zp, _ = quant_tensor(weight, self.w_quant_min, self.w_quant_max,
                                     self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
@@ -293,6 +293,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 gather_qweight = msops.cat(gather_qweight)
                 gather_scale = msops.cat(gather_scale, 1)
                 gather_zero = msops.cat(gather_zero, 1)
+                scale_shape = (scale_shape[0], scale_shape[1], scale_shape[-1] // self.cfg.tp_size)
                 self.qweight, self.group_scale, self.group_zero = self._qweight_reshape(gather_qweight, gather_scale,
                                                                                         gather_zero, weight_shape,
                                                                                         scale_shape)
