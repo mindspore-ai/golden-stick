@@ -1,6 +1,6 @@
 # 安装MindSpore Golden Stick
 
-[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/r1.0.0/docs/zh_cn/install.md)
+[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/master/docs/zh_cn/install.md)
 
 [View English](../docs_en/install.md)
 
@@ -52,11 +52,11 @@ pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{ms_version}/Gol
 下载[源码](https://gitee.com/mindspore/golden-stick)，下载后进入`golden_stick`目录。
 
 ```shell
+git clone https://gitee.com/mindspore/golden-stick.git
+cd golden-stick
 bash build.sh
 pip install output/mindspore_gs-{mg_version}-py3-none-any.whl
 ```
-
-其中，`build.sh`为`golden_stick`目录下的编译脚本文件。
 
 ## 验证安装是否成功
 
