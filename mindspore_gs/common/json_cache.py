@@ -79,11 +79,7 @@ class JSONCache:
             self._ensure_directory_exists()
             with open(self.__class__._filepath, 'r') as f:
                 raw_data = json.load(f)
-                for k, v in raw_data.items():
-                    if isinstance(v, str):
-                        self._data[str(k)] = np.load(v)
-                    else:
-                        self._data[str(k)] = float(v)
+                self._data = {str(k): v for k, v in raw_data.items()}
         except (FileNotFoundError, json.JSONDecodeError):
             self._data = {}
 
@@ -97,7 +93,12 @@ class JSONCache:
             json.dump(self._data, f, indent=2)
 
     def get(self, key: str) -> Optional[float]:
-        return self._data.get(key, None)
+        value = self._data.get(key, None)
+        if not value:
+            return value
+        if str(value).endswith('.npy'):
+            return np.load(str(value))
+        return float(value)
 
     def put(self, key: str, value: float) -> None:
         """push key and value to cache and save data"""
@@ -109,12 +110,11 @@ class JSONCache:
                 cache_path = cache_path.split('.')[0]
                 os.makedirs(cache_path, exist_ok=True)
                 np.save(os.path.join(cache_path, key), value)
-                num = os.path.join(cache_path, f"{key}.npy")
+                self._data[key] = str(os.path.join(cache_path, f'{key}.npy'))
             else:
-                num = float(value)
+                self._data[key] = float(value)
         except ValueError:
             raise TypeError("Value must be a number")
-        self._data[key] = num
         self._save_data()
 
     @classmethod
