@@ -25,6 +25,7 @@ from mindspore_gs.datasets import create_gsm8k_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
 from mindformers import MindFormerConfig
 
+
 def cal_acc_gsm8k(answer, res_data):
     '''cal_acc_gsm8k'''
     def extract_last_digit(res):
@@ -38,8 +39,8 @@ def cal_acc_gsm8k(answer, res_data):
             last_digit = None
         return last_digit
 
-    res_last_digit = extract_last_digit(res_data[0])
-    labels_res = extract_last_digit(answer[0])
+    res_last_digit = extract_last_digit(res_data)
+    labels_res = extract_last_digit(answer)
     print(f"labels res: {labels_res}, extract predict res: {res_last_digit}", flush=True)
     if res_last_digit is None or labels_res is None:
         return False
@@ -66,8 +67,8 @@ def evaluate(net, dataset_path, network_helper, n_samples):
     pad_token_id = network_helper.get_spec("pad_token_id")
     tokenizer = network_helper.create_tokenizer()
     ds = create_gsm8k_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
-                              n_samples=n_samples)
-
+                              n_samples=n_samples, need_pad=batch_size > 1, apply_chat_template=True)
+    total_samples = 0
     correct = 0
     data_count = 0
     total_count = ds.get_dataset_size()
@@ -92,14 +93,18 @@ def evaluate(net, dataset_path, network_helper, n_samples):
         pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
 
-        if cal_acc_gsm8k(labels_str, pres_str):
-            correct += 1
-            print(f"question: {question}\n predict: {pres_str} answer: {labels_str}. correct!", flush=True)
-        else:
-            print(f"question: {question}\n predict: {pres_str} answer: {labels_str}. not correct!", flush=True)
-        if data_count % 100 == 0:
-            print(f"acc: {correct / data_count}", flush=True)
-    print(f"total acc: {correct / data_count}", flush=True)
+        for i, _ in enumerate(labels_str):
+            total_samples += 1
+            if cal_acc_gsm8k(labels_str[i], pres_str[i]):
+                correct += 1
+                print(f"sample idx:{total_samples} question: {question[i]}\n" \
+                      f" predict: {pres_str[i]} answer: {labels_str[i]}. correct!", flush=True)
+            else:
+                print(f"sample idx:{total_samples} question: {question[i]}\n" \
+                      f"predict: {pres_str[i]} answer: {labels_str[i]}. not correct!", flush=True)
+        if total_samples % 100 == 0:
+            print(f"acc: {correct / total_samples}", flush=True)
+    print(f"total acc: {correct / total_samples}", flush=True)
     print('Evaluate Over!', flush=True)
 
 

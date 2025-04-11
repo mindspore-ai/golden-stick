@@ -14,7 +14,7 @@
 # ============================================================================
 """test squad dataset."""
 import os.path
-
+import math
 import pytest
 import numpy as np
 from mindspore import context, Tensor, dtype
@@ -37,7 +37,7 @@ def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
     assert ds.output_types()[0] == np.int32
     assert ds.output_shapes()[0] == [bs, seq_length]
     assert ds.output_shapes()[1] == [bs, seq_length]
-    assert ds.get_dataset_size() == 2067 // bs * repeat
+    assert ds.get_dataset_size() == math.ceil(2067 / bs * repeat)
 
     index = 0
     for inputs in ds.create_dict_iterator():
@@ -55,7 +55,7 @@ def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
 
     n_samples = 3
     ds = create_squad_dataset(ds_path, "eval", bs, seq_length, tokenizer, repeat=repeat, n_samples=n_samples)
-    assert ds.get_dataset_size() == n_samples // bs * repeat
+    assert ds.get_dataset_size() == math.ceil(n_samples / bs * repeat)
 
 
 @pytest.mark.level0

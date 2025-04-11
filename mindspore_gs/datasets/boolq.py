@@ -66,6 +66,6 @@ def create_boolq_dataset(ds_path: str, mode: str, bs: int, seq_length: int, toke
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
     ds = ds.map(operations=type_cast_op, input_columns="labels")
-    ds = ds.batch(bs, drop_remainder=True)
+    ds = ds.batch(bs, drop_remainder=False)
     ds = ds.repeat(repeat)
     return ds

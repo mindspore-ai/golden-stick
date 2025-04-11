@@ -14,7 +14,7 @@
 # ============================================================================
 """test wikitext2-parquet dataset."""
 import os.path
-
+import math
 import pytest
 import numpy as np
 from mindspore import context, Tensor
@@ -33,7 +33,7 @@ def check_ds_pt(ds_path: str, bs: int, seq_length: int, max_decode_len: int, voc
     assert ds.get_repeat_count() == repeat
     assert ds.output_types()[0] == np.int32
     assert ds.output_shapes()[0] == [bs, seq_length]
-    assert ds.get_dataset_size() == wiki_items // bs * repeat
+    assert ds.get_dataset_size() == math.ceil(wiki_items / bs * repeat)
 
     index = 0
     for inputs in ds.create_dict_iterator():
@@ -49,7 +49,7 @@ def check_ds_pt(ds_path: str, bs: int, seq_length: int, max_decode_len: int, voc
 
     n_samples = 3
     ds = create_wikitext_dataset(ds_path, bs, seq_length, max_decode_len, tokenizer, repeat, n_samples=n_samples)
-    assert ds.get_dataset_size() == n_samples // bs * repeat
+    assert ds.get_dataset_size() == math.ceil(n_samples / bs * repeat)
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
