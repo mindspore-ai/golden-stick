@@ -25,7 +25,7 @@ from tqdm import tqdm
 import mindspore as ms
 from mindspore import dtype
 from mindspore.communication.management import get_rank
-from .model_parallelism import BaseWeightProcessor
+from model_parallelism import BaseWeightProcessor
 
 
 def convert_np_to_ms_dtype(value):
