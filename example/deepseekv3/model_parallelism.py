@@ -20,7 +20,8 @@ transform huggingface safetensor.
 import os
 from safetensors import safe_open
 from mindspore.communication.management import get_rank, get_group_size
-
+from mindformers.experimental.infer.core.utils import get_tp_world_size
+from mindformers.experimental.parallel_core.pynative.parallel_state import get_data_parallel_world_size
 
 class BaseWeightProcessor:
     r"""
@@ -35,9 +36,11 @@ class BaseWeightProcessor:
         self.config = config
         self.network = network
         self.is_quant = is_quant
-        self.tp_group_size = get_group_size()
+        self.tp_group_size = get_tp_world_size()
+        self.dp_group_size = get_data_parallel_world_size()
+        print(f"the dp_group_size size is {self.dp_group_size}", flush=True)
         self.ep_group_size = 16    # get_ep_group_size()
-        self.rank_id = get_rank()
+        self.rank_id = get_rank() % self.dp_group_size
         self.parameter_dict = {}
         self.file_handles = {}
 
@@ -57,7 +60,7 @@ class BaseWeightProcessor:
         qint4 = False
         if sf_file.metadata() is not None and hf_param_name in sf_file.metadata().keys():
             qint4 = True
-        if not is_split_param:
+        if not is_split_param or self.tp_group_size == 1:
             np_data = sf_file.get_tensor(hf_param_name)
             return np_data, qint4
 
@@ -78,6 +81,9 @@ class BaseWeightProcessor:
         return split_data, qint4
 
     def split_weight_by_rank(self, weight, split_axis=0):
+        if self.tp_group_size == 1:
+            return weight
+
         shape = weight.shape
         if split_axis == 0:
             split_size = shape[0] // self.tp_group_size
