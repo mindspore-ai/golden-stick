@@ -24,7 +24,7 @@ export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
 mf_path=$1
-worker_num=${2:-8}
+worker_num=${2:-16}
 base_path=$(cd "$(dirname $0)"; pwd)
 strategy_ckpt_save_dir=${base_path}
 export DEVICE_NUM_PER_NODE=${worker_num}
