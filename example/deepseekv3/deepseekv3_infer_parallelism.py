@@ -150,32 +150,45 @@ class DeepseekInferParallelism(BaseModelParallelism):
 
         for index in range(0, num_router_experts):
             w1_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.gate_proj.weight"
-            w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
-                                                           is_split_param=True, split_axis=0)
-
             w2_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.down_proj.weight"
-            w2_ms_param, _ = self.get_safetensor_from_file(w2_hf_name, src_hf_dir, hf_weight_map,
-                                                           is_split_param=True, split_axis=1)
-
             w3_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.up_proj.weight"
-            w3_ms_param, _ = self.get_safetensor_from_file(w3_hf_name, src_hf_dir, hf_weight_map,
-                                                           is_split_param=True, split_axis=0)
+
+            if self.ep_group_size > 1:
+                if self.rank_id <= index // (num_router_experts // self.ep_group_size) < self.rank_id + 1:
+                    w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map)
+                    w2_ms_param, _ = self.get_safetensor_from_file(w2_hf_name, src_hf_dir, hf_weight_map)
+                    w3_ms_param, _ = self.get_safetensor_from_file(w3_hf_name, src_hf_dir, hf_weight_map)
+                else:
+                    continue
+            else:
+                w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
+                                                               is_split_param=True, split_axis=0)
+                w2_ms_param, _ = self.get_safetensor_from_file(w2_hf_name, src_hf_dir, hf_weight_map,
+                                                               is_split_param=True, split_axis=1)
+                w3_ms_param, _ = self.get_safetensor_from_file(w3_hf_name, src_hf_dir, hf_weight_map,
+                                                               is_split_param=True, split_axis=0)
 
             w1_list.append(w1_ms_param)
             w2_list.append(w2_ms_param)
             w3_list.append(w3_ms_param)
 
             w1_scale_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.gate_proj.weight_scale"
-            w1_scale_ms_param, _ = self.get_safetensor_from_file(w1_scale_hf_name, src_hf_dir, hf_weight_map,
-                                                                 is_split_param=True, split_axis=0)
-
             w2_scale_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.down_proj.weight_scale"
-            w2_scale_ms_param, _ = self.get_safetensor_from_file(w2_scale_hf_name, src_hf_dir, hf_weight_map)
-            # is_split_param=True, split_axis=0)
-
             w3_scale_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.up_proj.weight_scale"
-            w3_scale_ms_param, _ = self.get_safetensor_from_file(w3_scale_hf_name, src_hf_dir, hf_weight_map,
-                                                                 is_split_param=True, split_axis=0)
+
+            if self.ep_group_size > 1:
+                if self.rank_id <= index // (num_router_experts // self.ep_group_size) < self.rank_id + 1:
+                    w1_scale_ms_param, _ = self.get_safetensor_from_file(w1_scale_hf_name, src_hf_dir, hf_weight_map)
+                    w2_scale_ms_param, _ = self.get_safetensor_from_file(w2_scale_hf_name, src_hf_dir, hf_weight_map)
+                    w3_scale_ms_param, _ = self.get_safetensor_from_file(w3_scale_hf_name, src_hf_dir, hf_weight_map)
+                else:
+                    continue
+            else:
+                w1_scale_ms_param, _ = self.get_safetensor_from_file(w1_scale_hf_name, src_hf_dir, hf_weight_map,
+                                                                     is_split_param=True, split_axis=0)
+                w2_scale_ms_param, _ = self.get_safetensor_from_file(w2_scale_hf_name, src_hf_dir, hf_weight_map)
+                w3_scale_ms_param, _ = self.get_safetensor_from_file(w3_scale_hf_name, src_hf_dir, hf_weight_map,
+                                                                     is_split_param=True, split_axis=0)
 
             w1_scale_ms_param = w1_scale_ms_param.squeeze(axis=-1)
             w2_scale_ms_param = w2_scale_ms_param.squeeze(axis=-1)

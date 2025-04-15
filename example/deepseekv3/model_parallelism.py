@@ -32,6 +32,11 @@ class BaseModelParallelism:
         self.config = config
         self.network = network
         self.is_quant = is_quant
+        self.tp_group_size = get_group_size()
+        self.ep_group_size = 16
+        self.rank_id = get_rank()
+        self.parameter_dict = {}
+        self.file_handles = {}
 
     def get_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map, is_split_param=False, split_axis=0):
         """get_safetensor_from_file"""
