@@ -16,7 +16,6 @@
 """
 transform huggingface model to mindspore safetensor.
 """
-
 import os
 import json
 import gc
@@ -25,12 +24,30 @@ from tqdm import tqdm
 
 import mindspore as ms
 from mindspore import dtype
-from model_parallelism import BaseModelParallelism
+from mindspore.communication.management import get_rank
+from .model_parallelism import BaseWeightProcessor
 
 
-class DeepseekInferParallelism(BaseModelParallelism):
+def convert_np_to_ms_dtype(value):
+    """convert_np_to_ms_dtype"""
+    if value.dtype == np.int8:
+        value_dtype = ms.int8
+    elif value.dtype == np.int32:
+        value_dtype = ms.int32
+    elif value.dtype == np.int64:
+        value_dtype = ms.int64
+    elif value.dtype == np.float64:
+        value_dtype = ms.float64
+    elif value.dtype == np.float32:
+        value_dtype = ms.float32
+    else:
+        value_dtype = ms.bfloat16
+    return value_dtype
+
+
+class DeepseekV3WeightProcessor(BaseWeightProcessor):
     r"""
-    Provide DeepseekV3/R1 Quant Model infer parameter convert and parallelism.
+    Provide DeepseekV3/R1 Model weight load and shards.
     Args:
         config (DeepseekV3/R1Config): The config of DeepseekV3/R1 model.
         network (InferenceDeepseekV3ForCausalLM): The network of DeepseekV3/R1.
@@ -38,8 +55,9 @@ class DeepseekInferParallelism(BaseModelParallelism):
     """
 
     def __init__(self, config, network, is_quant):
-        # pylint: disable=useless-super-delegation
         super().__init__(config, network, is_quant)
+        self.num_layers = self.config.model.model_config.num_layers
+        self.expert_num = self.config.moe_config.expert_num
 
     def quant_convert_weight_name(self, weight_name: str):
         """replace quant net weight name"""
@@ -115,21 +133,21 @@ class DeepseekInferParallelism(BaseModelParallelism):
         ffn_concat = self.config.model.model_config.ffn_concat
         num_router_experts = self.config.moe_config.expert_num
 
-        parameter_dict = {}
         # router expert dense
         router_dense_hf_name = f"model.layers.{layer_id}.mlp.gate.weight"
         router_dense_ms_name = self.quant_convert_weight_name(router_dense_hf_name)
         router_dense_ms_param, _ = self.get_safetensor_from_file(router_dense_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[router_dense_ms_name] = ms.Parameter(ms.Tensor(router_dense_ms_param, ms.bfloat16),
-                                                            name=router_dense_ms_name, requires_grad=False)
+        self.parameter_dict[router_dense_ms_name] = ms.Parameter(
+            ms.from_numpy(router_dense_ms_param).astype(ms.bfloat16),
+            name=router_dense_ms_name, requires_grad=False)
 
         # e_score_correction_bias
         e_score_correction_bias_hf_name = f"model.layers.{layer_id}.mlp.gate.e_score_correction_bias"
         e_score_correction_bias_ms_name = self.quant_convert_weight_name(e_score_correction_bias_hf_name)
         e_score_correction_bias_ms_param, _ = self.get_safetensor_from_file(e_score_correction_bias_hf_name, src_hf_dir,
                                                                             hf_weight_map)
-        parameter_dict[e_score_correction_bias_ms_name] = ms.Parameter(
-            ms.Tensor(e_score_correction_bias_ms_param, ms.float32),
+        self.parameter_dict[e_score_correction_bias_ms_name] = ms.Parameter(
+            ms.from_numpy(e_score_correction_bias_ms_param).astype(ms.float32),
             name=e_score_correction_bias_ms_name, requires_grad=False)
 
         w1_list = []
@@ -152,7 +170,6 @@ class DeepseekInferParallelism(BaseModelParallelism):
             w1_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.gate_proj.weight"
             w2_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.down_proj.weight"
             w3_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.up_proj.weight"
-
             if self.ep_group_size > 1:
                 if self.rank_id <= index // (num_router_experts // self.ep_group_size) < self.rank_id + 1:
                     w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map)
@@ -197,9 +214,9 @@ class DeepseekInferParallelism(BaseModelParallelism):
             w2_scale_list.append(w2_scale_ms_param)
             w3_scale_list.append(w3_scale_ms_param)
 
-        w1_ms_stack_param = np.stack(w1_list, axis=0).transpose(0, 2, 1)
-        w2_ms_stack_param = np.stack(w2_list, axis=0).transpose(0, 2, 1)
-        w3_ms_stack_param = np.stack(w3_list, axis=0).transpose(0, 2, 1)
+        w1_ms_stack_param = np.stack(w1_list, axis=0)
+        w2_ms_stack_param = np.stack(w2_list, axis=0)
+        w3_ms_stack_param = np.stack(w3_list, axis=0)
 
         w1_scale_ms_stack_param = np.stack(w1_scale_list, axis=0)
         w2_scale_ms_stack_param = np.stack(w2_scale_list, axis=0)
@@ -208,49 +225,54 @@ class DeepseekInferParallelism(BaseModelParallelism):
         if ffn_concat:
             # w_gate_hidden
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w_gate_hidden._layer.weight"
-            w_gate_hidden_param = ms.Tensor(np.concatenate([w1_ms_stack_param, w3_ms_stack_param], axis=2),
-                                            dtype=ms.int8)
-            parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
-                                                              requires_grad=False)
+            w_gate_hidden_np = np.concatenate([w1_ms_stack_param, w3_ms_stack_param], axis=1)
+            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).permute(0, 2, 1).astype(ms.int8)
+            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
+                                                                   requires_grad=False)
             # w_scale_gate_hidden
-            w_scale_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn." \
-                                        "w_gate_hidden._layer.matmul.weight_scale"
-            w_scale_gate_hidden_param = ms.Tensor(
-                np.concatenate([w1_scale_ms_stack_param, w3_scale_ms_stack_param], axis=1), dtype=ms.bfloat16)
-            parameter_dict[w_scale_gate_hidden_name] = ms.Parameter(w_scale_gate_hidden_param,
-                                                                    name=w_scale_gate_hidden_name,
-                                                                    requires_grad=False)
+            w_scale_gate_hidden_name = \
+                f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w_gate_hidden._layer.matmul.weight_scale"
+
+            w_scale_gate_hidden_np = np.concatenate([w1_scale_ms_stack_param, w3_scale_ms_stack_param], axis=1)
+            w_scale_gate_hidden_param = ms.from_numpy(w_scale_gate_hidden_np).astype(ms.bfloat16)
+            self.parameter_dict[w_scale_gate_hidden_name] = ms.Parameter(w_scale_gate_hidden_param,
+                                                                         name=w_scale_gate_hidden_name,
+                                                                         requires_grad=False)
         else:
             # w1 w3
-            parameter_dict[w1_ms_name] = ms.Parameter(ms.Tensor(w1_ms_stack_param, ms.int8), name=w1_ms_name,
-                                                      requires_grad=False)
-            parameter_dict[w3_ms_name] = ms.Parameter(ms.Tensor(w3_ms_stack_param, ms.int8), name=w3_ms_name,
-                                                      requires_grad=False)
+            self.parameter_dict[w1_ms_name] = ms.Parameter(
+                ms.from_numpy(w1_ms_stack_param).permute(0, 2, 1).astype(ms.int8),
+                name=w1_ms_name,
+                requires_grad=False)
+            self.parameter_dict[w3_ms_name] = ms.Parameter(
+                ms.from_numpy(w3_ms_stack_param).permute(0, 2, 1).astype(ms.int8),
+                name=w3_ms_name,
+                requires_grad=False)
 
             # w1_scale w3_scale
-            parameter_dict[w1_scale_ms_name] = ms.Parameter(ms.Tensor(w1_scale_ms_stack_param, ms.bfloat16),
-                                                            name=w1_ms_name,
-                                                            requires_grad=False)
-            parameter_dict[w3_scale_ms_name] = ms.Parameter(ms.Tensor(w3_scale_ms_stack_param, ms.bfloat16),
-                                                            name=w3_ms_name,
-                                                            requires_grad=False)
+            self.parameter_dict[w1_scale_ms_name] = ms.Parameter(
+                ms.from_numpy(w1_scale_ms_stack_param).astype(ms.bfloat16),
+                name=w1_ms_name,
+                requires_grad=False)
+            self.parameter_dict[w3_scale_ms_name] = ms.Parameter(
+                ms.from_numpy(w3_scale_ms_stack_param).astype(ms.bfloat16),
+                name=w3_ms_name,
+                requires_grad=False)
 
-        parameter_dict[w2_ms_name] = ms.Parameter(ms.Tensor(w2_ms_stack_param, ms.int8), name=w2_ms_name,
-                                                  requires_grad=False)
+        self.parameter_dict[w2_ms_name] = ms.Parameter(
+            ms.from_numpy(w2_ms_stack_param).permute(0, 2, 1).astype(ms.int8),
+            name=w2_ms_name,
+            requires_grad=False)
 
-        parameter_dict[w2_scale_ms_name] = ms.Parameter(ms.Tensor(w2_scale_ms_stack_param, ms.bfloat16),
-                                                        name=w2_scale_ms_name,
-                                                        requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[w2_scale_ms_name] = ms.Parameter(
+            ms.from_numpy(w2_scale_ms_stack_param).astype(ms.bfloat16),
+            name=w2_scale_ms_name,
+            requires_grad=False)
 
     def infer_quant_process_moe_shared_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer quant process moe shared expert ffn weight"""
 
         ffn_concat = self.config.model.model_config.ffn_concat
-        parameter_dict = {}
         w1_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.gate_proj.weight"
         w1_ms_name = self.quant_convert_weight_name(w1_hf_name)
         w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
@@ -286,52 +308,49 @@ class DeepseekInferParallelism(BaseModelParallelism):
 
         if ffn_concat:
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.shared_experts.w_gate_hidden._layer.weight"
-            w_gate_hidden_param = ms.Tensor(np.concatenate([w1_ms_param, w3_ms_param], axis=0), dtype=ms.int8)
-            parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
-                                                              requires_grad=False)
+            w_gate_hidden_np = np.concatenate([w1_ms_param, w3_ms_param], axis=0)
+            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).astype(ms.int8)
+            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
+                                                                   requires_grad=False)
 
-            w_scale_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.shared_experts.w_gate_hidden." \
-                                        "_layer.matmul.weight_scale"
-            w_scale_gate_hidden_param = ms.Tensor(
-                np.concatenate([w1_scale_ms_param, w3_scale_ms_param], axis=0),
-                dtype=ms.bfloat16)
-
-            parameter_dict[w_scale_gate_hidden_name] = ms.Parameter(w_scale_gate_hidden_param,
-                                                                    name=w_scale_gate_hidden_name,
-                                                                    requires_grad=False)
+            w_scale_gate_hidden_name = \
+                f"model.layers.{layer_id}.feed_forward.shared_experts.w_gate_hidden._layer.matmul.weight_scale"
+            w_scale_gate_hidden_np = np.concatenate([w1_scale_ms_param, w3_scale_ms_param], axis=0)
+            w_scale_gate_hidden_param = ms.from_numpy(w_scale_gate_hidden_np).astype(ms.bfloat16)
+            self.parameter_dict[w_scale_gate_hidden_name] = ms.Parameter(w_scale_gate_hidden_param,
+                                                                         name=w_scale_gate_hidden_name,
+                                                                         requires_grad=False)
 
         else:
-            parameter_dict[w1_ms_name] = ms.Parameter(ms.Tensor(w1_ms_param, ms.int8),
-                                                      name=w1_ms_name,
-                                                      requires_grad=False)
-            parameter_dict[w3_ms_name] = ms.Parameter(ms.Tensor(w3_ms_param, ms.int8),
-                                                      name=w3_ms_name,
-                                                      requires_grad=False)
+            self.parameter_dict[w1_ms_name] = ms.Parameter(ms.from_numpy(w1_ms_param).astype(ms.int8),
+                                                           name=w1_ms_name,
+                                                           requires_grad=False)
+            self.parameter_dict[w3_ms_name] = ms.Parameter(ms.from_numpy(w3_ms_param).astype(ms.int8),
+                                                           name=w3_ms_name,
+                                                           requires_grad=False)
 
-            parameter_dict[w1_scale_ms_name] = ms.Parameter(ms.Tensor(w1_scale_ms_param, ms.bfloat16),
-                                                            name=w1_ms_name,
-                                                            requires_grad=False)
-            parameter_dict[w3_scale_ms_name] = ms.Parameter(ms.Tensor(w3_scale_ms_param, ms.bfloat16),
-                                                            name=w3_ms_name,
-                                                            requires_grad=False)
+            self.parameter_dict[w1_scale_ms_name] = ms.Parameter(
+                ms.from_numpy(w1_scale_ms_param).astype(ms.bfloat16),
+                name=w1_ms_name,
+                requires_grad=False)
+            self.parameter_dict[w3_scale_ms_name] = ms.Parameter(
+                ms.from_numpy(w3_scale_ms_param).astype(ms.bfloat16),
+                name=w3_ms_name,
+                requires_grad=False)
 
-        parameter_dict[w2_ms_name] = ms.Parameter(ms.Tensor(w2_ms_param, ms.int8),
-                                                  name=w2_ms_name,
-                                                  requires_grad=False)
+        self.parameter_dict[w2_ms_name] = ms.Parameter(ms.from_numpy(w2_ms_param).astype(ms.int8),
+                                                       name=w2_ms_name,
+                                                       requires_grad=False)
 
-        parameter_dict[w2_scale_ms_name] = ms.Parameter(ms.Tensor(w2_scale_ms_param, ms.bfloat16),
-                                                        name=w2_ms_name,
-                                                        requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[w2_scale_ms_name] = ms.Parameter(
+            ms.from_numpy(w2_scale_ms_param).astype(ms.bfloat16),
+            name=w2_ms_name,
+            requires_grad=False)
 
     def infer_quant_process_dense_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer process dense ffn weight"""
 
         ffn_concat = self.config.model.model_config.ffn_concat
-        parameter_dict = {}
         w1_hf_name = f"model.layers.{layer_id}.mlp.gate_proj.weight"
         w1_ms_name = self.quant_convert_weight_name(w1_hf_name)
         w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
@@ -352,8 +371,6 @@ class DeepseekInferParallelism(BaseModelParallelism):
         w2_scale_ms_name = self.quant_convert_weight_name(w2_scale_hf_name)
         # shape:[7168,1]
         w2_scale_ms_param, _ = self.get_safetensor_from_file(w2_scale_hf_name, src_hf_dir, hf_weight_map)
-        # is_split_param=True,
-        # split_axis=0)
 
         w3_hf_name = f"model.layers.{layer_id}.mlp.up_proj.weight"
         w3_ms_name = self.quant_convert_weight_name(w3_hf_name)
@@ -372,61 +389,59 @@ class DeepseekInferParallelism(BaseModelParallelism):
 
         if ffn_concat:
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.w_gate_hidden._layer.weight"
-            w_gate_hidden_param = ms.Tensor(np.concatenate([w1_ms_param, w3_ms_param], axis=0),
-                                            dtype=ms.int8)
-            parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
-                                                              requires_grad=False)
+            w_gate_hidden_np = np.concatenate([w1_ms_param, w3_ms_param], axis=0)
+            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).astype(dtype=ms.int8)
+            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
+                                                                   requires_grad=False)
 
             w_scale_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.w_gate_hidden._layer.matmul.weight_scale"
-            w_scale_gate_hidden_param = ms.Tensor(
-                np.concatenate([w1_scale_ms_param, w3_scale_ms_param], axis=0),
-                dtype=ms.bfloat16)
-            parameter_dict[w_scale_gate_hidden_name] = ms.Parameter(w_scale_gate_hidden_param,
-                                                                    name=w_scale_gate_hidden_name,
-                                                                    requires_grad=False)
+            w_scale_gate_hidden_param = ms.from_numpy(
+                np.concatenate([w1_scale_ms_param, w3_scale_ms_param], axis=0)).astype(dtype=ms.bfloat16)
+            self.parameter_dict[w_scale_gate_hidden_name] = ms.Parameter(w_scale_gate_hidden_param,
+                                                                         name=w_scale_gate_hidden_name,
+                                                                         requires_grad=False)
 
         else:
-            parameter_dict[w1_ms_name] = ms.Parameter(ms.Tensor(w1_ms_param, ms.int8),
-                                                      name=w1_ms_name,
-                                                      requires_grad=False)
-            parameter_dict[w3_ms_name] = ms.Parameter(ms.Tensor(w3_ms_param, ms.int8),
-                                                      name=w3_ms_name,
-                                                      requires_grad=False)
+            self.parameter_dict[w1_ms_name] = ms.Parameter(ms.from_numpy(w1_ms_param).astype(ms.int8),
+                                                           name=w1_ms_name,
+                                                           requires_grad=False)
+            self.parameter_dict[w3_ms_name] = ms.Parameter(ms.from_numpy(w3_ms_param).astype(ms.int8),
+                                                           name=w3_ms_name,
+                                                           requires_grad=False)
 
-            parameter_dict[w1_scale_ms_name] = ms.Parameter(ms.Tensor(w1_scale_ms_param, ms.bfloat16),
-                                                            name=w1_scale_ms_name,
-                                                            requires_grad=False)
-            parameter_dict[w3_scale_ms_name] = ms.Parameter(ms.Tensor(w3_scale_ms_param, ms.bfloat16),
-                                                            name=w3_scale_ms_name,
-                                                            requires_grad=False)
+            self.parameter_dict[w1_scale_ms_name] = ms.Parameter(
+                ms.from_numpy(w1_scale_ms_param).astype(ms.bfloat16),
+                name=w1_scale_ms_name,
+                requires_grad=False)
+            self.parameter_dict[w3_scale_ms_name] = ms.Parameter(
+                ms.from_numpy(w3_scale_ms_param).astype(ms.bfloat16),
+                name=w3_scale_ms_name,
+                requires_grad=False)
 
-        parameter_dict[w2_ms_name] = ms.Parameter(ms.Tensor(w2_ms_param, ms.int8),
-                                                  name=w2_ms_name,
-                                                  requires_grad=False)
+        self.parameter_dict[w2_ms_name] = ms.Parameter(ms.from_numpy(w2_ms_param).astype(ms.int8),
+                                                       name=w2_ms_name,
+                                                       requires_grad=False)
 
-        parameter_dict[w2_scale_ms_name] = ms.Parameter(ms.Tensor(w2_scale_ms_param, ms.bfloat16),
-                                                        name=w2_ms_name,
-                                                        requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[w2_scale_ms_name] = ms.Parameter(
+            ms.from_numpy(w2_scale_ms_param).astype(ms.bfloat16),
+            name=w2_ms_name,
+            requires_grad=False)
 
     def infer_convert_outer_weight(self, src_hf_dir, hf_weight_map):
         """convert weight not in model"""
-        parameter_dict = {}
         embed_tokens_hf_name = "model.embed_tokens.weight"
         embed_tokens_ms_name = self.quant_convert_weight_name(embed_tokens_hf_name)
         np_data, _ = self.get_safetensor_from_file(embed_tokens_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[embed_tokens_ms_name] = ms.Parameter(ms.Tensor(np_data, ms.bfloat16),
-                                                            name=embed_tokens_ms_name,
-                                                            requires_grad=False)
+        self.parameter_dict[embed_tokens_ms_name] = ms.Parameter(ms.from_numpy(np_data).astype(ms.bfloat16),
+                                                                 name=embed_tokens_ms_name,
+                                                                 requires_grad=False)
 
         norm_hf_name = "model.norm.weight"
         norm_ms_name = self.quant_convert_weight_name(norm_hf_name)
         np_data, _ = self.get_safetensor_from_file(norm_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[norm_ms_name] = ms.Parameter(ms.Tensor(np_data, ms.bfloat16), name=norm_ms_name,
-                                                    requires_grad=False)
+        self.parameter_dict[norm_ms_name] = ms.Parameter(ms.from_numpy(np_data).astype(ms.bfloat16),
+                                                         name=norm_ms_name,
+                                                         requires_grad=False)
 
         lm_head_hf_name = "lm_head.weight"
         lm_head_ms_name = self.quant_convert_weight_name(lm_head_hf_name)
@@ -435,35 +450,31 @@ class DeepseekInferParallelism(BaseModelParallelism):
                                                        is_split_param=True, split_axis=0)
         else:
             np_data, _ = self.get_safetensor_from_file(lm_head_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[lm_head_ms_name] = ms.Parameter(ms.Tensor(np_data, ms.bfloat16), name=lm_head_ms_name,
-                                                       requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[lm_head_ms_name] = ms.Parameter(ms.from_numpy(np_data).astype(ms.bfloat16),
+                                                            name=lm_head_ms_name,
+                                                            requires_grad=False)
 
     def quant_special_attention_weight(self, layer_id, src_hf_dir, hf_weight_map, name, is_trans_rope_weigh=False,
                                        is_split_param=False):
-        """quant_special_attention_weight"""
         # q_a_proj->q2l_proj
         # kv_a_proj_with_mqa->kv2l
         # q_a_layernorm->lq_norm
         # o_proj->wo
 
         # input_scale, input_zp no split
-        parameter_dict = {}
         input_scale_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".input_scale"
         input_scale_ms_name = self.quant_convert_weight_name(input_scale_hf_name)
         input_scale_ms_param, _ = self.get_safetensor_from_file(input_scale_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[input_scale_ms_name] = ms.Parameter(ms.Tensor(input_scale_ms_param, ms.bfloat16),
-                                                           name=input_scale_ms_name, requires_grad=False)
+        self.parameter_dict[input_scale_ms_name] = ms.Parameter(
+            ms.from_numpy(input_scale_ms_param).astype(ms.bfloat16),
+            name=input_scale_ms_name, requires_grad=False)
 
         input_zp_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".input_offset"
         input_zp_ms_name = self.quant_convert_weight_name(input_zp_hf_name)
         input_zp_ms_param, _ = self.get_safetensor_from_file(input_zp_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[input_zp_ms_name] = ms.Parameter(ms.Tensor(input_zp_ms_param, ms.int8),
-                                                        name=input_zp_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[input_zp_ms_name] = ms.Parameter(ms.from_numpy(input_zp_ms_param).astype(ms.int8),
+                                                             name=input_zp_ms_name,
+                                                             requires_grad=False)
 
         if not is_trans_rope_weigh:
             quant_bias_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".quant_bias"
@@ -511,19 +522,16 @@ class DeepseekInferParallelism(BaseModelParallelism):
             quant_bias_ms_param = self.split_weight_by_rank(quant_bias_ms_param, split_axis=0)
             dequant_scale_ms_param = self.split_weight_by_rank(dequant_scale_ms_param, split_axis=0)
 
-        parameter_dict[quant_bias_ms_name] = ms.Parameter(ms.Tensor(quant_bias_ms_param, ms.int32),
-                                                          name=quant_bias_ms_name, requires_grad=False)
-        parameter_dict[dequant_scale_ms_name] = ms.Parameter(ms.Tensor(dequant_scale_ms_param, ms.float32),
-                                                             name=dequant_scale_ms_name, requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[quant_bias_ms_name] = ms.Parameter(
+            ms.from_numpy(quant_bias_ms_param).astype(ms.int32),
+            name=quant_bias_ms_name, requires_grad=False)
+        self.parameter_dict[dequant_scale_ms_name] = ms.Parameter(
+            ms.from_numpy(dequant_scale_ms_param).astype(ms.float32),
+            name=dequant_scale_ms_name,
+            requires_grad=False)
 
     def infer_quant_bias_weight(self, src_hf_dir, layer_id, hf_weight_map):
-        """infer_quant_bias_weight"""
         # quant_op.beta
-        parameter_dict = {}
         q2l_proj_bias_hf_name = f"model.layers.{layer_id}.input_layernorm.bias"
         q2l_proj_bias_ms_name = self.quant_convert_weight_name(q2l_proj_bias_hf_name)
         q2l_proj_bias_ms_param, _ = self.get_safetensor_from_file(q2l_proj_bias_hf_name, src_hf_dir, hf_weight_map)
@@ -535,22 +543,21 @@ class DeepseekInferParallelism(BaseModelParallelism):
         l2q_proj_bias_ms_name = self.quant_convert_weight_name(l2q_proj_bias_hf_name)
         l2q_proj_bias_ms_param, _ = self.get_safetensor_from_file(l2q_proj_bias_hf_name, src_hf_dir, hf_weight_map)
 
-        parameter_dict[q2l_proj_bias_ms_name] = ms.Parameter(ms.Tensor(q2l_proj_bias_ms_param, ms.bfloat16),
-                                                             name=q2l_proj_bias_ms_name, requires_grad=False)
-        parameter_dict[kv2l_bias_ms_name] = ms.Parameter(ms.Tensor(kv2l_bias_ms_param, ms.bfloat16),
-                                                         name=kv2l_bias_ms_name,
-                                                         requires_grad=False)
-        parameter_dict[l2q_proj_bias_ms_name] = ms.Parameter(ms.Tensor(l2q_proj_bias_ms_param, ms.bfloat16),
-                                                             name=l2q_proj_bias_ms_name,
-                                                             requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[q2l_proj_bias_ms_name] = ms.Parameter(
+            ms.from_numpy(q2l_proj_bias_ms_param).astype(ms.bfloat16),
+            name=q2l_proj_bias_ms_name,
+            requires_grad=False)
+        self.parameter_dict[kv2l_bias_ms_name] = ms.Parameter(
+            ms.from_numpy(kv2l_bias_ms_param).astype(ms.bfloat16),
+            name=kv2l_bias_ms_name,
+            requires_grad=False)
+        self.parameter_dict[l2q_proj_bias_ms_name] = ms.Parameter(
+            ms.from_numpy(l2q_proj_bias_ms_param).astype(ms.bfloat16),
+            name=l2q_proj_bias_ms_name,
+            requires_grad=False)
 
     def infer_quant_process_attention_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer quant process attention weight"""
-        parameter_dict = {}
         num_heads = self.config.model.model_config.num_heads
         kv_lora_rank = self.config.model.model_config.kv_lora_rank
         qk_rope_head_dim = self.config.model.model_config.qk_rope_head_dim
@@ -564,9 +571,10 @@ class DeepseekInferParallelism(BaseModelParallelism):
         q2l_proj_hf_name = f"model.layers.{layer_id}.self_attn.q_a_proj.weight"
         q2l_proj_ms_name = self.quant_convert_weight_name(q2l_proj_hf_name)
         q2l_proj_ms_param, _ = self.get_safetensor_from_file(q2l_proj_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[q2l_proj_ms_name] = ms.Parameter(ms.Tensor(q2l_proj_ms_param, ms.int8),
-                                                        name=q2l_proj_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[q2l_proj_ms_name] = ms.Parameter(
+            ms.from_numpy(q2l_proj_ms_param).astype(ms.int8),
+            name=q2l_proj_ms_name,
+            requires_grad=False)
         self.quant_special_attention_weight(layer_id, src_hf_dir, hf_weight_map, "q_a_proj")
 
         # kv_a_proj_with_mqa->kv2l
@@ -575,8 +583,9 @@ class DeepseekInferParallelism(BaseModelParallelism):
         kv2l_ms_param, _ = self.get_safetensor_from_file(kv2l_hf_name, src_hf_dir, hf_weight_map)
         kv2l_ms_param = kv2l_ms_param.reshape(kv_head_dim, -1)
         kv2l_ms_param = self.infer_trans_rope_weight(kv2l_ms_param, qk_rope_head_dim)
-        parameter_dict[kv2l_ms_name] = ms.Parameter(ms.Tensor(kv2l_ms_param, ms.int8), name=kv2l_ms_name,
-                                                    requires_grad=False)
+        self.parameter_dict[kv2l_ms_name] = ms.Parameter(ms.from_numpy(kv2l_ms_param).astype(ms.int8),
+                                                         name=kv2l_ms_name,
+                                                         requires_grad=False)
         self.quant_special_attention_weight(layer_id, src_hf_dir, hf_weight_map, "kv_a_proj_with_mqa",
                                             is_trans_rope_weigh=True)
 
@@ -584,9 +593,9 @@ class DeepseekInferParallelism(BaseModelParallelism):
         lq_norm_hf_name = f"model.layers.{layer_id}.self_attn.q_a_layernorm.weight"
         lq_norm_ms_name = self.quant_convert_weight_name(lq_norm_hf_name)
         lq_norm_ms_param, _ = self.get_safetensor_from_file(lq_norm_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[lq_norm_ms_name] = ms.Parameter(ms.Tensor(lq_norm_ms_param, ms.bfloat16),
-                                                       name=lq_norm_ms_name,
-                                                       requires_grad=False)
+        self.parameter_dict[lq_norm_ms_name] = ms.Parameter(ms.from_numpy(lq_norm_ms_param).astype(ms.bfloat16),
+                                                            name=lq_norm_ms_name,
+                                                            requires_grad=False)
 
         # q_b_proj->l2q_proj
         l2q_proj_hf_name = f"model.layers.{layer_id}.self_attn.q_b_proj.weight"
@@ -596,9 +605,10 @@ class DeepseekInferParallelism(BaseModelParallelism):
         l2q_proj_ms_param = self.infer_trans_rope_weight(l2q_proj_ms_param, qk_rope_head_dim)
         l2q_proj_ms_param = l2q_proj_ms_param.reshape(num_heads * rope_dim, -1)
         l2q_proj_ms_param = self.split_weight_by_rank(l2q_proj_ms_param, split_axis=0)
-        parameter_dict[l2q_proj_ms_name] = ms.Parameter(ms.Tensor(l2q_proj_ms_param, ms.int8),
-                                                        name=l2q_proj_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[l2q_proj_ms_name] = ms.Parameter(
+            ms.from_numpy(l2q_proj_ms_param).astype(ms.int8),
+            name=l2q_proj_ms_name,
+            requires_grad=False)
         self.quant_special_attention_weight(layer_id, src_hf_dir, hf_weight_map, "q_b_proj", is_trans_rope_weigh=True,
                                             is_split_param=True)
 
@@ -606,9 +616,10 @@ class DeepseekInferParallelism(BaseModelParallelism):
         lkv_norm_hf_name = f"model.layers.{layer_id}.self_attn.kv_a_layernorm.weight"
         lkv_norm_ms_name = self.quant_convert_weight_name(lkv_norm_hf_name)
         lkv_norm_ms_param, _ = self.get_safetensor_from_file(lkv_norm_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[lkv_norm_ms_name] = ms.Parameter(ms.Tensor(lkv_norm_ms_param, ms.bfloat16),
-                                                        name=lkv_norm_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[lkv_norm_ms_name] = ms.Parameter(
+            ms.from_numpy(lkv_norm_ms_param).astype(ms.bfloat16),
+            name=lkv_norm_ms_name,
+            requires_grad=False)
 
         # kv_b_proj->lkv2kv
         lkv2kv_hf_name = f"model.layers.{layer_id}.self_attn.kv_b_proj.weight"
@@ -622,32 +633,29 @@ class DeepseekInferParallelism(BaseModelParallelism):
         value_k_nope = value_k_nope.reshape(-1, value_k_nope.shape[-1])
         value_k_nope = self.split_weight_by_rank(value_k_nope, split_axis=0)
         name_k_nope = lkv2kv_ms_name.replace(".attention.lkv2kv.", ".attention.lkv2kv_k_nope.")
-        parameter_dict[name_k_nope] = ms.Parameter(ms.Tensor(value_k_nope, ms.bfloat16), name=name_k_nope,
-                                                   requires_grad=False)
+        self.parameter_dict[name_k_nope] = ms.Parameter(ms.from_numpy(value_k_nope).astype(ms.bfloat16),
+                                                        name=name_k_nope,
+                                                        requires_grad=False)
         # value_v
         value_v = value_v.reshape(-1, value_v.shape[-1])
         value_v = self.split_weight_by_rank(value_v, split_axis=0)
         name_v = lkv2kv_ms_name.replace(".attention.lkv2kv.", ".attention.lkv2kv_v.")
-        parameter_dict[name_v] = ms.Parameter(ms.Tensor(value_v, ms.bfloat16), name=name_v,
-                                              requires_grad=False)
+        self.parameter_dict[name_v] = ms.Parameter(ms.from_numpy(value_v).astype(ms.bfloat16),
+                                                   name=name_v,
+                                                   requires_grad=False)
 
         # o_proj->wo
         wo_hf_name = f"model.layers.{layer_id}.self_attn.o_proj.weight"
         wo_ms_name = self.quant_convert_weight_name(wo_hf_name)
         wo_ms_param, _ = self.get_safetensor_from_file(wo_hf_name, src_hf_dir, hf_weight_map)
         wo_ms_param = self.split_weight_by_rank(wo_ms_param, split_axis=1)
-        parameter_dict[wo_ms_name] = ms.Parameter(ms.Tensor(wo_ms_param, ms.int8), name=wo_ms_name,
-                                                  requires_grad=False)
+        self.parameter_dict[wo_ms_name] = ms.Parameter(ms.from_numpy(wo_ms_param).astype(ms.int8),
+                                                       name=wo_ms_name,
+                                                       requires_grad=False)
         self.quant_special_attention_weight(layer_id, src_hf_dir, hf_weight_map, "o_proj")
-
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
 
     def infer_quant_net_convert_layer_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer quant net convert layer weight"""
-        print(f"..... start convert layer {layer_id} .......", flush=True)
 
         if layer_id >= 3:
             self.infer_quant_process_moe_routed_expert_ffn_weight(src_hf_dir, layer_id, hf_weight_map)
@@ -658,8 +666,6 @@ class DeepseekInferParallelism(BaseModelParallelism):
         self.infer_quant_process_attention_weight(src_hf_dir, layer_id, hf_weight_map)
         self.infer_quant_bias_weight(src_hf_dir, layer_id, hf_weight_map)
         self.infer_process_norm_weight(src_hf_dir, layer_id, hf_weight_map)
-
-        print(f"..... end convert layer {layer_id} .......", flush=True)
 
     def convert_weight_name(self, weight_name: str):
         """replace weight name"""
@@ -684,28 +690,47 @@ class DeepseekInferParallelism(BaseModelParallelism):
         weight_name = weight_name.replace('.input_layernorm.', '.attention_norm.')
         weight_name = weight_name.replace('.post_attention_layernorm.', '.ffn_norm.')
         weight_name = weight_name.replace('model.norm.weight', 'model.norm_out.weight')
+
+        weight_name = self.convert_mtp_weight_name(weight_name)
+        return weight_name
+
+    def convert_mtp_weight_name(self, weight_name: str):
+        layer = 0 if 'layers.' not in weight_name else int(weight_name[weight_name.find('layers.') : ].split('.')[1])
+        if layer < self.num_layers:
+            return weight_name
+        mtp_prefix = f'mtp_model'
+        is_mtp_layer = 'tok_embeddings' not in weight_name and 'shared_head.' not in weight_name
+        mtp_prefix = mtp_prefix if not is_mtp_layer else f'{mtp_prefix}.layer'
+        is_decode_layer = "ffn" in weight_name or "attention" in weight_name or "feed_forward" in weight_name
+        mtp_prefix = mtp_prefix if not is_decode_layer else f'{mtp_prefix}.decode_layer'
+
+        weight_name = weight_name.replace(f'model.layers.{layer}', mtp_prefix)
+        if "tok_embeddings" in weight_name:
+            weight_name = weight_name.replace(f'.weight', f'.embedding_weight')
+        if "shared_head." in weight_name:
+            weight_name = weight_name.replace(f'shared_head.', f'')
         return weight_name
 
     def infer_process_moe_routed_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """process moe router expert weight"""
         ffn_concat = self.config.model.model_config.ffn_concat
         num_router_experts = self.config.moe_config.expert_num
-        parameter_dict = {}
 
         # router expert dense
         router_dense_hf_name = f"model.layers.{layer_id}.mlp.gate.weight"
         router_dense_ms_name = self.convert_weight_name(router_dense_hf_name)
         router_dense_ms_param, _ = self.get_safetensor_from_file(router_dense_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[router_dense_ms_name] = ms.Parameter(ms.Tensor(router_dense_ms_param, ms.bfloat16),
-                                                            name=router_dense_ms_name, requires_grad=False)
+        self.parameter_dict[router_dense_ms_name] = ms.Parameter(
+            ms.from_numpy(router_dense_ms_param).astype(ms.bfloat16),
+            name=router_dense_ms_name, requires_grad=False)
 
         # e_score_correction_bias
         e_score_correction_bias_hf_name = f"model.layers.{layer_id}.mlp.gate.e_score_correction_bias"
         e_score_correction_bias_ms_name = self.convert_weight_name(e_score_correction_bias_hf_name)
         e_score_correction_bias_ms_param, _ = self.get_safetensor_from_file(e_score_correction_bias_hf_name, src_hf_dir,
                                                                             hf_weight_map)
-        parameter_dict[e_score_correction_bias_ms_name] = ms.Parameter(
-            ms.Tensor(e_score_correction_bias_ms_param, ms.float32),
+        self.parameter_dict[e_score_correction_bias_ms_name] = ms.Parameter(
+            ms.from_numpy(e_score_correction_bias_ms_param).astype(ms.float32),
             name=e_score_correction_bias_ms_name, requires_grad=False)
 
         w1_list = []
@@ -713,8 +738,12 @@ class DeepseekInferParallelism(BaseModelParallelism):
         w3_list = []
 
         w1_ms_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w1.weight"
+        w1_ms_name = w1_ms_name if layer_id < self.num_layers else self.convert_mtp_weight_name(w1_ms_name)
         w2_ms_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w2.weight"
+        w2_ms_name = w2_ms_name if layer_id < self.num_layers else self.convert_mtp_weight_name(w2_ms_name)
         w3_ms_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w3.weight"
+        w3_ms_name = w3_ms_name if layer_id < self.num_layers else self.convert_mtp_weight_name(w3_ms_name)
+
         for index in range(0, num_router_experts):
             w1_hf_name = f"model.layers.{layer_id}.mlp.experts.{index}.gate_proj.weight"
             w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
@@ -732,33 +761,38 @@ class DeepseekInferParallelism(BaseModelParallelism):
             w2_list.append(w2_ms_param)
             w3_list.append(w3_ms_param)
 
-        w1_ms_stack_param = np.stack(w1_list, axis=0).transpose(0, 2, 1)
-        w2_ms_stack_param = np.stack(w2_list, axis=0).transpose(0, 2, 1)
-        w3_ms_stack_param = np.stack(w3_list, axis=0).transpose(0, 2, 1)
+        w1_ms_stack_param = np.stack(w1_list, axis=0)
+        w2_ms_stack_param = np.stack(w2_list, axis=0)
+        w3_ms_stack_param = np.stack(w3_list, axis=0)
 
         if ffn_concat:
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w_gate_hidden.weight"
-            w_gate_hidden_param = ms.Tensor(np.concatenate([w1_ms_stack_param, w3_ms_stack_param], axis=2),
-                                            dtype=ms.bfloat16)
-            parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
-                                                              requires_grad=False)
+            w_gate_hidden_name = w_gate_hidden_name if layer_id < self.num_layers else \
+                self.convert_mtp_weight_name(w_gate_hidden_name)
+            w_gate_hidden_np = np.concatenate([w1_ms_stack_param, w3_ms_stack_param], axis=1)
+            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).permute(0, 2, 1).astype(dtype=ms.bfloat16)
+            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param,
+                                                                   name=w_gate_hidden_name,
+                                                                   requires_grad=False)
         else:
-            parameter_dict[w1_ms_name] = ms.Parameter(ms.Tensor(w1_ms_stack_param, ms.bfloat16), name=w1_ms_name,
-                                                      requires_grad=False)
-            parameter_dict[w3_ms_name] = ms.Parameter(ms.Tensor(w3_ms_stack_param, ms.bfloat16), name=w3_ms_name,
-                                                      requires_grad=False)
+            w1_ms_stack_param = ms.from_numpy(w1_ms_stack_param).permute(0, 2, 1).astype(ms.bfloat16)
+            self.parameter_dict[w1_ms_name] = ms.Parameter(w1_ms_stack_param,
+                                                           name=w1_ms_name,
+                                                           requires_grad=False)
 
-        parameter_dict[w2_ms_name] = ms.Parameter(ms.Tensor(w2_ms_stack_param, ms.bfloat16), name=w2_ms_name,
-                                                  requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
+            w3_ms_stack_param = ms.from_numpy(w3_ms_stack_param).permute(0, 2, 1).astype(ms.bfloat16)
+            self.parameter_dict[w3_ms_name] = ms.Parameter(w3_ms_stack_param,
+                                                           name=w3_ms_name,
+                                                           requires_grad=False)
 
-        del parameter_dict
-        gc.collect()
+        w2_ms_stack_param = ms.from_numpy(w2_ms_stack_param).permute(0, 2, 1).astype(ms.bfloat16)
+        self.parameter_dict[w2_ms_name] = ms.Parameter(w2_ms_stack_param,
+                                                       name=w2_ms_name,
+                                                       requires_grad=False)
 
     def infer_process_moe_shared_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer process moe shared expert ffn weight"""
         ffn_concat = self.config.model.model_config.ffn_concat
-        parameter_dict = {}
         w1_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.gate_proj.weight"
         w1_ms_name = self.convert_weight_name(w1_hf_name)
         w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
@@ -776,26 +810,28 @@ class DeepseekInferParallelism(BaseModelParallelism):
 
         if ffn_concat:
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.shared_experts.w_gate_hidden.weight"
-            w_gate_hidden_param = ms.Tensor(np.concatenate([w1_ms_param, w3_ms_param], axis=0), dtype=ms.bfloat16)
-            parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
-                                                              requires_grad=False)
+            w_gate_hidden_name = w_gate_hidden_name if layer_id < self.num_layers else \
+                self.convert_mtp_weight_name(w_gate_hidden_name)
+            w_gate_hidden_np = np.concatenate([w1_ms_param, w3_ms_param], axis=0)
+            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).astype(ms.bfloat16)
+            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param,
+                                                                   name=w_gate_hidden_name,
+                                                                   requires_grad=False)
         else:
-            parameter_dict[w1_ms_name] = ms.Parameter(ms.Tensor(w1_ms_param, ms.bfloat16), name=w1_ms_name,
-                                                      requires_grad=False)
-            parameter_dict[w3_ms_name] = ms.Parameter(ms.Tensor(w3_ms_param, ms.bfloat16), name=w3_ms_name,
-                                                      requires_grad=False)
-        parameter_dict[w2_ms_name] = ms.Parameter(ms.Tensor(w2_ms_param, ms.bfloat16), name=w2_ms_name,
-                                                  requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+            self.parameter_dict[w1_ms_name] = ms.Parameter(ms.from_numpy(w1_ms_param).astype(ms.bfloat16),
+                                                           name=w1_ms_name,
+                                                           requires_grad=False)
+            self.parameter_dict[w3_ms_name] = ms.Parameter(ms.from_numpy(w3_ms_param).astype(ms.bfloat16),
+                                                           name=w3_ms_name,
+                                                           requires_grad=False)
+        self.parameter_dict[w2_ms_name] = ms.Parameter(ms.from_numpy(w2_ms_param).astype(ms.bfloat16),
+                                                       name=w2_ms_name,
+                                                       requires_grad=False)
 
     def infer_process_dense_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer process dense ffn weight"""
 
         ffn_concat = self.config.model.model_config.ffn_concat
-        parameter_dict = {}
 
         w1_hf_name = f"model.layers.{layer_id}.mlp.gate_proj.weight"
         w1_ms_name = self.convert_weight_name(w1_hf_name)
@@ -814,21 +850,22 @@ class DeepseekInferParallelism(BaseModelParallelism):
 
         if ffn_concat:
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.w_gate_hidden.weight"
-            w_gate_hidden_param = ms.Tensor(np.concatenate([w1_ms_param, w3_ms_param], axis=0), dtype=ms.bfloat16)
-            parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
-                                                              requires_grad=False)
+            w_gate_hidden_np = np.concatenate([w1_ms_param, w3_ms_param], axis=0)
+            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).astype(ms.bfloat16)
+            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param,
+                                                                   name=w_gate_hidden_name,
+                                                                   requires_grad=False)
         else:
-            parameter_dict[w1_ms_name] = ms.Parameter(ms.Tensor(w1_ms_param, ms.bfloat16), name=w1_ms_name,
-                                                      requires_grad=False)
-            parameter_dict[w3_ms_name] = ms.Parameter(ms.Tensor(w3_ms_param, ms.bfloat16), name=w3_ms_name,
-                                                      requires_grad=False)
+            self.parameter_dict[w1_ms_name] = ms.Parameter(ms.from_numpy(w1_ms_param).astype(ms.bfloat16),
+                                                           name=w1_ms_name,
+                                                           requires_grad=False)
+            self.parameter_dict[w3_ms_name] = ms.Parameter(ms.from_numpy(w3_ms_param).astype(ms.bfloat16),
+                                                           name=w3_ms_name,
+                                                           requires_grad=False)
 
-        parameter_dict[w2_ms_name] = ms.Parameter(ms.Tensor(w2_ms_param, ms.bfloat16), name=w2_ms_name,
-                                                  requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[w2_ms_name] = ms.Parameter(ms.from_numpy(w2_ms_param).astype(ms.bfloat16),
+                                                       name=w2_ms_name,
+                                                       requires_grad=False)
 
     def infer_process_attention_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer process attention weight"""
@@ -841,12 +878,14 @@ class DeepseekInferParallelism(BaseModelParallelism):
         rope_dim = qk_rope_head_dim + qk_nope_head_dim
         kv_head_dim = kv_lora_rank + qk_rope_head_dim
 
-        parameter_dict = {}
-        qkv_concat = self.config.model.model_config.qkv_concat
         # q2l_proj
         q2l_proj_hf_name = f"model.layers.{layer_id}.self_attn.q_a_proj.weight"
         q2l_proj_ms_name = self.convert_weight_name(q2l_proj_hf_name)
         q_a_proj_ms_param, _ = self.get_safetensor_from_file(q2l_proj_hf_name, src_hf_dir, hf_weight_map)
+        self.parameter_dict[q2l_proj_ms_name] = ms.Parameter(
+            ms.from_numpy(q_a_proj_ms_param).astype(ms.bfloat16),
+            name=q2l_proj_ms_name,
+            requires_grad=False)
 
         # kv2l
         kv2l_hf_name = f"model.layers.{layer_id}.self_attn.kv_a_proj_with_mqa.weight"
@@ -854,26 +893,17 @@ class DeepseekInferParallelism(BaseModelParallelism):
         kv2l_ms_param, _ = self.get_safetensor_from_file(kv2l_hf_name, src_hf_dir, hf_weight_map)
         kv2l_ms_param = kv2l_ms_param.reshape(kv_head_dim, -1)
         kv2l_ms_param = self.infer_trans_rope_weight(kv2l_ms_param, qk_rope_head_dim)
-
-        if qkv_concat:
-            wqkv2l_weight = np.concatenate((q_a_proj_ms_param, kv2l_ms_param), 0)
-            wqkv2l_weight_name = f"model.layers.{layer_id}.attention.qkv2l.weight"
-            parameter_dict[wqkv2l_weight_name] = ms.Parameter(ms.Tensor(wqkv2l_weight, ms.bfloat16),
-                                                              name=wqkv2l_weight_name,
-                                                              requires_grad=False)
-        else:
-            parameter_dict[q2l_proj_ms_name] = ms.Parameter(ms.Tensor(q_a_proj_ms_param, ms.bfloat16),
-                                                            name=q2l_proj_ms_name,
-                                                            requires_grad=False)
-            parameter_dict[kv2l_ms_name] = ms.Parameter(ms.Tensor(kv2l_ms_param, ms.bfloat16), name=kv2l_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[kv2l_ms_name] = ms.Parameter(ms.from_numpy(kv2l_ms_param).astype(ms.bfloat16),
+                                                         name=kv2l_ms_name,
+                                                         requires_grad=False)
 
         # lq_norm
         lq_norm_hf_name = f"model.layers.{layer_id}.self_attn.q_a_layernorm.weight"
         lq_norm_ms_name = self.convert_weight_name(lq_norm_hf_name)
         lq_norm_ms_param, _ = self.get_safetensor_from_file(lq_norm_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[lq_norm_ms_name] = ms.Parameter(ms.Tensor(lq_norm_ms_param, ms.bfloat16), name=lq_norm_ms_name,
-                                                       requires_grad=False)
+        self.parameter_dict[lq_norm_ms_name] = ms.Parameter(ms.from_numpy(lq_norm_ms_param).astype(ms.bfloat16),
+                                                            name=lq_norm_ms_name,
+                                                            requires_grad=False)
 
         # l2q_proj
         l2q_proj_hf_name = f"model.layers.{layer_id}.self_attn.q_b_proj.weight"
@@ -883,17 +913,19 @@ class DeepseekInferParallelism(BaseModelParallelism):
         l2q_proj_ms_param = self.infer_trans_rope_weight(l2q_proj_ms_param, qk_rope_head_dim)
         l2q_proj_ms_param = l2q_proj_ms_param.reshape(num_heads * rope_dim, -1)
         l2q_proj_ms_param = self.split_weight_by_rank(l2q_proj_ms_param, split_axis=0)
-        parameter_dict[l2q_proj_ms_name] = ms.Parameter(ms.Tensor(l2q_proj_ms_param, ms.bfloat16),
-                                                        name=l2q_proj_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[l2q_proj_ms_name] = ms.Parameter(
+            ms.from_numpy(l2q_proj_ms_param).astype(ms.bfloat16),
+            name=l2q_proj_ms_name,
+            requires_grad=False)
 
         # lkv_norm
         lkv_norm_hf_name = f"model.layers.{layer_id}.self_attn.kv_a_layernorm.weight"
         lkv_norm_ms_name = self.convert_weight_name(lkv_norm_hf_name)
         lkv_norm_ms_param, _ = self.get_safetensor_from_file(lkv_norm_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[lkv_norm_ms_name] = ms.Parameter(ms.Tensor(lkv_norm_ms_param, ms.bfloat16),
-                                                        name=lkv_norm_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[lkv_norm_ms_name] = ms.Parameter(
+            ms.from_numpy(lkv_norm_ms_param).astype(ms.bfloat16),
+            name=lkv_norm_ms_name,
+            requires_grad=False)
 
         # lkv2kv
         lkv2kv_hf_name = f"model.layers.{layer_id}.self_attn.kv_b_proj.weight"
@@ -907,57 +939,69 @@ class DeepseekInferParallelism(BaseModelParallelism):
         value_k_nope = value_k_nope.reshape(-1, value_k_nope.shape[-1])
         value_k_nope = self.split_weight_by_rank(value_k_nope, split_axis=0)
         name_k_nope = lkv2kv_ms_name.replace(".attention.lkv2kv.", ".attention.lkv2kv_k_nope.")
-        parameter_dict[name_k_nope] = ms.Parameter(ms.Tensor(value_k_nope, ms.bfloat16), name=name_k_nope,
-                                                   requires_grad=False)
+        self.parameter_dict[name_k_nope] = ms.Parameter(ms.from_numpy(value_k_nope).astype(ms.bfloat16),
+                                                        name=name_k_nope,
+                                                        requires_grad=False)
         # value_v
         value_v = value_v.reshape(-1, value_v.shape[-1])
         value_v = self.split_weight_by_rank(value_v, split_axis=0)
         name_v = lkv2kv_ms_name.replace(".attention.lkv2kv.", ".attention.lkv2kv_v.")
-        parameter_dict[name_v] = ms.Parameter(ms.Tensor(value_v, ms.bfloat16), name=name_v,
-                                              requires_grad=False)
+        self.parameter_dict[name_v] = ms.Parameter(ms.from_numpy(value_v).astype(ms.bfloat16),
+                                                   name=name_v,
+                                                   requires_grad=False)
 
         # wo
         wo_hf_name = f"model.layers.{layer_id}.self_attn.o_proj.weight"
         wo_ms_name = self.convert_weight_name(wo_hf_name)
         wo_ms_param, _ = self.get_safetensor_from_file(wo_hf_name, src_hf_dir, hf_weight_map)
         wo_ms_param = self.split_weight_by_rank(wo_ms_param, split_axis=1)
-        parameter_dict[wo_ms_name] = ms.Parameter(ms.Tensor(wo_ms_param, ms.bfloat16), name=wo_ms_name,
-                                                  requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
-
-        del parameter_dict
-        gc.collect()
+        self.parameter_dict[wo_ms_name] = ms.Parameter(ms.from_numpy(wo_ms_param).astype(ms.bfloat16),
+                                                       name=wo_ms_name,
+                                                       requires_grad=False)
 
     def infer_process_norm_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer process attention weight"""
-        parameter_dict = {}
         # attention_norm
         attention_norm_hf_name = f"model.layers.{layer_id}.input_layernorm.weight"
         attention_norm_ms_name = self.convert_weight_name(attention_norm_hf_name)
         attention_norm_ms_param, _ = self.get_safetensor_from_file(attention_norm_hf_name,
                                                                    src_hf_dir,
                                                                    hf_weight_map)
-        parameter_dict[attention_norm_ms_name] = ms.Parameter(ms.Tensor(attention_norm_ms_param, ms.bfloat16),
-                                                              name=attention_norm_ms_name,
-                                                              requires_grad=False)
+        self.parameter_dict[attention_norm_ms_name] = ms.Parameter(
+            ms.from_numpy(attention_norm_ms_param).astype(ms.bfloat16),
+            name=attention_norm_ms_name,
+            requires_grad=False)
 
         # ffn_norm
         ffn_norm_hf_name = f"model.layers.{layer_id}.post_attention_layernorm.weight"
         ffn_norm_ms_name = self.convert_weight_name(ffn_norm_hf_name)
         ffn_norm_ms_param, _ = self.get_safetensor_from_file(ffn_norm_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[ffn_norm_ms_name] = ms.Parameter(ms.Tensor(ffn_norm_ms_param, ms.bfloat16),
-                                                        name=ffn_norm_ms_name,
-                                                        requires_grad=False)
+        self.parameter_dict[ffn_norm_ms_name] = ms.Parameter(
+            ms.from_numpy(ffn_norm_ms_param).astype(ms.bfloat16),
+            name=ffn_norm_ms_name,
+            requires_grad=False)
 
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
+    def infer_process_mtp_layer_weight(self, src_hf_dir, layer_id, hf_weight_map):
+        parameter_dict = {}
+        mtp_layer_names = ["embed_tokens.weight", "enorm.weight", "hnorm.weight", "eh_proj.weight",
+                           "shared_head.norm.weight", "shared_head.head.weight"]
+        head_names = ["eh_proj.weight", "shared_head.head.weight"]
+        for prefix_name in mtp_layer_names:
+            hf_name = f"model.layers.{layer_id}.{prefix_name}"
+            ms_name = self.convert_weight_name(hf_name)
+            if prefix_name in head_names and not self.config.parallel_config.vocab_emb_dp:
+                ms_param, _ = self.get_safetensor_from_file(hf_name, src_hf_dir, hf_weight_map,
+                                                         is_split_param=True, split_axis=0)
+            else:
+                ms_param, _ = self.get_safetensor_from_file(hf_name, src_hf_dir, hf_weight_map)
+            parameter_dict[ms_name] = ms.Parameter(ms.Tensor(ms_param, ms.bfloat16),
+                                                             name=ms_name,
+                                                             requires_grad=False)
 
-        del parameter_dict
-        gc.collect()
+        _, ckpt_not_load = ms.load_param_into_net(self.network, parameter_dict)
 
     def infer_convert_layer_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer convert layer weight"""
-        print(f"..... start convert layer {layer_id} .......", flush=True)
-
         if layer_id >= 3:
             self.infer_process_moe_routed_expert_ffn_weight(src_hf_dir, layer_id, hf_weight_map)
             self.infer_process_moe_shared_expert_ffn_weight(src_hf_dir, layer_id, hf_weight_map)
@@ -967,68 +1011,95 @@ class DeepseekInferParallelism(BaseModelParallelism):
         self.infer_process_attention_weight(src_hf_dir, layer_id, hf_weight_map)
         self.infer_process_norm_weight(src_hf_dir, layer_id, hf_weight_map)
 
-        print(f"..... end convert layer {layer_id} .......", flush=True)
+        # convert mtp shared weights.
+        if layer_id >= self.num_layers:
+            self.infer_process_mtp_layer_weight(src_hf_dir, layer_id, hf_weight_map)
 
-    def convert_to_ms_dtype(self, value):
-        """convert_to_ms_dtype"""
-        if value.dtype == np.int8:
-            value_dtype = ms.int8
-        elif value.dtype == np.int32:
-            value_dtype = ms.int32
-        elif value.dtype == np.int64:
-            value_dtype = ms.int64
-        elif value.dtype == np.float64:
-            value_dtype = ms.float64
-        elif value.dtype == np.float32:
-            value_dtype = ms.float32
-        else:
-            value_dtype = ms.bfloat16
-        return value_dtype
+    def infer_smooth_quant_net_ms_convert_layer_weight(self, src_hf_dir, num_layers, hf_weight_map):
+        """infer_smooth_quant_net_ms_convert_layer_weight"""
+        parameter_dict = {}
 
-    def _get_value(self, param_name, src_hf_dir, hf_weight_map, no_need_split_layer):
-        """_get_value"""
-        value = None
-        is_int4 = None
-        if any([name in param_name for name in no_need_split_layer]):
-            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
-                                                           hf_weight_map)
-        elif any([name in param_name for name in [".l2q_proj.", ".feed_forward.w_gate_hidden.",
-                                                  "shared_experts.w_gate_hidden"]]):
-            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
-                                                           hf_weight_map, is_split_param=True,
-                                                           split_axis=1)
-        elif any([name in param_name for name in [".feed_forward.w2.", ".wo.",
-                                                  "shared_experts.w2"]]):
-            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
-                                                           hf_weight_map, is_split_param=True,
-                                                           split_axis=0)
-        elif ".routed_experts.ffn.w_gate_hidden." in param_name:
-            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
-            value_list = []
-            for experts_id in range(value.shape[0]):
-                value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=1))
-            value = np.stack(value_list, axis=0)
-        elif ".routed_experts.ffn.w2" in param_name:
-            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
-            value_list = []
-            for experts_id in range(value.shape[0]):
-                value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=0))
-            value = np.stack(value_list, axis=0)
-        elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
-            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
-                                                           is_split_param=True, split_axis=0)
-        elif "lm_head" in param_name:
-            if not self.config.parallel_config.vocab_emb_dp:
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
+        no_need_split_layer = ["tok_embeddings", "norm", "q2l_proj",
+                               "kv2l", "routed_experts.router.dense",
+                               "routed_experts.router.e_score_correction_bias",
+                               "topk_bias"]
+        for param_name, _ in tqdm(hf_weight_map.items(), desc="split safetensors"):
+            if "model.layers" in param_name and int(param_name.split('.')[2]) >= num_layers:
+                continue
+
+            if any([name in param_name for name in no_need_split_layer]):
+                value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                               hf_weight_map)
+            elif any([name in param_name for name in [".l2q_proj.", ".feed_forward.w_gate_hidden.",
+                                                      "shared_experts.w_gate_hidden"]]):
+                if param_name.endswith(".weight") or "matmul" in param_name:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                   hf_weight_map, is_split_param=True,
+                                                                   split_axis=0)
+                else:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                   hf_weight_map)
+            elif any([name in param_name for name in [".feed_forward.w2.", ".wo.", "shared_experts.w2"]]):
+                if param_name.endswith(".weight"):
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                   hf_weight_map, is_split_param=True,
+                                                                   split_axis=1)
+                elif "quant_op" in param_name:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                   hf_weight_map, is_split_param=True,
+                                                                   split_axis=0)
+                else:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                   hf_weight_map)
+            elif ".routed_experts.ffn.w_gate_hidden." in param_name:
+                if param_name.endswith(".weight"):
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+                    value_list = []
+                    for experts_id in range(value.shape[0]):
+                        value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=1))
+                    value = np.stack(value_list, axis=0)
+                elif "matmul" in param_name:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+                    value_list = []
+                    for experts_id in range(value.shape[0]):
+                        value_list.append(self.split_weight_by_rank(value[experts_id, :], split_axis=0))
+                    value = np.stack(value_list, axis=0)
+                else:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                   hf_weight_map)
+            elif ".routed_experts.ffn.w2" in param_name:
+                if param_name.endswith(".weight"):
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+                    value_list = []
+                    for experts_id in range(value.shape[0]):
+                        value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=0))
+                    value = np.stack(value_list, axis=0)
+                else:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                   hf_weight_map)
+            elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
+                value, _ = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
                                                                is_split_param=True, split_axis=0)
+            elif "lm_head" in param_name:
+                if not self.config.parallel_config.vocab_emb_dp:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
+                                                                   is_split_param=True, split_axis=0)
+                else:
+                    value, _ = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
             else:
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
-        else:
-            raise ValueError(f"not found layer {param_name}, please check safetensors file.")
-        return value, is_int4
+                raise ValueError(f"not found layer {param_name}, please check safetensors file.")
 
-    def infer_quant_net_ms_convert_layer_weight(self, src_hf_dir, num_layers, hf_weight_map):
-        """infer_quant_net_ms_convert_layer_weight"""
+            dst_dtype = convert_np_to_ms_dtype(value)
+
+            parameter_dict[param_name] = ms.Parameter(ms.Tensor(value, dtype=dst_dtype),
+                                                        name=param_name, requires_grad=False)
+
+        param_not_load, ckpt_not_load = ms.load_param_into_net(self.network, parameter_dict)
+        print(f"smoothquant param_not_load:{param_not_load}")
+        print(f"smoothquant ckpt_not_load:{ckpt_not_load}")
+
+    def infer_gptq_quant_net_ms_convert_layer_weight(self, src_hf_dir, num_layers, hf_weight_map):
+        """infer_gptq_quant_net_ms_convert_layer_weight"""
         parameter_dict = {}
 
         no_need_split_layer = ["tok_embeddings", "norm", "q2l_proj",
@@ -1039,26 +1110,66 @@ class DeepseekInferParallelism(BaseModelParallelism):
         for param_name, _ in tqdm(hf_weight_map.items(), desc="split safetensors"):
             if "model.layers" in param_name and int(param_name.split('.')[2]) >= num_layers:
                 continue
-            value, is_int4 = self._get_value(param_name, src_hf_dir, hf_weight_map, no_need_split_layer)
-            dst_dtype = self.convert_to_ms_dtype(value)
+
+            if any([name in param_name for name in no_need_split_layer]):
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                               hf_weight_map)
+            elif any([name in param_name for name in [".l2q_proj.", ".feed_forward.w_gate_hidden.",
+                                                      "shared_experts.w_gate_hidden"]]):
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                hf_weight_map, is_split_param=True,
+                                                                split_axis=1)
+            elif any([name in param_name for name in [".feed_forward.w2.", ".wo.",
+                                                      "shared_experts.w2"]]):
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                                hf_weight_map, is_split_param=True,
+                                                                split_axis=0)
+            elif ".routed_experts.ffn.w_gate_hidden." in param_name:
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+                value_list = []
+                for experts_id in range(value.shape[0]):
+                    value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=1))
+                value = np.stack(value_list, axis=0)
+            elif ".routed_experts.ffn.w2" in param_name:
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+                value_list = []
+                for experts_id in range(value.shape[0]):
+                    value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=0))
+                value = np.stack(value_list, axis=0)
+            elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
+                                                               is_split_param=True, split_axis=0)
+            elif "lm_head" in param_name:
+                if not self.config.parallel_config.vocab_emb_dp:
+                    value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
+                                                                   is_split_param=True, split_axis=0)
+                else:
+                    value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+            else:
+                raise ValueError(f"not found layer {param_name}, please check safetensors file.")
+
+            dst_dtype = convert_np_to_ms_dtype(value)
             if is_int4:
                 parameter_dict[param_name] = ms.Parameter(ms.Tensor(value, dtype=dtype.qint4x2),
                                                           name=param_name, requires_grad=False)
             else:
                 parameter_dict[param_name] = ms.Parameter(ms.Tensor(value, dtype=dst_dtype),
                                                           name=param_name, requires_grad=False)
-        _, _ = ms.load_param_into_net(self.network, parameter_dict)
+            _, _ = ms.load_param_into_net(self.network, parameter_dict)
 
-    def infer_convert_and_parallelism(self, src_hf_dir):
-        """convert inference model weight """
+    def load_safetensors_shard(self, src_hf_dir, is_mtp_model=False):
+        """deepseek load safetensors and shard """
+        rank_id = get_rank()
         param_json_path = ""
 
         for file in os.listdir(src_hf_dir):
             if file.endswith('index.json'):
-                param_json_path = os.path.join(src_hf_dir, file)
-                with open(param_json_path, "r") as fp:
-                    hf_weight_map = json.load(fp)['weight_map']
-                break
+                # mtp model do not support quantization, needs to load bf16 weight.
+                if (self.is_quant and 'quant' in file) or (is_mtp_model and 'quant' not in file):
+                    param_json_path = os.path.join(src_hf_dir, file)
+                    with open(param_json_path, "r") as fp:
+                        hf_weight_map = json.load(fp)['weight_map']
+                    break
             elif file.endswith('_name_map.json'):
                 param_json_path = os.path.join(src_hf_dir, file)
                 with open(param_json_path, "r") as fp:
@@ -1069,19 +1180,30 @@ class DeepseekInferParallelism(BaseModelParallelism):
 
         if not param_json_path:
             raise ValueError(f"Not found param_json_path in {src_hf_dir}")
-        print("param_json_path is {}".format(param_json_path))
 
         quantization_config = self.config.model.model_config.quantization_config
         quant_method = quantization_config.quant_method if quantization_config else None
-        if not quant_method or quant_method != "gptq-pergroup":
+        if not quant_method or (quant_method != "gptq-pergroup" and quant_method != "smoothquant") and \
+                not is_mtp_model:
             self.infer_convert_outer_weight(src_hf_dir, hf_weight_map)
 
-        num_layers = self.config.model.model_config.num_layers
         if quant_method and quant_method == "gptq-pergroup":
-            self.infer_quant_net_ms_convert_layer_weight(src_hf_dir, num_layers, hf_weight_map)
+            self.infer_gptq_quant_net_ms_convert_layer_weight(src_hf_dir, self.num_layers, hf_weight_map)
             return
-        for layer_id in range(num_layers):
+        if quant_method and quant_method == "smoothquant":
+            self.infer_smooth_quant_net_ms_convert_layer_weight(src_hf_dir, self.num_layers, hf_weight_map)
+            return
+
+        enable_tqdm = rank_id == 0
+        mtp_layers = self.config.model.model_config.num_nextn_predict_layers
+        start_layer = 0 if not is_mtp_model else self.num_layers
+        end_layer = self.num_layers if not is_mtp_model else self.num_layers + mtp_layers
+        for layer_id in tqdm(range(start_layer, end_layer), desc="Weight loading", disable=not enable_tqdm):
             if self.is_quant:
                 self.infer_quant_net_convert_layer_weight(src_hf_dir, layer_id, hf_weight_map)
             else:
                 self.infer_convert_layer_weight(src_hf_dir, layer_id, hf_weight_map)
+
+        ms.load_param_into_net(self.network, self.parameter_dict)
+        del self.parameter_dict
+        gc.collect()
