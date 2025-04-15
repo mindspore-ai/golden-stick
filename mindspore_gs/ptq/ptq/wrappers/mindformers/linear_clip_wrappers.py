@@ -107,7 +107,7 @@ class ClipLinearCell(WrapperLinearCell):
         # [1, n_sample_tokens, n_group, group_size]
         input_feat = input_feat[:, ::step_size]
         logger.debug(f"ClipLinearCell: input feature of Layer({self._layer_name}) is {{{input_feat.shape}, "
-                     f"{input_feat.dtype}, {input_feat.asnumpy()}}}")
+                     f"{input_feat.dtype}}}")
 
         # [oc, 1, n_group, group_size]
         w = self._layer.weight.reshape(org_w_shape[0], 1, -1, group_size)
@@ -121,12 +121,10 @@ class ClipLinearCell(WrapperLinearCell):
             # [oc_batch_size, 1, n_group, group_size]
             logger.info(f"ClipLinearCell: search iter {i_b}")
             w = w_all[i_b * oc_batch_size : (i_b + 1) * oc_batch_size]
-            logger.debug(f"w of Layer({self._layer_name}) is {{{w.shape}, "
-                         f"{w.dtype}, {w.asnumpy()}}}")
+            logger.debug(f"w of Layer({self._layer_name}) is {{{w.shape}, {w.dtype}}}")
             # [oc, 1, n_group, 1]
             org_max_val = self.w_obs_max(msops.abs(w), axis=-1, keepdims=True)[0]
-            logger.debug(f"org_max_val of Layer({self._layer_name}) is {{{org_max_val.shape}, "
-                         f"{org_max_val.dtype}, {org_max_val.asnumpy()}}}")
+            logger.debug(f"org_max_val of Layer({self._layer_name}) is {{{org_max_val.shape}, {org_max_val.dtype}}}")
             best_max_val = copy.deepcopy(org_max_val)
             min_errs = msops.ones_like(org_max_val) * 1e9
 
@@ -150,14 +148,12 @@ class ClipLinearCell(WrapperLinearCell):
                                          True,
                                          True)
                 logger.debug(f"ClipLinearCell: search iter {i_b}, weight_clip_ratio {i_s}, "
-                             f"pesudo weight of Layer({self._layer_name}) is {{{q_w.shape}, "
-                             f"{q_w.dtype}, {q_w.asnumpy()}}}")
+                             f"pesudo weight of Layer({self._layer_name}) is {{{q_w.shape}, {q_w.dtype}}}")
                 cur_out = msops.sum(msops.mul(input_feat, q_w), dim=-1)
 
                 err = msops.mean(msops.pow(cur_out - org_out, 2), axis=1).reshape(min_errs.shape)
                 logger.info(f"Layer {self._layer_name}, weight clip search iter {i_b}, ratio {i_s}")
-                logger.debug(f"clip err of Layer({self._layer_name}) is {{{err.shape}, "
-                             f"{err.dtype}, {err.asnumpy()}}}")
+                logger.debug(f"clip err of Layer({self._layer_name}) is {{{err.shape}, {err.dtype}}}")
                 del cur_w
                 del cur_out
                 cur_best_idx = err < min_errs
@@ -177,8 +173,7 @@ class ClipLinearCell(WrapperLinearCell):
         weight = weight.clamp(-clip_val, clip_val)
         weight = weight.reshape(org_shape)
         self._layer.weight.set_data(weight)
-        logger.debug(f"ClipLinearCell: clip weight of Layer({self._layer_name}) is {{{weight.shape}, "
-                     f"{weight.dtype}, {weight.asnumpy()}}}")
+        logger.debug(f"ClipLinearCell: clip weight of Layer({self._layer_name}) is {{{weight.shape}, {weight.dtype}}}")
 
     def process(self):
         super(ClipLinearCell, self).process()
@@ -202,7 +197,7 @@ class ClipLinearCell(WrapperLinearCell):
         else:
             raise ValueError(f"AWQConfig clip alpha only support list or float type, but got {type(weight_clip_ratio)}")
         logger.debug(f"ClipLinearCell: best clip_val of Layer({self._layer_name}) is {{{clip_val.shape}, "
-                     f"{clip_val.dtype}, {clip_val.asnumpy()}}}")
+                     f"{clip_val.dtype}}}")
         self.cfg.dumper.dump_data(self.layer_name, "|awq_clip_val", clip_val)
         self._apply_clip(clip_val)
 

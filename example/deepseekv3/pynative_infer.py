@@ -28,7 +28,7 @@ from mindspore_gs.ptq.ptq.quant import InputCatcher
 
 from mindformers.experimental.infer.core.norm import RMSNorm
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear
-from deepseek3_model_infer import DeepseekV3DecodeLayer
+from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
 from ds_utils import create_network
 
 
