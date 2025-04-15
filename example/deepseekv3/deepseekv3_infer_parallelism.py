@@ -829,13 +829,11 @@ class DeepseekInferParallelism(BaseModelParallelism):
         kv_head_dim = kv_lora_rank + qk_rope_head_dim
 
         parameter_dict = {}
+        qkv_concat = self.config.model.model_config.qkv_concat
         # q2l_proj
         q2l_proj_hf_name = f"model.layers.{layer_id}.self_attn.q_a_proj.weight"
         q2l_proj_ms_name = self.convert_weight_name(q2l_proj_hf_name)
         q_a_proj_ms_param, _ = self.get_safetensor_from_file(q2l_proj_hf_name, src_hf_dir, hf_weight_map)
-        parameter_dict[q2l_proj_ms_name] = ms.Parameter(ms.Tensor(q_a_proj_ms_param, ms.bfloat16),
-                                                        name=q2l_proj_ms_name,
-                                                        requires_grad=False)
 
         # kv2l
         kv2l_hf_name = f"model.layers.{layer_id}.self_attn.kv_a_proj_with_mqa.weight"
@@ -843,8 +841,19 @@ class DeepseekInferParallelism(BaseModelParallelism):
         kv2l_ms_param, _ = self.get_safetensor_from_file(kv2l_hf_name, src_hf_dir, hf_weight_map)
         kv2l_ms_param = kv2l_ms_param.reshape(kv_head_dim, -1)
         kv2l_ms_param = self.infer_trans_rope_weight(kv2l_ms_param, qk_rope_head_dim)
-        parameter_dict[kv2l_ms_name] = ms.Parameter(ms.Tensor(kv2l_ms_param, ms.bfloat16), name=kv2l_ms_name,
-                                                    requires_grad=False)
+
+        if qkv_concat:
+            wqkv2l_weight = np.concatenate((q_a_proj_ms_param, kv2l_ms_param), 0)
+            wqkv2l_weight_name = f"model.layers.{layer_id}.attention.qkv2l.weight"
+            parameter_dict[wqkv2l_weight_name] = ms.Parameter(ms.Tensor(wqkv2l_weight, ms.bfloat16),
+                                                              name=wqkv2l_weight_name,
+                                                              requires_grad=False)
+        else:
+            parameter_dict[q2l_proj_ms_name] = ms.Parameter(ms.Tensor(q_a_proj_ms_param, ms.bfloat16),
+                                                            name=q2l_proj_ms_name,
+                                                            requires_grad=False)
+            parameter_dict[kv2l_ms_name] = ms.Parameter(ms.Tensor(kv2l_ms_param, ms.bfloat16), name=kv2l_ms_name,
+                                                        requires_grad=False)
 
         # lq_norm
         lq_norm_hf_name = f"model.layers.{layer_id}.self_attn.q_a_layernorm.weight"

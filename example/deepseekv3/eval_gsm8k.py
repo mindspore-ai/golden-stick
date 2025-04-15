@@ -84,7 +84,7 @@ def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
             batch_valid_length.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
         batch_valid_length = np.array(batch_valid_length)
         outputs = net.generate(input_ids, do_sample=do_sample, max_length=seq_length, top_k=top_k, top_p=top_p,
-                               max_new_tokens=2048)
+                               max_new_tokens=4096)
         output_ids = []
         for j in range(input_ids.shape[0]):
             output_ids.append(outputs[j][int(batch_valid_length[j]):])
