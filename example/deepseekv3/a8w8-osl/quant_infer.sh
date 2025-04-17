@@ -37,7 +37,7 @@ msrun --worker_num=${worker_num} \
       --master_port=8188 \
       --cluster_time_out=300 \
       --join=False \
-      --log_dir=omniquant_infer_log \
+      --log_dir=osl_infer_log \
       python ${quant_infer_path} \
              --config ${yaml} \
-             --approach omniquant > log_omniquant_infer 2>&1 &
+             --approach osl > log_osl_infer 2>&1 &

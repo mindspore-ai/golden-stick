@@ -88,9 +88,10 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
                               act_quant_granularity=QuantGranularity.PER_TOKEN,
                               weight_quant_granularity=QuantGranularity.PER_CHANNEL)
         layer_policies = OrderedDict({r'.*\.w2.*': w2_config})
-    elif quant_type.lower() == 'omniquant':
+    elif quant_type.lower() == 'osl':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.OMNIQUANT_GRID,
+                        act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
                         opname_blacklist=['lm_head', 'lkv2kv'])
         w2_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                               act_quant_dtype=msdtype.int8,
@@ -118,10 +119,10 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
         # pylint: disable=protected-access
         ptq._config.aclnn_quant_list = ["routed_experts.ffn.w_gate_hidden"]
     ptq._config.algorithm_cache_path = ""
-    if quant_type.lower() == 'omniquant':
+    if quant_type.lower() == 'osl':
         # pylint: disable=protected-access
         ptq._config.always_use_fp_input_in_processer = True
-        ptq._config.algorithm_cache_path = 'omniquant_cache'
+        ptq._config.algorithm_cache_path = 'osl_cache'
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
     return ptq

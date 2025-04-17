@@ -43,9 +43,9 @@ msrun --worker_num=${worker_num} \
       --master_port=8188 \
       --cluster_time_out=300 \
       --join=False \
-      --log_dir=calibrate_omniquant_log \
+      --log_dir=calibrate_osl_log \
       python ${calibrate_path} \
             --config ${yaml} \
-            --approach omniquant \
+            --approach osl \
             -t ceval \
-            -s ${ceval_path} > log_calibrate_omniquant 2>&1 &
+            -s ${ceval_path} > log_calibrate_osl 2>&1 &
