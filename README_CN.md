@@ -46,7 +46,7 @@ MindSpore Golden Stick除了提供丰富的模型压缩算法外，一个重要�
 
 > - 应用MindSpore Golden Stick算法的细节，可以在每个算法章节中找到详细说明和示例代码。
 > - 流程中的"ms.export"步骤可以参考[导出mindir格式文件](https://www.mindspore.cn/tutorials/zh-CN/master/beginner/save_load.html#保存和加载mindir)章节。
-> - 流程中的"昇思推理优化工具和运行时"步骤可以参考[昇思推理](https://www.mindspore.cn/docs/zh-CN/master/model_infer/ms_infer/llm_inference_overview.html)章节。
+> - 流程中的"昇思推理优化工具和运行时"步骤可以参考[昇思推理](https://www.mindspore.cn/tutorials/zh-CN/master/model_infer/ms_infer/llm_inference_overview.html)章节。
 
 ## 文档
 
