@@ -271,7 +271,7 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
     np.allclose(foutput.asnumpy(), qoutput.asnumpy(), 0, 0)
 
 
-def quant_simple_gmm_net(non_decoder, linear_type):
+def quant_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     Feature: quant simplenet which including one gmm linear.
     Description: quant simplenet with A8W8C8 PTQ algorithm.
@@ -286,13 +286,26 @@ def quant_simple_gmm_net(non_decoder, linear_type):
     net_helper = SimpleGmmNetworkHelper(seq_length=1024, linear_type=linear_type)
     network = net_helper.create_network()
     ds = create_foo_ds(1)
-
-    cfg = PTQConfig(mode=PTQMode.QUANTIZE,
-                    backend=BackendTarget.ASCEND,
-                    opname_blacklist=["w2", "lm_head"],
-                    act_quant_granularity=QuantGranularity.PER_TOKEN,
-                    act_quant_dtype=dtype.int8,
-                    weight_quant_dtype=dtype.int8)
+    fpoutput = []
+    for _, ds_item in enumerate(ds.create_dict_iterator()):
+        input_ids = ds_item['input_ids'].asnumpy()
+        fpoutput.append(net_helper.generate(network, input_ids, max_new_tokens=100))
+    if quant_type == "w8perchannela8pertoken":
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
+    elif quant_type == "w8a8-smoothquant":
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
+    else:
+        raise ValueError(f"Unsupported quant_algo : {quant_type}")
     set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
     ptq = PTQ(config=cfg)
     if non_decoder:
@@ -302,9 +315,10 @@ def quant_simple_gmm_net(non_decoder, linear_type):
     ms.save_checkpoint(network.parameters_dict(), os.path.join("./simplegmm-quant.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
                         "float_weight" not in x)
+    return fpoutput
 
 
-def eval_simple_gmm_net(non_decoder, linear_type):
+def eval_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     Feature: eval simplenet which including one GroupedMatMul linear.
     Description: simple GroupedMatMul network inference.
@@ -322,22 +336,34 @@ def eval_simple_gmm_net(non_decoder, linear_type):
     network = net_helper.create_network()
     ds = create_foo_ds(1)
 
-    cfg = PTQConfig(mode=PTQMode.DEPLOY,
-                    backend=BackendTarget.ASCEND,
-                    opname_blacklist=["w2", "lm_head"],
-                    act_quant_granularity=QuantGranularity.PER_TOKEN,
-                    act_quant_dtype=dtype.int8,
-                    weight_quant_dtype=dtype.int8)
+    if quant_type == "w8perchannela8pertoken":
+        cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
+    elif quant_type == "w8a8-smoothquant":
+        cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
+    else:
+        raise ValueError(f"Unsupported quant_algo : {quant_type}")
     ptq = PTQ(config=cfg)
     if non_decoder:
         ptq.decoder_layer_types.append(SimpleGmmNet.DecoderCell)
     network = ptq.apply(network, ds=ds)
     network = ptq.convert(network)
     param_dict = ms.load_checkpoint('./simplegmm-quant.ckpt')
+    qoutput = []
     ms.load_param_into_net(network, param_dict)
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
-        net_helper.generate(network, input_ids, max_new_tokens=100)
+        qoutput.append(net_helper.generate(network, input_ids, max_new_tokens=100))
+    return qoutput
 
 
 @pytest.mark.level0
@@ -354,21 +380,32 @@ def test_ptq_simple_swiglu_net(non_decoder, quant_type):
     quant_simple_swiglu_net(non_decoder, quant_type)
     eval_simple_swiglu_net(non_decoder, quant_type)
 
+def get_cos_similar(a: list, b: list):
+    '''get_cos_similar'''
+    a = a.astype(np.float32).flatten()
+    b = b.astype(np.float32).flatten()
+    dot_product = np.dot(a, b)
+    norm_a = np.linalg.norm(a)
+    norm_b = np.linalg.norm(b)
+    cosine_similarity = dot_product / (norm_a * norm_b)
+    return cosine_similarity
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("non_decoder", [True, False])
 @pytest.mark.parametrize("linear_type", ["RowParallelLinear", "ColumnParallelLinear"])
-def test_ptq_simple_gmm_net(non_decoder, linear_type):
+@pytest.mark.parametrize("quant_type", ["w8perchannela8pertoken", "w8a8-smoothquant"])
+def test_ptq_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     Feature: eval simplenet which including one GroupedMatMul linear.
     Description: simple GroupedMatMul network inference.
     Expectation: network inference normally.
     """
-    quant_simple_gmm_net(non_decoder, linear_type)
-    eval_simple_gmm_net(non_decoder, linear_type)
-
+    fpoutput = quant_simple_gmm_net(non_decoder, linear_type, quant_type)
+    qoutput = eval_simple_gmm_net(non_decoder, linear_type, quant_type)
+    for fpout, qout in zip(fpoutput, qoutput):
+        assert get_cos_similar(fpout, qout) > 0.99
 
 class SimpleNet(nn.Cell):
     """
