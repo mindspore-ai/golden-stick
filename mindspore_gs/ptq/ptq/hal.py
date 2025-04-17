@@ -39,7 +39,8 @@ from mindspore_gs.ptq.convert_utils import AntiQuantCell
 from mindspore_gs.ptq.basic_quant_func import (
     np_int4data_pack_to_int8,
     np_int4data_pack_to_int8_3d,
-    convert_fp32_to_int64)
+    convert_fp32_to_int64,
+    convert_fp32_to_uint64)
 
 RANK_ID = get_rank()
 
@@ -784,67 +785,80 @@ class DynamicQuantMatmul(QuantUnitCell):
 class GptqDynamicQuantMatmul(QuantUnitCell):
     """Gptq dynamic quant"""
 
-    def __init__(self, layer_name, is_deploy, perm, w_qparam, transpose_a=False, transpose_b=False,
+    def __init__(self, layer_name, is_deploy, w_qparam, transpose_a=False, transpose_b=False,
                  dst_dtype=dtype.float16, is_group_mm=False):
         super().__init__(layer_name)
         self.dst_dtype = dst_dtype
-        weight_scale_dtype = dtype.bfloat16 if dst_dtype == dtype.bfloat16 else dtype.float32
+        self.is_group_mm = is_group_mm
+        if not is_group_mm:
+            weight_scale_dtype = dtype.bfloat16 if dst_dtype == dtype.bfloat16 else dtype.float32
+        else:
+            weight_scale_dtype = dtype.uint64
         if is_deploy:
             self.weight_scale = Parameter(initializer("ones", w_qparam.scale.shape, weight_scale_dtype))
-            self.perm = Parameter(initializer('ones', perm.shape, dtype=dtype.int32))
+            if is_group_mm:
+                self.gmm_bias = Parameter(initializer("zeros", (w_qparam.scale.shape[0], w_qparam.scale.shape[-1]),
+                                                    dtype.float32))
         else:
-            self.weight_scale = Parameter(w_qparam.scale.astype(weight_scale_dtype))
-            self.perm = Parameter(Tensor(perm.asnumpy(), dtype=dtype.int32))
+            if not is_group_mm:
+                self.weight_scale = Parameter(w_qparam.scale.astype(weight_scale_dtype))
+            else:
+                self.gmm_bias = None
+                ori_scale_shape = w_qparam.scale.shape
+                weight_scale = convert_fp32_to_uint64(w_qparam.scale.asnumpy().astype(np.float32))
+                self.weight_scale = Parameter(Tensor(weight_scale.reshape(ori_scale_shape), dtype=weight_scale_dtype))
             logger.debug(f"DynamicQuantMatmul: weight_scale of Layer({layer_name}) is {{{self.weight_scale.shape}, "
                          f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
-        self.is_group_mm = is_group_mm
         transpose_b = False
-        self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
+        if is_group_mm:
+            self.gmm = GroupedMatmulV4()
+        else:
+            self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
 
     @staticmethod
-    def _from_matmul_prim(layer_name, is_deploy, perm, w_qparam: QuantParam, transpose_a=False, transpose_b=False,
+    def _from_matmul_prim(layer_name, is_deploy, w_qparam: QuantParam, transpose_a=False, transpose_b=False,
                           dst_dtype=dtype.float16, is_group_mm=False):
-        qbmm = GptqDynamicQuantMatmul(layer_name, is_deploy, perm, w_qparam, transpose_a, transpose_b, dst_dtype,
+        qbmm = GptqDynamicQuantMatmul(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype,
                                   is_group_mm)
         quant_op = DynamicQuantCell.create(layer_name, is_deploy, None)
         return qbmm, quant_op
 
     @staticmethod
-    def _from_smooth_matmul(layer_name, is_deploy, src: SmoothMatmul, perm, w_qparam: QuantParam, transpose_a=False,
+    def _from_smooth_matmul(layer_name, is_deploy, src: SmoothMatmul, w_qparam: QuantParam, transpose_a=False,
                             transpose_b=False, dst_dtype=dtype.float16):
         if isinstance(src.mm, msops.MatMul):
-            qbmm = GptqDynamicQuantMatmul(layer_name, is_deploy, perm, w_qparam, transpose_a, transpose_b, dst_dtype)
+            qbmm = GptqDynamicQuantMatmul(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype)
             quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
             return qbmm, quant_op
         raise ValueError(
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul}, but got {src.mm}.')
 
     @staticmethod
-    def _from_smooth_matmul_for_deploy(layer_name, is_deploy, src: SmoothMatmulForDeploy, perm, w_qparam: QuantParam,
+    def _from_smooth_matmul_for_deploy(layer_name, is_deploy, src: SmoothMatmulForDeploy, w_qparam: QuantParam,
                                        transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
         if isinstance(src.mm, msops.MatMul):
-            qbmm = GptqDynamicQuantMatmul(layer_name, is_deploy, perm, w_qparam, transpose_a, transpose_b, dst_dtype)
+            qbmm = GptqDynamicQuantMatmul(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype)
             quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
             return qbmm, quant_op
         raise ValueError(
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul}, but got {src.mm}.')
 
     @staticmethod
-    def create(layer_name, q_weight, linear, perm, w_qparam: QuantParam, is_deploy, transpose_a=False,
+    def create(layer_name, q_weight, linear, w_qparam: QuantParam, is_deploy, transpose_a=False,
                transpose_b=False, dst_dtype=dtype.float16):
         """create"""
         if isinstance(linear.matmul, msops.MatMul):
-            gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, perm, w_qparam,
+            gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam,
                                                                        transpose_a, transpose_b, dst_dtype)
         elif isinstance(linear.matmul, GroupedMatmulV4):
-            gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, perm, w_qparam,
+            gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam,
                                                                        transpose_a, transpose_b, dst_dtype, True)
         elif isinstance(linear.matmul, SmoothMatmul):
-            gdqmm, quant_op = GptqDynamicQuantMatmul._from_smooth_matmul(layer_name, is_deploy, linear.matmul, perm,
+            gdqmm, quant_op = GptqDynamicQuantMatmul._from_smooth_matmul(layer_name, is_deploy, linear.matmul,
                                                                          w_qparam, transpose_a, transpose_b, dst_dtype)
         elif isinstance(linear.matmul, SmoothMatmulForDeploy):
             gdqmm, quant_op = GptqDynamicQuantMatmul._from_smooth_matmul_for_deploy(layer_name, is_deploy, linear.matmul
-                                                                                    , perm, w_qparam, transpose_a,
+                                                                                    , w_qparam, transpose_a,
                                                                                     transpose_b, dst_dtype)
         else:
             raise ValueError(f"Not support creating GptqDynamicQuantMatmul from {linear.matmul}.")
@@ -868,33 +882,42 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                 q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
             logger.debug(f"GptqDynamicQuantMatmul: pack q_weight of Layer({layer_name}) is "
                          f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
+            if gdqmm.is_group_mm:
+                scale = msops.repeat_elements(w_qparam.scale, rep=w_qparam.group_size, axis=1)
+                gmm_bias = msops.mul(8,
+                                    msops.sum(
+                                        msops.mul(q_weight.astype(dtype.float32), scale), dim=1
+                                    )).astype(dtype.float32)
+                gdqmm.gmm_bias = Parameter(gmm_bias, name="gmm_bias")
             q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
         return gdqmm, q_weight, quant_op
 
     def construct(self, qx, quant_weight, group_list=None, x_scale=None):
         """forward for GptqDynamicQuantCell"""
         if self.is_group_mm:
-            output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
-                               group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            output = self.gmm([qx], [quant_weight], [self.gmm_bias], [self.weight_scale], None, None, None,
+                              [x_scale], group_list, split_item=3, group_type=0, group_list_type=1)[0]
         else:
-            qx = msops.cast(qx, dtype.float16)
+            qx = msops.cast(qx, self.dst_dtype)
             weight_scale = msops.cast(self.weight_scale, dtype.float16)
-            x = msops.gather(qx, self.perm, axis=1)
-            output = self.weight_qbmm(x, quant_weight, weight_scale, None, None, None, None)
-            output = output.transpose(1, 0)
-            output = msops.mul(output, x_scale)
-            output = output.transpose(1, 0)
+            output = self.weight_qbmm(qx, quant_weight, weight_scale, None, None, None, None)
+            output = msops.mul(output, x_scale.unsqueeze(1))
         return output.astype(self.dst_dtype)
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
         if parallel_type == ParallelType.COL_PARALLEL:
-            weight_scale_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
+            t_scale_shard = (1, 1, tensor_parallel_num) if self.is_group_mm else (1, tensor_parallel_num)
+            gmm_bias_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
-            weight_scale_shard = (1, 1) if self.is_group_mm else (1,)
+            t_scale_shard = (1, tensor_parallel_num, 1) if self.is_group_mm else (tensor_parallel_num, 1)
+            gmm_bias_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
         else:
             return {}
-        shard_state = {self.weight_scale.name: {'shape': self.weight_scale.shape, 'shard': weight_scale_shard}}
+        shard_state = {
+            self.weight_scale.name: {'shape': self.weight_scale.shape, 'shard': t_scale_shard},
+            self.gmm_bias.name: {'shape': self.gmm_bias.shape, 'shard': gmm_bias_shard},
+        }
         return shard_state
 
 

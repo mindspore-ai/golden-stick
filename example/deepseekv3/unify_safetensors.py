@@ -121,6 +121,20 @@ def split_3_dim_w_gate_hidden(value, rank_num):
     return np.reshape(w1, (value.shape[0], value.shape[1], -1)), np.reshape(w3, (value.shape[0], value.shape[1], -1))
 
 
+def split_w_gate_hidden_gmm_bias(value, rank_num):
+    '''split_3_dim_w_gate_hidden'''
+    if len(value.shape) > 2:
+        raise ValueError(f"value.shape:{value.shape} 's dim > 2.")
+    if value.shape[1]%rank_num != 0:
+        raise ValueError(f"value.shape:{value.shape}[1] % {rank_num} != 0.")
+    per_rank_len = int(value.shape[1] / rank_num)
+    reshape_array = np.reshape(value, (value.shape[0], rank_num, per_rank_len))
+    half_len = int(per_rank_len / 2)
+    w1 = reshape_array[:, :, :half_len]
+    w3 = reshape_array[:, :, half_len:]
+    return np.reshape(w1, (value.shape[0], -1)), np.reshape(w3, (value.shape[0], -1))
+
+
 def process_feed_forward_w_gate_hidden(name, ori_param, rank_num):
     '''process_feed_forward_w_gate_hidden'''
     if "matmul" in name:
@@ -237,6 +251,53 @@ def process_routed_experts_w_gate_hidden(name, ori_param, rank_num):
         return
 
 
+def process_routed_experts_w_gate_hidden_pergroup_quant(name, ori_param, rank_num):
+    '''process_routed_experts_w_gate_hidden_pergroup'''
+    param_dtype = ori_param[name].dtype
+    if param_dtype == ms.bfloat16:
+        value = ori_param[name].astype(ms.float32).asnumpy()
+    else:
+        value = ori_param[name].asnumpy()
+
+    if "gmm_bias" in name:
+        w1, w3 = split_w_gate_hidden_gmm_bias(value, rank_num)
+    else:
+        w1, w3 = split_3_dim_w_gate_hidden(value, rank_num)
+    w1_name = name.replace("w_gate_hidden", "w1")
+    w3_name = name.replace("w_gate_hidden", "w3")
+    ori_param.pop(name)
+    ori_param[w1_name] = ms.Parameter(ms.Tensor(w1, param_dtype), name=w1_name,
+                                      requires_grad=False)
+    ori_param[w3_name] = ms.Parameter(ms.Tensor(w3, param_dtype), name=w3_name,
+                                      requires_grad=False)
+
+
+def process_name_map(ckpt_path, folder_name, ffn_split, qkv_split):
+    """process_name_map"""
+    param_json_path = os.path.join(ckpt_path, folder_name)
+    with open(param_json_path, "r") as fp:
+        origin_map = json.load(fp)
+    weight_map = origin_map['weight_map']
+    keys = list(weight_map.keys())
+    for key in keys:
+        value = weight_map[key]
+        if ffn_split and "w_gate_hidden" in key:
+            w1_key = key.replace("w_gate_hidden", "w1")
+            w3_key = key.replace("w_gate_hidden", "w3")
+            weight_map.pop(key)
+            weight_map[w1_key] = value
+            weight_map[w3_key] = value
+        if qkv_split and "qkv2l" in key:
+            q2l_key = key.replace("qkv2l", "q2l_proj")
+            kv2l_key = key.replace("qkv2l", "kv2l")
+            weight_map.pop(key)
+            weight_map[q2l_key] = value
+            weight_map[kv2l_key] = value
+    origin_map["weight_map"] = weight_map
+    with open(param_json_path, "w") as fp:
+        json.dump(weight_map, fp, indent=2)
+
+
 def split_for_smooth_quant(ckpt_path, rank_num, ffn_split, qkv_split):
     '''trans_int8_to_int4'''
     for folder_name in os.listdir(ckpt_path):
@@ -256,28 +317,31 @@ def split_for_smooth_quant(ckpt_path, rank_num, ffn_split, qkv_split):
             ms.save_checkpoint(ori_param, folder_path, format="safetensors")
             print(f"save {folder_path} int4 safetensors success.")
         if folder_name.endswith('name_map.json'):
-            param_json_path = os.path.join(ckpt_path, folder_name)
-            with open(param_json_path, "r") as fp:
-                origin_map = json.load(fp)
-            weight_map = origin_map['weight_map']
-            keys = list(weight_map.keys())
-            for key in keys:
-                value = weight_map[key]
-                if ffn_split and "w_gate_hidden" in key:
-                    w1_key = key.replace("w_gate_hidden", "w1")
-                    w3_key = key.replace("w_gate_hidden", "w3")
-                    weight_map.pop(key)
-                    weight_map[w1_key] = value
-                    weight_map[w3_key] = value
-                if qkv_split and "qkv2l" in key:
-                    q2l_key = key.replace("qkv2l", "q2l_proj")
-                    kv2l_key = key.replace("qkv2l", "kv2l")
-                    weight_map.pop(key)
-                    weight_map[q2l_key] = value
-                    weight_map[kv2l_key] = value
-            origin_map["weight_map"] = weight_map
-            with open(param_json_path, "w") as fp:
-                json.dump(weight_map, fp, indent=2)
+            process_name_map(ckpt_path, folder_name, ffn_split, qkv_split)
+
+
+def split_for_a8w4(ckpt_path, rank_num, ffn_split, qkv_split):
+    '''split_for_a8w4'''
+    for folder_name in os.listdir(ckpt_path):
+        if folder_name.endswith(".safetensors"):
+            folder_path = os.path.join(ckpt_path, folder_name)
+            ori_param = ms.load_checkpoint(folder_path, format="safetensors")
+            for name in sorted(ori_param.keys()):
+                if ffn_split and ("feed_forward.w_gate_hidden" in name or "shared_experts.w_gate_hidden" in name):
+                    print(f"ffn split for {name}")
+                    process_feed_forward_w_gate_hidden(name, ori_param, rank_num)
+                if  ffn_split and ("routed_experts.ffn.w_gate_hidden" in name):
+                    print(f"ffn split for {name}")
+                    process_routed_experts_w_gate_hidden_pergroup_quant(name, ori_param, rank_num)
+                if qkv_split and ("attention.qkv2l" in name):
+                    print(f"qkv split for {name}")
+                    process_qkv_split(name, ori_param)
+            ms.save_checkpoint(ori_param, folder_path, format="safetensors")
+            print(f"save a8w4 {folder_path} {folder_name} safetensors success.")
+        if folder_name.endswith('name_map.json'):
+            process_name_map(ckpt_path, folder_name, ffn_split, qkv_split)
+            print(f"save {folder_path} {folder_name} success.")
+
 
 
 if __name__ == "__main__":
@@ -302,8 +366,10 @@ if __name__ == "__main__":
         print(f"start split for {args.approach} approach. ffn_split:{args.ffn_split}, qkv_split:{args.qkv_split}")
         if args.approach == "smoothquant":
             split_for_smooth_quant(args.dst_dir, args.rank_num, args.ffn_split, args.qkv_split)
-        if args.approach == "osl":
+        elif args.approach == "osl":
             split_for_smooth_quant(args.dst_dir, args.rank_num, args.ffn_split, args.qkv_split)
+        elif args.approach == "a8w4":
+            split_for_a8w4(args.dst_dir, args.rank_num, args.ffn_split, args.qkv_split)
         else:
             print(f"not support split for {args.approach} approach. ffn_split:{args.ffn_split}," \
                   f" qkv_split:{args.qkv_split}")

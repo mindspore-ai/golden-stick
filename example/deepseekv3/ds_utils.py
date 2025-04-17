@@ -111,6 +111,27 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
                         act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
                         opname_blacklist=['lm_head', 'lkv2kv'])
         layer_policies = OrderedDict()
+    elif quant_type.lower() == 'a8w4':
+        cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        opname_blacklist=['lm_head', 'lkv2kv'])
+        mlp_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                               act_quant_dtype=msdtype.int8,
+                               outliers_suppression=OutliersSuppressionType.NONE,
+                               precision_recovery=PrecisionRecovery.NONE,
+                               act_quant_granularity=QuantGranularity.PER_TOKEN,
+                               weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+        gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
+        moe_cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+                            act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
+                            weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128,
+                            algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ)
+        layer_policies = OrderedDict({r'.*\.feed_forward\.w2.*': mlp_config,
+                                      r'.*\.feed_forward\.w_gate_hidden.*': mlp_config,
+                                      r'.*\.shared_experts\.w2.*': mlp_config,
+                                      r'.*\.shared_experts\.w_gate_hidden.*': mlp_config,
+                                      r'.*\.routed_experts\.ffn\.w_gate_hidden.*': moe_cfg,
+                                      r'.*\.routed_experts\.ffn\.w2.*': moe_cfg})
     else:
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
     ptq = PTQ(config=cfg, layer_policies=layer_policies)
