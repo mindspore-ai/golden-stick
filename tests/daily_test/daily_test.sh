@@ -45,7 +45,7 @@ prepare_env()
   echo "download ms pkg ${MS_PKG_LINK}."
   wget --no-check-certificate $MS_PKG_LINK || exit 1
   echo "clone gs repo."
-  git clone https://gitee.com/mindspore/golden-stick.git gs || exit 1
+  git clone -b r1.1.0 https://gitee.com/mindspore/golden-stick.git gs || exit 1
   cd gs || exit 1
   echo "build gs."
   bash build.sh || exit 1
