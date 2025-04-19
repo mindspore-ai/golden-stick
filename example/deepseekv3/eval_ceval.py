@@ -33,10 +33,11 @@ def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
     ignore_token_id = network_helper.get_spec("ignore_token_id")
     pad_token_id = network_helper.get_spec("pad_token_id")
     ds = create_ceval_dataset(dataset_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
-                              n_samples=n_samples)
+                              n_samples=n_samples, need_pad=batch_size > 1)
 
     total_score = {}
     data_count = 0
+    total_num = 0
     total_count = ds.get_dataset_size()
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         subject = ds_item['subjects'].asnumpy()[0]
@@ -63,20 +64,22 @@ def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
         question = tokenizer.decode(input_ids, skip_special_tokens=True)
         pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
-
-        if labels_str[0].lower() in pres_str[0].lower():
-            total_score[subject]["correct nums"] = total_score[subject]["correct nums"] + 1
-            print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}。回答正确", flush=True)
-        else:
-            print(f"问题: {question}\n 预测: {pres_str} 正确答案: {labels_str}。回答错误", flush=True)
-        total_score[subject]["total nums"] = total_score[subject]["total nums"] + 1
+        for i, _ in enumerate(labels_str):
+            if labels_str[i].lower() in pres_str[i].lower():
+                total_score[subject]["correct nums"] = total_score[subject]["correct nums"] + 1
+                print(f"问题: {question[i]}\n 预测: {pres_str[i]} 正确答案: {labels_str[i]}。回答正确", flush=True)
+            else:
+                print(f"问题: {question[i]}\n 预测: {pres_str[i]} 正确答案: {labels_str[i]}。回答错误", flush=True)
+            total_score[subject]["total nums"] = total_score[subject]["total nums"] + 1
+            total_num += 1
 
     print("各个科目成绩:", flush=True)
     total_correct = 0
     for subject, score in total_score.items():
         total_correct += score["correct nums"]
         print(f"科目: {subject} -- 成绩: {(score['correct nums'] / score['total nums']):.4f}", flush=True)
-    print(f"总成绩: {(total_correct / data_count):.4f}", flush=True)
+    print(f"total_correct: {total_correct}, total_num: {total_num}, 总成绩: {(total_correct / total_num):.4f}",
+          flush=True)
     print('评测完成!', flush=True)
 
 
