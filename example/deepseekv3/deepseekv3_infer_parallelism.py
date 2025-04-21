@@ -26,6 +26,7 @@ import mindspore as ms
 from mindspore import dtype
 from mindspore.communication.management import get_rank
 from model_parallelism import BaseWeightProcessor
+from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_rank
 
 
 def convert_np_to_ms_dtype(value):
@@ -569,6 +570,8 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             quant_bias_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".quant_bias"
             quant_bias_ms_name = self.quant_convert_weight_name(quant_bias_hf_name)
             quant_bias_ms_param, _ = self.get_safetensor_from_file(quant_bias_hf_name, src_hf_dir, hf_weight_map)
+            if name == "o_proj" and get_tensor_model_parallel_rank() != 0:
+                quant_bias_ms_param.fill(0)
 
             dequant_scale_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".deq_scale"
             dequant_scale_ms_name = self.quant_convert_weight_name(dequant_scale_hf_name)
