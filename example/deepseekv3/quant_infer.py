@@ -21,27 +21,32 @@ from ds_utils import create_network
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']
 
 
-def infer(yaml_file, quant_type):
+def infer(yaml_file, quant_type, first_token_check):
     """infer"""
     tokenizer, network = create_network(yaml_file, quant_type=quant_type)
     multi_inputs = []
     for question in input_questions:
-        message = [
-            {'role': 'system', 'content': 'You are a helpful assistant.'},
-            {'role': 'user', 'content': question}
-        ]
-        input_ids = tokenizer.apply_chat_template(message, tokenize=True, add_generation_prompt=True, max_length=64)
+        if first_token_check:
+            input_ids = tokenizer(question)["input_ids"]
+        else:
+            message = [
+                {'role': 'system', 'content': 'You are a helpful assistant.'},
+                {'role': 'user', 'content': question}
+            ]
+            input_ids = tokenizer.apply_chat_template(message, tokenize=True, add_generation_prompt=True, max_length=64)
         multi_inputs.append(input_ids)
     for batch_input in multi_inputs:
         output = network.generate(batch_input, max_length=1024, do_sample=False, top_k=5, top_p=1, max_new_tokens=1024)
         answer = tokenizer.decode(output)
         print("answer:", answer)
-
+        if first_token_check:
+            break
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True, type=str)
     parser.add_argument('--approach', required=True, type=str,
                         help="awq, smoothquant, dsquant, a16w8, a8dynw8, gptq-perchannel, gptq-pergroup")
+    parser.add_argument('--first_token_check', required=False, type=bool, default=False)
     args = parser.parse_args()
-    infer(args.config, args.approach)
+    infer(args.config, args.approach, args.first_token_check)

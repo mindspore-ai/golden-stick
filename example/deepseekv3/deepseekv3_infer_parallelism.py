@@ -26,6 +26,7 @@ from tqdm import tqdm
 import mindspore as ms
 from mindspore import dtype
 from model_parallelism import BaseModelParallelism
+from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_rank
 
 
 class DeepseekInferParallelism(BaseModelParallelism):
@@ -456,6 +457,8 @@ class DeepseekInferParallelism(BaseModelParallelism):
             quant_bias_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".quant_bias"
             quant_bias_ms_name = self.quant_convert_weight_name(quant_bias_hf_name)
             quant_bias_ms_param, _ = self.get_safetensor_from_file(quant_bias_hf_name, src_hf_dir, hf_weight_map)
+            if name == "o_proj" and get_tensor_model_parallel_rank() != 0:
+                quant_bias_ms_param.fill(0)
 
             dequant_scale_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".deq_scale"
             dequant_scale_ms_name = self.quant_convert_weight_name(dequant_scale_hf_name)
@@ -1079,6 +1082,8 @@ class DeepseekInferParallelism(BaseModelParallelism):
         else:
             value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                      hf_weight_map)
+        if "wo._layer.matmul.quant_bias" in param_name and get_tensor_model_parallel_rank() != 0:
+            value.fill(0)
         return value
 
     def infer_smooth_quant_net_ms_convert_layer_weight(self, src_hf_dir, num_layers, hf_weight_map):

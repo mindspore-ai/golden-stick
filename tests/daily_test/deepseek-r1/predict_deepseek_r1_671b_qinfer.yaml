@@ -40,7 +40,7 @@ model:
   model_config:
     type: DeepseekV3Config
     auto_register: deepseek3_config.DeepseekV3Config
-    batch_size: 1 # add for incre predict
+    batch_size: 16 # add for incre predict
     seq_length: 4096
     hidden_size: 7168
     num_layers: 61
@@ -75,7 +75,7 @@ model:
     use_past: True
     extend_method: "YARN"
     use_flash_attention: True
-    block_size: 16
+    block_size: 128
     num_blocks: 512
     offset: 0
     checkpoint_name_or_path: ""

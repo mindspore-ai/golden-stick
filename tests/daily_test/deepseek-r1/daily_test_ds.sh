@@ -40,6 +40,7 @@ bfp16_model_path=${1}
 atb_a8w8_model_path=${2}
 vocab_file=${3}
 tokenizer_file=${4}
+mode=${5:-0} # 0: 4 layer for first token check 1: 61 layer for ceval_test (need 16 card)
 sleep_time=10
 
 prepare_env()
@@ -79,6 +80,7 @@ prepare_env()
   echo "cp eval script"
   cp ./example/deepseekv3/ds_utils.py ../ || exit 1
   cp ./example/deepseekv3/eval_ceval.py ../daily_eval.py || exit 1
+  cp ./example/deepseekv3/quant_infer.py ../daily_infer.py || exit 1
   cd .. || exit 1
 
   ms_pkg=$(find ./ -name "mindspore-*.whl")
@@ -129,6 +131,24 @@ eval()
   cd ..
 }
 
+infer()
+{
+  unset FORCE_EAGER
+  unset MS_JIT
+  echo "enter test workspace."
+  cd ws || exit 1
+  echo "${1}, save yaml to ${2}_infer_log/"
+  mkdir -p "${2}_infer_log"
+  echo "msrun --worker_num=${3} --local_worker_num=${3} --master_port=33333 --log_dir=${2}_infer_log --join=True --cluster_time_out=300 python daily_infer.py --config ${4} --first_token_check True --approach ${5} > infer_${2}_log 2>&1 &" > "${2}_infer_log/cmd.sh"
+  msrun --worker_num=${3} --local_worker_num=${3} --master_port=33333 --log_dir="${2}_infer_log" --join=True --cluster_time_out=300 python daily_infer.py --config "${4}" --first_token_check True --approach ${5} > "infer_${2}_log" 2>&1 &
+  sleep ${sleep_time}
+  pid=$(ps -u | grep msrun | grep "daily_infer.py" | grep -v grep | awk -F ' ' '{print$2}')
+  echo "waiting pid ${pid}"
+  tail --pid ${pid} -f "${2}_infer_log/worker_0.log"
+  sleep ${sleep_time}
+  cd ..
+}
+
 sed_qconfig()
 {
   f=$1
@@ -137,30 +157,20 @@ sed_qconfig()
   sed -i s#"tokenizer_file: .*"#"tokenizer_file: \"${4}\""#g ${f}
   sed -i s#"model_parallel: .*"#"model_parallel: ${5}"#g ${f}
   sed -i s#"auto_trans_ckpt: .*"#"auto_trans_ckpt: ${6}"#g ${f}
+  sed -i s#"num_layers: .*"#"num_layers: ${7:-61}"#g ${f}
+  sed -i s#"qkv_concat: .*"#"qkv_concat: ${8:-True}"#g ${f}
 }
 
-prepare_env
-############################ atb a8w8 ############################
-# atb a8w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" ${atb_a8w8_model_path} ${vocab_file} ${tokenizer_file} 16 True
-eval "eval atb a8w8 deepseek-r1" "atb-a8w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "dsquant"
-
-############################ gptq a16w4 ############################
-# quant ckpt gptq a16w4
-sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True
-quant "quant deepseek-r1 bfp16 to a16w4 by gptq" "gptq-a16w4" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "gptq-pergroup" 
-# gptq a16w4 acc
-sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_gptq-pergroup_safetensors/" ${vocab_file} ${tokenizer_file} 8 False
-eval "eval gptq-a16w4 deepseek-r1" "gptq-a16w4" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "gptq-pergroup"
-
-############################ conda info ############################
-conda_path=$(pip show mindspore | grep 'Location' | awk -F ' ' '{print$2}')
-echo "mindspore commit:"
-cat ${conda_path}/mindspore/.commit_id
-echo "mindspore_gs commit:"
-cat ${conda_path}/mindspore_gs/.commit_id
-echo "mindformers commit:"
-head -n 3 ${conda_path}/mindformers/.commit_id
+show_conda(){
+  ############################ conda info ############################
+  conda_path=$(pip show mindspore | grep 'Location' | awk -F ' ' '{print$2}')
+  echo "mindspore commit:"
+  cat ${conda_path}/mindspore/.commit_id
+  echo "mindspore_gs commit:"
+  cat ${conda_path}/mindspore_gs/.commit_id
+  echo "mindformers commit:"
+  head -n 3 ${conda_path}/mindformers/.commit_id
+}
 
 ############################ results info ############################
 echo_result()
@@ -173,5 +183,126 @@ echo_result()
   fi
 }
 
-echo_result "atb a8w8 deepseek-r1" "${BASEPATH}/ws/atb-a8w8_eval_log/worker_0.log"
-echo_result "gptq a16w4 deepseek-r1" "${BASEPATH}/ws/gptq-a16w4_eval_log/worker_0.log"
+############################ results info ############################
+check_infer_result()
+{
+  name=$1
+  path=$2
+  if [ -f "${path}" ]; then
+    echo "----------------- ${name} ${ds_type} check_first_token "介绍下北京故宫博物院" result -----------------"
+    if grep "answer:" ${path} | grep -q "介绍下北京故宫博物院"; then
+      echo "${name} ${ds_type} check_first_token_result success."
+    else
+      echo "${name} ${ds_type} check_first_token_result error, answer is: $(grep "answer:" ${path})"
+    fi
+  fi
+}
+
+dataset_eval()
+{
+  ############################ atb a8w8 ############################
+  # atb a8w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" ${atb_a8w8_model_path} ${vocab_file} ${tokenizer_file} 16 True 61 False
+  eval "eval atb a8w8 deepseek-r1" "atb-a8w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "dsquant"
+
+  ############################ gptq a16w4 ############################
+  # quant ckpt gptq a16w4
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True
+  quant "quant deepseek-r1 bfp16 to a16w4 by gptq" "gptq-a16w4" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "gptq-pergroup" 
+  # gptq a16w4 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_gptq-pergroup_safetensors/" ${vocab_file} ${tokenizer_file} 8 False
+  eval "eval gptq-a16w4 deepseek-r1" "gptq-a16w4" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "gptq-pergroup"
+
+  ############################ smooth-quant-a8w8 ############################
+  # quant ckpt smooth-quant-a8w8
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 16 True
+  quant "quant deepseek-r1 bfp16 to a8w8 by smooth-quant" "a8w8-smoothquant" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "smoothquant" 
+  # smooth-quant-a8w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_smoothquant_safetensors/" ${vocab_file} ${tokenizer_file} 16 False
+  eval "eval smooth-quant-a8w8 deepseek-r1" "a8w8-smoothquant" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "smoothquant"
+
+  ############################ a16w8 ############################
+  # quant a16w8 ckpt
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 16 True
+  quant "quant deepseek-r1 bfp16 to a16w8" "a16w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "a16w8" 
+  # a16w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a16w8_safetensors/" ${vocab_file} ${tokenizer_file} 16 False
+  eval "eval a16w8 deepseek-r1" "a16w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a16w8"
+
+  ############################ a8perotken-w8 ############################
+  # quant a8perotken-w8 ckpt
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 16 True
+  quant "quant deepseek-r1 bfp16 to a8perotken-w8" "a8perotken-w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "a8dynw8" 
+  # a8perotken-w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a8dynw8_safetensors/" ${vocab_file} ${tokenizer_file} 16 False
+  eval "eval a8perotken-w8 deepseek-r1" "a8perotken-w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a8dynw8"
+
+  show_conda
+  echo_result "atb a8w8 deepseek-r1" "${BASEPATH}/ws/atb-a8w8_eval_log/worker_0.log"
+  echo_result "gptq a16w4 deepseek-r1" "${BASEPATH}/ws/gptq-a16w4_eval_log/worker_0.log"
+  echo_result "a8w8-smoothquant deepseek-r1" "${BASEPATH}/ws/a8w8-smoothquant_eval_log/worker_0.log"
+  echo_result "a16w8 deepseek-r1" "${BASEPATH}/ws/a16w8_eval_log/worker_0.log"
+  echo_result "a8perotken-w8 deepseek-r1" "${BASEPATH}/ws/a8perotken-w8_eval_log/worker_0.log"
+}
+
+quant_infer()
+{
+  ############################ atb a8w8 ############################
+  # atb a8w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" ${atb_a8w8_model_path} ${vocab_file} ${tokenizer_file} 8 True 4 False
+  infer "infer atb a8w8 deepseek-r1" "atb-a8w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "dsquant"
+
+  ############################ gptq a16w4 ############################
+  # quant ckpt gptq a16w4
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True 4
+  quant "quant deepseek-r1 bfp16 to a16w4 by gptq" "gptq-a16w4" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "gptq-pergroup" 
+  # gptq a16w4 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_gptq-pergroup_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
+  infer "infer gptq-a16w4 deepseek-r1" "gptq-a16w4" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "gptq-pergroup"
+
+  ############################ smooth-quant-a8w8 ############################
+  # quant ckpt smooth-quant-a8w8
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True 4
+  quant "quant deepseek-r1 bfp16 to a8w8 by smooth-quant" "a8w8-smoothquant" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "smoothquant" 
+  # smooth-quant-a8w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_smoothquant_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
+  infer "infer smooth-quant-a8w8 deepseek-r1" "a8w8-smoothquant" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "smoothquant"
+
+  ############################ a16w8 ############################
+  # quant a16w8 ckpt
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True 4
+  quant "quant deepseek-r1 bfp16 to a16w8" "a16w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "a16w8" 
+  # a16w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a16w8_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
+  infer "infer a16w8 deepseek-r1" "a16w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a16w8"
+
+  ############################ a8perotken-w8 ############################
+  # quant a8perotken-w8 ckpt
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True 4
+  quant "quant deepseek-r1 bfp16 to a8perotken-w8" "a8perotken-w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "a8dynw8" 
+  # a8perotken-w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a8dynw8_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
+  infer "infer a8perotken-w8 deepseek-r1" "a8perotken-w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a8dynw8"
+  show_conda
+  check_infer_result "atb a8w8 deepseek-r1" "${BASEPATH}/ws/atb-a8w8_infer_log/worker_0.log"
+  check_infer_result "gptq a16w4 deepseek-r1" "${BASEPATH}/ws/gptq-a16w4_infer_log/worker_0.log"
+  check_infer_result "a8w8-smoothquant deepseek-r1" "${BASEPATH}/ws/a8w8-smoothquant_infer_log/worker_0.log"
+  check_infer_result "a16w8 deepseek-r1" "${BASEPATH}/ws/a16w8_infer_log/worker_0.log"
+  check_infer_result "a8perotken-w8 deepseek-r1" "${BASEPATH}/ws/a8perotken-w8_infer_log/worker_0.log"
+
+}
+
+prepare_env
+case ${mode} in
+  0)
+    echo "mode is ${mode}, start quant_infer"
+    quant_infer
+    ;;
+  1)
+    echo "mode is ${mode}, start dataset_eval(need 16 card)"
+    dataset_eval
+    ;;
+  *)
+    echo "Error: Invalid argument: mode ${mode}. Only 0 or 1 is allowed."
+    ;;
+esac
