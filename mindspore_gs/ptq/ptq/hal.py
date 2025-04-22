@@ -937,7 +937,7 @@ class AllQuantMatmul(QuantUnitCell):
             quant_bias = Parameter(t_bias, name=bias_name)
 
         # create qmm
-        if isinstance(linear.matmul, msops.MatMul):
+        if isinstance(linear.matmul, (msops.MatMul, GroupedMatmulV4)):
             qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(layer_name, linear.matmul, x_qparam, w_qparam,
                                                                  is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
                                                                  kernel_type)
