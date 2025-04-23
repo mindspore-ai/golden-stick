@@ -75,8 +75,8 @@ prepare_env()
 
   echo "cp quant ckpt script"
   cp ./example/deepseekv3/calibrate.py ../daily_quant_ckpt.py || exit 1
-  cp ./example/deepseekv3/deepseekv3_infer_parallelism.py ../ || exit 1
-  cp ./example/deepseekv3/model_parallelism.py ../ || exit 1
+  cp ./example/deepseekv3/deepseekv3_weight_processor.py ../ || exit 1
+  cp ./example/deepseekv3/weight_processor.py ../ || exit 1
   echo "cp eval script"
   cp ./example/deepseekv3/ds_utils.py ../ || exit 1
   cp ./example/deepseekv3/eval_ceval.py ../daily_eval.py || exit 1
@@ -189,11 +189,11 @@ check_infer_result()
   name=$1
   path=$2
   if [ -f "${path}" ]; then
-    echo "----------------- ${name} ${ds_type} check_first_token "介绍下北京故宫博物院" result -----------------"
+    echo "----------------- ${name} check_first_token "介绍下北京故宫博物院" result -----------------"
     if grep "answer:" ${path} | grep -q "介绍下北京故宫博物院"; then
-      echo "${name} ${ds_type} check_first_token_result success."
+      echo "${name} check_first_token_result success."
     else
-      echo "${name} ${ds_type} check_first_token_result error, answer is: $(grep "answer:" ${path})"
+      echo "${name} check_first_token_result error, answer is: $(grep "answer:" ${path})"
     fi
   fi
 }
