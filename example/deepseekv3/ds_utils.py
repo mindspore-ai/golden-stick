@@ -148,7 +148,7 @@ def create_network(yaml_file, quant_type=None):
 
     if config.load_checkpoint:
         if auto_online_trans:
-            model_parallelism = DeepseekV3WeightProcessor(config, network, quant_type is not None)
+            model_parallelism = DeepseekV3WeightProcessor(config, network, quant_type is not None, enable_ep=True)
             model_parallelism.load_safetensors_shard(config.load_checkpoint)
             barrier()
         else:

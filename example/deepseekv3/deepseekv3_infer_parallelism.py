@@ -55,8 +55,8 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     """
 
-    def __init__(self, config, network, is_quant):
-        super().__init__(config, network, is_quant)
+    def __init__(self, config, network, is_quant, enable_ep=False):
+        super().__init__(config, network, is_quant, enable_ep)
         self.num_layers = self.config.model.model_config.num_layers
         self.expert_num = self.config.moe_config.expert_num
         self.moe_tensor_parallel = self.config.moe_config.moe_tensor_parallel
@@ -361,22 +361,22 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     def infer_quant_process_moe_shared_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer quant process moe shared expert ffn weight"""
-
+        split_num = self.global_group_size if self.enable_ep else -1
         ffn_concat = self.config.model.model_config.ffn_concat
         w1_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.gate_proj.weight"
         w1_ms_name = self.quant_convert_weight_name(w1_hf_name)
-        w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
-                                                       is_split_param=True, split_axis=0)
+        w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map, is_split_param=True,
+                                                       split_axis=0, split_num=split_num)
 
         w1_scale_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.gate_proj.weight_scale"
         w1_scale_ms_name = self.quant_convert_weight_name(w1_scale_hf_name)
         w1_scale_ms_param, _ = self.get_safetensor_from_file(w1_scale_hf_name, src_hf_dir, hf_weight_map,
-                                                             is_split_param=True, split_axis=0)
+                                                             is_split_param=True, split_axis=0, split_num=split_num)
 
         w2_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.down_proj.weight"
         w2_ms_name = self.quant_convert_weight_name(w2_hf_name)
         w2_ms_param, _ = self.get_safetensor_from_file(w2_hf_name, src_hf_dir, hf_weight_map,
-                                                       is_split_param=True, split_axis=1)
+                                                       is_split_param=True, split_axis=1, split_num=split_num)
 
         w2_scale_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.down_proj.weight_scale"
         w2_scale_ms_name = self.quant_convert_weight_name(w2_scale_hf_name)
@@ -385,12 +385,12 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         w3_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.up_proj.weight"
         w3_ms_name = self.quant_convert_weight_name(w3_hf_name)
         w3_ms_param, _ = self.get_safetensor_from_file(w3_hf_name, src_hf_dir, hf_weight_map,
-                                                       is_split_param=True, split_axis=0)
+                                                       is_split_param=True, split_axis=0, split_num=split_num)
 
         w3_scale_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.up_proj.weight_scale"
         w3_scale_ms_name = self.quant_convert_weight_name(w3_scale_hf_name)
         w3_scale_ms_param, _ = self.get_safetensor_from_file(w3_scale_hf_name, src_hf_dir, hf_weight_map,
-                                                             is_split_param=True, split_axis=0)
+                                                             is_split_param=True, split_axis=0, split_num=split_num)
 
         w1_scale_ms_param = w1_scale_ms_param.squeeze(axis=-1)
         w2_scale_ms_param = w2_scale_ms_param.squeeze(axis=-1)
@@ -884,21 +884,22 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     def infer_process_moe_shared_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer process moe shared expert ffn weight"""
+        split_num = self.global_group_size if self.enable_ep else -1
         ffn_concat = self.config.model.model_config.ffn_concat
         w1_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.gate_proj.weight"
         w1_ms_name = self.convert_weight_name(w1_hf_name)
         w1_ms_param, _ = self.get_safetensor_from_file(w1_hf_name, src_hf_dir, hf_weight_map,
-                                                       is_split_param=True, split_axis=0)
+                                                       is_split_param=True, split_axis=0, split_num=split_num)
 
         w2_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.down_proj.weight"
         w2_ms_name = self.convert_weight_name(w2_hf_name)
         w2_ms_param, _ = self.get_safetensor_from_file(w2_hf_name, src_hf_dir, hf_weight_map,
-                                                       is_split_param=True, split_axis=1)
+                                                       is_split_param=True, split_axis=1, split_num=split_num)
 
         w3_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.up_proj.weight"
         w3_ms_name = self.convert_weight_name(w3_hf_name)
         w3_ms_param, _ = self.get_safetensor_from_file(w3_hf_name, src_hf_dir, hf_weight_map,
-                                                       is_split_param=True, split_axis=0)
+                                                       is_split_param=True, split_axis=0, split_num=split_num)
 
         if ffn_concat:
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.shared_experts.w_gate_hidden.weight"
