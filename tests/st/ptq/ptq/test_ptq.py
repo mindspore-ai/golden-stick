@@ -752,7 +752,7 @@ def test_ptq_simplenet(non_decoder):
 @pytest.mark.parametrize("quant_algo", ['A8W8C8', 'A16W8C8'])
 def test_ptq_llama2_predict_2stage_1p_run_part1(quant_algo):
     """
-    Feature: test omni quant adjust parameter in two stages with one cards.
+    Feature: test PTQ adjust parameter in two stages with one cards.
     Description: apply OQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
@@ -783,7 +783,7 @@ def test_ptq_llama2_predict_2stage_1p_run_part1(quant_algo):
 @pytest.mark.parametrize("quant_algo", ['C8', 'C8_Dynamic', 'A16W4_GPTQ', 'A16W4_AWQ', 'A8W4_GPTQ'])
 def test_ptq_llama2_predict_2stage_1p_run_part2(quant_algo):
     """
-    Feature: test omni quant adjust parameter in two stages with one cards.
+    Feature: test PTQ adjust parameter in two stages with one cards.
     Description: apply OQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
@@ -812,7 +812,7 @@ def test_ptq_llama2_predict_2stage_1p_run_part2(quant_algo):
 @pytest.mark.parametrize("quant_algo", ['A16W4_GPTQ_per_group'])
 def test_ptq_llama2_predict_2stage_1p_run_per_group(quant_algo):
     """
-    Feature: test omni quant adjust parameter in two stages with one cards.
+    Feature: test PTQ adjust parameter in two stages with one cards.
     Description: apply OQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
@@ -840,10 +840,10 @@ def test_ptq_llama2_predict_2stage_1p_run_per_group(quant_algo):
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 # 'A16W8C8'
-@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'OmniQuant_A8W8', 'A8W4_GPTQ'])
+@pytest.mark.parametrize("quant_algo", ['A8W8', 'A16W8', 'A8W8C8', 'OSL_A8W8', 'A8W4_GPTQ'])
 def test_ptq_llama2_predict_2stage_2p_run_part1(quant_algo):
     """
-    Feature: test omni quant adjust parameter in two stages with two cards.
+    Feature: test PTQ adjust parameter in two stages with two cards.
     Description: apply OQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
@@ -875,7 +875,7 @@ def test_ptq_llama2_predict_2stage_2p_run_part1(quant_algo):
 @pytest.mark.parametrize("quant_algo", ['C8'])
 def test_ptq_llama2_predict_2stage_2p_run_part2(quant_algo):
     """
-    Feature: test omni quant adjust parameter in two stages with two cards.
+    Feature: test PTQ adjust parameter in two stages with two cards.
     Description: apply OQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """
@@ -905,7 +905,7 @@ def test_ptq_llama2_predict_2stage_2p_run_part2(quant_algo):
 @pytest.mark.parametrize("quant_algo", ['A16W4_GPTQ_per_group'])
 def test_ptq_llama2_predict_2stage_2p_run_per_group(quant_algo):
     """
-    Feature: test omni quant adjust parameter in two stages with two cards.
+    Feature: test PTQ adjust parameter in two stages with two cards.
     Description: apply OQ on llama2 and check accuracy.
     Expectation: accuracy is good.
     """

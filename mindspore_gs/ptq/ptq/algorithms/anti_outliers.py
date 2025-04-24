@@ -200,7 +200,7 @@ class LinearAutoSmoother(LinearSmoother):
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 if (not layer_policy or
                         layer_policy.outliers_suppression not in (OutliersSuppressionType.AWQ,
-                                                                  OutliersSuppressionType.OMNIQUANT_GRID,
+                                                                  OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
                                                                   OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS)):
                     return cell, False
                 if any(opname in cell_name for opname in layer_policy.opname_blacklist):

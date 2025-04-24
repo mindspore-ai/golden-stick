@@ -68,7 +68,7 @@ class LinearClipper(Algorithm):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 is_satisfied = layer_policy.outliers_suppression == OutliersSuppressionType.AWQ or \
-                    layer_policy.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID
+                    layer_policy.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE
                 if not layer_policy or not is_satisfied:
                     return cell, False
                 if (any(opname in cell_name for opname in layer_policy.opname_blacklist) or

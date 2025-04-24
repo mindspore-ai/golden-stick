@@ -322,18 +322,21 @@ class SearchLinearCell(nn.Cell):
         self._settle_best(best_hyper_param)
 
 
-class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
-    """SearchOmniQuantLinearCell"""
+class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
+    """SearchOutlierSuppressionLiteLinearCell"""
 
     @staticmethod
     def reg_self():
-        class SearchOmniQuantChecker(Checker):
+        class SearchOutlierSuppressionLiteChecker(Checker):
             def check(self, config: InnerPTQConfig):
-                return config.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID
+                return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE
 
-        LinearAutoSmoother.reg_layer_map(Linear, SearchOmniQuantLinearCell, SearchOmniQuantChecker())
-        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, SearchOmniQuantLinearCell, SearchOmniQuantChecker())
-        LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOmniQuantLinearCell, SearchOmniQuantChecker())
+        LinearAutoSmoother.reg_layer_map(Linear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
 
     def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
         super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
@@ -369,13 +372,13 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
 
         if context.algorithm_cache_path:
             cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', \
-                                           'omniquant_smooth.json')
+                                           'osl_smooth.json')
         else:
             cache_file_path = ''
         self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
 
     def _quant_info(self):
-        return "OMNIQuant"
+        return "OSL"
 
     def _search_best_scale(self, alpha):
         """search best scale"""
@@ -383,7 +386,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         if best_alpha:
             logger.info(f'layer {self.layer_name} using cached alpha: {best_alpha}')
             best_scale = self._calc_smooth_scale(best_alpha)
-            logger.info(f'OmniSmoothLinearCell: best scale alpha {best_alpha} of Layer({self._layer_name}).'
+            logger.info(f'OSLLinearCell: best scale alpha {best_alpha} of Layer({self._layer_name}).'
                         ' Used cache.')
         else:
             best_scale, best_alpha = self._compute_best_scale(alpha)
@@ -489,7 +492,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
             msops.assign(self._layer.weight, fp16_weight)
 
             loss = self._loss(fp16_output, quant_output)
-            logger.info(f"OmniSmoothLinearCell: search alpha {ratio}, loss of Layer({self._layer_name}) is {loss}")
+            logger.info(f"OSLLinearCell: search alpha {ratio}, loss of Layer({self._layer_name}) is {loss}")
             history.append(loss)
             if loss < best_error:
                 best_error = loss
@@ -515,7 +518,7 @@ class SearchOmniQuantLinearCell(SmoothQuantLinearCell):
         gc.collect()
         if best_ratio == -1:
             raise RuntimeError(f"Found no suitablt ratio, please check history of loss: {history}.")
-        logger.info(f"OmniSmoothLinearCell: best scale alpha {best_ratio}, best_error of Layer({self._layer_name}) "
+        logger.info(f"OSLLinearCell: best scale alpha {best_ratio}, best_error of Layer({self._layer_name}) "
                     f"is {best_error}")
         return best_scale, best_ratio
 

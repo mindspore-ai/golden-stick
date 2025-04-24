@@ -169,12 +169,12 @@ def create_cfg(quant_algo_, mode):
                             backend=BackendTarget.ASCEND,
                             opname_blacklist=["lm_head"],
                             outliers_suppression=OutliersSuppressionType.SMOOTH)
-    elif quant_algo_ == 'OmniQuant_A8W8':
+    elif quant_algo_ == 'OSL_A8W8':
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["w2", "lm_head"],
                         weight_quant_dtype=dtype.int8, act_quant_dtype=dtype.int8,
-                        outliers_suppression=OutliersSuppressionType.OMNIQUANT_GRID,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
                         act_quant_granularity=QuantGranularity.PER_TENSOR,
                         weight_quant_granularity=QuantGranularity.PER_CHANNEL,
                         kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
@@ -184,7 +184,7 @@ def create_cfg(quant_algo_, mode):
 
 
 def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
-    """omni quant to quant llama2"""
+    """quant llama2 using PTQ"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['FORCE_EAGER'] = "true"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
@@ -322,7 +322,7 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
         elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
             ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
-        elif quant_algo_ == 'OmniQuant_A8W8':
+        elif quant_algo_ == 'OSL_A8W8':
             ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         else:
             assert False
@@ -353,7 +353,7 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
         ret = np.allclose(qoutput[:, :58], foutput[:, :58], 0, 0)
     elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
         ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
-    elif quant_algo_ == 'OmniQuant_A8W8':
+    elif quant_algo_ == 'OSL_A8W8':
         ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     else:
         assert False
@@ -363,7 +363,7 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
 
 
 def fp16_llama2_infer(config_path_, ckpt_path, output_dir_, example, quant_algo_):
-    """omni quant to quant llama2"""
+    """infer original float point llama2"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:

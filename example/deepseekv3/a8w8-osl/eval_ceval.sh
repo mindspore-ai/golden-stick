@@ -38,8 +38,8 @@ msrun --worker_num=${worker_num} \
       --master_port=8188 \
       --cluster_time_out=300 \
       --join=False \
-      --log_dir=eval_ceval_omniquant_log \
+      --log_dir=eval_ceval_osl_log \
       python ${eval_ceval_path} \
              --config ${yaml} \
              --dataset_path ${dataset_path} \
-             --approach omniquant > log_eval_ceval_omniquant 2>&1 &
+             --approach osl > log_eval_ceval_osl 2>&1 &

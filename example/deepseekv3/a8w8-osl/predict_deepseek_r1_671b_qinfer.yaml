@@ -3,7 +3,7 @@ output_dir: './output' # path to save checkpoint/strategy
 run_mode: 'predict'
 use_parallel: True
 
-load_checkpoint: "/path/to/output/DeepSeekR1_omniquant_ckpt"
+load_checkpoint: "/path/to/output/DeepSeekR1_osl_ckpt"
 load_ckpt_format: "safetensors"
 auto_trans_ckpt: False # If true, auto transform load_checkpoint to load in distributed model
 

@@ -48,7 +48,7 @@ class OutliersSuppressionType(Enum):
     SMOOTH = 'smooth'
     AWQ = 'awq'
     OUTLIER_SUPPRESSION_PLUS = 'outlier-suppression+'
-    OMNIQUANT_GRID = 'omniquant-grid'
+    OUTLIER_SUPPRESSION_LITE = 'outlier-suppression-lite'
     NONE = 'none'
 
     @classmethod
@@ -65,8 +65,8 @@ class OutliersSuppressionType(Enum):
             return OutliersSuppressionType.AWQ
         if name.lower() == 'outlier-suppression+':
             return OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS
-        if name.lower() == 'omniquant-grid':
-            return OutliersSuppressionType.OMNIQUANT_GRID
+        if name.lower() == 'outlier-suppression-lite':
+            return OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE
         return OutliersSuppressionType.NONE
 
 
@@ -240,8 +240,7 @@ class PTQConfig:
             ``ASCEND`` for ascend backend.
         opname_blacklist (List[str]): Blacklist of opname. Layers in network with name fuzzy matched with this blacklist
             will not being quanted.
-        algo_args (Union[dict, dataclass]): Used to configure hyperparameters of algorithms such as RTN, SmoothQuant,
-            and OmniQuant.
+        algo_args (Union[dict, dataclass]): Used to configure hyperparameters of algorithms such as RTN and SmoothQuant.
         act_quant_dtype (mindspore.dtype): Used to configure the quantization type of activation. mindspore.dtype.int8
             indicates that the activation is quantized by 8 bits, and None indicates that it is not quantized.
         weight_quant_dtype (mindspore.dtype): Used to configure the quantization type of weight. mindspore.dtype.int8

@@ -167,7 +167,7 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
         if uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
             # pylint: disable=protected-access
             ptq._config.weight_symmetric = False
-        if uargs.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID:
+        if uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE:
             # pylint: disable=protected-access
             ptq._config.always_use_fp_input_in_processer = True
     else:
@@ -220,8 +220,8 @@ def ckpt_name(model_name_, uargs_):
         name += "_smooth"
     elif uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
         name += "_awq"
-    elif uargs_.outliers_suppression == OutliersSuppressionType.OMNIQUANT_GRID:
-        name += "_omniquant"
+    elif uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE:
+        name += "_osl"
     elif uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS:
         name += "_outlier_suppression+"
     else:
