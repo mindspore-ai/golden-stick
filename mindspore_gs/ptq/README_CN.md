@@ -35,5 +35,5 @@
 ## 示例
 
 - [PTQ算法示例](./ptq/README_CN.md)：基于MindSpore动态图能力构建的后量化算法，支持权重量化，全量化，KVCache量化。
-- [RTN算法示例](./round_to_nearest/README_CN.md)：基于MinMax的基础后量化算法，仅支持8bit权重量化和8bit KVCache量化。
+- [RTN算法示例](./round_to_nearest/README_CN.ipynb)：基于MinMax的基础后量化算法，仅支持8bit权重量化和8bit KVCache量化。
 
