@@ -41,17 +41,17 @@ class BaseWeightProcessor:
 
     """
 
-    def __init__(self, config, network, is_quant, ep_method=EPMethod.DEFAULT):
+    def __init__(self, config, network, is_quant):
         self.config = config
         self.network = network
         self.is_quant = is_quant
-        self.ep_method = ep_method
         self.global_rank_id = get_rank()
         self.global_group_size = get_group_size()
         self.tp_group_size = get_tp_world_size()
         self.dp_group_size = get_data_parallel_world_size()
         self.moe_ep_size = self.config.moe_config.moe_expert_parallel
         self.moe_tp_size = self.config.moe_config.moe_tensor_parallel
+        self.ep_method = EPMethod.DEFAULT
         self.tp_rank_id = self.global_rank_id % self.tp_group_size
 
         num_router_experts = self.config.moe_config.expert_num
