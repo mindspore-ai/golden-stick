@@ -30,6 +30,8 @@ from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
+from mindformers.experimental.infer.core.moe import ColumnParallelGroupLinear, RowParallelGroupLinear, \
+    ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion
 
 
 class AllQuantLinearCell(WeightQuantLinearCell):
@@ -45,6 +47,10 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(Linear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(ColumnParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(RowParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(RowParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
         super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
