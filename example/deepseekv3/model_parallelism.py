@@ -18,10 +18,19 @@ transform huggingface safetensor.
 """
 
 import os
+from enum import Enum
 from safetensors import safe_open
 from mindspore.communication.management import get_rank, get_group_size
 from mindformers.experimental.infer.core.utils import get_tp_world_size, get_moe_tp_world_size, get_moe_ep_world_size
 from mindformers.experimental.parallel_core.pynative.parallel_state import get_data_parallel_world_size
+
+class EPMethod(Enum):
+    """
+    EP method enums
+    """
+    DEFAULT = 'default'
+    ALLTOALL = 'alltoall'
+    ALLGATHER = 'allgather'
 
 class BaseWeightProcessor:
     r"""
@@ -32,11 +41,11 @@ class BaseWeightProcessor:
 
     """
 
-    def __init__(self, config, network, is_quant, enable_ep=False):
+    def __init__(self, config, network, is_quant, ep_method=EPMethod.DEFAULT):
         self.config = config
         self.network = network
         self.is_quant = is_quant
-        self.enable_ep = enable_ep
+        self.ep_method = ep_method
         self.global_rank_id = get_rank()
         self.global_group_size = get_group_size()
         self.tp_group_size = get_tp_world_size()
@@ -101,7 +110,8 @@ class BaseWeightProcessor:
         return split_data, qint4
 
     def get_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map, is_split_param=False, split_axis=0,
-                                 split_num=-1):
+                                 split_num=-1, rank_id=-1):
+        rank_id = rank_id if rank_id != -1 else self.tp_rank_id
         split_num = split_num if split_num != -1 else self.tp_group_size
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
@@ -117,13 +127,13 @@ class BaseWeightProcessor:
         shape = np_data.get_shape()
         if split_axis == 0:
             split_size = shape[0] // split_num
-            start = self.tp_rank_id * split_size
-            stop = (self.tp_rank_id + 1) * split_size
+            start = rank_id * split_size
+            stop = (rank_id + 1) * split_size
             split_data = np_data[start:stop]
         elif split_axis == 1:
             split_size = shape[1] // split_num
-            start = self.tp_rank_id * split_size
-            stop = (self.tp_rank_id + 1) * split_size
+            start = rank_id * split_size
+            stop = (rank_id + 1) * split_size
             split_data = np_data[:, start:stop]
         else:
             raise ValueError("split_axis:{} is not supported.".format(split_axis))

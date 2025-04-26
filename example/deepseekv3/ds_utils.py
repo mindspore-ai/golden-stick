@@ -33,9 +33,9 @@ from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery, \
     GPTQQuantConfig
 from deepseekv3_infer_parallelism import DeepseekV3WeightProcessor
-
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
+from model_parallelism import EPMethod
 
 
 def create_ptq(quant_type: str, quant_mode: PTQMode):
@@ -148,7 +148,8 @@ def create_network(yaml_file, quant_type=None):
 
     if config.load_checkpoint:
         if auto_online_trans:
-            model_parallelism = DeepseekV3WeightProcessor(config, network, quant_type is not None, enable_ep=True)
+            model_parallelism = DeepseekV3WeightProcessor(config, network, quant_type is not None,
+                                                          ep_method=EPMethod.ALLGATHER)
             model_parallelism.load_safetensors_shard(config.load_checkpoint)
             barrier()
         else:
