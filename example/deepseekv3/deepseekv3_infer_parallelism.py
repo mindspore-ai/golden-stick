@@ -55,12 +55,17 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     """
 
-    def __init__(self, config, network, is_quant, ep_method=EPMethod.DEFAULT):
-        super().__init__(config, network, is_quant, ep_method)
+    def __init__(self, config, network, is_quant):
+        super().__init__(config, network, is_quant)
         self.num_layers = self.config.model.model_config.num_layers
         self.expert_num = self.config.moe_config.expert_num
         self.moe_tensor_parallel = self.config.moe_config.moe_tensor_parallel
         self.moe_expert_parallel = self.config.moe_config.moe_expert_parallel
+        self.ep_method = EPMethod.DEFAULT
+        if self.dp_group_size > 1 and self.moe_expert_parallel == self.global_group_size:
+            self.ep_method = EPMethod.ALLTOALL
+        elif self.dp_group_size > 1:
+            self.ep_method = EPMethod.ALLGATHER
 
     def quant_convert_weight_name(self, weight_name: str):
         """replace quant net weight name"""
@@ -359,8 +364,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             name=w2_scale_ms_name,
             requires_grad=False)
 
-    def infer_quant_process_moe_shared_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
-        """infer quant process moe shared expert ffn weight"""
+    def get_moe_shared_expert_split_info(self):
         split_num = -1
         rank_id = -1
         if self.ep_method == EPMethod.ALLGATHER:
@@ -369,6 +373,11 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         elif self.ep_method == EPMethod.ALLTOALL:
             split_num = 1
             rank_id = 0
+        return split_num, rank_id
+
+    def infer_quant_process_moe_shared_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
+        """infer quant process moe shared expert ffn weight"""
+        split_num, rank_id = self.get_moe_shared_expert_split_info()
 
         ffn_concat = self.config.model.model_config.ffn_concat
         w1_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.gate_proj.weight"
@@ -896,14 +905,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     def infer_process_moe_shared_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer process moe shared expert ffn weight"""
-        split_num = -1
-        rank_id = -1
-        if self.ep_method == EPMethod.ALLGATHER:
-            split_num = self.global_group_size
-            rank_id = get_rank()
-        elif self.ep_method == EPMethod.ALLTOALL:
-            split_num = 1
-            rank_id = 0
+        split_num, rank_id = self.get_moe_shared_expert_split_info()
 
         ffn_concat = self.config.model.model_config.ffn_concat
         w1_hf_name = f"model.layers.{layer_id}.mlp.shared_experts.gate_proj.weight"
