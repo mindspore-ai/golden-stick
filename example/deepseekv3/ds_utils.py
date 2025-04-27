@@ -32,10 +32,11 @@ from mindspore_gs.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery, \
     GPTQQuantConfig
-from deepseekv3_infer_parallelism import DeepseekV3WeightProcessor
+from deepseekv3_weight_processor import DeepseekV3WeightProcessor
+
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
-from model_parallelism import EPMethod
+from weight_processor import EPMethod
 
 
 def create_ptq(quant_type: str, quant_mode: PTQMode):
@@ -116,7 +117,8 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
         ptq._config.weight_symmetric = False
     if 'smoothquant' in quant_type.lower():
         # pylint: disable=protected-access
-        ptq._config.aclnn_quant_list = ["routed_experts.ffn.w_gate_hidden"]
+        ptq._config.aclnn_quant_list = ["routed_experts.ffn.w_gate_hidden", "routed_experts.ffn.w1",
+                                        "routed_experts.ffn.w3"]
     ptq._config.algorithm_cache_path = ""
     if quant_type.lower() == 'omniquant':
         # pylint: disable=protected-access

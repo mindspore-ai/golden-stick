@@ -42,7 +42,8 @@ from .parallel_minmax import (
     get_w_sum_op,
     get_min_max_op)
 from .linear_wrapper import WrapperLinearCell
-
+from mindformers.experimental.infer.core.moe import ColumnParallelGroupLinear, RowParallelGroupLinear, \
+    ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion
 
 class SmoothMethod(enum.Enum):
     NONE = 0
@@ -253,6 +254,10 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(Linear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
 
     def _get_smooth_method(self):
         return SmoothMethod.SMOOTH_QUANT

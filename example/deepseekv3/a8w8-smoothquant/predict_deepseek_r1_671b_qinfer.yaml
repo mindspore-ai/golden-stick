@@ -3,9 +3,9 @@ output_dir: './output' # path to save checkpoint/strategy
 run_mode: 'predict'
 use_parallel: True
 
-load_checkpoint: "/path/to/output/DeepSeekR1_smoothquant_ckpt"
-load_ckpt_format: "ckpt"
-auto_trans_ckpt: False # If true, auto transform load_checkpoint to load in distributed model
+load_checkpoint: ""
+load_ckpt_format: "safetensors"
+auto_trans_ckpt: True # If true, auto transform load_checkpoint to load in distributed model
 
 # trainer config
 trainer:
@@ -84,6 +84,8 @@ model:
     top_k: 1
     top_p: 1
     theta: 10000.0
+    quantization_config:
+      quant_method: "smoothquant"
     do_sample: False
     is_dynamic: True
     qkv_concat: True
