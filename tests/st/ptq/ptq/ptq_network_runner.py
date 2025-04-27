@@ -178,6 +178,16 @@ def create_cfg(quant_algo_, mode):
                         act_quant_granularity=QuantGranularity.PER_TENSOR,
                         weight_quant_granularity=QuantGranularity.PER_CHANNEL,
                         kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
+    elif quant_algo_ == 'OSPQuant_A8W8':
+        os.environ["MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST"] = "RmsNormQuant,PagedAttention"
+        cfg = PTQConfig(mode=mode,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        weight_quant_dtype=dtype.int8, act_quant_dtype=dtype.int8,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS,
+                        act_quant_granularity=QuantGranularity.PER_TENSOR,
+                        weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+                        kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_algo_}")
     return cfg
@@ -225,6 +235,9 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     if quant_algo_ == "A16W4_AWQ":
         # pylint: disable=W0212
         ptq._config.weight_symmetric = False
+    if quant_algo_ == "OSPQuant_A8W8":
+        # pylint: disable=W0212
+        ptq._config.use_inner_osp = True
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_hello_ds(tokenizer, 1)
@@ -268,6 +281,9 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
         if quant_algo_ == "A8W8_FallBack":
             # pylint: disable=W0212
             ptq._config.fallback_blacklist = {'w2': LayerQuantizeAlgo.A16W8}
+        if quant_algo_ == "OSPQuant_A8W8":
+            # pylint: disable=W0212
+            ptq._config.use_inner_osp = True
         # pylint: disable=W0212
         ptq._config.enable_deploy_fusion = False
         network = ptq.apply(network)
@@ -324,6 +340,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
             ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
         elif quant_algo_ == 'OSL_A8W8':
             ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
+        elif quant_algo_ == 'OSPQuant_A8W8':
+            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
         else:
             assert False
         if not ret:
@@ -354,6 +372,8 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
     elif quant_algo_ == 'Quant_A8W16_Deploy_A8W8_Dynamic':
         ret = np.allclose(qoutput[:, :100], foutput[:, :100], 0, 0)
     elif quant_algo_ == 'OSL_A8W8':
+        ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
+    elif quant_algo_ == 'OSPQuant_A8W8':
         ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
     else:
         assert False
