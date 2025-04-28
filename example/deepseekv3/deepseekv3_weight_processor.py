@@ -1542,6 +1542,8 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         else:
             value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                      hf_weight_map)
+        if "wo._layer.matmul.quant_bias" in param_name and get_tensor_model_parallel_rank() != 0:
+            value.fill(0)
         return value
 
     def infer_smooth_quant_get_value(self, param_name, src_hf_dir, hf_weight_map, no_need_split_layer):
