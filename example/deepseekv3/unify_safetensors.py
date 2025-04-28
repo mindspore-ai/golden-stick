@@ -126,8 +126,9 @@ def process_feed_forward_w_gate_hidden(name, ori_param, rank_num):
     if "matmul" in name:
         param_dtype = ori_param[name].dtype
         if param_dtype == ms.bfloat16:
-            raise ValueError(f"param_dtype:{param_dtype} == ms.bfloat16.")
-        value = ori_param[name].asnumpy()
+            value = ori_param[name].astype(ms.float32).asnumpy()
+        else:
+            value = ori_param[name].asnumpy()
         w1, w3 = split_1_dim_w_gate_hidden(value, rank_num)
         w1_name = name.replace("w_gate_hidden", "w1")
         w3_name = name.replace("w_gate_hidden", "w3")
@@ -151,19 +152,6 @@ def process_feed_forward_w_gate_hidden(name, ori_param, rank_num):
         ori_param[w3_name] = ms.Parameter(ms.Tensor(w3, param_dtype), name=w3_name,
                                           requires_grad=False)
         return
-    if "quant_op" in name:
-        param_dtype = ori_param[name].dtype
-        if param_dtype == ms.bfloat16:
-            value = ori_param[name].astype(ms.float32).asnumpy()
-        else:
-            value = ori_param[name].asnumpy()
-        w1_name = name.replace("w_gate_hidden", "w1")
-        w3_name = name.replace("w_gate_hidden", "w3")
-        ori_param.pop(name)
-        ori_param[w1_name] = ms.Parameter(ms.Tensor(value, param_dtype), name=w1_name,
-                                          requires_grad=False)
-        ori_param[w3_name] = ms.Parameter(ms.Tensor(value, param_dtype), name=w3_name,
-                                          requires_grad=False)
 
 
 def process_qkv_split(name, ori_param):
@@ -223,7 +211,6 @@ def process_routed_experts_w_gate_hidden(name, ori_param, rank_num):
             value = ori_param[name].astype(ms.float32).asnumpy()
         else:
             value = ori_param[name].asnumpy()
-        value = ori_param[name].asnumpy()
         w1, w3 = split_routed_expert_2_dim_w_gate_hidden(value, rank_num)
         w1_name = name.replace("w_gate_hidden", "w1")
         w3_name = name.replace("w_gate_hidden", "w3")
@@ -247,19 +234,6 @@ def process_routed_experts_w_gate_hidden(name, ori_param, rank_num):
         ori_param[w3_name] = ms.Parameter(ms.Tensor(w3, param_dtype), name=w3_name,
                                           requires_grad=False)
         return
-    if "quant_op" in name:
-        param_dtype = ori_param[name].dtype
-        if param_dtype == ms.bfloat16:
-            value = ori_param[name].astype(ms.float32).asnumpy()
-        else:
-            value = ori_param[name].asnumpy()
-        w1_name = name.replace("w_gate_hidden", "w1")
-        w3_name = name.replace("w_gate_hidden", "w3")
-        ori_param.pop(name)
-        ori_param[w1_name] = ms.Parameter(ms.Tensor(value, param_dtype), name=w1_name,
-                                          requires_grad=False)
-        ori_param[w3_name] = ms.Parameter(ms.Tensor(value, param_dtype), name=w3_name,
-                                          requires_grad=False)
 
 
 def split_for_smooth_quant(ckpt_path, rank_num, ffn_split, qkv_split):
