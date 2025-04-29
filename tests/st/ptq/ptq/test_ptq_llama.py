@@ -19,7 +19,7 @@ import pytest
 from tests.st.test_utils import get_available_port
 
 
-def test_ptq_predict_2stage_2p_run(quant_algo):
+def ptq_predict_2stage_2p_run(quant_algo):
     """
     Feature: test dynamic quant adjust parameter in two stages with two cards.
     Description: apply ptq on llama2 and check accuracy.
@@ -49,76 +49,76 @@ def test_ptq_predict_2stage_2p_run(quant_algo):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_dynamic_llama2_predict_2stage_2p_run_a8w8c8():
+def test_ptq_llama2_predict_2stage_2p_run_a8w8c8():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply A8W8C8 on llama2 and check score.
     Expectation: score is good.
     """
-    test_ptq_predict_2stage_2p_run("A8W8C8")
+    ptq_predict_2stage_2p_run("A8W8C8")
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_dynamic_llama2_predict_2stage_2p_run_a16w8c8():
+def test_ptq_llama2_predict_2stage_2p_run_a16w8c8():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply A16W8C8 on llama2 and check score.
     Expectation: score is good.
     """
-    test_ptq_predict_2stage_2p_run("A16W8C8")
+    ptq_predict_2stage_2p_run("A16W8C8")
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_dynamic_llama2_predict_2stage_2p_run_c8():
+def test_ptq_llama2_predict_2stage_2p_run_c8():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply C8 on llama2 and check score.
     Expectation: score is good.
     """
-    test_ptq_predict_2stage_2p_run("C8")
+    ptq_predict_2stage_2p_run("C8")
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_dynamic_llama2_predict_2stage_2p_run_a8w8():
+def test_ptq_llama2_predict_2stage_2p_run_a8w8():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply A8W8 on llama2 and check score.
     Expectation: score is good.
     """
-    test_ptq_predict_2stage_2p_run("A8W8")
+    ptq_predict_2stage_2p_run("A8W8")
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_dynamic_llama2_predict_2stage_2p_run_a16w8():
+def test_ptq_llama2_predict_2stage_2p_run_a16w8():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply A16W8 on llama2 and check score.
     Expectation: score is good.
     """
-    test_ptq_predict_2stage_2p_run("A16W8")
+    ptq_predict_2stage_2p_run("A16W8")
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_dynamic_llama2_predict_2stage_2p_run_a8w8_dynamic():
+def test_ptq_llama2_predict_2stage_2p_run_a8w8_dynamic():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply A8W8_Dynamic on llama2 and check score.
     Expectation: score is good.
     """
-    test_ptq_predict_2stage_2p_run("A8W8_Dynamic")
+    ptq_predict_2stage_2p_run("A8W8_Dynamic")
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_dynamic_llama2_predict_2stage_2p_run_c8_dynamic():
+def test_ptq_llama2_predict_2stage_2p_run_c8_dynamic():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply C8_Dynamic on llama2 and check score.
     Expectation: score is good.
     """
-    test_ptq_predict_2stage_2p_run("C8_Dynamic")
+    ptq_predict_2stage_2p_run("C8_Dynamic")
