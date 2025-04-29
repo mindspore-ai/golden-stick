@@ -88,6 +88,8 @@ model:
     is_dynamic: True
     qkv_concat: False
     ffn_concat: True
+    quantization_config:
+      quant_method: "osl"
     auto_map:
       AutoConfig: deepseek3_config.DeepseekV3Config
       AutoModel: deepseek3.DeepseekV3ForCausalLM
