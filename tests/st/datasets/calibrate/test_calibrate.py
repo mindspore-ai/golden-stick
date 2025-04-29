@@ -27,14 +27,14 @@ def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
     tokenizer = LlamaTokenizer(vocab_file=vocab_file)
     if bs == 1:
         ds = create_calibrate_dataset(ds_path, "eval", bs, seq_length, tokenizer, repeat=repeat)
-        samples = 150
+        samples = 200
         assert ds.get_repeat_count() == repeat
         assert ds.output_types()[0] == np.int32
         assert ds.output_shapes()[0] == [bs, 366]
         assert ds.output_shapes()[1] == [bs, 1]
         assert ds.get_dataset_size() == samples // bs * repeat
     ds = create_calibrate_dataset(ds_path, "eval", bs, seq_length, tokenizer, repeat=repeat, need_pad=True)
-    samples = 150
+    samples = 200
     assert ds.get_repeat_count() == repeat
     assert ds.output_types()[0] == np.int32
     assert ds.output_shapes()[0] == [bs, seq_length]
