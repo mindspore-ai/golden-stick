@@ -1278,7 +1278,9 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         else:
             value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                      hf_weight_map)
-        if "wo._layer.matmul.quant_bias" in param_name and get_tensor_model_parallel_rank() != 0:
+        quant_bias_set_zero = ["wo._layer.matmul.quant_bias", "w2._layer.matmul.quant_bias"]
+        if any([name in param_name for name in quant_bias_set_zero]) and \
+            get_tensor_model_parallel_rank() != 0:
             value.fill(0)
         return value
 
@@ -1359,6 +1361,49 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         print(f"smoothquant param_not_load:{param_not_load}")
         print(f"smoothquant ckpt_not_load:{ckpt_not_load}")
 
+    def infer_gptq_quant_get_value(self, param_name, src_hf_dir, hf_weight_map, no_need_split_layer):
+        """infer_gptq_quant_get_value"""
+
+        if any([name in param_name for name in no_need_split_layer]):
+            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                            hf_weight_map)
+        elif any([name in param_name for name in [".l2q_proj.", ".feed_forward.w_gate_hidden.",
+                                                    "shared_experts.w_gate_hidden"]]):
+            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                            hf_weight_map, is_split_param=True,
+                                                            split_axis=1)
+        elif any([name in param_name for name in [".wo."]]):
+            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
+                                                            hf_weight_map, is_split_param=True,
+                                                            split_axis=0)
+        elif any([name in param_name for name in [".feed_forward.w2.", "shared_experts.w2"]]):
+            value = self.infer_smooth_quant_row_linear_split(param_name, src_hf_dir, hf_weight_map)
+            is_int4 = False
+        elif ".routed_experts.ffn.w_gate_hidden." in param_name:
+            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+            value_list = []
+            for experts_id in range(value.shape[0]):
+                value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=1))
+            value = np.stack(value_list, axis=0)
+        elif ".routed_experts.ffn.w2" in param_name:
+            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+            value_list = []
+            for experts_id in range(value.shape[0]):
+                value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=0))
+            value = np.stack(value_list, axis=0)
+        elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
+            value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
+                                                            is_split_param=True, split_axis=0)
+        elif "lm_head" in param_name:
+            if not self.config.parallel_config.vocab_emb_dp:
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
+                                                                is_split_param=True, split_axis=0)
+            else:
+                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
+        else:
+            raise ValueError(f"not found layer {param_name}, please check safetensors file.")
+        return value, is_int4
+
     def infer_gptq_quant_net_ms_convert_layer_weight(self, src_hf_dir, num_layers, hf_weight_map):
         """infer_gptq_quant_net_ms_convert_layer_weight"""
         parameter_dict = {}
@@ -1371,44 +1416,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         for param_name, _ in tqdm(hf_weight_map.items(), desc="split safetensors"):
             if "model.layers" in param_name and int(param_name.split('.')[2]) >= num_layers:
                 continue
-
-            if any([name in param_name for name in no_need_split_layer]):
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
-                                                               hf_weight_map)
-            elif any([name in param_name for name in [".l2q_proj.", ".feed_forward.w_gate_hidden.",
-                                                      "shared_experts.w_gate_hidden"]]):
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
-                                                                hf_weight_map, is_split_param=True,
-                                                                split_axis=1)
-            elif any([name in param_name for name in [".feed_forward.w2.", ".wo.",
-                                                      "shared_experts.w2"]]):
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
-                                                                hf_weight_map, is_split_param=True,
-                                                                split_axis=0)
-            elif ".routed_experts.ffn.w_gate_hidden." in param_name:
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
-                value_list = []
-                for experts_id in range(value.shape[0]):
-                    value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=1))
-                value = np.stack(value_list, axis=0)
-            elif ".routed_experts.ffn.w2" in param_name:
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
-                value_list = []
-                for experts_id in range(value.shape[0]):
-                    value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=0))
-                value = np.stack(value_list, axis=0)
-            elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
-                value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
-                                                               is_split_param=True, split_axis=0)
-            elif "lm_head" in param_name:
-                if not self.config.parallel_config.vocab_emb_dp:
-                    value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
-                                                                   is_split_param=True, split_axis=0)
-                else:
-                    value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map)
-            else:
-                raise ValueError(f"not found layer {param_name}, please check safetensors file.")
-
+            value, is_int4 = self.infer_gptq_quant_get_value(param_name, src_hf_dir, hf_weight_map, no_need_split_layer)
             dst_dtype = convert_np_to_ms_dtype(value)
             if is_int4:
                 parameter_dict[param_name] = ms.Parameter(ms.Tensor(value, dtype=dtype.qint4x2),
@@ -1445,7 +1453,8 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
         quantization_config = self.config.model.model_config.quantization_config
         quant_method = quantization_config.quant_method if quantization_config else None
-        if not quant_method or (quant_method != "gptq-pergroup" and quant_method != "smoothquant") and \
+        support_quant_method = ["gptq-pergroup", "smoothquant"]
+        if not quant_method or (quant_method not in support_quant_method) and \
                 not is_mtp_model:
             self.infer_convert_outer_weight(src_hf_dir, hf_weight_map)
 

@@ -27,7 +27,7 @@ mf_path=$1
 worker_num=${2:-8}
 base_path=$(cd "$(dirname $0)"; pwd)
 yaml=${base_path}/predict_deepseek_r1_671b_calibrate.yaml
-ceval_path=${base_path}/../../../tests/data/ceval-dataset/dev/
+calibrate_dataset_path=${base_path}/../../../tests/data/calibrate-dataset/calibrate.jsonl
 calibrate_path=${base_path}/../calibrate.py
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
@@ -43,5 +43,5 @@ msrun --worker_num=${worker_num} \
       python ${calibrate_path} \
             --config ${yaml} \
             --approach gptq-pergroup \
-            -t ceval \
-            -s ${ceval_path} > log_calibrate_gptq_pergroup 2>&1 &
+            -t calibrate \
+            -s ${calibrate_dataset_path} > log_calibrate_gptq_pergroup 2>&1 &

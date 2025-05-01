@@ -28,6 +28,7 @@ from mindspore.ops.operations._infer_ops import QuantV2
 from mindspore.common.initializer import initializer
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
+from mindspore.communication import get_rank
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt, GroupedMatmulV4
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
@@ -40,6 +41,7 @@ from mindspore_gs.ptq.basic_quant_func import (
     np_int4data_pack_to_int8_3d,
     convert_fp32_to_int64)
 
+RANK_ID = get_rank()
 
 class KernelType(enum.Enum):
     ASD = 0
@@ -431,6 +433,7 @@ class QuantWithOutlierSuppressionPlusHighPrecisionSmooth(QuantWithOutlierSuppres
         out = msops.clip(out, -128., 127.)
         return msops.cast(out, self.dst_dtype)
 
+
 class QuantWithOutlierSuppressionPlusHighPerformanceSmooth(QuantWithOutlierSuppressionPlusSmooth):
     """QuantWithOutlierSuppressionPlusHighPerformanceSmooth"""
     # pylint: disable=unused-argument
@@ -479,6 +482,7 @@ class QuantWithOutlierSuppressionPlusHighPerformanceSmooth(QuantWithOutlierSuppr
     def construct(self, x):
         x = msops.add(x, self.beta_osp)
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
+
 
 class SmoothMatmul(QuantUnitCell):
     """SmoothMatmul"""
@@ -558,6 +562,7 @@ class SmoothMatmulForDeploy(QuantUnitCell):
             return {}
         return {self.smooth_scale.name: {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}}
 
+
 class OutlierSuppressionPlusMatmulForDeploy(QuantUnitCell):
     """OutlierSuppressionPlusMatmulForDeploy"""
     def __init__(self, layer_name, mm, ic_, compute_dtype_):
@@ -584,6 +589,7 @@ class OutlierSuppressionPlusMatmulForDeploy(QuantUnitCell):
         else:
             return {}
         return {self.beta.name: {'shape': self.beta.shape, 'shard': beta_shard}}
+
 
 class OutlierSuppressionPlusSmoothMatmul(QuantUnitCell):
     """OutlierSuppressionPlusSmoothMatmul"""
@@ -639,6 +645,7 @@ class OutlierSuppressionPlusSmoothMatmul(QuantUnitCell):
         shard_state[self.beta_osp.name] = {'shape': self.beta_osp.shape, 'shard': beta_shared}
         return shard_state
 
+
 class OutlierSuppressionPlusSmoothMatmulForDeploy(QuantUnitCell):
     """OutlierSuppressionPlusSmoothMatmulForDeploy"""
     def __init__(self, layer_name, mm, ic_, compute_dtype_):
@@ -682,6 +689,7 @@ class OutlierSuppressionPlusSmoothMatmulForDeploy(QuantUnitCell):
         shard_state = {self.smooth_scale.name: {'shape': self.smooth_scale.shape, 'shard': smooth_scale_shard}}
         shard_state[self.beta_osp.name] = {'shape': self.beta_osp.shape, 'shard': beta_shared}
         return shard_state
+
 
 class DynamicQuantMatmul(QuantUnitCell):
     """dynamic quant"""
@@ -1295,6 +1303,9 @@ class AllQuantMatmul(QuantUnitCell):
                     t_bias = AllQuantMatmul._correction_into_bias(
                         q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
                     )
+                    # set quant_bias=0 on other card when doing pynative eval
+                    if RANK_ID != 0:
+                        t_bias = msops.zeros_like(t_bias)
                 else:
                     t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
                         linear.matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, bias_osp
