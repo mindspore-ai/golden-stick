@@ -1464,12 +1464,14 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         if quant_method and quant_method == "smoothquant":
             self.infer_smooth_quant_net_ms_convert_layer_weight(src_hf_dir, self.num_layers, hf_weight_map)
             return
+        if quant_method and quant_method == "osl":
+            self.infer_smooth_quant_net_ms_convert_layer_weight(src_hf_dir, self.num_layers, hf_weight_map)
+            return
 
-        enable_tqdm = rank_id == 0
         mtp_layers = self.config.model.model_config.num_nextn_predict_layers
         start_layer = 0 if not is_mtp_model else self.num_layers
         end_layer = self.num_layers if not is_mtp_model else self.num_layers + mtp_layers
-        for layer_id in tqdm(range(start_layer, end_layer), desc="Weight loading", disable=not enable_tqdm):
+        for layer_id in tqdm(range(start_layer, end_layer), desc="Weight loading"):
             if self.is_quant:
                 self.infer_quant_net_convert_layer_weight(src_hf_dir, layer_id, hf_weight_map)
             else:

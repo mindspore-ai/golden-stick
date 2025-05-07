@@ -327,6 +327,8 @@ if __name__ == "__main__":
         print(f"start split for {args.approach} approach. ffn_split:{args.ffn_split}, qkv_split:{args.qkv_split}")
         if args.approach == "smoothquant":
             split_for_smooth_quant(args.dst_dir, args.rank_num, args.ffn_split, args.qkv_split)
+        if args.approach == "osl":
+            split_for_smooth_quant(args.dst_dir, args.rank_num, args.ffn_split, args.qkv_split)
         else:
             print(f"not support split for {args.approach} approach. ffn_split:{args.ffn_split}," \
                   f" qkv_split:{args.qkv_split}")
