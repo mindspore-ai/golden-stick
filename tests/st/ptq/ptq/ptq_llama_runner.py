@@ -31,7 +31,7 @@ from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
 from mindspore_gs.datasets import get_datasets
-from mindspore_gs.datasets import create_ceval_dataset
+from mindspore_gs.datasets import create_boolq_dataset
 
 def create_ds(network_helper, ds_path, ds_type, tokenizer_):
     """Create datasets."""
@@ -40,7 +40,7 @@ def create_ds(network_helper, ds_path, ds_type, tokenizer_):
     max_decode_length = network_helper.get_spec('max_decode_length')
     ignore_token_id = network_helper.get_spec('ignore_token_id')
     ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer_, ignore_token_id,
-                      1, False, n_samples=50)
+                      1, False, n_samples=30)
     return ds
 
 
@@ -105,16 +105,12 @@ def evaluate(network, ds_path, tokenizer, helper):
     seq_length = helper.get_spec("seq_length")
     ignore_token_id = helper.get_spec("ignore_token_id")
     pad_token_id = helper.get_spec("pad_token_id")
-    ds = create_ceval_dataset(ds_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
-                              n_samples=50)
+    ds = create_boolq_dataset(ds_path, "eval", batch_size, seq_length, tokenizer, ignore_token_id,
+                              n_samples=30)
 
-    total_score = {}
+    correct = 0
     data_count = 0
     for _, ds_item in enumerate(ds.create_dict_iterator()):
-        subject = ds_item['subjects'].asnumpy()[0]
-        if subject not in total_score.keys():
-            total_score[subject] = {"correct nums": 0, "total nums": 0}
-
         data_count += 1
         input_ids = ds_item['input_ids'].asnumpy()
         labels = ds_item['labels'].asnumpy()
@@ -123,7 +119,6 @@ def evaluate(network, ds_path, tokenizer, helper):
         for j in range(input_ids.shape[0]):
             batch_valid_length.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
         batch_valid_length = np.array(batch_valid_length)
-
         outputs = network.generate(input_ids, do_sample=do_sample, max_length=seq_length,
                                    top_p=top_p, top_k=top_k, max_new_tokens=5)
         output_ids = []
@@ -134,13 +129,9 @@ def evaluate(network, ds_path, tokenizer, helper):
         labels_str = tokenizer.decode(labels, skip_special_tokens=True)
 
         if labels_str[0].lower() in pres_str[0].lower():
-            total_score[subject]["correct nums"] = total_score[subject]["correct nums"] + 1
-        total_score[subject]["total nums"] = total_score[subject]["total nums"] + 1
+            correct += 1
     ms.ms_memory_recycle()
-    total_correct = 0
-    for subject, score in total_score.items():
-        total_correct += score["correct nums"]
-    return total_correct / data_count
+    return correct / data_count
 
 
 def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
@@ -169,7 +160,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
     ptq = PTQ(config=cfg)
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
-    ds = create_ds(helper, ds_path, 'ceval', tokenizer)
+    ds = create_ds(helper, ds_path, 'boolq', tokenizer)
     network = ptq.apply(network, helper, datasets=ds)
     network = ptq.convert(network)
     try:
@@ -221,11 +212,22 @@ def eval_llama2(is_quant, config_path_, ckpt_path_, quant_algo_, ds_path):
 
 def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path):
     """ptq_llama2_predict_2stage"""
+    score_mapping = {
+        "A8W8C8": 0.83,
+        "A16W8C8": 0.86,
+        "C8": 0.86,
+        "A8W8": 0.86,
+        "A16W8": 0.85,
+        "A8W8_Dynamic": 0.86,
+        "C8_Dynamic": 0.86,
+    }
+
     quant_llama2(config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path)
 
     score = eval_llama2(True, config_path_, quant_ckpt_path_, quant_algo_, ds_path)
 
-    assert score >= 0.28, f"Score {quant_algo_} is {score:.4f}, which is lower than standard 0.3115"
+    assert score >= score_mapping[quant_algo_], f"Score {quant_algo_} is {score:.4f}, \
+                                  which is lower than standard f{score_mapping[quant_algo_]}"
 
 
 if __name__ == "__main__":
@@ -241,7 +243,7 @@ if __name__ == "__main__":
         config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b.yaml")
         fp16_ckpt_2p_path = os.path.join(cur_dir, "/home/workspace/mindspore_ckpt/ckpt/llama2/llama2-13b-fp16-2p")
         quant_ckpt_path = os.path.join(cur_dir, f"output/parallelLlama2-quant-2p-{quant_algo}")
-        dataset_path = os.path.join(cur_dir, f'../../../data/ceval-dataset/dev/')
+        dataset_path = os.path.join(cur_dir, f'../../../data/boolq-dataset/dev.jsonl')
 
         ptq_llama2_predict_2stage(config_path, fp16_ckpt_2p_path, quant_ckpt_path, quant_algo, dataset_path)
     else:
