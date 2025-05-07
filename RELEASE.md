@@ -138,7 +138,7 @@ Contributions of any kind are welcome!
 
 * [stable] SLB（Searching for Low-Bit Weights in Quantized Neural Networks）QAT algorithm now support BatchNorm calibration. we can invoke `set_enable_bn_calibration` api to enable BatchNorm calibration. For a network with a BatchNorm layer, the BatchNorm calibration can reduces the decrease in network accuracy caused by the SLB quantization algorithm. ([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
 * [stable] We verified the quantization effect of SimQAT(Simulated Quantization Aware Training) algorithm and the SLB algorithm on the ResNet network and the Imagenet2012 dataset. For details, please refer to [MindSpore Models readme](https://gitee.com/mindspore/models/tree/r2.0.0-alpha/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4).
-* [stable] SimQAT algorithm now support inference on MindSpore Lite backend. We quant the LeNet network with SimQAT and deploy it on ARM CPU. For details, please refer to [Deployment Effect](https://www.mindspore.cn/golden_stick/docs/en/master/quantization/simqat.html#summary-of-deployment).
+* [stable] SimQAT algorithm now support inference on MindSpore Lite backend. We quant the LeNet network with SimQAT and deploy it on ARM CPU. For details, please refer to [Deployment Effect](https://www.mindspore.cn/golden_stick/docs/en/r0.3.0-alpha/quantization/simqat.html).
 
 ### API Change
 
