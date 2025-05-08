@@ -270,6 +270,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = "" #os.path.join(cur_dir_, ckpt_path_)
     helper.mf_config.processor.tokenizer.vocab_file = vocab_file
+    helper.mf_config.context.mode = 0
 
     device_id = int(os.environ.get('DEVICE_ID', '0'))
     helper.mf_config.context.device_id = device_id
@@ -382,64 +383,6 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
     return ret
 
 
-def fp16_llama2_infer(config_path_, ckpt_path, output_dir_, example, quant_algo_):
-    """infer original float point llama2"""
-    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
-    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    if not ascend_path:
-        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    cur_dir_ = os.path.dirname(os.path.abspath(__file__))
-    config_path_ = os.path.join(cur_dir_, config_path_)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
-
-    helper = MFParallelLlama2Helper(config_path_)
-    helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path)
-    helper.mf_config.output_dir = os.path.join(cur_dir_, output_dir_)
-    helper.mf_config.processor.tokenizer.vocab_file = vocab_file
-    device_id = int(os.environ.get('DEVICE_ID', '0'))
-    helper.mf_config.context.device_id = device_id
-    config = helper.mf_config
-
-    network = helper.create_network()
-    tokenizer = helper.create_tokenizer()
-
-    def generate_(net, tokenizer_, input_):
-        seq_len = 100
-        input_ids = tokenizer_(input_)['input_ids']
-        outputs = net.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
-        return outputs
-    foutput = generate_(network, tokenizer, example)
-    ms.ms_memory_recycle()
-    file_path = f'./foutput-{quant_algo_}-{config.parallel_config.model_parallel}.npy'
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    np.save(file_path, np.array(foutput))
-
-
-def ptq_llama2_predict_2stage_c8(config_path_, fp16_ckpt_path_, output_dir_, model_parallel_, quant_algo_):
-    """ptq_llama2_predict_2stage_c8"""
-    example = "Hello"
-    fp16_llama2_infer(config_path_, fp16_ckpt_path_, output_dir_, example, quant_algo_)
-    foutput = np.load(f'./foutput-{quant_algo_}-{model_parallel_}.npy')
-    qoutput, _ = eval_llama2(input_=example, is_quant=True,
-                             config_path_=config_path_, ckpt_path_=fp16_ckpt_path_,
-                             quant_algo_=quant_algo_)
-    qoutput = np.array(qoutput)
-    if model_parallel_ == 1:
-        if quant_algo_ == 'C8_Dynamic':
-            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
-        else:
-            assert False
-    else:
-        if quant_algo_ == 'C8_Dynamic':
-            ret = np.allclose(qoutput[:, :3], foutput[:, :3], 0, 0)
-        else:
-            assert False
-    if not ret:
-        print_output(qoutput, foutput)
-    return ret
-
-
 def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
@@ -463,9 +406,7 @@ if __name__ == "__main__":
         quant_ckpt_path = f"../../../data/test_llama2/parallelLlama2-quant-1decoder-1p-{quant_algo}/rank_0/quant.ckpt"
         quant_ckpt_path = os.path.join(cur_dir, quant_ckpt_path)
         output_dir = os.path.join(cur_dir, f"../../../data/test_llama2/parallelLlama2-quant-1decoder-1p-{quant_algo}")
-        if quant_algo == "C8_Dynamic":
-            assert ptq_llama2_predict_2stage_c8(config_path, fp16_ckpt_path, output_dir, model_parallel, quant_algo)
-        elif quant_algo == "A16W4_GPTQ_per_group":
+        if quant_algo == "A16W4_GPTQ_per_group":
             assert ptq_llama2_predict_2stage(config_path_per_group, fp16_ckpt_path, quant_ckpt_path, output_dir,
                                              model_parallel, quant_algo)
         else:
@@ -479,9 +420,7 @@ if __name__ == "__main__":
         quant_ckpt_path = os.path.join(cur_dir,
                                        f"../../../data/test_llama2/parallelLlama2-quant-1decoder-2p-{quant_algo}")
         output_dir = os.path.join(cur_dir, f"../../../data/test_llama2/parallelLlama2-quant-1decoder-2p-{quant_algo}")
-        if quant_algo == "C8_Dynamic":
-            assert ptq_llama2_predict_2stage_c8(config_path, fp16_ckpt_path, output_dir, model_parallel, quant_algo)
-        elif quant_algo == "A16W4_GPTQ_per_group":
+        if quant_algo == "A16W4_GPTQ_per_group":
             assert ptq_llama2_predict_2stage(config_path_per_group, fp16_ckpt_path, quant_ckpt_path, output_dir,
                                              model_parallel, quant_algo)
         else:

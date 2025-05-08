@@ -681,6 +681,7 @@ def sq_predict_llama2_2stage():
     return res
 
 
+@pytest.mark.skip(reason="SmoothQuant is deprecated.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
