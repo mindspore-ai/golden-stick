@@ -16,7 +16,7 @@
 
 
 import pytest
-from mindspore_gs.ptq.ptq.transformer_inspect import TransformerInspect, LayerType
+from mindspore_gs.ptq.transformer_inspect import TransformerInspect, LayerType
 
 from .llama2 import llama2
 
