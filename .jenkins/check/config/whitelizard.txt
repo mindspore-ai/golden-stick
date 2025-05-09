@@ -1,2 +1,2 @@
-golden-stick/mindspore_gs/ptq/ptq/transformer_inspect.py:_get_layer_type
+golden-stick/mindspore_gs/ptq/transformer_inspect.py:_get_layer_type
 golden-stick/example/deepseekv3/deepseekv3_weight_processor.py:load_safetensors_shard

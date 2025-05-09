@@ -122,6 +122,7 @@ class TransformerInspect:
     norm_keys = ('norm', 'ln')
 
     def __init__(self):
+        self.parsed = False
         self.name_tree = NameTree()
         # MHA/GQA
         self.q_nodes = []
@@ -200,7 +201,7 @@ class TransformerInspect:
         self.attn_norm_nodes = self._find_node(self.norm_keys, ['att'])
         self.ffn_norm_nodes = self._find_node(self.norm_keys, [], ['att', 'norm_out'])
 
-    def _parse_name_tree(self, network: Cell):
+    def _parse_name_tree(self, network: Cell, end_points: tuple):
         """_parse_name_tree"""
         class NetworkWalker(Processor):
             def __init__(self, name_tree: NameTree):
@@ -211,15 +212,21 @@ class TransformerInspect:
                 if not isinstance(cell, Cell):
                     return cell, True
                 self.name_tree.add_name(cell_name, cell)
-                return cell, False
+                return cell, type(cell) in end_points
 
         walker = NetworkWalker(self.name_tree)
         walker.process(network)
 
-    def parse(self, network: Cell):
+    def parse(self, network: Cell, end_points: tuple = None):
         """parse"""
-        self._parse_name_tree(network)
+        end_points = end_points if end_points else []
+        if self.parsed:
+            raise RuntimeError('Please do not call parse more than once on one instance.')
+        self._parse_name_tree(network, end_points)
         self._find_layers()
+        self.parsed = True
+        self.print_self()
+        self.name_tree.generate_dot('test.dot')
 
     def _get_layer_type(self, layer_name: str):
         """_get_layer_type"""
@@ -316,7 +323,7 @@ class TransformerInspect:
             return LayerInfo(pre_layer_node.name, pre_layer_node.value, pre_layer_type)
         return None
 
-    def get_pre_layer(self, layer_name: str):
+    def get_pre_layer(self, layer_name: str) -> LayerInfo:
         """get_pre_layer"""
         cur_layer_type = self._get_layer_type(layer_name)
         pre_layer_types = self._get_pre_layer_type(cur_layer_type)

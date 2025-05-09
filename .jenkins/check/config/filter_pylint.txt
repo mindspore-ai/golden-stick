@@ -67,6 +67,7 @@
 "golden-stick/mindspore_gs/common/json_cache.py"                                                         "protected-access"
 "golden-stick/mindspore_gs/common/json_cache.py"                                                         "unused-argument"
 "golden-stick/mindspore_gs/common/logger.py"                                                             "unused-argument"
+"golden-stick/mindspore_gs/ptq/transformer_inspect.py"                                                   "unidiomatic-typecheck"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"

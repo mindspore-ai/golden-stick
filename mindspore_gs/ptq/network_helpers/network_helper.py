@@ -14,7 +14,6 @@
 # ============================================================================
 
 """Network helper base class."""
-import warnings
 from typing import Union, List
 
 import numpy as np
@@ -143,51 +142,3 @@ class NetworkHelper:
             [[  0,   1,   2 ... 253, 254, 255]]), Tensor(shape=[2], dtype=Int32, value= [0, 1]))
         """
         raise NotImplementedError
-
-    # pylint: disable=unused-argument
-    def analysis_decoder_groups(self, network):
-        """
-        Analyze decoder groups information of network.
-
-        Args:
-            network (Cell): network to analyze decoder groups information.
-
-        Examples:
-            >>> from mindspore import context
-            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
-            >>> from mindformers import LlamaForCausalLM, LlamaConfig
-            >>> from mindformers.tools.register.config import MindFormerConfig
-            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
-            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
-            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
-            >>> helper = MFLlama2Helper(mfconfig)
-            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
-            >>> helper.analysis_decoder_groups(network)
-        """
-        warnings.warn("`analysis_decoder_groups` is no longer used and will be remove soon.", DeprecationWarning)
-
-    # pylint: disable=unused-argument
-    def get_pre_layer(self, linear_name):
-        """
-        Get pre layer information from current linear_name.
-
-        Args:
-            linear_name (str): linear layer name.
-
-        Returns:
-            A dict of pre layer information which include pre layer name、layer and type.
-
-        Examples:
-            >>> from mindspore import context
-            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
-            >>> from mindformers import LlamaForCausalLM, LlamaConfig
-            >>> from mindformers.tools.register.config import MindFormerConfig
-            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
-            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
-            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
-            >>> helper = MFLlama2Helper(mfconfig)
-            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
-            >>> helper.analysis_decoder_groups(network)
-            >>> helper.get_pre_layer(linear_name)
-        """
-        warnings.warn("`get_pre_layer` is no longer used and will be remove soon.", DeprecationWarning)
