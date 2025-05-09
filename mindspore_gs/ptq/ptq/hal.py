@@ -722,8 +722,10 @@ class DynamicQuantMatmul(QuantUnitCell):
     @staticmethod
     def _from_smooth_matmul(layer_name, is_deploy, src: SmoothMatmul, w_qparam: QuantParam, transpose_a=False,
                             transpose_b=False, dst_dtype=dtype.float16):
-        if isinstance(src.mm, msops.MatMul): # why not gmm
-            qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
+            is_group_mm = isinstance(src.mm, GroupedMatmulV4)
+            qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype,
+                                      is_group_mm)
             quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
             return qbmm, quant_op
         raise ValueError(
@@ -732,8 +734,10 @@ class DynamicQuantMatmul(QuantUnitCell):
     @staticmethod
     def _from_smooth_matmul_for_deploy(layer_name, is_deploy, src: SmoothMatmulForDeploy, w_qparam: QuantParam,
                                        transpose_a=False, transpose_b=False, dst_dtype=dtype.float16):
-        if isinstance(src.mm, msops.MatMul): # why not gmm
-            qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype)
+        if isinstance(src.mm, (msops.MatMul, GroupedMatmulV4)):
+            is_group_mm = isinstance(src.mm, GroupedMatmulV4)
+            qbmm = DynamicQuantMatmul(layer_name, is_deploy, w_qparam.scale, transpose_a, transpose_b, dst_dtype,
+                                      is_group_mm)
             quant_op = DynamicQuantCell.create(layer_name, is_deploy, src.smooth_scale)
             return qbmm, quant_op
         raise ValueError(
