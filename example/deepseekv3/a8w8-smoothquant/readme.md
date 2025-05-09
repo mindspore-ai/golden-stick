@@ -42,7 +42,7 @@ ASCEND_RT_VISIBLE_DEVICES=xxx bash quant_infer.sh /path/to/mindformers
 ASCEND_RT_VISIBLE_DEVICES=xxx bash eval_ceval.sh /path/to/mindformers /path/to/ceval_dataset_path
 ```
 
-实测ceval(acc)结果为：89.38%
+实测ceval(acc)结果为：89.45%
 
 ## 5. 量化网络gsm8k数据集评测
 
@@ -51,3 +51,5 @@ ASCEND_RT_VISIBLE_DEVICES=xxx bash eval_ceval.sh /path/to/mindformers /path/to/c
 ```bash
 ASCEND_RT_VISIBLE_DEVICES=xxx bash eval_gsm8k.sh /path/to/mindformers /path/to/ceval_dataset_path
 ```
+
+实测gsm8k(acc)结果为：92.48%
