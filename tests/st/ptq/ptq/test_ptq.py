@@ -297,6 +297,14 @@ def quant_simple_gmm_net(non_decoder, linear_type, quant_type):
                         act_quant_granularity=QuantGranularity.PER_TOKEN,
                         act_quant_dtype=dtype.int8,
                         weight_quant_dtype=dtype.int8)
+    elif quant_type == "pertoken-smooth":
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
     elif quant_type == "w8a8-smoothquant":
         cfg = PTQConfig(mode=PTQMode.QUANTIZE,
                         backend=BackendTarget.ASCEND,
@@ -347,6 +355,14 @@ def eval_simple_gmm_net(non_decoder, linear_type, quant_type):
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["w2", "lm_head"],
                         act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        act_quant_dtype=dtype.int8,
+                        weight_quant_dtype=dtype.int8)
+    elif quant_type == "pertoken-smooth":
+        cfg = PTQConfig(mode=PTQMode.DEPLOY,
+                        backend=BackendTarget.ASCEND,
+                        opname_blacklist=["w2", "lm_head"],
+                        act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH,
                         act_quant_dtype=dtype.int8,
                         weight_quant_dtype=dtype.int8)
     elif quant_type == "w8a8-smoothquant":
@@ -407,7 +423,7 @@ def get_cos_similar(a: list, b: list):
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("non_decoder", [True, False])
 @pytest.mark.parametrize("linear_type", ["RowParallelLinear", "ColumnParallelLinear"])
-@pytest.mark.parametrize("quant_type", ["w8perchannela8pertoken", "w8a8-smoothquant", "w8a8"])
+@pytest.mark.parametrize("quant_type", ["w8perchannela8pertoken", "pertoken-smooth", "w8a8-smoothquant", "w8a8"])
 def test_ptq_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     Feature: eval simplenet which including one GroupedMatMul linear.
