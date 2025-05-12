@@ -133,6 +133,7 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     if quant_type.lower() == 'osl':
         # pylint: disable=protected-access
         ptq._config.always_use_fp_input_in_processer = True
+        ptq._config.skip_offload_in_processing = True
         ptq._config.algorithm_cache_path = 'osl_cache'
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)

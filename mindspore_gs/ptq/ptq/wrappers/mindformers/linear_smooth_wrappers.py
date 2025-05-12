@@ -428,7 +428,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         best_ratio = -1
         best_scale = 0
         best_error = float("inf")
-        fp16_weight = copy.deepcopy(self._layer.weight).astype(self.compute_type)
+        fp16_weight = self._layer.weight.value().astype(self.compute_type)
 
         group_size = self.cfg.group_size if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP \
               else self._layer.weight.shape[self.ic_axis]
@@ -450,7 +450,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                                             -1,
                                             False,
                                             False,
-                                            high_precision_params=True)
+                                            high_precision_params=False)
             w_scale, _, q_weight = quant_tensor(self._layer.weight.data,
                                                 self.w_quant_min,
                                                 self.w_quant_max,
@@ -462,7 +462,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                                                 self.oc_axis,
                                                 True,
                                                 False,
-                                                high_precision_params=True)
+                                                high_precision_params=False)
             t_w_scale = Tensor(w_scale)
             if self._layer.transpose_b:
                 t_w_scale = msops.transpose(t_w_scale, (1, 0))
@@ -519,8 +519,8 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
     def _loss(self, preds, grounds):
         total_loss = 0
         for pred, ground in zip(preds, grounds):
-            ground = msops.cast(ground, msdtype.float64)
-            pred = msops.cast(pred, msdtype.float64)
+            ground = msops.cast(ground, msdtype.float32)
+            pred = msops.cast(pred, msdtype.float32)
             total_loss += float(msops.mse_loss(ground, pred, reduction='mean'))
         return total_loss / len(grounds)
 
@@ -535,8 +535,6 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
             raise RuntimeError("Please catch matmul inputs before quantization.")
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)
         self.smooth()
-        # pylint: disable=protected-access
-        self.layer.weight._offload()
         self.cat_samples = None
         self.samples.clear()
 

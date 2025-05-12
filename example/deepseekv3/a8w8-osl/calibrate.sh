@@ -25,10 +25,6 @@ export MS_ENABLE_SYNC_COPY_INPUT=1
 export MS_JIT=0
 export FORCE_EAGER=true
 
-export HCCL_DETERMINISTIC=true
-export ASCEND_LAUNCH_BLOCKING=1
-export CUSTOM_MATMUL_SHUFFLE=off
-
 mf_path=$1
 worker_num=${2:-16}
 base_path=$(cd "$(dirname $0)"; pwd)

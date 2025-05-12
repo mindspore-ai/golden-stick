@@ -170,6 +170,7 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
         if uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE:
             # pylint: disable=protected-access
             ptq._config.always_use_fp_input_in_processer = True
+            ptq._config.skip_offload_in_processing = True
     else:
         raise ValueError(f"uargs.approach = {uargs_.approach} is unexpected, Available: w8a16, w8a8, c8, ptq.")
     logger.info(f'Create quantizer cost time is {time.time() - start_time} s.')
