@@ -314,9 +314,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         del self.qweight
 
     def _cache_key(self):
-        qweight_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|qweight'
-        scale_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|scale'
-        zero_name = '|' + 'layers|' + self.layer_name.split('.')[3] + '|' + self.linear_name + '|zero'
+        qweight_name = self.layer_name + '.qweight'
+        scale_name = self.layer_name + '.scale'
+        zero_name = self.layer_name + '.zero'
         return qweight_name, scale_name, zero_name
 
     def process(self):
