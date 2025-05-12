@@ -649,7 +649,8 @@ class AWQSmoothLinearCell(AWQLinearCell):
             self.cache.put(self.layer_name, best_ratio)
         # pylint: disable=protected-access
         del self.fp16_weight
-        _ = msops.AllReduce(group=GlobalComm.WORLD_COMM_GROUP)(best_scale)
+        if self.cfg.tp_size > 1:
+            _ = msops.AllReduce(group=GlobalComm.WORLD_COMM_GROUP)(best_scale)
         return best_scale
 
     def _compute_best_scale(self, alpha):
