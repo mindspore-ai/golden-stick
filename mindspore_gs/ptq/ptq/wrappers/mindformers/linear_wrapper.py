@@ -21,6 +21,7 @@ from mindspore.ops import functional as F
 from mindspore.ops.auto_generate import GroupedMatmulV4
 from mindspore.nn import Cell
 from mindformers.modules.layers import Linear
+from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.hal import ParallelType, QuantWithSmooth, DynamicQuantCell
 
@@ -75,6 +76,46 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
             self.layer.matmul.mm.__class__ = GroupedMatmulV4
         else:
             raise RuntimeError(f"Unsupported matmul type for hook: {type(self.layer.matmul)}")
+
+    def _find_aux_nodes(self):
+        if not self.context.enable_deploy_fusion:
+            logger.info(f"no aux nodes found for {self.layer_name} because not enable_deploy_fusion.")
+            return []
+        results = []
+        if any(self.layer_name == qnode.name for qnode in self.context.transformer_inspect.q_nodes):
+            siblings = self.context.transformer_inspect.name_tree.get_sibling_leaf_nodes(self.layer_name)
+            for sibling in siblings:
+                if (sibling in self.context.transformer_inspect.k_nodes or
+                    sibling in self.context.transformer_inspect.v_nodes):
+                    logger.info(f"add {sibling.name} as aux nodes for qnode {self.layer_name}.")
+                    results.append(sibling)
+        elif any(self.layer_name == knode.name for knode in self.context.transformer_inspect.k_nodes):
+            siblings = self.context.transformer_inspect.name_tree.get_sibling_leaf_nodes(self.layer_name)
+            for sibling in siblings:
+                if (sibling in self.context.transformer_inspect.q_nodes or
+                    sibling in self.context.transformer_inspect.v_nodes):
+                    logger.info(f"add {sibling.name} as aux nodes for knode {self.layer_name}.")
+                    results.append(sibling)
+        elif any(self.layer_name == vnode.name for vnode in self.context.transformer_inspect.v_nodes):
+            siblings = self.context.transformer_inspect.name_tree.get_sibling_leaf_nodes(self.layer_name)
+            for sibling in siblings:
+                if (sibling in self.context.transformer_inspect.q_nodes or
+                    sibling in self.context.transformer_inspect.k_nodes):
+                    logger.info(f"add {sibling.name} as aux nodes for vnode {self.layer_name}.")
+                    results.append(sibling)
+        elif any(self.layer_name == mlpw1node.name for mlpw1node in self.context.transformer_inspect.mlp_w1_nodes):
+            siblings = self.context.transformer_inspect.name_tree.get_sibling_leaf_nodes(self.layer_name)
+            for sibling in siblings:
+                if sibling in self.context.transformer_inspect.mlp_w3_nodes:
+                    logger.info(f"add {sibling.name} as aux nodes for mlp-w1 {self.layer_name}.")
+                    results.append(sibling)
+        elif any(self.layer_name == mlpw3node.name for mlpw3node in self.context.transformer_inspect.mlp_w3_nodes):
+            siblings = self.context.transformer_inspect.name_tree.get_sibling_leaf_nodes(self.layer_name)
+            for sibling in siblings:
+                if sibling in self.context.transformer_inspect.mlp_w1_nodes:
+                    logger.info(f"add {sibling.name} as aux nodes for mlp-w3 {self.layer_name}.")
+                    results.append(sibling)
+        return results
 
     @abc.abstractmethod
     def deploy(self):

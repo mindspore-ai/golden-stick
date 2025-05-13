@@ -26,7 +26,9 @@ from mindspore_gs.common.dumper import Dumper
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.register import RegisterMachine
 from mindspore_gs.common.gs_enum import BackendTarget
+from mindspore_gs.common.kvcache import KVCache
 from .ptq_config import PTQConfig, QuantGranularity, PrecisionRecovery, OutliersSuppressionType, PTQMode
+from .transformer_inspect import TransformerInspect
 
 algo_cfg_register = RegisterMachine()
 
@@ -107,6 +109,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     act_narrow_range: bool = False
     weight_narrow_range: bool = False
     kvcache_narrow_range: bool = False
+
     enable_deploy_fusion: bool = True
     kvcache_calibrate_max_new_tokens: int = 10
     reflash_inputs_after_each_processor: bool = False
@@ -122,6 +125,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
 
     dump_path: str = ""
     dumper: Dumper = Dumper()
+    transformer_inspect = TransformerInspect()
+    kvcache: KVCache = KVCache()
 
     def report_quant_info(self, layer_name: str, quant_type: str):
         info = self.layer_quant_info_collect.get(layer_name)

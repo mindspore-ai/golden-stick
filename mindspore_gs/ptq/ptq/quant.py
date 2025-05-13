@@ -280,6 +280,7 @@ class PTQ(CompAlgo):
         """
         self._config.update_comm_info()
         self._get_decoder_layers(network)
+        self._config.transformer_inspect.parse(network, self._target_layer_type)
         if self._config.mode == PTQMode.DEPLOY:
             logger.info("unset environ FORCE_EAGER and MS_JIT because of PTQMode.DEPLOY mode")
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):

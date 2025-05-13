@@ -62,6 +62,8 @@ class SmoothLinearCell(WrapperLinearCell):
         self.x_obs_max, self.x_obs_min = get_smooth_x_obs_min_max_op()
         self.w_obs_max, self.w_obs_min = get_min_max_op(cfg.tp_size, self.is_colparallel)
 
+        self.aux_nodes = self._find_aux_nodes()
+
     def _calc_smooth_scale(self, alpha, **kwargs):
         raise NotImplementedError
 
@@ -194,20 +196,28 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         except ImportError:
             pass
 
+    def _get_weight_max(self, layer_name, tensor, axis):
+        key = [layer_name, 'weight', 'max']
+        weight_max = self.context.kvcache.get(key)
+        if weight_max is None:
+            tensor.move_to('Ascend')
+            weight_max = msops.maximum(msops.abs(self.w_obs_max(tensor, axis)[0]),
+                                       msops.abs(self.w_obs_min(tensor, axis)[0]))
+            self.context.kvcache.put(key, weight_max)
+            tensor._offload()
+        else:
+            logger.info(f"Hit cache for {key}.")
+        return weight_max
+
     def _calc_smooth_scale(self, alpha, **kwargs):
         """_calc_smooth_scale"""
         shift_values = kwargs.get('shift_values', None)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|input0_alpha", Tensor(alpha))
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|input1_activation_inputs",
                                   self.cat_samples)
-        act_max = msops.maximum(
-            msops.abs(
-                self.x_obs_max(self.cat_samples - shift_values if shift_values is not None else self.cat_samples, 0)[0]
-            ),
-            msops.abs(
-                self.x_obs_min(self.cat_samples - shift_values if shift_values is not None else self.cat_samples, 0)[0]
-            ),
-        )
+        cat_samples = self.cat_samples - shift_values if shift_values is not None else self.cat_samples
+        act_max = msops.maximum(msops.abs(self.x_obs_max(cat_samples, 0)[0]),
+                                msops.abs(self.x_obs_min(cat_samples, 0)[0]))
         logger.debug(f"SmoothLinearCell: act_max of Layer({self._layer_name}) is {{{act_max.shape}, {act_max.dtype}}}")
         input_max_pow = msops.pow(act_max, alpha)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|output0_activation_minmax_pow",
@@ -217,8 +227,13 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input1_weight", self.layer.weight)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input2_weight_minmax_axis",
                                   Tensor(weight_smooth_minmax_axis))
-        weight_max = msops.maximum(msops.abs(self.w_obs_max(self.layer.weight, weight_smooth_minmax_axis)[0]),
-                                   msops.abs(self.w_obs_min(self.layer.weight, weight_smooth_minmax_axis)[0]))
+        weight_max = self._get_weight_max(self.layer_name, self.layer.weight, weight_smooth_minmax_axis)
+        logger.info(f'{self.layer_name}.weight_max = {weight_max}')
+        for aux_node in self.aux_nodes:
+            cur_weight_max = self._get_weight_max(aux_node.name, aux_node.value.weight, weight_smooth_minmax_axis)
+            logger.info(f'aux {aux_node.name}.weight_max = {cur_weight_max}')
+            weight_max = msops.maximum(weight_max, cur_weight_max)
+            logger.info(f'update {self.layer_name}.weight_max = {weight_max}')
         if len(weight_max.shape) == 2:
             weight_max = self.w_obs_max(weight_max, 0)[0]
         elif len(weight_max.shape) > 2:
