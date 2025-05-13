@@ -1017,65 +1017,30 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                                                            is_split_param=True,
                                                            split_axis=2)
 
-        w1_bias_name = f"model.layers.{layer_id}.{layer_type}.w1._layer.matmul.quant_bias"
-        w1_bias_param, _ = self.get_safetensor_from_file(w1_bias_name, src_hf_dir, hf_weight_map,
-                                                         is_split_param=True,
-                                                         split_axis=1)
-        w1_scale_name = f"model.layers.{layer_id}.{layer_type}.w1._layer.matmul.dequant_scale"
+        w1_scale_name = f"model.layers.{layer_id}.{layer_type}.w1._layer.matmul.weight_scale"
         w1_scale_param, _ = self.get_safetensor_from_file(w1_scale_name, src_hf_dir, hf_weight_map,
                                                           is_split_param=True,
                                                           split_axis=1)
-
-        w1_quant_zp = f"model.layers.{layer_id}.{layer_type}.w1.quant_op.input_zp"
-        w1_quant_scale = f"model.layers.{layer_id}.{layer_type}.w1.quant_op.input_scale"
-        w1_quant_zp_param, _ = self.get_safetensor_from_file(w1_quant_zp, src_hf_dir, hf_weight_map)
-        w1_quant_scale_param, _ = self.get_safetensor_from_file(w1_quant_scale, src_hf_dir, hf_weight_map)
 
         w3_weight_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.weight"
         w3_weight_param, _ = self.get_safetensor_from_file(w3_weight_name, src_hf_dir, hf_weight_map,
                                                            is_split_param=True,
                                                            split_axis=2)
 
-        w3_bias_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.matmul.quant_bias"
-        w3_bias_param, _ = self.get_safetensor_from_file(w3_bias_name, src_hf_dir, hf_weight_map,
-                                                         is_split_param=True,
-                                                         split_axis=1)
-
-        w3_scale_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.matmul.dequant_scale"
+        w3_scale_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.matmul.weight_scale"
         w3_scale_param, _ = self.get_safetensor_from_file(w3_scale_name, src_hf_dir, hf_weight_map,
                                                           is_split_param=True,
                                                           split_axis=1)
-
-        w3_quant_zp = f"model.layers.{layer_id}.{layer_type}.w3.quant_op.input_zp"
-        w3_quant_scale = f"model.layers.{layer_id}.{layer_type}.w3.quant_op.input_scale"
-        w3_quant_zp_param, _ = self.get_safetensor_from_file(w3_quant_zp, src_hf_dir, hf_weight_map)
-        w3_quant_scale_param, _ = self.get_safetensor_from_file(w3_quant_scale, src_hf_dir, hf_weight_map)
         if ffn_concat:
             concat_weight_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.weight"
             concat_weight_param = ms.Tensor(np.concatenate([w1_weight_param, w3_weight_param], axis=2), dtype=ms.int8)
             parameter_dict[concat_weight_name] = ms.Parameter(concat_weight_param, name=concat_weight_name,
                                                               requires_grad=False)
 
-            concat_bias_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.matmul.quant_bias"
-            concat_bias_param = ms.Tensor(np.concatenate([w1_bias_param, w3_bias_param], axis=1), dtype=ms.int32)
-            parameter_dict[concat_bias_name] = ms.Parameter(concat_bias_param, name=concat_bias_name,
-                                                            requires_grad=False)
-
-            concat_scale_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.matmul.dequant_scale"
+            concat_scale_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.matmul.weight_scale"
             concat_scale_param = ms.Tensor(np.concatenate([w1_scale_param, w3_scale_param], axis=1), dtype=ms.bfloat16)
             parameter_dict[concat_scale_name] = ms.Parameter(concat_scale_param, name=concat_scale_name,
                                                              requires_grad=False)
-
-            concat_quant_zp_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden.quant_op.input_zp"
-            concat_quant_zp_param = ms.Tensor(w1_quant_zp_param, dtype=ms.bfloat16)
-            parameter_dict[concat_quant_zp_name] = ms.Parameter(concat_quant_zp_param, name=concat_quant_zp_name,
-                                                                requires_grad=False)
-
-            concat_quant_scale_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden.quant_op.input_scale"
-            concat_quant_scale_param = ms.Tensor(w1_quant_scale_param, dtype=ms.bfloat16)
-            parameter_dict[concat_quant_scale_name] = ms.Parameter(concat_quant_scale_param,
-                                                                   name=concat_quant_scale_name,
-                                                                   requires_grad=False)
         else:
             # w1 w3
             parameter_dict[w1_weight_name] = ms.Parameter(ms.Tensor(w1_weight_param, ms.int8), name=w1_weight_name,
@@ -1083,25 +1048,10 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             parameter_dict[w3_weight_name] = ms.Parameter(ms.Tensor(w3_weight_param, ms.int8), name=w3_weight_name,
                                                           requires_grad=False)
 
-            parameter_dict[w1_bias_name] = ms.Parameter(ms.Tensor(w1_bias_param, ms.int32),
-                                                        name=w1_bias_name, requires_grad=False)
-            parameter_dict[w3_bias_name] = ms.Parameter(ms.Tensor(w3_bias_param, ms.int32),
-                                                        name=w3_bias_name, requires_grad=False)
-
             parameter_dict[w1_scale_name] = ms.Parameter(ms.Tensor(w1_scale_param, ms.bfloat16),
                                                          name=w1_scale_name, requires_grad=False)
             parameter_dict[w3_scale_name] = ms.Parameter(ms.Tensor(w3_scale_param, ms.bfloat16),
                                                          name=w3_scale_name, requires_grad=False)
-
-            parameter_dict[w1_quant_zp] = ms.Parameter(ms.Tensor(w1_quant_zp_param, ms.bfloat16),
-                                                       name=w1_quant_zp, requires_grad=False)
-            parameter_dict[w3_quant_zp] = ms.Parameter(ms.Tensor(w3_quant_zp_param, ms.bfloat16),
-                                                       name=w3_quant_zp, requires_grad=False)
-
-            parameter_dict[w1_quant_scale] = ms.Parameter(ms.Tensor(w1_quant_scale_param, ms.bfloat16),
-                                                          name=w1_quant_scale, requires_grad=False)
-            parameter_dict[w3_quant_scale] = ms.Parameter(ms.Tensor(w3_quant_scale_param, ms.bfloat16),
-                                                          name=w3_quant_scale, requires_grad=False)
 
     def smooth_quant_process_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map, parameter_dict, layer_type):
         """smooth_quant_process_ffn_weight"""
@@ -1111,63 +1061,30 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         w1_weight_param, _ = self.get_safetensor_from_file(w1_weight_name, src_hf_dir, hf_weight_map,
                                                            is_split_param=True,
                                                            split_axis=0)
-        w1_bias_name = f"model.layers.{layer_id}.{layer_type}.w1._layer.matmul.quant_bias"
-        w1_bias_param, _ = self.get_safetensor_from_file(w1_bias_name, src_hf_dir, hf_weight_map,
-                                                         is_split_param=True,
-                                                         split_axis=0)
-        w1_scale_name = f"model.layers.{layer_id}.{layer_type}.w1._layer.matmul.dequant_scale"
+        w1_scale_name = f"model.layers.{layer_id}.{layer_type}.w1._layer.matmul.weight_scale"
         w1_scale_param, _ = self.get_safetensor_from_file(w1_scale_name, src_hf_dir, hf_weight_map,
                                                           is_split_param=True,
                                                           split_axis=0)
-
-        w1_quant_zp = f"model.layers.{layer_id}.{layer_type}.w1.quant_op.input_zp"
-        w1_quant_scale = f"model.layers.{layer_id}.{layer_type}.w1.quant_op.input_scale"
-        w1_quant_zp_param, _ = self.get_safetensor_from_file(w1_quant_zp, src_hf_dir, hf_weight_map)
-        w1_quant_scale_param, _ = self.get_safetensor_from_file(w1_quant_scale, src_hf_dir, hf_weight_map)
 
         w3_weight_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.weight"
         w3_weight_param, _ = self.get_safetensor_from_file(w3_weight_name, src_hf_dir, hf_weight_map,
                                                            is_split_param=True,
                                                            split_axis=0)
-        w3_bias_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.matmul.quant_bias"
-        w3_bias_param, _ = self.get_safetensor_from_file(w3_bias_name, src_hf_dir, hf_weight_map,
-                                                         is_split_param=True,
-                                                         split_axis=0)
-        w3_scale_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.matmul.dequant_scale"
+        w3_scale_name = f"model.layers.{layer_id}.{layer_type}.w3._layer.matmul.weight_scale"
         w3_scale_param, _ = self.get_safetensor_from_file(w3_scale_name, src_hf_dir, hf_weight_map,
                                                           is_split_param=True,
                                                           split_axis=0)
 
-        w3_quant_zp = f"model.layers.{layer_id}.{layer_type}.w3.quant_op.input_zp"
-        w3_quant_scale = f"model.layers.{layer_id}.{layer_type}.w3.quant_op.input_scale"
-        w3_quant_zp_param, _ = self.get_safetensor_from_file(w3_quant_zp, src_hf_dir, hf_weight_map)
-        w3_quant_scale_param, _ = self.get_safetensor_from_file(w3_quant_scale, src_hf_dir, hf_weight_map)
         if ffn_concat:
             concat_weight_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.weight"
             concat_weight_param = ms.Tensor(np.concatenate([w1_weight_param, w3_weight_param], axis=0), dtype=ms.int8)
             parameter_dict[concat_weight_name] = ms.Parameter(concat_weight_param, name=concat_weight_name,
                                                               requires_grad=False)
 
-            concat_bias_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.matmul.quant_bias"
-            concat_bias_param = ms.Tensor(np.concatenate([w1_bias_param, w3_bias_param], axis=0), dtype=ms.int32)
-            parameter_dict[concat_bias_name] = ms.Parameter(concat_bias_param, name=concat_bias_name,
-                                                            requires_grad=False)
-
-            concat_scale_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.matmul.dequant_scale"
-            concat_scale_param = ms.Tensor(np.concatenate([w1_scale_param, w3_scale_param], axis=0), dtype=ms.float32)
+            concat_scale_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.matmul.weight_scale"
+            concat_scale_param = ms.Tensor(np.concatenate([w1_scale_param, w3_scale_param], axis=0), dtype=ms.bfloat16)
             parameter_dict[concat_scale_name] = ms.Parameter(concat_scale_param, name=concat_scale_name,
                                                              requires_grad=False)
-
-            concat_quant_zp_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden.quant_op.input_zp"
-            concat_quant_zp_param = ms.Tensor(w1_quant_zp_param, dtype=ms.int8)
-            parameter_dict[concat_quant_zp_name] = ms.Parameter(concat_quant_zp_param, name=concat_quant_zp_name,
-                                                                requires_grad=False)
-
-            concat_quant_scale_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden.quant_op.input_scale"
-            concat_quant_scale_param = ms.Tensor(w1_quant_scale_param, dtype=ms.bfloat16)
-            parameter_dict[concat_quant_scale_name] = ms.Parameter(concat_quant_scale_param,
-                                                                   name=concat_quant_scale_name,
-                                                                   requires_grad=False)
         else:
             # w1 w3
             parameter_dict[w1_weight_name] = ms.Parameter(ms.Tensor(w1_weight_param, ms.int8), name=w1_weight_name,
@@ -1175,25 +1092,10 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             parameter_dict[w3_weight_name] = ms.Parameter(ms.Tensor(w3_weight_param, ms.int8), name=w3_weight_name,
                                                           requires_grad=False)
 
-            parameter_dict[w1_bias_name] = ms.Parameter(ms.Tensor(w1_bias_param, ms.int32),
-                                                        name=w1_bias_name, requires_grad=False)
-            parameter_dict[w3_bias_name] = ms.Parameter(ms.Tensor(w3_bias_param, ms.int32),
-                                                        name=w3_bias_name, requires_grad=False)
-
-            parameter_dict[w1_scale_name] = ms.Parameter(ms.Tensor(w1_scale_param, ms.float32),
+            parameter_dict[w1_scale_name] = ms.Parameter(ms.Tensor(w1_scale_param, ms.bfloat16),
                                                          name=w1_scale_name, requires_grad=False)
-            parameter_dict[w3_scale_name] = ms.Parameter(ms.Tensor(w3_scale_param, ms.float32),
+            parameter_dict[w3_scale_name] = ms.Parameter(ms.Tensor(w3_scale_param, ms.bfloat16),
                                                          name=w3_scale_name, requires_grad=False)
-
-            parameter_dict[w1_quant_zp] = ms.Parameter(ms.Tensor(w1_quant_zp_param, ms.int8),
-                                                       name=w1_quant_zp, requires_grad=False)
-            parameter_dict[w3_quant_zp] = ms.Parameter(ms.Tensor(w3_quant_zp_param, ms.int8),
-                                                       name=w3_quant_zp, requires_grad=False)
-
-            parameter_dict[w1_quant_scale] = ms.Parameter(ms.Tensor(w1_quant_scale_param, ms.bfloat16),
-                                                          name=w1_quant_scale, requires_grad=False)
-            parameter_dict[w3_quant_scale] = ms.Parameter(ms.Tensor(w3_quant_scale_param, ms.bfloat16),
-                                                          name=w3_quant_scale, requires_grad=False)
 
     def smooth_quant_process_qkv_weight(self, src_hf_dir, layer_id, hf_weight_map, parameter_dict):
         '''smooth_quant_process_qkv_weight'''
