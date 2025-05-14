@@ -115,8 +115,24 @@ ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_qu
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                       outliers_suppression=OutliersSuppressionType.SMOOTH)
+```
+
+#### OutlierSuppressionLite算法
+
+[SmoothQuant](https://arxiv.org/pdf/2211.10438)算法将激活值的量化难度转移到权重的量化上，同时引入超参数“迁移强度”(migration strength)α来控制这一幅度。论文通过整网粒度的实验得出，对于大多数模型而言α的最佳取值是0.5。然而，不同的模型结构、不同的decoder层位置、docoder层内矩阵的不同位置会导致激活值和权重的分布不同，进而导致α的最佳取值差异。
+
+OutlierSuppressionLite提供一种优化α的网格搜索算法，为网络中的每个矩阵分别搜索最优α值，进一步提升静态量化精度。
+
+可以通过如下配置项使能PTQ的OutlierSuppressionLite能力：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                       outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
 ```
 
 #### GPTQ算法
