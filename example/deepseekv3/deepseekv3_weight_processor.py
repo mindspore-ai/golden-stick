@@ -59,7 +59,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         self.num_layers = self.config.model.model_config.num_layers
         self.expert_num = self.config.moe_config.expert_num
         self.moe_expert_parallel = self.config.parallel_config.expert_parallel
-        self.moe_tensor_parallel = self.global_group_size // self.moe_tensor_parallel
+        self.moe_tensor_parallel = self.global_group_size // self.moe_expert_parallel
         self.ep_method = EPMethod.DEFAULT
         if self.dp_group_size > 1 and self.moe_expert_parallel == self.global_group_size:
             self.ep_method = EPMethod.ALLTOALL

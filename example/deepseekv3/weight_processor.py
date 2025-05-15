@@ -49,7 +49,7 @@ class BaseWeightProcessor:
         self.global_group_size = get_group_size()
         self.tp_group_size = get_tp_world_size()
         self.dp_group_size = get_data_parallel_world_size()
-        self.moe_ep_size = self.config.parallel.moe_expert_parallel
+        self.moe_ep_size = self.config.parallel_config.expert_parallel
         self.moe_tp_size = self.global_group_size // self.moe_ep_size
         self.ep_method = EPMethod.DEFAULT
         self.tp_rank_id = self.global_rank_id % self.tp_group_size
