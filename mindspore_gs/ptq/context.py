@@ -118,6 +118,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     algorithm_cache_path: str = ''
     always_use_fp_input_in_processer: bool = False
     use_inner_osp: bool = False
+    skip_offload_in_processing: bool = False
 
     dump_path: str = ""
     dumper: Dumper = Dumper()

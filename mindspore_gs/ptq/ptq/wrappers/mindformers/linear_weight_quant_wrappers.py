@@ -131,8 +131,12 @@ class WeightQuantLinearCell(WrapperLinearCell):
     def process(self):
         super().process()
         self.quant()
-        # pylint: disable=protected-access
-        self.layer.weight._offload()
+        if not self.cfg.skip_offload_in_processing:
+            # FIXME: Experiments show that offloading weight here may lead to memory leak. Set the temporary flag
+            # 'skip_offload_in_processing' to skip this call, the weight param will be offloaded in PTQ.apply procedure.
+            # The switch should be removed after the issue is fixed. -- @tongl2
+            # pylint: disable=protected-access
+            self.layer.weight._offload()
         self.cat_samples = None
 
     def deploy(self):

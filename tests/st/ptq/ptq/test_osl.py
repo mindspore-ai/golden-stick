@@ -184,6 +184,7 @@ def create_ptq(mode):
     ptq = PTQ(config=cfg)
     # pylint: disable=protected-access
     ptq._config.always_use_fp_input_in_processer = True
+    ptq._config.skip_offload_in_processing = True
     ptq._config.algorithm_cache_path = '' # Disable cache for testing
     ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
     return ptq

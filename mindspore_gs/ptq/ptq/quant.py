@@ -347,6 +347,7 @@ class PTQ(CompAlgo):
                     index += 1
             start_time = time.time()
             offload_network(layer)
+            gc.collect()
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
