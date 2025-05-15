@@ -221,6 +221,14 @@ dataset_eval()
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_smoothquant_safetensors/" ${vocab_file} ${tokenizer_file} 16 False
   eval "eval smooth-quant-a8w8 deepseek-r1" "a8w8-smoothquant" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "smoothquant"
 
+  ############################ osl-a8w8 ############################
+  # quant ckpt osl-a8w8
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 16 True
+  quant "quant deepseek-r1 bfp16 to a8w8 by osl" "a8w8-osl" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "osl"
+  # osl-a8w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_osl_safetensors/" ${vocab_file} ${tokenizer_file} 16 False
+  eval "eval osl-a8w8 deepseek-r1" "a8w8-osl" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "osl"
+
   ############################ a16w8 ############################
   # quant a16w8 ckpt
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 16 True
@@ -241,6 +249,7 @@ dataset_eval()
   echo_result "atb a8w8 deepseek-r1" "${BASEPATH}/ws/atb-a8w8_eval_log/worker_0.log"
   echo_result "gptq a16w4 deepseek-r1" "${BASEPATH}/ws/gptq-a16w4_eval_log/worker_0.log"
   echo_result "a8w8-smoothquant deepseek-r1" "${BASEPATH}/ws/a8w8-smoothquant_eval_log/worker_0.log"
+  echo_result "a8w8-osl deepseek-r1" "${BASEPATH}/ws/a8w8-osl_eval_log/worker_0.log"
   echo_result "a16w8 deepseek-r1" "${BASEPATH}/ws/a16w8_eval_log/worker_0.log"
   echo_result "a8perotken-w8 deepseek-r1" "${BASEPATH}/ws/a8perotken-w8_eval_log/worker_0.log"
 }
@@ -268,6 +277,14 @@ quant_infer()
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_smoothquant_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
   infer "infer smooth-quant-a8w8 deepseek-r1" "a8w8-smoothquant" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "smoothquant"
 
+  ############################ osl-a8w8 ############################
+  # quant ckpt osl-a8w8
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True 4
+  quant "quant deepseek-r1 bfp16 to a8w8 by osl" "a8w8-osl" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "osl"
+  # osl-a8w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_osl_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
+  infer "infer osl-a8w8 deepseek-r1" "a8w8-osl" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "osl"
+
   ############################ a16w8 ############################
   # quant a16w8 ckpt
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True 4
@@ -287,6 +304,7 @@ quant_infer()
   check_infer_result "atb a8w8 deepseek-r1" "${BASEPATH}/ws/atb-a8w8_infer_log/worker_0.log"
   check_infer_result "gptq a16w4 deepseek-r1" "${BASEPATH}/ws/gptq-a16w4_infer_log/worker_0.log"
   check_infer_result "a8w8-smoothquant deepseek-r1" "${BASEPATH}/ws/a8w8-smoothquant_infer_log/worker_0.log"
+  check_infer_result "a8w8-osl deepseek-r1" "${BASEPATH}/ws/a8w8-osl_infer_log/worker_0.log"
   check_infer_result "a16w8 deepseek-r1" "${BASEPATH}/ws/a16w8_infer_log/worker_0.log"
   check_infer_result "a8perotken-w8 deepseek-r1" "${BASEPATH}/ws/a8perotken-w8_infer_log/worker_0.log"
 
