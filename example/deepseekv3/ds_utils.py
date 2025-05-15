@@ -80,15 +80,18 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'smoothquant':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                        opname_blacklist=['lm_head', 'lkv2kv'])
-        w2_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                              act_quant_dtype=msdtype.int8,
-                              outliers_suppression=OutliersSuppressionType.NONE,
-                              precision_recovery=PrecisionRecovery.NONE,
-                              act_quant_granularity=QuantGranularity.PER_TOKEN,
-                              weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-        layer_policies = OrderedDict({r'.*\.w2.*': w2_config})
+                        act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS,
+                        opname_blacklist=['lkv2kv', 'lm_head'], precision_recovery=PrecisionRecovery.NONE,
+                        act_quant_granularity=QuantGranularity.PER_TENSOR,
+                        weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+        ffn_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                               act_quant_dtype=msdtype.int8,
+                               outliers_suppression=OutliersSuppressionType.NONE,
+                               precision_recovery=PrecisionRecovery.NONE,
+                               act_quant_granularity=QuantGranularity.PER_TOKEN,
+                               weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+        layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
     elif quant_type.lower() == 'omniquant':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.OMNIQUANT_GRID,
@@ -115,10 +118,6 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     if 'awq' in quant_type.lower():
         # pylint: disable=protected-access
         ptq._config.weight_symmetric = False
-    if 'smoothquant' in quant_type.lower():
-        # pylint: disable=protected-access
-        ptq._config.aclnn_quant_list = ["routed_experts.ffn.w_gate_hidden", "routed_experts.ffn.w1",
-                                        "routed_experts.ffn.w3"]
     ptq._config.algorithm_cache_path = ""
     if quant_type.lower() == 'omniquant':
         # pylint: disable=protected-access
