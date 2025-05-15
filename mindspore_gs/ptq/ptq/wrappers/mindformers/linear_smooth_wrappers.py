@@ -29,6 +29,9 @@ from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
+from mindformers.experimental.infer.core.moe import ColumnParallelGroupLinear, RowParallelGroupLinear, \
+    ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion
+
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
@@ -234,6 +237,7 @@ class AWQLinearCell(SmoothLinearCell):
     """SmoothLinearCell"""
     @staticmethod
     def reg_self():
+        '''register quant method'''
         class AWQChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 return False
@@ -241,6 +245,10 @@ class AWQLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
 
     def _quant_info(self) -> str:
         return ""

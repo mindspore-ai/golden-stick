@@ -36,7 +36,6 @@ from deepseekv3_weight_processor import DeepseekV3WeightProcessor
 from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
 from research.deepseek3.deepseek3_config import DeepseekV3Config
 
-
 def create_ptq(quant_type: str, quant_mode: PTQMode):
     """create_ptq"""
     if quant_type.lower() == 'dsquant':

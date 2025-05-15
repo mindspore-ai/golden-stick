@@ -225,7 +225,7 @@ class LinearInferCell(Cell):
             output = self._layer.reduce_scatter_to_sp_region(output_parallel)
             output = output.swapaxes(0, 1).contiguous()
         else:
-            if self._layer.moe_delay_allreduce:
+            if self._layer.delay_allreduce:
                 output = output_parallel
             else:
                 output = self._layer.reduce_from_mp_region(output_parallel)
