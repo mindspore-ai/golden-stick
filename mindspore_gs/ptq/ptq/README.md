@@ -115,8 +115,24 @@ User can enable the SmoothQuant capability of PTQ with the following configurati
 from mindspore import dtype as msdtype
 from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
                        outliers_suppression=OutliersSuppressionType.SMOOTH)
+```
+
+#### OutlierSuppressionLite Algorithm
+
+[SmoothQuant](https://arxiv.org/pdf/2211.10438) algorithm migrates the quantization difficulty from activations to weights, and introduces a hyper-parameter, migration strength α, to control how much difficulty is migrated. Through whole-model experiments, the paper found that α = 0.5 is the well-balanced point for most models. However, different network structures, different positions of decoder layers, and different positions of matrices within decoder layers can lead to different distributions of activation values and weights, thereby resulting in different optimal values of α.
+
+OutlierSuppressionLite offers a grid search algorithm to optimize α, searching for the optimal α value for each matrix respectively in the network, in order to further improve static quantization accuracy.
+
+User can enable the OutlierSuppressionLite capability of PTQ with the following configuration item:
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                       outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
 ```
 
 #### Dynamic Quantization Algorithm
