@@ -251,6 +251,29 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         transform_and_load_checkpoint(self.mf_config, None, network, None)
 
 
+class Qwen3Helper(MFLlama2Helper):
+    """
+    Derived from 'NetworkHelper', a utility class for the MindFormers framework ParrallelLlamaForCasualLM network.
+
+    Args:
+        config (MindFormerConfig): A MindFormerConfig object indicates the network configuration.
+
+    Raises:
+        TypeError: If input `config` is not an instance of `MindFormerConfig`.
+
+    Examples:
+        >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
+        >>> from mindformers.tools.register.config import MindFormerConfig
+        >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+        >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+        >>> helper = MFParallelLlama2Helper(mfconfig)
+        >>> network = helper.create_network()
+    """
+    def _load_ckpt(self, network):
+        """_load_ckpt"""
+        transform_and_load_checkpoint(self.mf_config, None, network, None)
+
+
 class MFParallelTeleChat2Helper(MFParallelLlama2Helper):
     """MFParallelTeleChat2Helper"""
 
