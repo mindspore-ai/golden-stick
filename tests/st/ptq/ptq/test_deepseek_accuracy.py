@@ -57,7 +57,7 @@ def test_ptq_deepseek_smoothquant_accuracy():
     ptq_predict_deepseek_4p_run("smoothquant")
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_ptq_deepseek_a16w8_accuracy():

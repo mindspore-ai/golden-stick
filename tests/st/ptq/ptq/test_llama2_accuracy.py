@@ -71,7 +71,6 @@ def test_ptq_llama2_a16w8c8_accuracy():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.skip(reason="update package, fix later.")
 def test_ptq_llama2_a8dynw8_accuracy():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
