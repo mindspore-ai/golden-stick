@@ -50,8 +50,8 @@ class QuantPageAttentionMgrCell(WrapperCell):
         Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
         Quantizer.reg_layer_map(ParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
 
-    def __init__(self, linear_name, layer, context: InnerPTQConfig, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, layer, cfg, context, network_helper, **kwargs)
+    def __init__(self, linear_name, layer, context: InnerPTQConfig, cfg, **kwargs):
+        super().__init__(linear_name, layer, cfg, context, **kwargs)
         self.key_samples = []
         self.value_samples = []
         n = layer.n_kv_heads

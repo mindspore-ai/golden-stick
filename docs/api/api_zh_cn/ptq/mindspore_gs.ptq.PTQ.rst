@@ -31,7 +31,6 @@ mindspore_gs.ptq.PTQ
         异常：
             - **RuntimeError** - 如果当前算法没有有效的初始化。
             - **TypeError** - `network` 不是一个 `Cell` 对象。
-            - **ValueError** - `PTQMode.DEPLOY` 模式时，`network_helper` 为空。
             - **ValueError** - 当datasets为空。
 
     .. py:method:: convert(net_opt: Cell, ckpt_path="")

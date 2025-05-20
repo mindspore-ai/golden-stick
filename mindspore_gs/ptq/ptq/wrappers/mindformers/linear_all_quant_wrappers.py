@@ -57,8 +57,8 @@ class AllQuantLinearCell(WeightQuantLinearCell):
             Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(RowParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
 
-    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
 
         is_rowparallel = self.parallel_type == ParallelType.ROW_PARALLEL
         self.x_quant_max, self.x_quant_min = get_min_max_op(cfg.tp_size, is_rowparallel)

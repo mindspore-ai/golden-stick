@@ -21,7 +21,6 @@ from mindspore import dtype as msdtype
 from mindspore.nn import Cell
 
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.processor import Processor, transform_network_inplace
 from mindspore_gs.ptq.ptq_config import OutliersSuppressionType
 from mindspore_gs.ptq.context import LayerQuantizeAlgo
@@ -81,7 +80,7 @@ class Algorithm:
         """load_mindformers_plugin"""
         raise NotImplementedError
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
+    def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
         """replace"""
         raise NotImplementedError
 

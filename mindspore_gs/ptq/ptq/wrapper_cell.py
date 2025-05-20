@@ -19,7 +19,6 @@ import dataclasses
 from mindspore.nn import Cell
 from mindspore import ops as msops
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 
 class Checker:
@@ -39,12 +38,11 @@ class WrapperCell(abc.ABC, Cell):
 
     # pylint: disable=W0613
     def __init__(self, layer_name: str, layer, context: InnerPTQConfig, cfg: InnerPTQConfig,
-                 network_helper: NetworkHelper, **kwargs):
+                 **kwargs):
         super().__init__()
         self.cfg = cfg
         self._layer_name = layer_name
         self._layer = layer
-        self.net_helper = network_helper
         self.samples = []
         self.cat_samples = None
         self.group_list = None
