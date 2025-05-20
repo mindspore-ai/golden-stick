@@ -241,7 +241,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_hello_ds(tokenizer, 1)
-    network = ptq.apply(network, helper, datasets=ds)
+    network = ptq.apply(network, datasets=ds)
     network = ptq.convert(network)
     try:
         rank_id = get_rank()

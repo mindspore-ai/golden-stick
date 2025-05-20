@@ -48,8 +48,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
         Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
 
-    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
         if isinstance(self.layer, RowParallelLinear):
             self.parallel_type = ParallelType.ROW_PARALLEL
         elif isinstance(self.layer, ColumnParallelLinear):

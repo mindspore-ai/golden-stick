@@ -47,8 +47,8 @@ class ClipLinearCell(WrapperLinearCell):
     def _quant_info(self):
         return "wclip"
 
-    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
         self.is_rowparallel = isinstance(self.layer, RowParallelLinear)
         self.is_colparallel = isinstance(self.layer, ColumnParallelLinear)
         self.is_linear = isinstance(self.layer, Linear)

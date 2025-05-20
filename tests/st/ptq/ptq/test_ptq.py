@@ -29,7 +29,6 @@ from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
                               PrecisionRecovery, GPTQQuantConfig, AWQConfig, QuantGranularity)
-from mindspore_gs.ptq.network_helpers import NetworkHelper
 from tests.st.test_utils import get_available_port
 
 
@@ -70,11 +69,13 @@ class SimpleSwiGLUNet(nn.Cell):
             """linear"""
             return self.linear(*args, **kwargs)
 
-    def __init__(self):
+    def __init__(self, foo_seq_length=1024):
         super(SimpleSwiGLUNet, self).__init__()
         self.hidden_act = SwiGLU
+        self.foo_seq_length = foo_seq_length
         SwiGLU.set_size(512)
-        linear = Linear(in_channels=1024, out_channels=1024, activation=self.hidden_act, weight_init="ones")
+        linear = Linear(in_channels=foo_seq_length, out_channels=foo_seq_length, activation=self.hidden_act,
+                        weight_init="ones")
         linear.out_channels = 512
         self.decoder = SimpleNet.DecoderCell(linear)
 
@@ -82,28 +83,11 @@ class SimpleSwiGLUNet(nn.Cell):
         """decoder"""
         return self.decoder(x)
 
-
-class SimpleSwiGLUNetworkHelper(NetworkHelper):
-    """SimpleSwiGLUNetworkHelper"""
-    def __init__(self, **kwargs) -> None:
-        self.attrs = kwargs
-
-    def create_network(self):
-        return SimpleSwiGLUNet()
-
-    def get_spec(self, name: str):
-        return self.attrs.get(name, None)
-
-    def create_tokenizer(self, **kwargs):
-        return None
-
-    def generate(self, network: nn.Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
-        input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',
+    # pylint: disable=unused-argument
+    def generate(self, input_ids, do_sample=False, max_new_tokens=1):
+        input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
-        return network(Tensor(input_ids, dtype=dtype.float16))
-
-    def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
-        raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
+        return self.construct(Tensor(input_ids, dtype=dtype.float16))
 
 
 class SimpleGmmNet(nn.Cell):
@@ -126,13 +110,14 @@ class SimpleGmmNet(nn.Cell):
             super().__init__()
             self.use_sequence_parallel = False
 
-    def __init__(self, linear_type):
+    def __init__(self, linear_type, foo_seq_length=1024):
         super(SimpleGmmNet, self).__init__()
         self.config = SimpleGmmNet.ParallelConfig()
+        self.foo_seq_length = foo_seq_length
         if linear_type == "ColumnParallelLinear":
             linear = ColumnParallelLinear(
-                1024,
-                1024,
+                foo_seq_length,
+                foo_seq_length,
                 config=self.config,
                 bias=False,
                 transpose_b=True,
@@ -144,8 +129,8 @@ class SimpleGmmNet(nn.Cell):
             )
         elif linear_type == "RowParallelLinear":
             linear = RowParallelLinear(
-                1024,
-                1024,
+                foo_seq_length,
+                foo_seq_length,
                 config=self.config,
                 input_is_parallel=True,
                 bias=False,
@@ -164,28 +149,11 @@ class SimpleGmmNet(nn.Cell):
         """decoder"""
         return self.decoder(x, group_list=self.group_list)
 
-
-class SimpleGmmNetworkHelper(NetworkHelper):
-    """SimpleGmmNetworkHelper"""
-    def __init__(self, **kwargs) -> None:
-        self.attrs = kwargs
-
-    def create_network(self):
-        return SimpleGmmNet(self.attrs["linear_type"])
-
-    def get_spec(self, name: str):
-        return self.attrs.get(name, None)
-
-    def create_tokenizer(self, **kwargs):
-        return None
-
-    def generate(self, network: nn.Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
-        input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',
+    # pylint: disable=unused-argument
+    def generate(self, input_ids, do_sample=False, max_new_tokens=1):
+        input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
-        return network(Tensor(input_ids, dtype=dtype.bfloat16))
-
-    def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
-        raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
+        return self.construct(Tensor(input_ids, dtype=dtype.bfloat16))
 
 
 def quant_simple_swiglu_net(non_decoder, quant_type):
@@ -200,8 +168,7 @@ def quant_simple_swiglu_net(non_decoder, quant_type):
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
 
-    net_helper = SimpleSwiGLUNetworkHelper(seq_length=1024)
-    network = net_helper.create_network()
+    network = SimpleSwiGLUNet(1024)
     ds = create_foo_ds(1)
 
     if quant_type == "w8a8":
@@ -219,7 +186,7 @@ def quant_simple_swiglu_net(non_decoder, quant_type):
     ptq = PTQ(config=cfg)
     if non_decoder:
         ptq.decoder_layer_types.append(SimpleSwiGLUNet.DecoderCell)
-    network = ptq.apply(network, net_helper, datasets=ds)
+    network = ptq.apply(network, datasets=ds)
     network = ptq.convert(network)
     ms.save_checkpoint(network.parameters_dict(), os.path.join("./simpleswiglunet-quant.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
@@ -241,13 +208,12 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
 
-    net_helper = SimpleSwiGLUNetworkHelper(seq_length=1024)
-    network = net_helper.create_network()
+    network = SimpleSwiGLUNet(1024)
     ds = create_foo_ds(1)
 
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
-        foutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+        foutput = network.generate(input_ids, max_new_tokens=100)
     if quant_type == "w8a8":
         cfg = PTQConfig(mode=PTQMode.DEPLOY,
                         backend=BackendTarget.ASCEND,
@@ -267,7 +233,7 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
     ms.load_param_into_net(network, param_dict)
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
-        qoutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+        qoutput = network.generate(input_ids, max_new_tokens=100)
     np.allclose(foutput.asnumpy(), qoutput.asnumpy(), 0, 0)
 
 
@@ -284,13 +250,12 @@ def quant_simple_gmm_net(non_decoder, linear_type, quant_type):
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
 
-    net_helper = SimpleGmmNetworkHelper(seq_length=1024, linear_type=linear_type)
-    network = net_helper.create_network()
+    network = SimpleGmmNet(linear_type, 1024)
     ds = create_foo_ds(1)
     fpoutput = []
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
-        fpoutput.append(net_helper.generate(network, input_ids, max_new_tokens=100))
+        fpoutput.append(network.generate(input_ids, max_new_tokens=100))
     if quant_type == "w8perchannela8pertoken":
         cfg = PTQConfig(mode=PTQMode.QUANTIZE,
                         backend=BackendTarget.ASCEND,
@@ -325,7 +290,7 @@ def quant_simple_gmm_net(non_decoder, linear_type, quant_type):
     ptq = PTQ(config=cfg)
     if non_decoder:
         ptq.decoder_layer_types.append(SimpleGmmNet.DecoderCell)
-    network = ptq.apply(network, net_helper, datasets=ds)
+    network = ptq.apply(network, datasets=ds)
     network = ptq.convert(network)
     ms.save_checkpoint(network.parameters_dict(), os.path.join("./simplegmm-quant.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
@@ -347,8 +312,7 @@ def eval_simple_gmm_net(non_decoder, linear_type, quant_type):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
 
-    net_helper = SimpleGmmNetworkHelper(seq_length=1024, linear_type=linear_type)
-    network = net_helper.create_network()
+    network = SimpleGmmNet(linear_type, 1024)
     ds = create_foo_ds(1)
 
     if quant_type == "w8perchannela8pertoken":
@@ -391,7 +355,7 @@ def eval_simple_gmm_net(non_decoder, linear_type, quant_type):
     ms.load_param_into_net(network, param_dict)
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
-        qoutput.append(net_helper.generate(network, input_ids, max_new_tokens=100))
+        qoutput.append(network.generate(input_ids, max_new_tokens=100))
     return qoutput
 
 
@@ -408,6 +372,7 @@ def test_ptq_simple_swiglu_net(non_decoder, quant_type):
     """
     quant_simple_swiglu_net(non_decoder, quant_type)
     eval_simple_swiglu_net(non_decoder, quant_type)
+
 
 def get_cos_similar(a: list, b: list):
     '''get_cos_similar'''
@@ -437,6 +402,7 @@ def test_ptq_simple_gmm_net(non_decoder, linear_type, quant_type):
         for fpout, qout in zip(fpoutput, qoutput):
             assert get_cos_similar(fpout, qout) > 0.99
 
+
 class SimpleNet(nn.Cell):
     """
     Network with single linear to be quant
@@ -451,37 +417,21 @@ class SimpleNet(nn.Cell):
             """linear"""
             return self.linear(*args, **kwargs)
 
-    def __init__(self):
+    def __init__(self, foo_seq_length=1024):
         super(SimpleNet, self).__init__()
-        linear = Linear(in_channels=1024, out_channels=1024, weight_init="ones")
+        self.foo_seq_length = foo_seq_length
+        linear = Linear(in_channels=foo_seq_length, out_channels=foo_seq_length, weight_init="ones")
         self.decoder = SimpleNet.DecoderCell(linear)
 
     def construct(self, x):
         """decoder"""
         return self.decoder(x)
 
-
-class SimpleNetworkHelper(NetworkHelper):
-    """SimpleNetworkHelper"""
-    def __init__(self, **kwargs) -> None:
-        self.attrs = kwargs
-
-    def create_network(self):
-        return SimpleNet()
-
-    def get_spec(self, name: str):
-        return self.attrs.get(name, None)
-
-    def create_tokenizer(self, **kwargs):
-        return None
-
-    def generate(self, network: nn.Cell, input_ids: np.ndarray, max_new_tokens=1, **kwargs):
-        input_ids = np.pad(input_ids, ((0, 0), (0, self.get_spec("seq_length") - input_ids.shape[1])), 'constant',
+    # pylint: disable=unused-argument
+    def generate(self, input_ids, do_sample=False, max_new_tokens=1):
+        input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
-        return network(Tensor(input_ids, dtype=dtype.float16))
-
-    def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
-        raise RuntimeError("InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()")
+        return self.construct(Tensor(input_ids, dtype=dtype.float16))
 
 
 def create_foo_ds(repeat=1):
@@ -686,8 +636,7 @@ def quant_simplenet(non_decoder):
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
 
-    net_helper = SimpleNetworkHelper(seq_length=1024)
-    network = net_helper.create_network()
+    network = SimpleNet(1024)
     ds = create_foo_ds(1)
 
     cfg = PTQConfig(mode=PTQMode.QUANTIZE,
@@ -701,7 +650,7 @@ def quant_simplenet(non_decoder):
     ptq._config.enable_deploy_fusion = False
     if non_decoder:
         ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
-    network = ptq.apply(network, net_helper, datasets=ds)
+    network = ptq.apply(network, datasets=ds)
     network = ptq.convert(network)
     ms.save_checkpoint(network.parameters_dict(), os.path.join("./simplenet-quant.ckpt"),
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and \
@@ -722,13 +671,12 @@ def eval_simplenet(non_decoder):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     set_context(mode=GRAPH_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
 
-    net_helper = SimpleNetworkHelper(seq_length=1024)
-    network = net_helper.create_network()
+    network = SimpleNet(1024)
     ds = create_foo_ds(1)
 
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
-        foutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+        foutput = network.generate(input_ids, max_new_tokens=100)
 
     cfg = PTQConfig(mode=PTQMode.DEPLOY,
                     backend=BackendTarget.ASCEND,
@@ -744,7 +692,7 @@ def eval_simplenet(non_decoder):
     ms.load_param_into_net(network, param_dict)
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         input_ids = ds_item['input_ids'].asnumpy()
-        qoutput = net_helper.generate(network, input_ids, max_new_tokens=100)
+        qoutput = network.generate(input_ids, max_new_tokens=100)
     np.allclose(foutput.asnumpy(), qoutput.asnumpy(), 0, 0)
 
 

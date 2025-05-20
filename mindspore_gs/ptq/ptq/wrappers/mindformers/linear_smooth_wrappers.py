@@ -48,8 +48,8 @@ from .linear_wrapper import WrapperLinearCell
 class SmoothLinearCell(WrapperLinearCell):
     """SmoothLinearCell"""
 
-    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
         self.is_rowparallel = isinstance(self.layer, RowParallelLinear)
         self.is_colparallel = isinstance(self.layer, ColumnParallelLinear)
         self.is_linear = isinstance(self.layer, Linear)
@@ -324,8 +324,8 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
 
-    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
         if self.layer.has_bias:
             raise ValueError(f"Only cell without bias is supported, but {linear_name} has bias.")
         if isinstance(self.layer, Linear) and self.layer.activation_flag:
@@ -551,8 +551,8 @@ class AWQSmoothLinearCell(AWQLinearCell):
         LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
 
-    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
 
         if cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
             self.w_quant_max, self.w_quant_min = get_min_max_op(cfg.tp_size, False)
@@ -788,8 +788,8 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
                                          OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
 
-    def __init__(self, linear_name, linear, context, cfg, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
         if linear.expert_num and linear.expert_num > 1:
             self.is_moe = True
         else:
