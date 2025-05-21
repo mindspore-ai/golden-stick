@@ -2,6 +2,25 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 1.1.0 Release Notes
+
+### Major Features and Improvements
+
+* The Post-Training Quantization algorithm `PTQ` supports the configuration of mixed quantization strategies through regular expression matching.
+* The Post-Training Quantization algorithm `PTQ` has added a Summary feature, which will automatically print the entire network's quantization strategy after calibration is completed.
+
+### API Change
+
+* The constructor of `PTQ` has added the `layer_policies` parameter to specify per-layer quantization strategies. It's a dictionary where the key is a regular string to match layer names, and the value is a :class:`mindspore_gs.ptq.PTQConfig` representing a quantization strategy.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+ccsszz, yyyyrf, hangangqiang, yu-han39, huan-xiaoling, hz2901782080
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 1.0.0 Release Notes
 
 ### Major Features and Improvements
@@ -18,7 +37,7 @@
 
 Thanks goes to these wonderful people:
 
-huangzhuo, zhangminli, ccsszz, yyyyrf, hangangqiang
+hz2901782080, zhangminli, ccsszz, yyyyrf, hangangqiang
 
 Contributions of any kind are welcome!
 
