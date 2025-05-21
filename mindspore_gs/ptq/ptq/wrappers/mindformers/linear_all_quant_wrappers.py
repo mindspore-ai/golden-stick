@@ -19,8 +19,12 @@ from mindspore.common.initializer import initializer
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-from mindformers.experimental.infer.core.moe import ColumnParallelGroupLinear, RowParallelGroupLinear, \
-    ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion
+try:
+    from mindformers.experimental.infer.core.moe import ColumnParallelGroupLinear, RowParallelGroupLinear, \
+        ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion
+    SUPPORT_EP = True
+except ImportError:
+    SUPPORT_EP = False
 
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -47,10 +51,11 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(Linear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, AllQuantLinearCell, A8W8Checker())
-        Quantizer.reg_layer_map(ColumnParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
-        Quantizer.reg_layer_map(RowParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
-        Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
-        Quantizer.reg_layer_map(RowParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
+        if SUPPORT_EP:
+            Quantizer.reg_layer_map(ColumnParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(RowParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
         super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
