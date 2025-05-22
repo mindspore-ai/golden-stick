@@ -29,8 +29,12 @@ from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-from mindformers.experimental.infer.core.moe import ColumnParallelGroupLinear, RowParallelGroupLinear, \
-    ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion
+try:
+    from mindformers.experimental.infer.core.moe import ColumnParallelGroupLinear, RowParallelGroupLinear, \
+        ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion
+    SUPPORT_EP = True
+except ImportError:
+    SUPPORT_EP = False
 
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
@@ -179,6 +183,7 @@ class SmoothQuantLinearCell(SmoothLinearCell):
     """SmoothLinearCell"""
     @staticmethod
     def reg_self():
+        '''register smooth quant method'''
         class SmoothChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.outliers_suppression == OutliersSuppressionType.SMOOTH
@@ -186,6 +191,11 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(Linear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        if SUPPORT_EP:
+            LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(ColumnParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
 
     def _calc_smooth_scale(self, alpha, **kwargs):
         """_calc_smooth_scale"""
@@ -245,10 +255,6 @@ class AWQLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
-        LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
-        LinearSmoothQuant.reg_layer_map(RowParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
-        LinearSmoothQuant.reg_layer_map(ColumnParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
-        LinearSmoothQuant.reg_layer_map(RowParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
 
     def _quant_info(self) -> str:
         return ""
