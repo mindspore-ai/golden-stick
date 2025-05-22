@@ -12,6 +12,10 @@
 "golden-stick/example/deepseekv3/deepseekv3_weight_processor.py"                                                         "arguments-differ"
 "golden-stick/example/deepseekv3/deepseekv3_weight_processor.py"                                                         "consider-using-in"
 "golden-stick/example/deepseekv3/weight_processor.py"                                                                    "missing-docstring"
+"golden-stick/example/qwen3/ds_utils.py"                                                                                 "protected-access"
+"golden-stick/example/qwen3/weight_processor.py"                                                                         "missing-docstring"
+"golden-stick/example/qwen3/qwen2_weight_processor.py"                                                                   "useless-super-delegation"
+"golden-stick/example/qwen3/qwen3_weight_processor.py"                                                                   "useless-super-delegation"
 
 # expriments
 "golden-stick/mindspore_gs/experimental/trace/llama2.py"                                                                  "redefined-outer-name"
