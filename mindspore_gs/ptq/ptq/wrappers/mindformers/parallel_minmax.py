@@ -16,7 +16,7 @@
 
 from mindspore import ops as msops
 from mindspore import nn
-from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_group
+from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_group
 
 
 class MinFromTensorParallelRegion(nn.Cell):
