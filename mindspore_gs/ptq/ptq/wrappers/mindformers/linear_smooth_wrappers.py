@@ -428,7 +428,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         best_ratio = -1
         best_scale = 0
         best_error = float("inf")
-        fp16_weight = self._layer.weight.value().astype(self.compute_type)
+        fp16_weight = self._layer.weight.value()
 
         group_size = self.cfg.group_size if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP \
               else self._layer.weight.shape[self.ic_axis]
@@ -470,7 +470,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
             self.deq_scale = msops.cast((self.x_scale_fast * t_w_scale), msdtype.float32)
             self.x_scale_fast = msops.cast(1 / (self.x_scale_fast * Tensor(scales)), msdtype.float32)
             self.x_zp = Tensor(x_zp)
-            self._layer.weight.set_data(msops.cast(q_weight, self.compute_type))
+            self._layer.weight.set_data(msops.cast(q_weight, self._layer.weight.dtype))
             self.y_zp = q_weight.sum(axis=self.ic_axis, dtype=msdtype.int32) * self.x_zp.astype(msdtype.int32)
             if isinstance(self._layer, RowParallelLinear):
                 self.y_zp = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(self.y_zp)
