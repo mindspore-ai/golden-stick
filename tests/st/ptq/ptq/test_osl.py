@@ -24,7 +24,7 @@ from mindspore import nn, Tensor
 from mindspore.dataset import GeneratorDataset
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-from mindformers.experimental.infer.core.mapping import ScatterToModelParallelRegion
+from mindformers.parallel_core.inference.tensor_parallel.mappings import ScatterToModelParallelRegion
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.network_helpers import NetworkHelper
@@ -50,7 +50,7 @@ def parallel_args():
 def parallel_runner(args):
     """Init parallel context, and call the entry function."""
     from mindspore import communication as mscomm
-    from mindformers.experimental.parallel_core.pynative.parallel_state import initialize_model_parallel
+    from mindformers.parallel_core.inference.parallel_state import initialize_model_parallel
     mscomm.init()
     initialize_model_parallel(tensor_model_parallel_size=2, order='tp-ep-dp-pp')
     global IS_PARALLEL_RUNNER
@@ -205,6 +205,7 @@ def quant_net(linear_type, is_expert):
     """Quantize: Saves quantized weight to ./osl-quant.ckpt, and returns the original float point output."""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
     os.environ['FORCE_EAGER'] = 'true'
+    os.environ["RUN_MODE"] = "predict"
     ascend_path = os.environ.get('ASCEND_HOME_PATH', '')
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'

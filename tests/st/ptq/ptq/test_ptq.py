@@ -279,6 +279,7 @@ def quant_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['FORCE_EAGER'] = "true"
+    os.environ["RUN_MODE"] = "predict"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"

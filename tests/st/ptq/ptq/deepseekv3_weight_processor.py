@@ -25,7 +25,7 @@ from tqdm import tqdm
 import mindspore as ms
 from mindspore import dtype
 from mindspore.communication.management import get_rank, get_group_size
-from mindformers.experimental.parallel_core.pynative.parallel_state import get_tensor_model_parallel_rank
+from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_rank
 from safetensors import safe_open
 
 
