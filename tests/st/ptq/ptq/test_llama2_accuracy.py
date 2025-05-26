@@ -33,7 +33,7 @@ def ptq_predict_2stage_2p_run(quant_algo):
     return_code = os.system(
         f"msrun --worker_num=2 --local_worker_num=2 --master_addr=127.0.0.1 "
         f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_llama2_2p_logs "
-        f"python {run_file} -m 2 -a {quant_algo}"
+        f"python {run_file} -a {quant_algo}"
     )
     if return_code != 0:
         log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
@@ -71,6 +71,28 @@ def test_ptq_llama2_a16w8c8_accuracy():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
+def test_ptq_llama2_a8dynw8_accuracy():
+    """
+    Feature: test omni quant adjust parameter in two stages with two cards.
+    Description: apply A8W8_Dynamic on llama2 and check score.
+    Expectation: score is good.
+    """
+    ptq_predict_2stage_2p_run("A8W8_Dynamic")
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_ptq_llama2_c8dyn_accuracy():
+    """
+    Feature: test omni quant adjust parameter in two stages with two cards.
+    Description: apply C8_Dynamic on llama2 and check score.
+    Expectation: score is good.
+    """
+    ptq_predict_2stage_2p_run("C8_Dynamic")
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
 def test_ptq_llama2_c8_accuracy():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
@@ -100,25 +122,3 @@ def test_ptq_llama2_a16w8_accuracy():
     Expectation: score is good.
     """
     ptq_predict_2stage_2p_run("A16W8")
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_llama2_a8dynw8_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply A8W8_Dynamic on llama2 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_2p_run("A8W8_Dynamic")
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_llama2_c8dyn_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply C8_Dynamic on llama2 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_2p_run("C8_Dynamic")

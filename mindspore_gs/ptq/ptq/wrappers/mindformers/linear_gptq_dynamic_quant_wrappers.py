@@ -41,8 +41,9 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         Quantizer.reg_layer_map(Linear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
-    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
         self.weight_need_allgather = False
         self.h = ops.zeros((self.ic, self.ic), dtype=dtype.float32)
         if self.cfg.mode == PTQMode.QUANTIZE and not self.cfg.algo_args["desc_act"]:

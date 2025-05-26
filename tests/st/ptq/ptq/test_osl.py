@@ -112,14 +112,15 @@ class SimpleNet(nn.Cell):
             super().__init__()
             self.use_sequence_parallel = False
 
-    def __init__(self, linear_type, is_expert):
+    def __init__(self, linear_type, is_expert, foo_seq_length=1024):
         assert not (linear_type == 'Linear' and is_expert), 'expert gmm is not supported for Linear'
         super(SimpleNet, self).__init__()
         self.config = SimpleNet.ParallelConfig()
         self.is_expert = is_expert
+        self.foo_seq_length = foo_seq_length
         if linear_type == 'ColumnParallelLinear':
             linear = ColumnParallelLinear(
-                1024, 1024,
+                foo_seq_length, foo_seq_length,
                 config=self.config,
                 bias=False,
                 param_init_type=msdtype.bfloat16,
@@ -129,7 +130,7 @@ class SimpleNet(nn.Cell):
             )
         elif linear_type == 'RowParallelLinear':
             linear = RowParallelLinear(
-                1024, 1024,
+                foo_seq_length, foo_seq_length,
                 config=self.config,
                 input_is_parallel=True,
                 bias=False,
@@ -140,7 +141,7 @@ class SimpleNet(nn.Cell):
             )
         elif linear_type == 'Linear':
             linear = Linear(
-                1024, 1024,
+                foo_seq_length, foo_seq_length,
                 has_bias=False,
                 param_init_type=msdtype.bfloat16,
                 compute_dtype=msdtype.bfloat16,
@@ -154,6 +155,12 @@ class SimpleNet(nn.Cell):
         if not self.is_expert:
             return self.decoder(x)
         return self.decoder(x, group_list=self.group_list)
+
+    # pylint: disable=unused-argument
+    def generate(self, input_ids, do_sample=False, max_new_tokens=1):
+        input_ids = Tensor(input_ids)
+        input_ids = ms.ops.pad(input_ids, (0, self.foo_seq_length - input_ids.shape[1]), value=0)
+        return self.construct(input_ids.astype(msdtype.bfloat16))
 
 class SimpleNetworkHelper(NetworkHelper):
     """SimpleNetworkHelper"""
@@ -216,7 +223,7 @@ def quant_net(linear_type, is_expert):
 
     ms.set_context(mode=ms.PYNATIVE_MODE, jit_config={'jit_level': 'O0', 'infer_boost': 'on'})
     ptq = create_ptq(PTQMode.QUANTIZE)
-    network = ptq.apply(network, net_helper, datasets=dataset)
+    network = ptq.apply(network, datasets=dataset)
     network = ptq.convert(network)
     ms.save_checkpoint(network.parameters_dict(), get_save_file_name('osl-quant.ckpt'),
                        choice_func=lambda x: all(i not in x for i in ['key_cache', 'value_cache', 'float_weight']))
@@ -237,7 +244,7 @@ def infer_net(linear_type, is_expert):
 
     ms.set_context(mode=ms.GRAPH_MODE, jit_config={'jit_level': 'O0', 'infer_boost': 'on'})
     ptq = create_ptq(PTQMode.DEPLOY)
-    network = ptq.apply(network, net_helper, datasets=dataset)
+    network = ptq.apply(network, datasets=dataset)
     network = ptq.convert(network)
     param_dict = ms.load_checkpoint(get_save_file_name('osl-quant.ckpt'))
     ms.load_param_into_net(network, param_dict)
