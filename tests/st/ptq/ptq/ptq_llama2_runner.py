@@ -178,13 +178,13 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
 
 def eval_llama2(config_path_, ckpt_path_, quant_algo_, ds_path):
     """eval llama2 by float ckpt and int ckpt"""
-    ms.set_context(mode=0)
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
     os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    ms.set_context(mode=0, jit_config={"jit_level": "O0", "infer_boost": "on"})
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir_, config_path_)
     vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
@@ -215,11 +215,11 @@ def eval_llama2(config_path_, ckpt_path_, quant_algo_, ds_path):
 
 def infer_float(config_path_, ckpt_path_, example):
     """eval llama2 by float ckpt and int ckpt"""
-    ms.set_context(mode=0)
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
     os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    ms.set_context(mode=0, jit_config={"jit_level": "O0", "infer_boost": "on"})
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
@@ -234,6 +234,7 @@ def infer_float(config_path_, ckpt_path_, example):
     helper.mf_config.context.device_id = device_id
     network = helper.create_network()
     tokenizer = helper.create_tokenizer()
+    os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
     input_ids = tokenizer(example)['input_ids']
     outputs = network.generate(input_ids, do_sample=False, max_new_tokens=50)
     print(f"infer float llama2 result: {tokenizer.decode(outputs[0])}", flush=True)
@@ -242,11 +243,11 @@ def infer_float(config_path_, ckpt_path_, example):
 
 def infer_quant(config_path_, ckpt_path_, quant_algo_, example):
     """eval llama2 by float ckpt and int ckpt"""
-    ms.set_context(mode=0)
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
     os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    ms.set_context(mode=0, jit_config={"jit_level": "O0", "infer_boost": "on"})
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
@@ -262,6 +263,7 @@ def infer_quant(config_path_, ckpt_path_, quant_algo_, example):
     config = helper.mf_config
     network = helper.create_network()
 
+    os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
     cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
     ptq = PTQ(config=cfg)
     # pylint: disable=W0212

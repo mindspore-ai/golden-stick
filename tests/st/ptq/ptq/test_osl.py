@@ -27,7 +27,6 @@ from mindformers.experimental.infer.core.layers import ColumnParallelLinear, Row
 from mindformers.experimental.infer.core.mapping import ScatterToModelParallelRegion
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
-from mindspore_gs.ptq.network_helpers import NetworkHelper
 
 ms.set_context(pynative_synchronize=True)
 
@@ -162,28 +161,6 @@ class SimpleNet(nn.Cell):
         input_ids = ms.ops.pad(input_ids, (0, self.foo_seq_length - input_ids.shape[1]), value=0)
         return self.construct(input_ids.astype(msdtype.bfloat16))
 
-class SimpleNetworkHelper(NetworkHelper):
-    """SimpleNetworkHelper"""
-    def __init__(self, **kwargs) -> None:
-        self.attrs = kwargs
-
-    def create_network(self):
-        return SimpleNet(self.get_spec('linear_type'), self.get_spec('is_expert'))
-
-    def get_spec(self, name: str):
-        return self.attrs.get(name, None)
-
-    def create_tokenizer(self, **kwargs):
-        return None
-
-    def generate(self, network, input_ids, max_new_tokens=None, **kwargs):
-        input_ids = Tensor(input_ids)
-        input_ids = ms.ops.pad(input_ids, (0, self.get_spec('seq_length') - input_ids.shape[1]), value=0)
-        return network(input_ids.astype(msdtype.bfloat16))
-
-    def assemble_inputs(self, input_ids, **kwargs):
-        raise RuntimeError('InnerError, should not invoke SimpleNetworkHelper.assemble_inputs()')
-
 def create_ptq(mode):
     """Returns a PTQ instance with OSL config."""
     cfg = PTQConfig(mode=mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
@@ -216,10 +193,9 @@ def quant_net(linear_type, is_expert):
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'
 
-    net_helper = SimpleNetworkHelper(seq_length=1024, linear_type=linear_type, is_expert=is_expert)
-    network = net_helper.create_network()
+    network = SimpleNet(linear_type, is_expert, 1024)
     dataset = create_dataset(10)
-    fp_output = [net_helper.generate(network, i['input_ids']) for i in dataset.create_dict_iterator(output_numpy=True)]
+    fp_output = [network.generate(i['input_ids']) for i in dataset.create_dict_iterator(output_numpy=True)]
 
     ms.set_context(mode=ms.PYNATIVE_MODE, jit_config={'jit_level': 'O0', 'infer_boost': 'on'})
     ptq = create_ptq(PTQMode.QUANTIZE)
@@ -238,8 +214,7 @@ def infer_net(linear_type, is_expert):
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'
 
-    net_helper = SimpleNetworkHelper(seq_length=1024, linear_type=linear_type, is_expert=is_expert)
-    network = net_helper.create_network()
+    network = SimpleNet(linear_type, is_expert, 1024)
     dataset = create_dataset(10)
 
     ms.set_context(mode=ms.GRAPH_MODE, jit_config={'jit_level': 'O0', 'infer_boost': 'on'})
@@ -248,7 +223,7 @@ def infer_net(linear_type, is_expert):
     network = ptq.convert(network)
     param_dict = ms.load_checkpoint(get_save_file_name('osl-quant.ckpt'))
     ms.load_param_into_net(network, param_dict)
-    qoutput = [net_helper.generate(network, i['input_ids']) for i in dataset.create_dict_iterator(output_numpy=True)]
+    qoutput = [network.generate(i['input_ids']) for i in dataset.create_dict_iterator(output_numpy=True)]
     return qoutput
 
 def _test_simple_net(linear_type, is_expert):
