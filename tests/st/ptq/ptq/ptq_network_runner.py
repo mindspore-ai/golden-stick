@@ -197,6 +197,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     """quant llama2 using PTQ"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['FORCE_EAGER'] = "true"
+    os.environ['MS_DISABLE_INTERNAL_KERNELS_LIST'] = "FlashAttentionScore"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -252,6 +253,8 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
     save_checkpoint(network.parameters_dict(), os.path.join(save_path, "quant.ckpt"),
                     choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     offload_network(network)
+    os.environ.pop('FORCE_EAGER', None)
+    os.environ.pop('MS_DISABLE_INTERNAL_KERNELS_LIST', None)
 
 
 def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
@@ -276,6 +279,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
     helper.mf_config.context.device_id = device_id
     config = helper.mf_config
     network = helper.create_network()
+    os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
     if is_quant:
         cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
         ptq = PTQ(config=cfg)
