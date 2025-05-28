@@ -130,6 +130,9 @@ def evaluate(network, ds_path, tokenizer, helper):
 
         if labels_str[0].lower() in pres_str[0].lower():
             correct += 1
+        else:
+            question = tokenizer.decode(input_ids, skip_special_tokens=True)
+            print(f"question: {question}\n predict: {pres_str} answer: {labels_str}. not correct!", flush=True)
     ms.ms_memory_recycle()
     return correct / data_count
 
@@ -228,6 +231,7 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, q
 
     assert score >= score_mapping[quant_algo_], f"Score {quant_algo_} is {score:.4f}, \
                                   which is lower than standard f{score_mapping[quant_algo_]}"
+    print(f"Score of {quant_algo_} is {score}", flush=True)
 
 
 if __name__ == "__main__":

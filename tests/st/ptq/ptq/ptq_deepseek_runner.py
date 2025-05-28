@@ -16,6 +16,7 @@
 import argparse
 import os
 import sys
+import shutil
 from collections import OrderedDict
 import numpy as np
 
@@ -53,7 +54,7 @@ def create_ds(network_helper, ds_path, ds_type_, approach, tokenizer_):
         max_decode_length = network_helper.get_spec('max_decode_length')
         ignore_token_id = network_helper.get_spec('ignore_token_id')
         ds = get_datasets(ds_type_, ds_path, "train", bs_, seq_, max_decode_length, tokenizer_, ignore_token_id,
-                          1, False, n_samples=200)
+                          1, False, n_samples=50)
         return ds
     return None
 
@@ -184,7 +185,7 @@ def quant_deepseekv3(config_path_, fp16_ckpt_path_, output_dir_, quant_algo_, da
     tokenizer, network = create_deepseek_network(config)
 
     input_ids = tokenizer(example)['input_ids']
-    outputs = network.generate(input_ids, max_length=1024, do_sample=False, top_k=3, top_p=1, max_new_tokens=1024)
+    outputs = network.generate(input_ids, max_length=1024, do_sample=False, top_k=3, top_p=1, max_new_tokens=100)
 
     ptq = create_ptq(quant_algo_, PTQMode.QUANTIZE)
     dataset.config.set_numa_enable(False)
@@ -238,7 +239,10 @@ def eval_deepseekv3(config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_
     tokenizer, network = create_deepseek_network(config, quant_algo_)
 
     input_ids = tokenizer(example)['input_ids']
-    outputs = network.generate(input_ids, max_length=1024, do_sample=False, top_k=3, top_p=1, max_new_tokens=1024)
+    outputs = network.generate(input_ids, max_length=1024, do_sample=False, top_k=3, top_p=1, max_new_tokens=100)
+    rank_id = get_rank()
+    if rank_id == 0 and os.path.exists(quant_ckpt_path_):
+        shutil.rmtree(quant_ckpt_path_)
 
     return outputs[0]
 
@@ -259,7 +263,7 @@ def ptq_deepseek_predict_2stage(config_path_, fp16_ckpt_path_,
     if quant_algo_ == 'a16w8':
         ret = np.allclose(qoutput[:32], foutput[:32], 0, 0)
     elif quant_algo_ == 'smoothquant':
-        ret = np.allclose(qoutput[:5], foutput[:5], 0, 0)
+        ret = np.allclose(qoutput[:6], foutput[:6], 0, 0)
     elif quant_algo_ == 'gptq-pergroup':
         ret = np.allclose(qoutput[:22], foutput[:22], 0, 0)
     else:
