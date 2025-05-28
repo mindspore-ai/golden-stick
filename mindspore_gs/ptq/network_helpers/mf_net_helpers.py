@@ -65,12 +65,10 @@ class MFNetworkHelper(NetworkHelper):
         build_context(self.mf_config)
         network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
         network.set_train(False)
-        network.phase = 'predict'
         ckpt_path = self.mf_config.load_checkpoint
         if ckpt_path:
             self._load_ckpt(network)
         ms.ms_memory_recycle()
-        network.phase = 'predict'
         return network
 
     def get_spec(self, name: str):

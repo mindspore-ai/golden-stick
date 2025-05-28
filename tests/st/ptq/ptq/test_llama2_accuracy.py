@@ -90,7 +90,7 @@ def test_ptq_llama2_c8dyn_accuracy():
     """
     ptq_predict_2stage_2p_run("C8_Dynamic")
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_ptq_llama2_c8_accuracy():
@@ -101,7 +101,7 @@ def test_ptq_llama2_c8_accuracy():
     """
     ptq_predict_2stage_2p_run("C8")
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_ptq_llama2_a8w8_accuracy():
@@ -112,7 +112,7 @@ def test_ptq_llama2_a8w8_accuracy():
     """
     ptq_predict_2stage_2p_run("A8W8")
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_ptq_llama2_a16w8_accuracy():
