@@ -19,7 +19,6 @@ from mindspore.nn import Cell
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.context import InnerPTQConfig, OutliersSuppressionType
-from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, Checker, SearchInputs
 
@@ -30,7 +29,7 @@ class LinearSmoother(Algorithm):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
+    def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
         raise NotImplementedError
 
 
@@ -63,7 +62,7 @@ class LinearSmoothQuant(LinearSmoother):
             return checker_wrapper[1]
         return None
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
+    def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
         """infer_and_cache"""
         class Replacer(Processor):
             """Replacer"""
@@ -86,8 +85,7 @@ class LinearSmoothQuant(LinearSmoother):
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
-                                                 network_helper=network_helper)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 return wrapper_cell, True
 
@@ -123,7 +121,7 @@ class LinearAWQ(LinearSmoother):
             return checker_wrapper[1]
         return None
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
+    def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
         """infer_and_cache"""
         class Replacer(Processor):
             """Replacer"""
@@ -144,8 +142,7 @@ class LinearAWQ(LinearSmoother):
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
-                                                 network_helper=network_helper)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 return wrapper_cell, True
 
@@ -182,8 +179,7 @@ class LinearAutoSmoother(LinearSmoother):
         return None
 
     # pylint: disable=arguments-differ
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None,
-                search_inputs: SearchInputs = None, **kwargs):
+    def replace(self, decoder_layer_name: str, decoder_layer, search_inputs: SearchInputs = None, **kwargs):
         """infer_and_cache"""
         search_layer = search_inputs.layer if search_inputs else None
         search_args = search_inputs.layer_args if search_inputs else None
@@ -214,8 +210,8 @@ class LinearAutoSmoother(LinearSmoother):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
                 wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
-                                                 network_helper=network_helper, decoder_layer=search_layer,
-                                                 layer_args=search_args, layer_kwargs=search_kwargs)
+                                                 decoder_layer=search_layer, layer_args=search_args,
+                                                 layer_kwargs=search_kwargs)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 return wrapper_cell, True
 

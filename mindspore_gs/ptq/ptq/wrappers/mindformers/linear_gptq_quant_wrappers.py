@@ -51,8 +51,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(ColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(RowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
 
-    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, network_helper, **kwargs):
-        super().__init__(linear_name, linear, context, cfg, network_helper, **kwargs)
+    def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
         if linear.expert_num and linear.expert_num > 1:
             self.is_moe = True
         else:

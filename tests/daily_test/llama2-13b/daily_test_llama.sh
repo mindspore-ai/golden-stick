@@ -99,6 +99,12 @@ sed_qconfig()
   sed -i s/"kvcache_quant_granularity: .*"/"kvcache_quant_granularity: \'${kqg}\'"/g ${f}
 }
 
+sed_mode()
+{
+  f=$1
+  sed -i s/"  mode: .*"/"  mode: ${2}"/g ${f}
+}
+
 eval()
 {
   unset FORCE_EAGER
@@ -180,7 +186,9 @@ prepare_env
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "float16"
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "float16"
 # fp16 acc
+sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "0"
 eval "eval fp16 llama2-13b" "fp16" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
+sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "1"
 
 ############################ fp16->a8w8 ############################
 # quant ckpt a8w8
@@ -250,7 +258,9 @@ eval "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "bfloat16"
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "bfloat16"
 # bf16 acc
+sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "0"
 eval "eval bf16 llama2-13b" "bf16" "./predict_llama2_13b_qckpt.yaml"
+sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "1"
 
 ############################ bf16->a8w8 ############################
 # quant ckpt a8w8

@@ -66,7 +66,7 @@ micro_batch_interleave_num: 1
 
 # mindspore context init config
 context:
-  mode: 1 #0--Graph Mode; 1--Pynative Mode
+  mode: 0 #0--Graph Mode; 1--Pynative Mode
   device_target: "Ascend"
   enable_graph_kernel: False
   max_call_depth: 10000
@@ -85,7 +85,7 @@ model:
     batch_size: 1 # add for increase predict
     seq_length: 1024
     hidden_size: 5120
-    num_layers: 40
+    num_layers: 20
     num_heads: 40
     max_position_embedding: 4096
     vocab_size: 32000

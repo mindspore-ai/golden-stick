@@ -19,7 +19,6 @@ from mindspore.nn import Cell
 from mindspore import dtype as msdtype
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.ptq.algorithm import Algorithm
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, Checker
 from mindspore_gs.ptq.processor import Processor
@@ -58,7 +57,7 @@ class Quantizer(Algorithm):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
-    def replace(self, decoder_layer_name: str, decoder_layer, network_helper: NetworkHelper = None, **kwargs):
+    def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
 
         class Replacer(Processor):
             """Replacer"""
@@ -90,8 +89,7 @@ class Quantizer(Algorithm):
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
-                                                 network_helper=network_helper)
+                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy)
                 logger.info(f"Replacing {cell_name} with quant cell {wrapper_cell_type}.")
                 return wrapper_cell, True
 

@@ -528,7 +528,7 @@ ptq = PTQ(config=ptq_config)
 ```python
 import mindspore as ms
 
-ptq.apply(network, helper, ds)
+ptq.apply(network, ds)
 ptq.convert(network)
 ms.save_checkpoint(network.parameters_dict(), "a8w8c8.ckpt",
                    choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)

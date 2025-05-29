@@ -197,12 +197,12 @@ def create_ds(network_helper, ds_path, ds_type, approach):
     return None
 
 
-def quant_net(net, network_helper, ptq, ds):
+def quant_net(net, ptq, ds):
     """Quant network with algorithm."""
     quant_start = time.time()
     logger.info('Quantize-ing network...')
     start_time = time.time()
-    ptq.apply(net, network_helper, ds)
+    ptq.apply(net, ds)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
     net.phase = "quant_convert"
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     datasets = create_ds(helper, uargs.dataset_path, uargs.dataset_type, approach=uargs.approach)
     logger.info(f'Create Network cost time is {time.time() - start} s.')
     print('Quanting network...', flush=True)
-    network = quant_net(network, helper, algo, datasets)
+    network = quant_net(network, algo, datasets)
     print('Saving checkpoint...', flush=True)
     start = time.time()
     try:

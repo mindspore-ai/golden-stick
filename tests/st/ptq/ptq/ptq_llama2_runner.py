@@ -15,6 +15,7 @@
 """test interfaces of post training quant."""
 import argparse
 import os
+import shutil
 import numpy as np
 
 import mindspore as ms
@@ -40,7 +41,7 @@ def create_ds(network_helper, ds_path, ds_type, tokenizer_):
     max_decode_length = network_helper.get_spec('max_decode_length')
     ignore_token_id = network_helper.get_spec('ignore_token_id')
     ds = get_datasets(ds_type, ds_path, "train", bs_, seq_, max_decode_length, tokenizer_, ignore_token_id,
-                      1, False, n_samples=30)
+                      1, False, n_samples=20)
     return ds
 
 
@@ -164,7 +165,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_ds(helper, ds_path, 'boolq', tokenizer)
-    network = ptq.apply(network, helper, datasets=ds)
+    network = ptq.apply(network, datasets=ds)
     network = ptq.convert(network)
     try:
         rank_id = get_rank()
@@ -174,16 +175,82 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
     os.makedirs(save_path, exist_ok=True)
     save_checkpoint(network.parameters_dict(), os.path.join(save_path, "quant.ckpt"),
                     choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
+    print(f"Save quant ckpt to {save_path}", flush=True)
     offload_network(network)
 
 
-def eval_llama2(is_quant, config_path_, ckpt_path_, quant_algo_, ds_path):
+def eval_llama2(config_path_, ckpt_path_, quant_algo_, ds_path):
     """eval llama2 by float ckpt and int ckpt"""
-    ms.set_context(mode=0)
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
     os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    ms.set_context(mode=0, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    cur_dir_ = os.path.dirname(os.path.abspath(__file__))
+    config_path_ = os.path.join(cur_dir_, config_path_)
+    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+
+    helper = MFParallelLlama2Helper(config_path_)
+    helper.mf_config.load_checkpoint = ""
+    helper.mf_config.processor.tokenizer.vocab_file = vocab_file
+
+    device_id = int(os.environ.get('DEVICE_ID', '0'))
+    helper.mf_config.context.device_id = device_id
+    config = helper.mf_config
+    network = helper.create_network()
+
+    cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
+    ptq = PTQ(config=cfg)
+    # pylint: disable=W0212
+    ptq._config.enable_deploy_fusion = False
+    network = ptq.apply(network)
+    network = ptq.convert(network)
+
+    config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
+    transform_and_load_checkpoint(config, None, network, None)
+    tokenizer = helper.create_tokenizer()
+
+    res = evaluate(network, ds_path, tokenizer, helper)
+    return res
+
+
+def infer_float(config_path_, ckpt_path_, example):
+    """eval llama2 by float ckpt and int ckpt"""
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    os.environ.pop('FORCE_EAGER', None)
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    ms.set_context(mode=0, jit_config={"jit_level": "O0", "infer_boost": "on"})
+    if not ascend_path:
+        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+    cur_dir_ = os.path.dirname(os.path.abspath(__file__))
+    config_path_ = os.path.join(cur_dir_, config_path_)
+    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+
+    helper = MFParallelLlama2Helper(config_path_)
+    helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
+    helper.mf_config.processor.tokenizer.vocab_file = vocab_file
+
+    device_id = int(os.environ.get('DEVICE_ID', '0'))
+    helper.mf_config.context.device_id = device_id
+    network = helper.create_network()
+    tokenizer = helper.create_tokenizer()
+    os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
+    input_ids = tokenizer(example)['input_ids']
+    outputs = network.generate(input_ids, do_sample=False, max_new_tokens=50)
+    print(f"infer float llama2 result: {tokenizer.decode(outputs[0])}", flush=True)
+    return outputs[0]
+
+
+def infer_quant(config_path_, ckpt_path_, quant_algo_, example):
+    """eval llama2 by float ckpt and int ckpt"""
+    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+    os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+    os.environ.pop('FORCE_EAGER', None)
+    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+    ms.set_context(mode=0, jit_config={"jit_level": "O0", "infer_boost": "on"})
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
@@ -199,21 +266,60 @@ def eval_llama2(is_quant, config_path_, ckpt_path_, quant_algo_, ds_path):
     config = helper.mf_config
     network = helper.create_network()
 
-    if is_quant:
-        cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
-        ptq = PTQ(config=cfg)
-        # pylint: disable=W0212
-        ptq._config.enable_deploy_fusion = False
-        network = ptq.apply(network)
-        network = ptq.convert(network)
+    os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
+    cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
+    ptq = PTQ(config=cfg)
+    # pylint: disable=W0212
+    ptq._config.enable_deploy_fusion = False
+    network = ptq.apply(network)
+    network = ptq.convert(network)
 
     config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
     transform_and_load_checkpoint(config, None, network, None)
     tokenizer = helper.create_tokenizer()
+    input_ids = tokenizer(example)['input_ids']
+    outputs = network.generate(input_ids, do_sample=False, max_new_tokens=50)
+    print(f"infer quant llama2 result: {tokenizer.decode(outputs[0])}", flush=True)
+    return outputs[0]
 
-    return evaluate(network, ds_path, tokenizer, helper)
 
-def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path):
+def count_consecutive_same_elements(arr1: np.ndarray, arr2: np.ndarray):
+    min_length = min(arr1.size, arr2.size)
+    same_elements = (arr1[:min_length] == arr2[:min_length])
+    if same_elements.all():
+        return min_length
+    return np.argmax(~same_elements)
+
+
+def tokens_check(calibrate_config_path_, infer_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path):
+    """ptq_llama2_predict_2stage"""
+    tokens = {
+        "A8W8C8": 42,
+        "A16W8C8": 55,
+        "C8": 55,
+        "A8W8": 41,
+        "A16W8": 55,
+        "A8W8_Dynamic": 45,
+        "C8_Dynamic": 55,
+    }
+
+    quant_llama2(calibrate_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path)
+    example = 'I love Beijing, because'
+    quant_tokens = infer_quant(infer_config_path_, quant_ckpt_path_, quant_algo_, example)
+    float_tokens = infer_float(infer_config_path_, fp16_ckpt_path_, example)
+    count = count_consecutive_same_elements(quant_tokens, float_tokens)
+    try:
+        print(f"to rm dir: {quant_ckpt_path_}", flush=True)
+        shutil.rmtree(quant_ckpt_path_)
+    except (OSError, FileNotFoundError):
+        pass
+    print("="*50, flush=True)
+    print(f"{quant_algo_}, quant tokens: {quant_tokens}; float tokens: {float_tokens}; same count: {count}", flush=True)
+    assert count >= tokens.get(quant_algo_)
+
+
+def datasets_accuracy(calibrate_config_path_, infer_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_,
+                      ds_path):
     """ptq_llama2_predict_2stage"""
     score_mapping = {
         "A8W8C8": 0.83,
@@ -225,10 +331,16 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, q
         "C8_Dynamic": 0.86,
     }
 
-    quant_llama2(config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path)
+    quant_llama2(calibrate_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path)
 
-    score = eval_llama2(True, config_path_, quant_ckpt_path_, quant_algo_, ds_path)
-
+    score = eval_llama2(infer_config_path_, quant_ckpt_path_, quant_algo_, ds_path)
+    print("="*50, flush=True)
+    print(f"{quant_algo_} score {score}", flush=True)
+    try:
+        print(f"to rm dir: {quant_ckpt_path_}", flush=True)
+        shutil.rmtree(quant_ckpt_path_)
+    except (OSError, FileNotFoundError):
+        pass
     assert score >= score_mapping[quant_algo_], f"Score {quant_algo_} is {score:.4f}, \
                                   which is lower than standard f{score_mapping[quant_algo_]}"
     print(f"Score of {quant_algo_} is {score}", flush=True)
@@ -236,19 +348,14 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, q
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_parallel', '-m', type=int, default=1)
     parser.add_argument('--quant_algo', '-a', type=str, required=True)
     uargs = parser.parse_args()
-    model_parallel = uargs.model_parallel
     quant_algo = uargs.quant_algo
 
-    if model_parallel == 2:
-        cur_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b.yaml")
-        fp16_ckpt_2p_path = os.path.join(cur_dir, "/home/workspace/mindspore_ckpt/ckpt/llama2/llama2-13b-fp16-2p")
-        quant_ckpt_path = os.path.join(cur_dir, f"output/parallelLlama2-quant-2p-{quant_algo}")
-        dataset_path = os.path.join(cur_dir, f'../../../data/boolq-dataset/dev.jsonl')
-
-        ptq_llama2_predict_2stage(config_path, fp16_ckpt_2p_path, quant_ckpt_path, quant_algo, dataset_path)
-    else:
-        raise ValueError(f"Unsupported model_parallel: {model_parallel}")
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    calibrate_config_path = os.path.join(cur_dir, "../../../data/test_llama2/calibrate_parallelLlama2_13b.yaml")
+    infer_config_path = os.path.join(cur_dir, "../../../data/test_llama2/infer_parallelLlama2_13b.yaml")
+    fp16_ckpt_2p_path = os.path.join(cur_dir, "/home/workspace/mindspore_ckpt/ckpt/llama2/llama2-13b-fp16-2p")
+    quant_ckpt_path = os.path.join(cur_dir, f"output/parallelLlama2-quant-2p-{quant_algo}")
+    dataset_path = os.path.join(cur_dir, f'../../../data/boolq-dataset/dev.jsonl')
+    tokens_check(calibrate_config_path, infer_config_path, fp16_ckpt_2p_path, quant_ckpt_path, quant_algo, dataset_path)
