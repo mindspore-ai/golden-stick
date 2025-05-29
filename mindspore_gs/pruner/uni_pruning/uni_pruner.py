@@ -82,7 +82,7 @@ class UniPrunerCallback(Callback):
         else:
             self.save_model = False
         if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path)
+            os.makedirs(self.output_path, exist_ok=True)
 
     def epoch_begin(self, run_context):
         if self.prune_flag == 0:
