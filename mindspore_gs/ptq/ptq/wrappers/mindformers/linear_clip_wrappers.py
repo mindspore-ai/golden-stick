@@ -126,7 +126,7 @@ class ClipLinearCell(WrapperLinearCell):
             org_max_val = self.w_obs_max(msops.abs(w), axis=-1, keepdims=True)[0]
             logger.debug(f"org_max_val of Layer({self._layer_name}) is {{{org_max_val.shape}, {org_max_val.dtype}}}")
             best_max_val = copy.deepcopy(org_max_val)
-            min_errs = msops.ones_like(org_max_val) * 1e9
+            min_errs = msops.ones_like(org_max_val).astype(w.dtype) * 1e9
 
             # [oc, n_sample_token, n_group]
             org_out = msops.sum(msops.mul(input_feat, w), dim=-1)
@@ -134,7 +134,7 @@ class ClipLinearCell(WrapperLinearCell):
             for i_s in weight_clip_ratio:
                 max_val = msops.mul(org_max_val, i_s)
                 min_val = -max_val
-                cur_w = w.clamp(min_val, max_val)
+                cur_w = msops.clamp(w, min_val, max_val)
                 _, _, q_w = quant_tensor(cur_w,
                                          self.w_quant_min,
                                          self.w_quant_max,
@@ -151,7 +151,7 @@ class ClipLinearCell(WrapperLinearCell):
                              f"pesudo weight of Layer({self._layer_name}) is {{{q_w.shape}, {q_w.dtype}}}")
                 cur_out = msops.sum(msops.mul(input_feat, q_w), dim=-1)
 
-                err = msops.mean(msops.pow(cur_out - org_out, 2), axis=1).reshape(min_errs.shape)
+                err = msops.mean(msops.pow(cur_out - org_out, 2), axis=1).reshape(min_errs.shape).astype(w.dtype)
                 logger.info(f"Layer {self._layer_name}, weight clip search iter {i_b}, ratio {i_s}")
                 logger.debug(f"clip err of Layer({self._layer_name}) is {{{err.shape}, {err.dtype}}}")
                 del cur_w
@@ -170,7 +170,7 @@ class ClipLinearCell(WrapperLinearCell):
         """_apply_clip"""
         org_shape = self._layer.weight.shape
         weight = self._layer.weight.data.reshape(*clip_val.shape[:2], -1)
-        weight = weight.clamp(-clip_val, clip_val)
+        weight = msops.clamp(weight, -clip_val, clip_val)
         weight = weight.reshape(org_shape)
         self._layer.weight.set_data(weight)
         logger.debug(f"ClipLinearCell: clip weight of Layer({self._layer_name}) is {{{weight.shape}, {weight.dtype}}}")
