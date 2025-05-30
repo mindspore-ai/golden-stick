@@ -163,8 +163,8 @@ def quant_deepseekv3(config_path_, fp16_ckpt_path_, output_dir_, quant_algo_, da
     os.environ['MS_ALLOC_CONF'] = 'enable_vmm:True'
     os.environ['MS_PARALLEL_DISPATCH_NUM'] = '4'
     os.environ['MS_ENABLE_SYNC_COPY_INPUT'] = '1'
-    os.environ['MS_JIT'] = '0'
     os.environ['FORCE_EAGER'] = 'true'
+    os.environ['MS_DISABLE_INTERNAL_KERNELS_LIST'] = 'FlashAttentionScore'
     config_path_ = os.path.join(config_path_, 'predict_deepseek_r1_671b_calibrate.yaml')
 
     config = MindFormerConfig(config_path_)
@@ -204,7 +204,8 @@ def quant_deepseekv3(config_path_, fp16_ckpt_path_, output_dir_, quant_algo_, da
                        choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x,
                        format="safetensors")
     offload_network(network)
-
+    os.environ.pop('FORCE_EAGER', None)
+    os.environ.pop('MS_DISABLE_INTERNAL_KERNELS_LIST', None)
     return outputs[0]
 
 
@@ -237,7 +238,7 @@ def eval_deepseekv3(config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_
         config.qkv_concat = False
         config.model.model_config.quantization_config.quant_method = 'gptq-pergroup'
     tokenizer, network = create_deepseek_network(config, quant_algo_)
-
+    os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
     input_ids = tokenizer(example)['input_ids']
     outputs = network.generate(input_ids, max_length=1024, do_sample=False, top_k=3, top_p=1, max_new_tokens=100)
     rank_id = get_rank()
