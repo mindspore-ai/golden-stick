@@ -164,7 +164,6 @@ def quant_deepseekv3(config_path_, fp16_ckpt_path_, output_dir_, quant_algo_, da
     os.environ['MS_PARALLEL_DISPATCH_NUM'] = '4'
     os.environ['MS_ENABLE_SYNC_COPY_INPUT'] = '1'
     os.environ['FORCE_EAGER'] = 'true'
-    os.environ['MS_DISABLE_INTERNAL_KERNELS_LIST'] = 'FlashAttentionScore'
     config_path_ = os.path.join(config_path_, 'predict_deepseek_r1_671b_calibrate.yaml')
 
     config = MindFormerConfig(config_path_)
@@ -205,7 +204,6 @@ def quant_deepseekv3(config_path_, fp16_ckpt_path_, output_dir_, quant_algo_, da
                        format="safetensors")
     offload_network(network)
     os.environ.pop('FORCE_EAGER', None)
-    os.environ.pop('MS_DISABLE_INTERNAL_KERNELS_LIST', None)
     return outputs[0]
 
 

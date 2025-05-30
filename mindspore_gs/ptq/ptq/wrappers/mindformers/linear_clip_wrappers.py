@@ -36,6 +36,7 @@ class ClipLinearCell(WrapperLinearCell):
 
     @staticmethod
     def reg_self():
+        """reg_self"""
         class AutoClipChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.algo_args.get("weight_clip_ratio", [1 - i/20 for i in range(10)])
@@ -43,6 +44,15 @@ class ClipLinearCell(WrapperLinearCell):
         LinearClipper.reg_layer_map(Linear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(ColumnParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(RowParallelLinear, ClipLinearCell, AutoClipChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            LinearClipper.reg_layer_map(ColumnParallelGroupLinear, ClipLinearCell, AutoClipChecker())
+            LinearClipper.reg_layer_map(RowParallelGroupLinear, ClipLinearCell, AutoClipChecker())
+            LinearClipper.reg_layer_map(ColumnParallelLinearWorldRegion, ClipLinearCell, AutoClipChecker())
+            LinearClipper.reg_layer_map(RowParallelLinearWorldRegion, ClipLinearCell, AutoClipChecker())
+        except ImportError:
+            pass
 
     def _quant_info(self):
         return "wclip"

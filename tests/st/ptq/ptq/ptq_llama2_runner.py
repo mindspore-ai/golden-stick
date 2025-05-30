@@ -142,7 +142,6 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
     """PTQ quant to quant llama2"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['FORCE_EAGER'] = "true"
-    os.environ['MS_DISABLE_INTERNAL_KERNELS_LIST'] = "FlashAttentionScore"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -178,7 +177,6 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
                     choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     print(f"Save quant ckpt to {save_path}", flush=True)
     os.environ.pop('FORCE_EAGER', None)
-    os.environ.pop('MS_DISABLE_INTERNAL_KERNELS_LIST', None)
     offload_network(network)
 
 
@@ -297,12 +295,12 @@ def count_consecutive_same_elements(arr1: np.ndarray, arr2: np.ndarray):
 def tokens_check(calibrate_config_path_, infer_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path):
     """ptq_llama2_predict_2stage"""
     tokens = {
-        "A8W8C8": 42,
-        "A16W8C8": 55,
+        "A8W8C8": 58,
+        "A16W8C8": 58,
         "C8": 55,
         "A8W8": 41,
         "A16W8": 55,
-        "A8W8_Dynamic": 45,
+        "A8W8_Dynamic": 44,
         "C8_Dynamic": 55,
     }
 
