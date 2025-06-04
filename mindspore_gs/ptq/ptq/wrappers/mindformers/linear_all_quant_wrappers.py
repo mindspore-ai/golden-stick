@@ -45,6 +45,15 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(Linear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, AllQuantLinearCell, A8W8Checker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            Quantizer.reg_layer_map(ColumnParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(RowParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, AllQuantLinearCell, A8W8Checker())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)

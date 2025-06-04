@@ -47,6 +47,15 @@ class WeightQuantLinearCell(WrapperLinearCell):
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            Quantizer.reg_layer_map(ColumnParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, WeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)

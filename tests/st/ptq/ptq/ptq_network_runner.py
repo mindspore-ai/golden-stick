@@ -193,11 +193,10 @@ def create_cfg(quant_algo_, mode):
     return cfg
 
 
-def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
+def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_):
     """quant llama2 using PTQ"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['FORCE_EAGER'] = "true"
-    os.environ['MS_DISABLE_INTERNAL_KERNELS_LIST'] = "FlashAttentionScore"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -215,18 +214,6 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
 
     network = helper.create_network()
     tokenizer = helper.create_tokenizer()
-
-    def generate_(net, tokenizer_, input_):
-        seq_len = 100
-        input_ids = tokenizer_(input_)['input_ids']
-        outputs = net.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
-        return outputs
-    foutput = generate_(network, tokenizer, example)
-    ms.ms_memory_recycle()
-    file_path = f'./foutput-{quant_algo_}-{config.parallel_config.model_parallel}.npy'
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    np.save(file_path, np.array(foutput))
 
     cfg = create_cfg(quant_algo_, PTQMode.QUANTIZE)
     ptq = PTQ(config=cfg)
@@ -254,10 +241,9 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, example, quant_algo_):
                     choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
     offload_network(network)
     os.environ.pop('FORCE_EAGER', None)
-    os.environ.pop('MS_DISABLE_INTERNAL_KERNELS_LIST', None)
 
 
-def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
+def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_=""):
     """eval llama2 by float ckpt and int ckpt"""
     ms.set_context(mode=0)
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
@@ -299,6 +285,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_):
 
     seq_len = 100
     input_ids = tokenizer(input_)['input_ids']
+    os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
     outputs = network.generate(input_ids, do_sample=False, max_length=seq_len, top_p=1, top_k=3)
     answer = tokenizer.decode(outputs, skip_special_tokens=True)
     return outputs, answer
@@ -314,12 +301,14 @@ def ptq_llama2_predict_2stage(config_path_, fp16_ckpt_path_, quant_ckpt_path_, o
                               quant_algo_):
     """ptq_llama2_predict_2stage"""
     example = "Hello"
-    quant_llama2(config_path_, fp16_ckpt_path_, output_dir_, example, quant_algo_)
-    foutput = np.load(f'./foutput-{quant_algo_}-{model_parallel_}.npy')
+    quant_llama2(config_path_, fp16_ckpt_path_, output_dir_, quant_algo_)
     qoutput, _ = eval_llama2(input_=example, is_quant=True,
                              config_path_=config_path_, ckpt_path_=quant_ckpt_path_,
                              quant_algo_=quant_algo_)
+    foutput, _ = eval_llama2(input_=example, is_quant=False,
+                             config_path_=config_path_, ckpt_path_=fp16_ckpt_path_)
     qoutput = np.array(qoutput)
+    foutput = np.array(foutput)
     if model_parallel_ == 1:
         if quant_algo_ == 'A8W8':
             ret = np.allclose(qoutput[:, :69], foutput[:, :69], 0, 0)

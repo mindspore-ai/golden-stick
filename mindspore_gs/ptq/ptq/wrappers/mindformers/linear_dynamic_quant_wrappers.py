@@ -40,6 +40,15 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(Linear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(RowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            Quantizer.reg_layer_map(ColumnParallelGroupLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+            Quantizer.reg_layer_map(RowParallelGroupLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, DynamicQuantLinearCell, DynamicA8W8Checker())
+            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, DynamicQuantLinearCell, DynamicA8W8Checker())
+        except ImportError:
+            pass
 
     def _quant_info(self):
         res = super()._quant_info()

@@ -176,6 +176,7 @@ class SmoothQuantLinearCell(SmoothLinearCell):
     """SmoothLinearCell"""
     @staticmethod
     def reg_self():
+        """reg_self"""
         class SmoothChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.outliers_suppression == OutliersSuppressionType.SMOOTH
@@ -183,6 +184,15 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(Linear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(ColumnParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelLinearWorldRegion, SmoothQuantLinearCell, SmoothChecker())
+        except ImportError:
+            pass
 
     def _calc_smooth_scale(self, alpha, **kwargs):
         """_calc_smooth_scale"""
@@ -234,6 +244,7 @@ class AWQLinearCell(SmoothLinearCell):
     """SmoothLinearCell"""
     @staticmethod
     def reg_self():
+        """reg_self"""
         class AWQChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 return False
@@ -241,6 +252,15 @@ class AWQLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, AWQLinearCell, AWQChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelGroupLinear, AWQLinearCell, AWQChecker())
+            LinearSmoothQuant.reg_layer_map(ColumnParallelLinearWorldRegion, AWQLinearCell, AWQChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelLinearWorldRegion, AWQLinearCell, AWQChecker())
+        except ImportError:
+            pass
 
     def _quant_info(self) -> str:
         return ""
@@ -323,6 +343,19 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                                          SearchOutlierSuppressionLiteChecker())
         LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinearWorldRegion, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinearWorldRegion, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
@@ -538,6 +571,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         self.cat_samples = None
         self.samples.clear()
 
+
 class AWQSmoothLinearCell(AWQLinearCell):
     """AWQSmoothLinearCell"""
 
@@ -550,6 +584,15 @@ class AWQSmoothLinearCell(AWQLinearCell):
         LinearAutoSmoother.reg_layer_map(Linear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinearWorldRegion, AWQSmoothLinearCell, AWQSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinearWorldRegion, AWQSmoothLinearCell, AWQSmoothChecker())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
@@ -778,15 +821,25 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
                 return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS and \
                     config.use_inner_osp
 
-        LinearAutoSmoother.reg_layer_map(
-            Linear, OutlierSuppressionPlusSmoothLinearCell, OutlierSuppressionPlusSmoothChecker()
-        )
-        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear,
-                                         OutlierSuppressionPlusSmoothLinearCell,
+        LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
-        LinearAutoSmoother.reg_layer_map(RowParallelLinear,
-                                         OutlierSuppressionPlusSmoothLinearCell,
+        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinearWorldRegion, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinearWorldRegion, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
@@ -980,6 +1033,7 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
         self.check_xrange(self.cat_samples, xs)
         self._apply_smooth(smooth_scale)
 
+
 class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
     """SmoothQuantPlusLinearCell"""
 
@@ -991,12 +1045,23 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
                     not config.use_inner_osp
 
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusLinearCell, OutlierSuppressionPlusChecker())
-        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear,
-                                         OutlierSuppressionPlusLinearCell,
+        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusLinearCell,
                                          OutlierSuppressionPlusChecker())
-        LinearAutoSmoother.reg_layer_map(RowParallelLinear,
-                                         OutlierSuppressionPlusLinearCell,
+        LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusLinearCell,
                                          OutlierSuppressionPlusChecker())
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinearWorldRegion, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinearWorldRegion, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+        except ImportError:
+            pass
 
     def _quant_info(self):
         return "OutlierSuppressionPlus"
