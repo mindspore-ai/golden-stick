@@ -699,7 +699,7 @@ def test_sq_llama2_predict_2stage_1p(device, mode):
     assert sq_predict_llama2_2stage()
 
 
-@pytest.mark.skip(reason="re-enable after smoothquant ckpt is split.")
+@pytest.mark.skip(reason="SmoothQuant is deprecated.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single

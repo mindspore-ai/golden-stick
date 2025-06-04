@@ -109,7 +109,7 @@ def test_mf_llama_net_helper():
     network(*inputs)
 
 
-@pytest.mark.skip(reason="re-enable after parallel-llama support single card infer.")
+@pytest.mark.skip(reason="Network helper is Deprecated.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
@@ -180,7 +180,7 @@ def test_mf_parallel_llama_net_helper_inputs():
         helper.assemble_inputs(1)
 
 
-@pytest.mark.skip(reason="re-enable after parallel-llama support single card infer.")
+@pytest.mark.skip(reason="Network helper is Deprecated.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
