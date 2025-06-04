@@ -23,7 +23,7 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_deepseek_r1_671b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202505/20250528/master_20250528160015_b59b30d9dba1cba6bf159c5e75f5a3a14e995a71_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
+MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202506/20250604/master_20250604093607_29c50742d22bf0d2ee718bba97c65539c695cece_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
 
 export GSLOG=1
 export MS_ENABLE_LCCL=off
@@ -53,21 +53,21 @@ prepare_env()
 
   echo "enter test workspace."
   cd ws || exit 1
-  rm -rf gs *log* *yaml output graph *json kernel_meta *py
+  rm -rf gs mf *log* *yaml output graph *json kernel_meta *py
   cp ../*.yaml ./
 
   echo "download ms pkg ${MS_PKG_LINK}."
   wget --no-check-certificate -c $MS_PKG_LINK || exit 1
 
   echo "clone mf repo and install mf."
-  git clone -b br_infer_deepseek_os https://gitee.com/mindspore/mindformers.git mf || exit 1
+  git clone -b dev https://gitee.com/mindspore/mindformers.git mf || exit 1
   cd mf || exit 1
   echo "build mf."
   bash build.sh || exit 1
   cd .. || exit 1
 
   echo "clone gs repo."
-  git clone https://gitee.com/mindspore/golden-stick.git gs || exit 1
+  git clone -b master https://gitee.com/mindspore/golden-stick.git gs || exit 1
   cd gs || exit 1
   echo "build gs."
   bash build.sh || exit 1
@@ -237,13 +237,13 @@ dataset_eval()
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a16w8_safetensors/" ${vocab_file} ${tokenizer_file} 16 False
   eval "eval a16w8 deepseek-r1" "a16w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a16w8"
 
-  ############################ a8perotken-w8 ############################
-  # quant a8perotken-w8 ckpt
+  ############################ a8pertoken-w8 ############################
+  # quant a8pertoken-w8 ckpt
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 16 True
   quant "quant deepseek-r1 bfp16 to a8perotken-w8" "a8perotken-w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "a8dynw8" 
-  # a8perotken-w8 acc
+  # a8pertoken-w8 acc
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a8dynw8_safetensors/" ${vocab_file} ${tokenizer_file} 16 False
-  eval "eval a8perotken-w8 deepseek-r1" "a8perotken-w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a8dynw8"
+  eval "eval a8pertoken-w8 deepseek-r1" "a8pertoken-w8" 16 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a8dynw8"
 
   show_conda
   echo_result "atb a8w8 deepseek-r1" "${BASEPATH}/ws/atb-a8w8_eval_log/worker_0.log"
@@ -251,7 +251,7 @@ dataset_eval()
   echo_result "a8w8-smoothquant deepseek-r1" "${BASEPATH}/ws/a8w8-smoothquant_eval_log/worker_0.log"
   echo_result "a8w8-osl deepseek-r1" "${BASEPATH}/ws/a8w8-osl_eval_log/worker_0.log"
   echo_result "a16w8 deepseek-r1" "${BASEPATH}/ws/a16w8_eval_log/worker_0.log"
-  echo_result "a8perotken-w8 deepseek-r1" "${BASEPATH}/ws/a8perotken-w8_eval_log/worker_0.log"
+  echo_result "a8pertoken-w8 deepseek-r1" "${BASEPATH}/ws/a8pertoken-w8_eval_log/worker_0.log"
 }
 
 quant_infer()
@@ -293,20 +293,20 @@ quant_infer()
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a16w8_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
   infer "infer a16w8 deepseek-r1" "a16w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a16w8"
 
-  ############################ a8perotken-w8 ############################
-  # quant a8perotken-w8 ckpt
+  ############################ a8pertoken-w8 ############################
+  # quant a8pertoken-w8 ckpt
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" ${bfp16_model_path} ${vocab_file} ${tokenizer_file} 8 True 4
   quant "quant deepseek-r1 bfp16 to a8perotken-w8" "a8perotken-w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qckpt.yaml" "a8dynw8" 
-  # a8perotken-w8 acc
+  # a8pertoken-w8 acc
   sed_qconfig "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "./output/DeepSeekR1_a8dynw8_safetensors/" ${vocab_file} ${tokenizer_file} 8 False 4
-  infer "infer a8perotken-w8 deepseek-r1" "a8perotken-w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a8dynw8"
+  infer "infer a8pertoken-w8 deepseek-r1" "a8pertoken-w8" 8 "${BASEPATH}/ws/predict_deepseek_r1_671b_qinfer.yaml" "a8dynw8"
   show_conda
   check_infer_result "atb a8w8 deepseek-r1" "${BASEPATH}/ws/atb-a8w8_infer_log/worker_0.log"
   check_infer_result "gptq a16w4 deepseek-r1" "${BASEPATH}/ws/gptq-a16w4_infer_log/worker_0.log"
   check_infer_result "a8w8-smoothquant deepseek-r1" "${BASEPATH}/ws/a8w8-smoothquant_infer_log/worker_0.log"
   check_infer_result "a8w8-osl deepseek-r1" "${BASEPATH}/ws/a8w8-osl_infer_log/worker_0.log"
   check_infer_result "a16w8 deepseek-r1" "${BASEPATH}/ws/a16w8_infer_log/worker_0.log"
-  check_infer_result "a8perotken-w8 deepseek-r1" "${BASEPATH}/ws/a8perotken-w8_infer_log/worker_0.log"
+  check_infer_result "a8pertoken-w8 deepseek-r1" "${BASEPATH}/ws/a8pertoken-w8_infer_log/worker_0.log"
 
 }
 
