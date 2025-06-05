@@ -202,7 +202,7 @@ def quant_net(net, ptq, ds):
     quant_start = time.time()
     logger.info('Quantize-ing network...')
     start_time = time.time()
-    ptq.apply(net, ds)
+    ptq.apply(net, datasets=ds)
     logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
     start_time = time.time()
     net.phase = "quant_convert"
