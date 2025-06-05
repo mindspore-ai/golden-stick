@@ -106,7 +106,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
     def _hessian_compute(self):
         """compute Hessian Matrix"""
         for i in range(len(self.samples)):
-            if len(self.samples[i].shape) == 3:
+            if len(self.samples[i].shape) == 1 or len(self.samples[i].shape) == 3:
                 self.samples[i] = self.samples[i].reshape((-1, self.samples[i].shape[-1]))
             sqe = self.nsamples / (self.nsamples + 1)
             self.nsamples += 1

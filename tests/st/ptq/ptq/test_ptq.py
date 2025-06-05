@@ -284,6 +284,16 @@ def quant_simple_gmm_net(non_decoder, linear_type, quant_type):
                         opname_blacklist=["w2", "lm_head"],
                         act_quant_dtype=dtype.int8,
                         weight_quant_dtype=dtype.int8)
+    elif quant_type == "a16w4-gptq":
+        gptq_config = GPTQQuantConfig()
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                        weight_quant_dtype=dtype.qint4x2,
+                        algo_args=gptq_config,
+                        act_quant_dtype=None,
+                        precision_recovery=PrecisionRecovery.GPTQ,
+                        weight_quant_granularity=QuantGranularity.PER_GROUP,
+                        opname_blacklist=['lm_head', 'lkv2kv'],
+                        group_size=64)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_type}")
     set_context(mode=PYNATIVE_MODE, jit_config={"jit_level": "O0", "infer_boost": "on"})
@@ -343,6 +353,16 @@ def eval_simple_gmm_net(non_decoder, linear_type, quant_type):
                         opname_blacklist=["w2", "lm_head"],
                         act_quant_dtype=dtype.int8,
                         weight_quant_dtype=dtype.int8)
+    elif quant_type == "a16w4-gptq":
+        gptq_config = GPTQQuantConfig()
+        cfg = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND,
+                        weight_quant_dtype=dtype.qint4x2,
+                        algo_args=gptq_config,
+                        act_quant_dtype=None,
+                        precision_recovery=PrecisionRecovery.GPTQ,
+                        weight_quant_granularity=QuantGranularity.PER_GROUP,
+                        opname_blacklist=['lm_head', 'lkv2kv'],
+                        group_size=64)
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_type}")
     ptq = PTQ(config=cfg)
@@ -389,7 +409,8 @@ def get_cos_similar(a: list, b: list):
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("non_decoder", [True, False])
 @pytest.mark.parametrize("linear_type", ["RowParallelLinear", "ColumnParallelLinear"])
-@pytest.mark.parametrize("quant_type", ["w8perchannela8pertoken", "pertoken-smooth", "w8a8-smoothquant", "w8a8"])
+@pytest.mark.parametrize("quant_type", ["w8perchannela8pertoken", "pertoken-smooth",
+                                        "w8a8-smoothquant", "w8a8", "a16w4-gptq"])
 def test_ptq_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     Feature: eval simplenet which including one GroupedMatMul linear.
