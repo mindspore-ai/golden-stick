@@ -21,7 +21,7 @@ import warnings
 
 import numpy as np
 from mindformers.version_control import is_310p
-from mindspore import Tensor, dtype
+from mindspore import Tensor, dtype, mint
 from mindspore.nn import Cell
 from mindspore import Parameter
 from mindspore import ops as msops
