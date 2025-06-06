@@ -20,6 +20,7 @@ from typing import Optional
 import warnings
 
 import numpy as np
+from mindformers.version_control import is_310p
 from mindspore import Tensor, dtype
 from mindspore.nn import Cell
 from mindspore import Parameter
@@ -29,7 +30,8 @@ from mindspore.common.initializer import initializer
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.communication import get_rank
-from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt, GroupedMatmulV4
+from mindspore.ops.auto_generate import (WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt,
+                                         GroupedMatmulV4, GroupedMatmulV4Transpose, GroupedMatmul)
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
@@ -79,6 +81,7 @@ class QuantUnitCell(abc.ABC, Cell):
     def __init__(self, layer_name):
         super().__init__()
         self.layer_name = layer_name
+        self.is_310p = is_310p()
 
     @abc.abstractmethod
     def param_shard_state(self, tensor_parallel_num=1, **kwargs) -> dict:
@@ -143,7 +146,18 @@ class DynamicQuantCell(QuantUnitCell):
         return DynamicQuantCell(layer_name, is_deploy, smooth_scale)
 
     def construct(self, x):
-        qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
+        ori_shape = x.shape
+        if len(ori_shape) == 3:
+            my_x = x.reshape((-1, x.shape[2]))
+        else:
+            my_x = x
+        my_x = msops.cast(my_x, dtype=dtype.float32)
+        x_scale = mint.max(msops.abs(my_x), dim=1, keepdim=True)[0] / 127
+        qx = msops.round(my_x / x_scale)
+        qx = qx.reshape(ori_shape)
+        qx = msops.cast(qx, dtype=dtype.int8)
+        x_scale = msops.cast(x_scale, dtype=dtype.float32)
+        # qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
         return qx, x_scale
 
     # pylint: disable=arguments-differ
@@ -707,7 +721,10 @@ class DynamicQuantMatmul(QuantUnitCell):
                          f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
         self.is_group_mm = is_group_mm
         if is_group_mm:
-            self.qbmm = GroupedMatmulV4()
+            if not self.is_310p:
+                self.qbmm = GroupedMatmulV4()
+            else:
+                self.qbmm = GroupedMatmulV4Transpose()
         else:
             self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
 
@@ -750,7 +767,7 @@ class DynamicQuantMatmul(QuantUnitCell):
         if isinstance(src, msops.MatMul):
             return DynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam, transpose_a, transpose_b,
                                                         dst_dtype)
-        if isinstance(src, GroupedMatmulV4):
+        if isinstance(src, (GroupedMatmulV4, GroupedMatmul)):
             return DynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam, transpose_a, transpose_b,
                                                         dst_dtype, True)
         if isinstance(src, SmoothMatmul):
@@ -763,8 +780,14 @@ class DynamicQuantMatmul(QuantUnitCell):
 
     def construct(self, qx, quant_weight, group_list=None, x_scale=None):
         if self.is_group_mm:
-            output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
-                               group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            if not self.is_310p:
+                output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
+                                   group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            else:
+                group_list = msops.cast(group_list, dtype=dtype.int32)
+                output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
+                                   group_list, split_item=3, group_type=0, group_list_type=0, act_type=0,
+                                   transpose_a=False, transpose_b=True)[0]
         else:
             output = self.qbmm(qx, quant_weight, self.weight_scale, None, None, x_scale)
         return output.astype(self.dst_dtype)
@@ -1481,7 +1504,10 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
                          f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}, {self.dequant_scale.asnumpy()}}}")
 
         if self.is_group_mm:
-            self.gmm = GroupedMatmulV4()
+            if self.is_310p:
+                self.gmm = GroupedMatmul(split_item=3, group_type=0, transpose_b=True)
+            else:
+                self.gmm = GroupedMatmulV4()
         else:
             self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=self.dst_dtype)
 
@@ -1503,10 +1529,16 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
         return scale_i64
 
     def construct(self, qx, quant_weight, group_list=None):
+        """construct network forward"""
         # x: fp16 quant_weight: int8
         if self.is_group_mm:
-            output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,
-                               None, None, None, group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            if self.is_310p:
+                group_list = msops.cast(group_list, dtype=dtype.int32)
+                output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,
+                                  None, None, group_list)[0]
+            else:
+                output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,
+                                  None, None, None, group_list, split_item=3, group_type=0, group_list_type=1)[0]
         else:
             output = self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, self.quant_bias, None)
         return output.astype(self.dst_dtype)
