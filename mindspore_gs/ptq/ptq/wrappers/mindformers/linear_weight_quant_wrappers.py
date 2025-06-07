@@ -104,8 +104,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
             if rank == 2:
                 scale_zp_shape = (self.oc,)
             elif rank == 3:
-                scale_zp_shape = (linear.weight.shape[0], linear.weight.shape[2]) if self.layer.transpose_b else \
-                                 (linear.weight.shape[0], linear.weight.shape[2])
+                scale_zp_shape = (linear.weight.shape[0], linear.weight.shape[2]) if not self.layer.transpose_b else \
+                                 (linear.weight.shape[0], linear.weight.shape[1])
             else:
                 raise ValueError(f"Only support rank of weight is 2 or 3, but got {rank}.")
         self.w_scale = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
