@@ -261,6 +261,7 @@ class QuantWithOutlierSuppressionPlus(QuantUnitCell):
         self.input_scale = None
         self.input_zp = None
         self.beta = None
+        self.layer_name = layer_name
 
     @staticmethod
     def create(layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType, beta,
@@ -288,9 +289,13 @@ class QuantWithOutlierSuppressionPlus(QuantUnitCell):
             beta_shard = (tensor_parallel_num,)
         else:
             return {}
-        return {self.input_scale.name: {'shape': self.input_scale.shape, 'shard': input_scale_shard},
-                self.input_zp.name: {'shape': self.input_zp.shape, 'shard': input_zp_shard},
-                self.beta.name: {'shape': self.beta.shape, 'shard': beta_shard}}
+        if 'attention.wo' not in self.layer_name:
+            return {self.input_scale.name: {'shape': self.input_scale.shape, 'shard': input_scale_shard},
+                    self.input_zp.name: {'shape': self.input_zp.shape, 'shard': input_zp_shard},
+                    self.beta.name: {'shape': self.beta.shape, 'shard': beta_shard}}
+        else:
+            return {self.input_scale.name: {'shape': self.input_scale.shape, 'shard': input_scale_shard},
+                    self.input_zp.name: {'shape': self.input_zp.shape, 'shard': input_zp_shard}}
 
 
 class QuantWithOutlierSuppressionPlusHighPrecision(QuantWithOutlierSuppressionPlus):
@@ -321,7 +326,6 @@ class QuantWithOutlierSuppressionPlusHighPerformance(QuantWithOutlierSuppression
         super().__init__(layer_name, parallel_type)
         self.quant = QuantV2()
         self.beta = beta if 'attention.wo' not in layer_name else None
-        self.layer_name = layer_name
         if is_deploy:
             self.input_scale = Parameter(initializer('ones', (1,), dst_dtype))
             self.input_zp = Parameter(initializer('zeros', (1,), zp_dtype))
