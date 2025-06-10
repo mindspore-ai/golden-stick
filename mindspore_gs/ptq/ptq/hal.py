@@ -320,14 +320,16 @@ class QuantWithOutlierSuppressionPlusHighPerformance(QuantWithOutlierSuppression
                  beta, zp_dtype=dtype.int8):
         super().__init__(layer_name, parallel_type)
         self.quant = QuantV2()
-        self.beta = beta
+        self.beta = beta if 'attention.wo' not in layer_name else None
+        self.layer_name = layer_name
         if is_deploy:
             self.input_scale = Parameter(initializer('ones', (1,), dst_dtype))
             self.input_zp = Parameter(initializer('zeros', (1,), zp_dtype))
             return
 
     def construct(self, x):
-        x = msops.add(x, self.beta)
+        if 'attention.wo' not in self.layer_name:
+            x = msops.add(x, self.beta)
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
 
 
