@@ -146,18 +146,7 @@ class DynamicQuantCell(QuantUnitCell):
         return DynamicQuantCell(layer_name, is_deploy, smooth_scale)
 
     def construct(self, x):
-        ori_shape = x.shape
-        if len(ori_shape) == 3:
-            my_x = x.reshape((-1, x.shape[2]))
-        else:
-            my_x = x
-        my_x = msops.cast(my_x, dtype=dtype.float32)
-        x_scale = mint.max(msops.abs(my_x), dim=1, keepdim=True)[0] / 127
-        qx = msops.round(my_x / x_scale)
-        qx = qx.reshape(ori_shape)
-        qx = msops.cast(qx, dtype=dtype.int8)
-        x_scale = msops.cast(x_scale, dtype=dtype.float32)
-        # qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
+        qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
         return qx, x_scale
 
     # pylint: disable=arguments-differ
