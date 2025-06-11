@@ -108,7 +108,6 @@ sed_mode()
 eval()
 {
   unset FORCE_EAGER
-  unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_eval_log/"
@@ -124,10 +123,28 @@ eval()
   cd ..
 }
 
+eval_pynative()
+{
+  export FORCE_EAGER=true
+  export MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST=PageAttention
+  echo "enter test workspace."
+  cd ws || exit 1
+  echo "${1}, save yaml to ${2}_pynative_eval_log/"
+  mkdir -p "${2}_pynative_eval_log"
+  cp "${3}" "${2}_pynative_eval_log/"
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_pynative_eval_log --join=True --cluster_time_out=300 python daily_eval.py -c ${3} -s ${dataset} -n 2000 > pynative_eval_${2}_log 2>&1 &" > "${2}_pynative_eval_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_pynative_eval_log" --join=True --cluster_time_out=300 python daily_eval.py -c "${3}" -s ${dataset} -n 2000 > "pynative_eval_${2}_log" 2>&1 &
+  sleep ${sleep_time}
+  pid=$(ps -u | grep msrun | grep "daily_eval.py" | grep -v grep | awk -F ' ' '{print$2}')
+  echo "waiting pid ${pid}"
+  tail --pid ${pid} -f "${2}_pynative_eval_log/worker_0.log"
+  sleep ${sleep_time}
+  cd ..
+}
+
 quant()
 {
   export FORCE_EAGER=true
-  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -146,7 +163,6 @@ quant()
 quant_awq()
 {
   export FORCE_EAGER=true
-  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -165,7 +181,6 @@ quant_awq()
 quant_gptq()
 {
   export FORCE_EAGER=true
-  export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
   echo "${1}, save yaml to ${2}_quant_log/"
@@ -295,6 +310,7 @@ echo_result()
 }
 
 echo_result "fp16 llama2-13b" "${BASEPATH}/ws/fp16_eval_log/worker_0.log"
+echo_result "fp16 pynative llama2-13b" "${BASEPATH}/ws/fp16_pynative_eval_log/worker_0.log"
 echo_result "fp16->a8w8 llama2-13b" "${BASEPATH}/ws/fp16-a8w8_eval_log/worker_0.log"
 echo_result "fp16->a16w8 llama2-13b" "${BASEPATH}/ws/fp16-a16w8_eval_log/worker_0.log"
 echo_result "fp16->a8w8c8 llama2-13b" "${BASEPATH}/ws/fp16-a8w8c8_eval_log/worker_0.log"
