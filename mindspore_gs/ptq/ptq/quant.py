@@ -165,7 +165,9 @@ class PTQ(CompAlgo):
         self.decoder_layer_types.append(LLamaDecodeLayer)
         self.decoder_layer_types.append(ParallelTransformerLayer)
 
-        def generate(network, input_ids):
+        def generate(network, input_ids, helper=None):
+            if isinstance(helper, NetworkHelper):
+                return helper.generate(network, input_ids, do_sample=False, max_new_tokens=1)
             return network.generate(input_ids, do_sample=False, max_new_tokens=1)
         self._generate_func = generate
 
@@ -279,8 +281,6 @@ class PTQ(CompAlgo):
         self._config.update_comm_info()
         self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
-            os.environ.pop('FORCE_EAGER', None)
-            os.environ.pop('MS_JIT', None)
             logger.info("unset environ FORCE_EAGER and MS_JIT because of PTQMode.DEPLOY mode")
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = self.decoder_layers[i]
@@ -301,7 +301,7 @@ class PTQ(CompAlgo):
         logger.info("Analysis network structure.")
         start_time = time.time()
         logger.info(f"Catching inputs for first decoder layer with {datasets.get_dataset_size()} datasets samples.")
-        catcher, network = self._get_first_layer_input(network, datasets)
+        catcher, network = self._get_first_layer_input(network, datasets, network_helper)
         all_args = catcher.args
         all_kwargs = catcher.kwargs
         logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
@@ -352,7 +352,7 @@ class PTQ(CompAlgo):
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
-    def _get_first_layer_input(self, network: Cell, ds=None):
+    def _get_first_layer_input(self, network: Cell, ds=None, helper=None):
         """get first layer input"""
         catcher = InputCatcher()
         catcher.patch(self.decoder_layers[0][1])
@@ -364,7 +364,7 @@ class PTQ(CompAlgo):
             logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
             input_ids = ds_item['input_ids'].asnumpy()
             try:
-                self._generate_func(network, input_ids)
+                self._generate_func(network, input_ids, helper)
             except GeneratorExit:
                 if hasattr(network, "block_mgr") and network.block_mgr:
                     network.block_mgr.clear_cache()
