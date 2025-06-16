@@ -294,8 +294,14 @@ class DynamicQuantPagedAttentionDeploy(Cell):
         """The forward compute of KVCache for Paged Attention."""
         if self.is_first_iteration:
             batch_idx = batch_valid_length * 0
+            t, h = key.shape
+            key = self.reshape(key, (1, t, h))
+            value = self.reshape(value, (1, t, h))
         else:
             batch_idx = batch_valid_length - 1
+            t, h = key.shape
+            key = self.reshape(key, (t, 1, h))
+            value = self.reshape(value, (t, 1, h))
 
         quant_k, k_scale = self.dynamic_quant(key, None)
         quant_v, v_scale = self.dynamic_quant(value, None)
@@ -310,8 +316,12 @@ class DynamicQuantPagedAttentionDeploy(Cell):
         key_scale = self.reshape(self.key_scale, (1, self.max_batch_size, self.max_seq_length))
         value_scale = self.reshape(self.value_scale, (1, self.max_batch_size, self.max_seq_length))
         kv_scale = self.cast(self.concat_scale((key_scale, value_scale)), dtype.float16)
-        return self.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache, block_tables,
-                                    batch_valid_length, kv_scale, self.kv_offset)
+        t, h = query.shape
+        query = self.reshape(query, (t, 1, h))
+        res = self.paged_attention(query, self._kvcache.key_cache, self._kvcache.value_cache, block_tables,
+                                   batch_valid_length, kv_scale, self.kv_offset)
+        res = self.reshape(res, (t, h))
+        return res
 
     def paged_attn_with_alibi(self, query, batch_valid_length, block_tables, alibi_tensor, *args, **kwargs):
         """The forward compute of KVCache for Paged Attention with alibi tensor."""

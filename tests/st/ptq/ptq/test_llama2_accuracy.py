@@ -79,9 +79,9 @@ def test_ptq_llama2_a8dynw8_accuracy():
     """
     ptq_predict_2stage_2p_run("A8W8_Dynamic")
 
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.skip(reason="mindformers update network to TH, C8-Dyn need adapter to fit TH.")
 def test_ptq_llama2_c8dyn_accuracy():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
