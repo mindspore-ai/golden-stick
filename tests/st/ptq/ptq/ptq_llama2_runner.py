@@ -13,6 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """test interfaces of post training quant."""
+from collections import OrderedDict
+
 import argparse
 import os
 import shutil
@@ -47,6 +49,7 @@ def create_ds(network_helper, ds_path, ds_type, tokenizer_):
 
 def create_cfg(quant_algo_, mode):
     """create_cfg"""
+    layer_policies = OrderedDict()
     if quant_algo_ == 'A8W8':
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
@@ -92,9 +95,27 @@ def create_cfg(quant_algo_, mode):
                         weight_quant_dtype=None,
                         kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
                         kvcache_quant_dtype=dtype.int8)
+    elif quant_algo == 'attn_a8w8c8_attn_a16w8c8_ffn_a8dyw8c8':
+        cfg = PTQConfig(mode=mode, backend=BackendTarget.ASCEND, weight_quant_dtype=dtype.int8,
+                        act_quant_dtype=dtype.int8, kvcache_quant_dtype=dtype.int8,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        opname_blacklist=["w2", "lm_head"])
+        a16w8c8 = PTQConfig(mode=mode,
+                            backend=BackendTarget.ASCEND,
+                            opname_blacklist=["lm_head"],
+                            kvcache_quant_dtype=dtype.int8)
+        a8dyw8 = PTQConfig(mode=mode,
+                           backend=BackendTarget.ASCEND,
+                           opname_blacklist=["lm_head"],
+                           act_quant_dtype=dtype.int8,
+                           weight_quant_dtype=dtype.int8,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
+                           outliers_suppression=OutliersSuppressionType.SMOOTH)
+        layer_policies = OrderedDict({r'.*\.layers\.\b\d*(2[0-9]|3[0-9])\d*\b\.attention\..*': a16w8c8,
+                                      r'.*\.feed_forward\..*': a8dyw8})
     else:
         raise ValueError(f"Unsupported quant_algo : {quant_algo_}")
-    return cfg
+    return cfg, layer_policies
 
 
 def evaluate(network, ds_path, tokenizer, helper):
@@ -160,8 +181,8 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
     network = helper.create_network()
     tokenizer = helper.create_tokenizer()
 
-    cfg = create_cfg(quant_algo_, PTQMode.QUANTIZE)
-    ptq = PTQ(config=cfg)
+    cfg, layer_policies = create_cfg(quant_algo_, PTQMode.QUANTIZE)
+    ptq = PTQ(config=cfg, layer_policies=layer_policies)
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     ds = create_ds(helper, ds_path, 'boolq', tokenizer)
@@ -203,8 +224,8 @@ def eval_llama2(config_path_, ckpt_path_, quant_algo_, ds_path):
     network = helper.create_network()
     os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
 
-    cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
-    ptq = PTQ(config=cfg)
+    cfg, layer_policies = create_cfg(quant_algo_, PTQMode.DEPLOY)
+    ptq = PTQ(config=cfg, layer_policies=layer_policies)
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     network = ptq.apply(network)
@@ -268,8 +289,8 @@ def infer_quant(config_path_, ckpt_path_, quant_algo_, example):
     config = helper.mf_config
     network = helper.create_network()
     os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
-    cfg = create_cfg(quant_algo_, PTQMode.DEPLOY)
-    ptq = PTQ(config=cfg)
+    cfg, layer_policies = create_cfg(quant_algo_, PTQMode.DEPLOY)
+    ptq = PTQ(config=cfg, layer_policies=layer_policies)
     # pylint: disable=W0212
     ptq._config.enable_deploy_fusion = False
     network = ptq.apply(network)
@@ -302,6 +323,7 @@ def tokens_check(calibrate_config_path_, infer_config_path_, fp16_ckpt_path_, qu
         "A16W8": 55,
         "A8W8_Dynamic": 44,
         "C8_Dynamic": 55,
+        "attn_a8w8c8_attn_a16w8c8_ffn_a8dyw8c8": 50
     }
 
     quant_llama2(calibrate_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path)
@@ -330,6 +352,7 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, fp16_ckpt_path
         "A16W8": 0.85,
         "A8W8_Dynamic": 0.86,
         "C8_Dynamic": 0.86,
+        "attn_a8w8c8_attn_a16w8c8_ffn_a8dyw8c8": 0.86
     }
 
     quant_llama2(calibrate_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path)
@@ -359,4 +382,5 @@ if __name__ == "__main__":
     fp16_ckpt_2p_path = os.path.join(cur_dir, "/home/workspace/mindspore_ckpt/ckpt/llama2/llama2-13b-fp16-2p")
     quant_ckpt_path = os.path.join(cur_dir, f"output/parallelLlama2-quant-2p-{quant_algo}")
     dataset_path = os.path.join(cur_dir, f'../../../data/boolq-dataset/dev.jsonl')
-    tokens_check(calibrate_config_path, infer_config_path, fp16_ckpt_2p_path, quant_ckpt_path, quant_algo, dataset_path)
+    datasets_accuracy(calibrate_config_path, infer_config_path, fp16_ckpt_2p_path,
+                      quant_ckpt_path, quant_algo, dataset_path)

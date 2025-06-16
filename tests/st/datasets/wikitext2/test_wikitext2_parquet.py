@@ -51,7 +51,7 @@ def check_ds_pt(ds_path: str, bs: int, seq_length: int, max_decode_len: int, voc
     ds = create_wikitext_dataset(ds_path, bs, seq_length, max_decode_len, tokenizer, repeat, n_samples=n_samples)
     assert ds.get_dataset_size() == math.ceil(n_samples / bs * repeat)
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])

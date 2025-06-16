@@ -207,7 +207,7 @@ def create_foo_ds(repeat=1):
     return GeneratorDataset(source=SimpleIterable(repeat), column_names=["input_ids"])
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 # FIXME: wait for cpu round ops bugfix
@@ -320,7 +320,7 @@ class NoQuantNet(nn.Cell):
         return ops.add(x, x)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 # FIXME: wait for cpu round ops bugfix
@@ -352,7 +352,7 @@ def test_nothing_to_apply_convert(device_target):
         ptq.convert(network)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
@@ -682,7 +682,7 @@ def sq_predict_llama2_2stage():
 
 
 @pytest.mark.skip(reason="SmoothQuant is deprecated.")
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
@@ -700,7 +700,7 @@ def test_sq_llama2_predict_2stage_1p(device, mode):
 
 
 @pytest.mark.skip(reason="SmoothQuant is deprecated.")
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize("device", ["Ascend"])
