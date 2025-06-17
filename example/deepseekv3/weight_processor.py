@@ -21,8 +21,8 @@ import os
 from enum import Enum
 from safetensors import safe_open
 from mindspore.communication.management import get_rank, get_group_size
-from mindformers.parallel_core.inference.utils import get_tp_world_size
-from mindformers.parallel_core.inference.parallel_state import get_data_parallel_world_size
+#from mindformers.parallel_core.inference.utils import get_tp_world_size
+from mindformers.experimental.parallel_core.pynative.parallel_state import get_data_parallel_world_size
 
 class EPMethod(Enum):
     """
@@ -47,7 +47,7 @@ class BaseWeightProcessor:
         self.is_quant = is_quant
         self.global_rank_id = get_rank()
         self.global_group_size = get_group_size()
-        self.tp_group_size = get_tp_world_size()
+        self.tp_group_size = 4
         self.dp_group_size = get_data_parallel_world_size()
         self.moe_ep_size = self.config.parallel_config.expert_parallel
         self.moe_tp_size = self.global_group_size // self.moe_ep_size

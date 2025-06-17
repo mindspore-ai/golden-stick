@@ -39,7 +39,7 @@ from research.deepseek3.deepseek3_config import DeepseekV3Config
 
 def create_ptq(quant_type: str, quant_mode: PTQMode):
     """create_ptq"""
-    if quant_type.lower() == 'dsquant':
+    if quant_type.lower() == 'dsquant' or quant_type.lower() == 'dsquant-300iduo':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8,
                         outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS,

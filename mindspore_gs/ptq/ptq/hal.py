@@ -935,7 +935,10 @@ class WeightQuantMatmul(QuantUnitCell):
                          f"{{{self.weight_zp.shape}, {self.weight_zp.dtype}, {self.weight_zp.asnumpy()}}}")
         self.is_grouped_mm = is_grouped_mm
         if self.is_grouped_mm:
-            self.weight_qbmm = GroupedMatmulV4()
+            if not self.is_310p:
+                self.weight_qbmm = GroupedMatmulV4()
+            else:
+                self.weight_qbmm = GroupedMatmulV4Transpose()
         else:
             self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
         self.has_smooth = smooth_scale is not None
@@ -990,8 +993,14 @@ class WeightQuantMatmul(QuantUnitCell):
         if self.has_smooth:
             x = msops.mul(x, self.smooth_scale)
         if self.is_grouped_mm:
-            output = self.weight_qbmm([x], [weight], None, None, None, [self.weight_scale], [self.weight_zp], None,
-                                      group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            if not self.is_310p:
+                output = self.weight_qbmm([x], [weight], None, None, None, [self.weight_scale], [self.weight_zp], None,
+                                          group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            else:
+                group_list = msops.cast(group_list, dtype=dtype.int32)
+                output = self.qbmm([x], [weight], None, [self.weight_scale], None, None, None, None,
+                                   group_list, split_item=3, group_type=0, group_list_type=0, act_type=0,
+                                   transpose_a=False, transpose_b=False)[0]
         else:
             output = self.weight_qbmm(x, weight, self.weight_scale, self.weight_zp, None, None, None)
         return output.astype(self.dst_dtype)
@@ -1061,7 +1070,7 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         if isinstance(linear.matmul, msops.MatMul):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
                                                             linear.transpose_b, dst_dtype, False)
-        elif isinstance(linear.matmul, GroupedMatmulV4):
+        elif isinstance(linear.matmul, (GroupedMatmul, GroupedMatmulV4)):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
                                                             linear.transpose_b, dst_dtype, True)
         elif isinstance(linear.matmul, SmoothMatmul):
