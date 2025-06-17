@@ -998,7 +998,7 @@ class WeightQuantMatmul(QuantUnitCell):
                                           group_list, split_item=3, group_type=0, group_list_type=1)[0]
             else:
                 group_list = msops.cast(group_list, dtype=dtype.int32)
-                output = self.qbmm([x], [weight], None, [self.weight_scale], None, None, None, None,
+                output = self.weight_qbmm([x], [weight], None, None, None, [self.weight_scale], [self.weight_zp], None,
                                    group_list, split_item=3, group_type=0, group_list_type=0, act_type=0,
                                    transpose_a=False, transpose_b=False)[0]
         else:
