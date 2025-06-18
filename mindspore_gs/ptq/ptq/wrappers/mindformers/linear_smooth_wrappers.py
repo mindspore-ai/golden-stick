@@ -733,7 +733,8 @@ class AWQSmoothLinearCell(AWQLinearCell):
             pseudo_output = self._module_forward()
             self._layer.weight.set_data(Tensor(self.fp16_weight, dtype=self.compute_type))
 
-            loss = msops.mse_loss(fp16_output, pseudo_output, reduction='mean')
+            loss = msops.mse_loss(fp16_output.astype(msdtype.float32),
+                                  pseudo_output.astype(msdtype.float32), reduction='mean')
             logger.info(f"AWQSmoothLinearCell: search scale alpha {ratio}, scale loss of Layer({self._layer_name}) "
                         f"is {{{loss.shape}, {loss.dtype}, {loss}}}")
             history.append(loss)

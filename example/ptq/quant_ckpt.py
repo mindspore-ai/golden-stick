@@ -43,19 +43,6 @@ def dtype_formatter(name: str):
     return None
 
 
-def granularity_formatter(name: str):
-    """granularity_formatter"""
-    if name == 'per_tensor':
-        return QuantGranularity.PER_TENSOR
-    if name == 'per_channel':
-        return QuantGranularity.PER_CHANNEL
-    if name == 'per_token':
-        return QuantGranularity.PER_TOKEN
-    if name == 'per_group':
-        return QuantGranularity.PER_GROUP
-    return None
-
-
 def get_args():
     """init user options"""
     parser = argparse.ArgumentParser()
@@ -91,11 +78,6 @@ def get_args():
                                                                         "path.")
 
     args = parser.parse_args()
-    args.act_quant_granularity = QuantGranularity.from_str(args.act_quant_granularity)
-    args.weight_quant_granularity = QuantGranularity.from_str(args.weight_quant_granularity)
-    args.kvcache_quant_granularity = QuantGranularity.from_str(args.kvcache_quant_granularity)
-    args.outliers_suppression = OutliersSuppressionType.from_str(args.outliers_suppression)
-    args.precision_recovery = PrecisionRecovery.from_str(args.precision_recovery)
 
     if args.approach == 'rtn-a16w8':
         logger.info("weight_quant_dtype, act_quant_dtype, kvcache_quant_dtype and outliers_suppression be reset "
@@ -142,13 +124,19 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
         algorithm_config = GPTQQuantConfig()
     if uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
         algorithm_config = AWQConfig()
+
+    act_quant_granularity = QuantGranularity.from_str(uargs_.act_quant_granularity)
+    weight_quant_granularity = QuantGranularity.from_str(uargs_.weight_quant_granularity)
+    kvcache_quant_granularity = QuantGranularity.from_str(uargs_.kvcache_quant_granularity)
+    outliers_suppression = OutliersSuppressionType.from_str(uargs_.outliers_suppression)
+    precision_recovery = PrecisionRecovery.from_str(uargs_.precision_recovery)
     cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=backend, weight_quant_dtype=uargs_.weight_quant_dtype,
                     act_quant_dtype=uargs_.act_quant_dtype, kvcache_quant_dtype=uargs_.kvcache_quant_dtype,
-                    outliers_suppression=uargs_.outliers_suppression, opname_blacklist=uargs_.opname_blacklist,
-                    precision_recovery=uargs_.precision_recovery, algo_args=algorithm_config,
-                    act_quant_granularity=uargs_.act_quant_granularity,
-                    weight_quant_granularity=uargs_.weight_quant_granularity,
-                    kvcache_quant_granularity=uargs_.kvcache_quant_granularity,
+                    outliers_suppression=outliers_suppression, opname_blacklist=uargs_.opname_blacklist,
+                    precision_recovery=precision_recovery, algo_args=algorithm_config,
+                    act_quant_granularity=act_quant_granularity,
+                    weight_quant_granularity=weight_quant_granularity,
+                    kvcache_quant_granularity=kvcache_quant_granularity,
                     group_size=uargs_.group_size)
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
@@ -212,38 +200,35 @@ def quant_net(net, ptq, ds):
     return net
 
 
-def ckpt_name(model_name_, uargs_):
+def ckpt_name(model_name_, uargs_, cfg):
     """ckpt_name"""
     if uargs_.approach != 'ptq':
-        return f"{model_name_}_{uargs_.approach}"
-    name = f"{model_name_}_ptq"
-    if uargs_.outliers_suppression == OutliersSuppressionType.SMOOTH:
-        name += "_smooth"
-    elif uargs_.outliers_suppression == OutliersSuppressionType.AWQ:
-        name += "_awq"
-    elif uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE:
-        name += "_osl"
-    elif uargs_.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS:
-        name += "_outlier_suppression+"
+        return f"{model_name_}_{uargs_.approach}_{cfg.model.model_config.compute_dtype}"
+    name = f"{model_name_}_ptq_{cfg.model.model_config.compute_dtype}"
+    if uargs_.outliers_suppression != 'none':
+        name += "_" + uargs_.outliers_suppression
     else:
         name += "_no_smooth"
-    if uargs_.precision_recovery == PrecisionRecovery.GPTQ:
-        name += "_gptq"
+
+    if uargs_.precision_recovery != 'none':
+        name += "_" + uargs_.precision_recovery
+
     if uargs_.act_quant_dtype == msdtype.int8:
-        if uargs_.act_quant_granularity is QuantGranularity.PER_TOKEN:
-            name += "_a8dyn"
+        if uargs_.act_quant_granularity == "per_token":
+            name += "_a8dyn_" + uargs_.act_quant_granularity
         else:
-            name += "_a8"
+            name += "_a8_" + uargs_.act_quant_granularity
     else:
         name += "_a16"
+
     if uargs_.weight_quant_dtype == msdtype.int8:
-        name += "w8"
+        name += "_w8_" + uargs_.weight_quant_granularity
     elif uargs_.weight_quant_dtype == msdtype.qint4x2:
-        name += "w4"
+        name += "_w4_" + uargs_.weight_quant_granularity
     else:
-        name += "w16"
+        name += "_w16"
     if uargs_.kvcache_quant_dtype == msdtype.int8:
-        name += "c8"
+        name += "_c8_" + uargs_.kvcache_quant_granularity
     return name
 
 
@@ -279,14 +264,15 @@ if __name__ == "__main__":
         rank_id = 0
 
     if mfconfig.load_ckpt_format == "safetensors":
-        save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(model_name, uargs)}_safetensors")
+        save_ckpt_path = os.path.join(helper.mf_config.output_dir,
+                                      f"{ckpt_name(model_name, uargs, mfconfig)}_safetensors")
         save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
         os.makedirs(save_path, exist_ok=True)
         ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}"),
                            choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x,
                            format="safetensors")
     else:
-        save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(model_name, uargs)}_ckpt")
+        save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{ckpt_name(model_name, uargs, mfconfig)}_ckpt")
         save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
         os.makedirs(save_path, exist_ok=True)
         ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}.ckpt"),

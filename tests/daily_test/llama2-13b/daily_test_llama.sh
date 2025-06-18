@@ -23,15 +23,17 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_llama2_13b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202506/20250604/master_20250604093607_29c50742d22bf0d2ee718bba97c65539c695cece_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
-MF_PKG_LINK="https://repo.mindspore.cn/mindspore/mindformers/version/202506/20250604/dev_20250604010017_a058ee83019a7c5582e98b2d380f481f84a6be45_newest/any/mindformers-1.6.0-py3-none-any.whl"
 ds_type="boolq"
 dataset="${BASEPATH}/ws/gs/tests/data/boolq-dataset/dev.jsonl"
 eval_script="eval_boolq.py"
-export ASCEND_RT_VISIBLE_DEVICES=6,7
+export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export GSLOG=1
-port=33333
-sleep_time=10
+sleep_time=60
+
+checkpoint_path=${1}
+vocab_file=${2}
+MS_PKG_LINK=${3:-"https://repo.mindspore.cn/mindspore/mindspore/version/202505/20250507/master_20250507010016_8ed48766ed50bb506b8422a5ece21d9104692196_newest/unified/aarch64/mindspore-2.6.0-cp310-cp310-linux_aarch64.whl"}
+MF_PKG_LINK=${4-"https://repo.mindspore.cn/mindspore/mindformers/version/202505/20250507/dev_20250507031508_52aaafb134332b1e2118d91e943f0ffabbad0312_newest/any/mindformers-1.6.0-py3-none-any.whl"}
 
 prepare_env()
 {
@@ -105,20 +107,108 @@ sed_mode()
   sed -i s/"  mode: .*"/"  mode: ${2}"/g ${f}
 }
 
+sed_ckpt()
+{
+  f=$1
+  sed -i s#"load_checkpoint: .*"#"load_checkpoint: \"${2}\""#g ${f}
+}
+
+sed_vocab_file()
+{
+  f=$1
+  sed -i s#"vocab_file: .*"#"vocab_file: \"${2}\""#g ${f}
+}
+
+# Function to find two available NPU cards
+find_available_devices()
+{
+  local available_devices=()
+  for device_id in {0..7}; do
+    # Check if the device is in use by checking if msrun is running on it
+    output=$(npu-smi info -t proc-mem -i $device_id 2>&1)
+
+    if [[ "$output" == *"No process in device."* ]]; then
+      # shellcheck disable=SC2206
+      available_devices+=($device_id)
+    fi
+  done
+  echo "${available_devices[@]}"
+}
+
+set_devices()
+{
+  echo "Searching for available NPU devices..."
+  # shellcheck disable=SC2207
+  available_devices=($(find_available_devices))
+  while [ ${#available_devices[@]} -lt 2 ]; do
+    echo "Not enough available NPU devices. Waiting for 10 seconds..."
+    sleep 10
+    # shellcheck disable=SC2207
+    available_devices=($(find_available_devices))
+  done
+
+  # Set the available devices
+  export ASCEND_RT_VISIBLE_DEVICES="${available_devices[0]},${available_devices[1]}"
+  echo "Using NPU devices: ${ASCEND_RT_VISIBLE_DEVICES}"
+}
+
+get_port()
+{
+  port=$((RANDOM % (10000 - 1000) + 1000))
+  echo "Using port ${port}"
+}
+
+eval_nocheck()
+{
+  unset FORCE_EAGER
+  unset MS_JIT
+  echo "enter test workspace."
+  cd ws || exit 1
+
+  set_devices
+  get_port
+
+  echo "${1}, save yaml to ${2}_eval_log/"
+  mkdir -p "${2}_eval_log"
+  cp "${3}" "${2}_eval_log/"
+
+  echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_eval_log --join=True --cluster_time_out=300 python daily_eval.py -c ${3} -s ${dataset} -n 2000 > eval_${2}_log 2>&1 &" > "${2}_eval_log/cmd.sh"
+  msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval.py -c "${3}" -s ${dataset} -n 2000 > "eval_${2}_log" 2>&1 &
+  sleep ${sleep_time}
+  cd ..
+}
+
 eval()
 {
   unset FORCE_EAGER
   echo "enter test workspace."
   cd ws || exit 1
+
+  set_devices
+  get_port
+
   echo "${1}, save yaml to ${2}_eval_log/"
   mkdir -p "${2}_eval_log"
   cp "${3}" "${2}_eval_log/"
+
+  timeout=3600  # 1小时的秒数
+  start_time=$(date +%s)  # 获取当前时间的秒数
+
+  while ! grep -q "Save checkpoint cost time is" "${2}_quant_log/worker_0.log"; do
+    current_time=$(date +%s)  # 获取当前时间的秒数
+    elapsed_time=$((current_time - start_time))  # 计算已过去的时间
+
+    if [ $elapsed_time -ge $timeout ]; then
+        echo "${2} quant process has been running for more than 2 hours. Continuing with the next steps..."
+        break
+    fi
+
+    echo "${2} is in quant process. Waiting for 10 seconds..."
+    sleep 10
+  done
+
   echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_eval_log --join=True --cluster_time_out=300 python daily_eval.py -c ${3} -s ${dataset} -n 2000 > eval_${2}_log 2>&1 &" > "${2}_eval_log/cmd.sh"
   msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_eval_log" --join=True --cluster_time_out=300 python daily_eval.py -c "${3}" -s ${dataset} -n 2000 > "eval_${2}_log" 2>&1 &
-  sleep ${sleep_time}
-  pid=$(ps -u | grep msrun | grep "daily_eval.py" | grep -v grep | awk -F ' ' '{print$2}')
-  echo "waiting pid ${pid}"
-  tail --pid ${pid} -f "${2}_eval_log/worker_0.log"
   sleep ${sleep_time}
   cd ..
 }
@@ -147,15 +237,15 @@ quant()
   export FORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
+
+  set_devices
+  get_port
+
   echo "${1}, save yaml to ${2}_quant_log/"
   mkdir -p "${2}_quant_log"
   cp "${3}" "${2}_quant_log/"
   echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a $4 -w $5 -k $6 -o $7 -b w2 lm_head -t ${ds_type} -s ${dataset} > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
   msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a $4 -w $5 -k $6 -o $7 -b w2 lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
-  sleep ${sleep_time}
-  pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
-  echo "waiting pid ${pid}"
-  tail --pid ${pid} -f "${2}_quant_log/worker_0.log"
   sleep ${sleep_time}
   cd ..
 }
@@ -165,15 +255,15 @@ quant_awq()
   export FORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
+
+  set_devices
+  get_port
+
   echo "${1}, save yaml to ${2}_quant_log/"
   mkdir -p "${2}_quant_log"
   cp "${3}" "${2}_quant_log/"
   echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t ${ds_type} -s ${dataset} > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
   msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -o awq -wg ${4} -g ${5} -b lm_head -t ${ds_type} -s ${dataset} > "quant_${2}_log" 2>&1 &
-  sleep ${sleep_time}
-  pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
-  echo "waiting pid ${pid}"
-  tail --pid ${pid} -f "${2}_quant_log/worker_0.log"
   sleep ${sleep_time}
   cd ..
 }
@@ -183,90 +273,104 @@ quant_gptq()
   export FORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
+
+  set_devices
+  get_port
+
   echo "${1}, save yaml to ${2}_quant_log/"
   mkdir -p "${2}_quant_log"
   cp "${3}" "${2}_quant_log/"
   echo "msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir=${2}_quant_log --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c ${3} -q ptq -a none -w int4 -k none -p gptq -wg ${4} -g ${5} -b lm_head -t calibrate -s "${BASEPATH}/ws/gs/tests/data/calibrate-dataset/calibrate.jsonl" > quant_${2}_log 2>&1 &" > "${2}_quant_log/cmd.sh"
   msrun --worker_num=2 --local_worker_num=2 --master_port=${port} --log_dir="${2}_quant_log" --join=True --cluster_time_out=300 python daily_quant_ckpt.py -c "${3}" -q ptq -a none -w int4 -k none -p gptq -wg ${4} -g ${5} -b lm_head -t calibrate -s "${BASEPATH}/ws/gs/tests/data/calibrate-dataset/calibrate.jsonl" > "quant_${2}_log" 2>&1 &
   sleep ${sleep_time}
-  pid=$(ps -u | grep msrun | grep "daily_quant_ckpt.py" | grep -v grep | awk -F ' ' '{print$2}')
-  echo "waiting pid ${pid}"
-  tail --pid ${pid} -f "${2}_quant_log/worker_0.log"
-  sleep ${sleep_time}
   cd ..
 }
 
 prepare_env
-############################ fp16 ############################
+sed_ckpt "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" ${checkpoint_path}
+sed_vocab_file "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" ${vocab_file}
+sed_vocab_file "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" ${vocab_file}
+
+algo_quant_list()
+{
+  sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "1"
+
+  # quant ckpt a8w8
+  quant "quant llama2-13b-fp16 to a8w8" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "none" "smooth"
+
+  # quant ckpt a16w8
+  quant "quant llama2-13b-fp16 to a16w8" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
+
+  # quant ckpt a8w8c8
+  quant "quant llama2-13b-fp16 to a8w8c8" "fp16-a8w8c8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "int8" "smooth"
+
+  # quant ckpt a16w8c8
+  quant "quant llama2-13b-fp16 to a16w8c8" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "int8" "none"
+
+  # quant ckpt awq-pergroup
+  quant_awq "quant llama2-13b-fp16 to awq-pergroup" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
+
+  # quant ckpt awq-perchannel
+  quant_awq "quant llama2-13b-fp16 to awq-perchannel" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
+
+  # quant ckpt gptq-pergroup
+  quant_gptq "quant llama2-13b-fp16 to gptq-pergroup" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
+
+  # quant ckpt gptq-perchannel
+  quant_gptq "quant llama2-13b-fp16 to gptq-perchannel" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
+}
+
+algo_eval_list()
+{
+  # a8w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "none" "\.\/output\/llama2_13b_ptq_float16_smooth_a8_per_tensor_w8_per_channel_ckpt\/"
+  eval "eval a8w8 llama2-13b-fp16" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # a16w8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "none" "\.\/output\/llama2_13b_ptq_float16_no_smooth_a16_w8_per_channel_ckpt\/"
+  eval "eval a16w8 llama2-13b-fp16" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # a8w8c8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "int8" "smooth" "none" "\.\/output\/llama2_13b_ptq_float16_smooth_a8_per_tensor_w8_per_channel_c8_per_channel_ckpt\/"
+  eval "eval a8w8c8 llama2-13b-fp16" "fp16-a8w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # a8w8c8 acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "int8" "None" "none" "\.\/output\/llama2_13b_ptq_float16_no_smooth_a16_w8_per_channel_c8_per_channel_ckpt\/"
+  eval "eval a16w8c8 llama2-13b-fp16" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # awq-pergroup acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "none" "\.\/output\/llama2_13b_ptq_float16_awq_a16_w4_per_group_ckpt\/" "per_group" "128" "[\'lm_head\']"
+  eval "eval awq-pergroup llama2-13b-fp16" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # awq-perchannel acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "none" "\.\/output\/llama2_13b_ptq_float16_awq_a16_w4_per_channel_ckpt\/" "per_channel" "0" "[\'lm_head\']"
+  eval "eval awq-perchannel llama2-13b-fp16" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # a16w16c8 pertoken
+  ckpt_path=$(grep -oP "load_checkpoint:\s*'\K[^']+" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" | sed 's/[&/\]/\\&/g')
+  echo ${ckpt_path}
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "none" "int8" "None" "none" "${ckpt_path}" "per_channel" "0" "[\'lm_head\', \'w2\']" "per_token"
+  eval_nocheck "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # gptq-pergroup acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_float16_no_smooth_gptq_a16_w4_per_group_ckpt\/" "per_group" "128" "[\'lm_head\']" "per_channel"
+  eval "eval gptq-pergroup llama2-13b-fp16" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+  # gptq-perchannel acc
+  sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_float16_no_smooth_gptq_a16_w4_per_channel_ckpt\/" "per_channel" "0" "[\'lm_head\']" "per_channel"
+  eval "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+}
+
+############################ fp16-float ############################
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "float16"
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "float16"
 # fp16 acc
 sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "0"
-eval "eval fp16 llama2-13b" "fp16" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
-sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "1"
-
-############################ fp16->a8w8 ############################
-# quant ckpt a8w8
-quant "quant llama2-13b-fp16 to a8w8" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "none" "smooth"
-# a8w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "none" "\.\/output\/llama2_13b_ptq_smooth_a8w8_ckpt\/"
-eval "eval a8w8 llama2-13b-fp16" "fp16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->a16w8 ############################
-# quant ckpt a16w8
-quant "quant llama2-13b-fp16 to a16w8" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
-# a16w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "none" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
-eval "eval a16w8 llama2-13b-fp16" "fp16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->a8w8c8 ############################
-# quant ckpt a8w8c8
-quant "quant llama2-13b-fp16 to a8w8c8" "fp16-a8w8c8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "int8" "smooth"
-# a8w8c8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "int8" "smooth" "none" "\.\/output\/llama2_13b_ptq_smooth_a8w8c8_ckpt\/"
-eval "eval a8w8c8 llama2-13b-fp16" "fp16-a8w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->a16w8c8 ############################
-# quant ckpt a16w8c8
-quant "quant llama2-13b-fp16 to a16w8c8" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "int8" "none"
-# a8w8c8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "int8" "None" "none" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8c8_ckpt\/"
-eval "eval a16w8c8 llama2-13b-fp16" "fp16-a16w8c8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->awq-pergroup-a16w4 ############################
-# quant ckpt awq
-quant_awq "quant llama2-13b-fp16 to awq-pergroup" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
-# awq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "none" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']"
-eval "eval awq-pergroup llama2-13b-fp16" "fp16-awq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->awq-perchannel-a16w4 ############################
-# quant ckpt awq
-quant_awq "quant llama2-13b-fp16 to awq-perchannel" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
-# awq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "awq" "none" "\.\/output\/llama2_13b_ptq_awq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']"
-eval "eval awq-perchannel llama2-13b-fp16" "fp16-awq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->a16w16c8-pertoken ############################
-# a16w16c8 pertoken
-ckpt_path=$(grep -oP "load_checkpoint:\s*'\K[^']+" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" | sed 's/[&/\]/\\&/g')
-echo ${ckpt_path}
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "none" "int8" "None" "none" "${ckpt_path}" "per_channel" "0" "[\'lm_head\', \'w2\']" "per_token"
-eval "eval a16w16c8-pertoken llama2-13b-fp16" "fp16-a16w16c8-pertoken" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->gptq-pergroup-a16w4 ############################
-# quant ckpt gptq
-quant_gptq "quant llama2-13b-fp16 to gptq-pergroup" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_group" "128"
-# gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_no_smooth_gptq_a16w4_ckpt\/" "per_group" "128" "[\'lm_head\']" "per_channel"
-eval "eval gptq-pergroup llama2-13b-fp16" "fp16-gptq-pergroup" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ fp16->gptq-perchannel-a16w4 ############################
-# quant ckpt gptq
-quant_gptq "quant llama2-13b-fp16 to gptq-perchannel" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "per_channel" "0"
-# gptq acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int4" "none" "None" "gptq" "\.\/output\/llama2_13b_ptq_no_smooth_gptq_a16w4_ckpt\/" "per_channel" "0" "[\'lm_head\']" "per_channel"
-eval "eval gptq-perchannel llama2-13b-fp16" "fp16-gptq-perchannel" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+eval_nocheck "eval fp16 llama2-13b" "fp16" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml"
+# fp16 quant
+algo_quant_list
+# fp16 eval
+algo_eval_list
 
 
 ############################ bf16 ############################
@@ -274,22 +378,32 @@ sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "bfloat16"
 sed_dtype "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "bfloat16"
 # bf16 acc
 sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "0"
-eval "eval bf16 llama2-13b" "bf16" "./predict_llama2_13b_qckpt.yaml"
+eval_nocheck "eval bf16 llama2-13b" "bf16" "./predict_llama2_13b_qckpt.yaml"
 sed_mode "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "1"
 
-############################ bf16->a8w8 ############################
+############################ bf16-quant-eval ############################
 # quant ckpt a8w8
 quant "quant llama2-13b-bf16 to a8w8" "bf16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "int8" "int8" "none" "smooth"
-# a8w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "none" "\.\/output\/llama2_13b_ptq_smooth_a8w8_ckpt\/"
-eval "eval a8w8 llama2-13b-bf16" "bf16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
-
-############################ bf16->a16w8 ############################
 # quant ckpt a16w8
 quant "quant llama2-13b-bf16 to a16w8" "bf16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qckpt.yaml" "none" "int8" "none" "none"
+
 # a8w8 acc
-sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "none" "\.\/output\/llama2_13b_ptq_no_smooth_a16w8_ckpt\/"
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "int8" "int8" "none" "smooth" "none" "\.\/output\/llama2_13b_ptq_bfloat16_smooth_a8_per_tensor_w8_per_channel_ckpt\/"
+eval "eval a8w8 llama2-13b-bf16" "bf16-a8w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+# a16w8 acc
+sed_qconfig "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml" "none" "int8" "none" "None" "none" "\.\/output\/llama2_13b_ptq_bfloat16_no_smooth_a16_w8_per_channel_ckpt\/"
 eval "eval a16w8 llama2-13b-bf16" "bf16-a16w8" "${BASEPATH}/ws/predict_llama2_13b_qinfer.yaml"
+
+
+echo "waiting all process done..."
+# shellcheck disable=SC2207
+available_devices=($(find_available_devices))
+while [ ${#available_devices[@]} -lt 8 ]; do
+  echo "Still have process running, Waiting for 60 seconds..."
+  sleep 60
+  # shellcheck disable=SC2207
+  available_devices=($(find_available_devices))
+done
 
 conda_path=$(pip show mindspore | grep 'Location' | awk -F ' ' '{print$2}')
 echo "mindspore commit:"

@@ -46,7 +46,7 @@ else:
 def cholesky_compute(h, damp_percent=0.01):
     """compute cholesky decomposition"""
     damp = damp_percent * msops.mean(numpy.diag(h))
-    if msops.isnan(damp) or msops.isinf(damp):
+    if np.isnan(damp.asnumpy()) or np.isinf(damp.asnumpy()):
         raise ValueError("The damping is NaN or Inf.")
     diag = msops.arange(h.shape[0])
     h[diag, diag] += damp

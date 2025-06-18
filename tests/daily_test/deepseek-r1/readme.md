@@ -17,5 +17,5 @@
 脚本会依次执行DeepSeekR1的A8W8量化模型推理，基于gptq算法的A16W6模型量化和推理。
 
 ```bash
-bash daily_test-ds.sh "/path/to/bf16_model_path" "/path/to/a8w8_model_path" "/path/to/vocab_file" "/path/to/tokenizer_file"
+bash daily_test_ds.sh "/path/to/bf16_model_path" "/path/to/a8w8_model_path" "/path/to/vocab_file" "/path/to/tokenizer_file"
 ```
