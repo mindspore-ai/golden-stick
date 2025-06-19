@@ -54,7 +54,7 @@ def test_fake_quant_cell():
     assert not fq.attrs["narrow_range"]
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
@@ -91,7 +91,7 @@ def test_quant_cell_pertensor(mode):
     assert (expect == output2.asnumpy()).all()
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
@@ -127,7 +127,7 @@ def test_quant_cell_perchannel(mode):
     assert (expect == output2.asnumpy()).all()
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])

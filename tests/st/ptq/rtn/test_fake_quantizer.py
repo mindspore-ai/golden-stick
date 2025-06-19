@@ -22,7 +22,7 @@ from mindspore import dtype as mstype
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
@@ -52,7 +52,7 @@ def test_minmaxperchannel(mode):
         assert max_ == 1
     os.environ.pop('GRAPH_OP_RUN')
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])

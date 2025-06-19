@@ -58,7 +58,7 @@ class SimpleNet(nn.Cell):
         return self.linear(x)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 # FIXME: wait for cpu round ops bugfix
@@ -109,7 +109,7 @@ def test_apply_convert_error():
         ptq.convert(network, 1)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 # FIXME: wait for cpu round ops bugfix
@@ -164,7 +164,7 @@ def test_apply_convert(device_target):
     assert quant_cell.output_quantizer() is None
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
@@ -203,7 +203,7 @@ def test_woq_predict_1stage(device, mode):
     os.environ.pop('GRAPH_OP_RUN')
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
@@ -273,7 +273,7 @@ class LinearsNet(nn.Cell):
         return x
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])
@@ -328,7 +328,7 @@ def test_linears_woq_predict_2stage(device, mode):
     assert relative_tolerance_acceptable(quant_output.asnumpy(), fp_output.asnumpy(), 0.1587)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend"])

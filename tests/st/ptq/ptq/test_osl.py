@@ -28,8 +28,6 @@ from mindformers.parallel_core.inference.tensor_parallel.mappings import Scatter
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
 
-ms.set_context(pynative_synchronize=True)
-
 
 #############################################################################
 # Parallel runner

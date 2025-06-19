@@ -29,7 +29,7 @@ from mindspore_gs.common.numpy_quant_common import NumpyQuantOps, NumpyFullQuant
 from tests.st.test_utils import relative_tolerance_acceptable
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
@@ -56,7 +56,7 @@ def test_weight_quant_bmm_cell_as_antiquant_1p(mode):
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
@@ -83,7 +83,7 @@ def test_quant_cell_1p(mode):
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE])
@@ -115,7 +115,7 @@ def test_smooth_quant_cell_1p(mode):
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])
@@ -146,7 +146,7 @@ def test_dequant_bmm_cell_1p(mode):
     assert relative_tolerance_acceptable(fact, expect, 3e-2)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
 def test_numpy_full_quant_with_bias_correction():
@@ -214,7 +214,7 @@ class QuantDequantCell(Cell):
                          self.dequant_scale, self.dequant_offset, self.bias)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("mode", [GRAPH_MODE, PYNATIVE_MODE])

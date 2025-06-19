@@ -58,7 +58,7 @@ def check_ds(ds_path: str, bs: int, seq_length: int, vocab_file: str, repeat):
     assert ds.get_dataset_size() == math.ceil(n_samples / bs * repeat)
 
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("device", ["Ascend", "CPU"])
