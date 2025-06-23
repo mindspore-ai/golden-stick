@@ -96,7 +96,9 @@ def create_cfg(quant_algo_, mode):
                         group_size=128,
                         algo_args=algorithm_config)
     elif quant_algo_ == 'A8W4_GPTQ':
-        algorithm_config = GPTQQuantConfig(block_size=32, desc_act=True)
+        algorithm_config = GPTQQuantConfig(static_groups=True,
+                                           block_size=32,
+                                           desc_act=True)
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["w2", "lm_head"],
