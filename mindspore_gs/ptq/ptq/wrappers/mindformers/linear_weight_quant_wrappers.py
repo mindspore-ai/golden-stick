@@ -70,7 +70,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
                              f"but {linear_name} type is {type(linear)}.")
         if self.cfg.act_per_channel:
             raise ValueError("only per-tensor activation quantization now.")
-
         rank = len(linear.weight.shape)
         ic_axis = rank - 1 if linear.transpose_b else rank - 2
         self.weight_quantizer_axis = rank - 2 if linear.transpose_b else rank - 1
@@ -97,7 +96,10 @@ class WeightQuantLinearCell(WrapperLinearCell):
             elif rank == 3:
                 scale_zp_shape = (linear.weight.shape[0],
                                   linear.weight.shape[1] // self.cfg.group_size,
-                                  linear.weight.shape[2])
+                                  linear.weight.shape[2]) if not self.layer.transpose_b else \
+                                 (linear.weight.shape[0],
+                                  linear.weight.shape[2] // self.cfg.group_size,
+                                  linear.weight.shape[1])
             else:
                 raise ValueError(f"Only support rank of weight is 2 or 3, but got {rank}.")
         else:
