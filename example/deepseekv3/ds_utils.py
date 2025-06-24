@@ -113,19 +113,21 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'a8w4':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                        opname_blacklist=['lm_head', 'lkv2kv'])
+                        act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
+                        opname_blacklist=['lm_head', 'lkv2kv'], weight_clip=True)
         mlp_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                                act_quant_dtype=msdtype.int8,
                                outliers_suppression=OutliersSuppressionType.NONE,
                                precision_recovery=PrecisionRecovery.NONE,
                                act_quant_granularity=QuantGranularity.PER_TOKEN,
-                               weight_quant_granularity=QuantGranularity.PER_CHANNEL)
+                               weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+                               weight_clip=True)
         gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
         moe_cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
                             act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
-                            weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128,
-                            algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ)
+                            weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=256,
+                            algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ, weight_clip=True)
         layer_policies = OrderedDict({r'.*\.feed_forward\.w2.*': mlp_config,
                                       r'.*\.feed_forward\.w_gate_hidden.*': mlp_config,
                                       r'.*\.shared_experts\.w2.*': mlp_config,
@@ -142,12 +144,12 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
         # pylint: disable=protected-access
         ptq.layer_policies[r'.*\.feed_forward\.w2.*'].aclnn_quant_list = ["w2"]
         ptq.layer_policies[r'.*\.shared_experts.w2.*'].aclnn_quant_list = ["w2"]
-    ptq._config.algorithm_cache_path = ""
-    if quant_type.lower() == 'osl':
+    ptq._config.algorithm_cache_path = {}
+    if quant_type.lower() == 'osl' or quant_type.lower() == 'a8w4':
         # pylint: disable=protected-access
         ptq._config.always_use_fp_input_in_processer = True
         ptq._config.skip_offload_in_processing = True
-        ptq._config.algorithm_cache_path = 'osl_cache'
+        ptq._config.algorithm_cache_path["osl"] = 'osl_cache'
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
     return ptq

@@ -260,7 +260,8 @@ class PTQConfig:
             Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_TOKEN are supported.
         weight_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of weight.
             Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_GROUP are supported.
-        group_size (int, optional): group_size of per_group quantization, suggest using 64 or 128. Default value: ``0``.
+        group_size (int, optional): group_size of per_group quantization, suggest using 64, 128 or 256. Default value: ``0``.
+        weight_clip (bool, optional): Used to configure whether to use the clip policy, which will be forced to be true when using AWQ and OSL quantisation algorithms. Default value: ``False`.
 
     Raises:
         ValueError: If `mode` is not PTQMode.QUANTIZE or PTQMode.DEPLOY.
@@ -276,9 +277,10 @@ class PTQConfig:
         ValueError: If `act_quant_granularity` is QuantGranularity.PER_TOKEN but weight_quant_dtype != msdtype.int8 or act_quant_dtype != msdtype.int8.
         ValueError: If `kvcache_quant_granularity` is QuantGranularity.PER_TOKEN but kvcache_quant_dtype != msdtype.int8.
         ValueError: If `weight_quant_granularity` is not QuantGranularity.PER_CHANNEL or QuantGranularity.PER_GROUP.
-        ValueError: If `weight_quant_granularity` is QuantGranularity.PER_GROUP but `group_size` is not in [64, 128].
+        ValueError: If `weight_quant_granularity` is QuantGranularity.PER_GROUP but `group_size` is not in [64, 128, 256].
         ValueError: If `weight_quant_granularity` is not QuantGranularity.PER_GROUP but `group_size` != 0.
         TypeError: If `group_size` is not Int.
+        TypeError: If `weight_clip` is not Bool.
 
     Examples:
         >>> from mindspore_gs.ptq import PTQConfig, PTQMode
@@ -299,6 +301,7 @@ class PTQConfig:
     kvcache_quant_granularity: QuantGranularity = QuantGranularity.PER_CHANNEL
     act_quant_granularity: QuantGranularity = QuantGranularity.PER_TENSOR
     group_size: int = 0
+    weight_clip: bool = False
 
     def __post_init__(self):
         weight_support = [msdtype.int8, msdtype.qint4x2, None]
@@ -317,6 +320,7 @@ class PTQConfig:
         list_value_check('opname_blacklist', self.opname_blacklist, str)
         value_check('outliers_suppression', self.outliers_suppression, OutliersSuppressionType)
         value_check('group_size', self.group_size, int)
+        value_check('weight_clip', self.weight_clip, bool)
         self._check_quant_granularity()
         self._check_precision_recovery()
         if not isinstance(self.algo_args, dict) and not is_dataclass(self.algo_args):
@@ -366,5 +370,5 @@ class PTQConfig:
             logger.warning('kvcache_quant_granularity is QuantGranularity.PER_TOKEN, not need quantize for kvcache.')
         if self.weight_quant_granularity != QuantGranularity.PER_GROUP and self.group_size != 0:
             raise ValueError("group_size should equal to 0 when not to do pre_group quantize.")
-        if self.weight_quant_granularity == QuantGranularity.PER_GROUP and self.group_size not in [64, 128]:
-            raise ValueError("group_size should be in [64, 128] when doing pre_group quantize.")
+        if self.weight_quant_granularity == QuantGranularity.PER_GROUP and self.group_size not in [64, 128, 256]:
+            raise ValueError("group_size should be in [64, 128, 256] when doing pre_group quantize.")

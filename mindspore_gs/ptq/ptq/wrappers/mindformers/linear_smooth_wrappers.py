@@ -389,8 +389,8 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         self.deq_scale = None
         self.quant_forward = False
 
-        if context.algorithm_cache_path:
-            cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', \
+        if "osl" in context.algorithm_cache_path:
+            cache_file_path = os.path.join(context.algorithm_cache_path["osl"], f'rank_{context.rank_id}', \
                                            'osl_smooth.json')
         else:
             cache_file_path = ''
@@ -618,8 +618,9 @@ class AWQSmoothLinearCell(AWQLinearCell):
         self.w_mean = None
         self.x_mean = None
 
-        if context.algorithm_cache_path:
-            cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', 'awq_smooth.json')
+        if "awq" in context.algorithm_cache_path:
+            cache_file_path = os.path.join(context.algorithm_cache_path["awq"], \
+                f'rank_{context.rank_id}', 'awq_smooth.json')
         else:
             cache_file_path = ''
         self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
@@ -854,7 +855,7 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
         self.all_bias = None
         self.osp_bias_t = None
         self.is_replaced = False
-        if context.algorithm_cache_path:
+        if "osl" in context.algorithm_cache_path:
             self.enable_cache = True
         else:
             self.enable_cache = False

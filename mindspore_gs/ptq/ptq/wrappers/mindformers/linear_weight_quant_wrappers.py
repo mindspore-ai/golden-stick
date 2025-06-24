@@ -90,8 +90,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
             if self.ic % self.cfg.group_size != 0:
                 raise ValueError(f"input channel {self.ic} can not divide group_size {self.cfg.group_size}.")
-            if self.ic == self.cfg.group_size:
-                raise ValueError(f"input channel {self.ic} can not equal to group_size {self.cfg.group_size}.")
             if rank == 2:
                 scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
             elif rank == 3:
