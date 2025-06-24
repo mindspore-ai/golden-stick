@@ -98,7 +98,7 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
         ptq.layer_policies[r'.*\.feed_forward\.w2.*'].aclnn_quant_list = ["w2"]
         ptq.layer_policies[r'.*\.shared_experts.w2.*'].aclnn_quant_list = ["w2"]
     # pylint: disable=protected-access
-    ptq._config.algorithm_cache_path = ""
+    ptq._config.algorithm_cache_path = {}
     from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
     ptq.decoder_layer_types.append(DeepseekV3DecodeLayer)
     return ptq
