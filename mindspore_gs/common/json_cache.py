@@ -26,46 +26,38 @@ from .logger import logger
 
 class JSONCache:
     """JSONCache"""
-
-    _instance = None
-    _filepath = None
+    _instances = {}
     _empty_path_warned = False
 
-    def __new__(cls, filepath=''):
-        if cls._instance is not None:
-            if filepath != cls._filepath:
-                raise ValueError(
-                    f"Singleton already initialized with path: {cls._filepath!r}, "
-                    f"attempted to reuse with: {filepath!r}"
-                )
-            return cls._instance
-
-        instance = super().__new__(cls)
+    def __new__(cls, filepath: str):
+        if filepath not in cls._instances:
+            cls._instances[filepath] = super(JSONCache, cls).__new__(cls)
+            cls._instances[filepath]._filepath = filepath
+            cls._instances[filepath]._load_data()
 
         if filepath == "":
             if not cls._empty_path_warned:
                 logger.warning("Initialized with empty filepath - data will not persist")
                 cls._empty_path_warned = True
 
-        cls._filepath = filepath
-        cls._instance = instance
-        return instance
+        return cls._instances[filepath]
 
     def __init__(self, filepath=''):
         if not hasattr(self, '_initialized'):
+            self._filepath = filepath
             self._initialized = True
             self._data = {}
             self._load_data()
 
     def _should_skip_io(self) -> bool:
         """_should_skip_io"""
-        return self.__class__._filepath == ''
+        return self._filepath == ''
 
     def _ensure_directory_exists(self):
         if self._should_skip_io():
             return
 
-        dir_path = os.path.dirname(self.__class__._filepath)
+        dir_path = os.path.dirname(self._filepath)
         if dir_path:
             os.makedirs(dir_path, exist_ok=True)
 
@@ -77,7 +69,7 @@ class JSONCache:
 
         try:
             self._ensure_directory_exists()
-            with open(self.__class__._filepath, 'r') as f:
+            with open(self._filepath, 'r') as f:
                 raw_data = json.load(f)
                 self._data = {str(k): v for k, v in raw_data.items()}
         except (FileNotFoundError, json.JSONDecodeError):
@@ -89,7 +81,7 @@ class JSONCache:
             return
 
         self._ensure_directory_exists()
-        with open(self.__class__._filepath, 'w') as f:
+        with open(self._filepath, 'w') as f:
             json.dump(self._data, f, indent=2)
 
     def get(self, key: str) -> Optional[float]:

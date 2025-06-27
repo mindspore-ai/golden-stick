@@ -61,7 +61,7 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     if 'awq' in quant_type.lower():
         # pylint: disable=protected-access
         ptq._config.weight_symmetric = False
-    ptq._config.algorithm_cache_path = ""
+    ptq._config.algorithm_cache_path = {}
     from research.qwen3.qwen3_transformers import Qwen3ParallelTransformerLayer
     ptq.decoder_layer_types.append(Qwen3ParallelTransformerLayer)
     return ptq

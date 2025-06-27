@@ -68,9 +68,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         else:
             self.is_moe = False
         self.linear_name = linear_name.split('.')[-1] if not self.is_moe else 'moe|' + linear_name.split('.')[-1]
-        if context.algorithm_cache_path:
+        if "gptq" in context.algorithm_cache_path:
             self.enable_cache = True
-            cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', 'gptq.json')
+            cache_file_path = os.path.join(context.algorithm_cache_path["gptq"], f'rank_{context.rank_id}', 'gptq.json')
         else:
             self.enable_cache = False
             cache_file_path = ''

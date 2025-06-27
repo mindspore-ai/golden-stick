@@ -1,7 +1,7 @@
 mindspore_gs.ptq.PTQConfig
 ============================================================
 
-.. py:class:: mindspore_gs.ptq.PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=<class 'list'>, algo_args=<class 'dict'>, weight_quant_dtype=Int8, kvcache_quant_dtype=None, act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.NONE, precision_recovery=PrecisionRecovery.NONE, weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0, act_quant_granularity=QuantGranularity.PER_TENSOR, kvcache_quant_granularity=QuantGranularity.PER_CHANNEL)
+.. py:class:: mindspore_gs.ptq.PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=<class 'list'>, algo_args=<class 'dict'>, weight_quant_dtype=Int8, kvcache_quant_dtype=None, act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.NONE, precision_recovery=PrecisionRecovery.NONE, weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0, act_quant_granularity=QuantGranularity.PER_TENSOR, kvcache_quant_granularity=QuantGranularity.PER_CHANNEL, weight_clip=False)
 
     用于配置 MindSpore Golden Stick 后量化算法的数据类。
 
@@ -18,7 +18,8 @@ mindspore_gs.ptq.PTQConfig
         - **act_quant_granularity** (:class:`mindspore_gs.ptq.QuantGranularity`) - 用于配置激活的量化粒度。目前激活只支持QuantGranularity.PER_TENSOR和QuantGranularity.PER_TOKEN。
         - **kvcache_quant_granularity** (:class:`mindspore_gs.ptq.QuantGranularity`) - 用于配置kvcache的量化粒度。目前kvcache只支持QuantGranularity.PER_CHANNEL和QuantGranularity.PER_TOKEN。
         - **weight_quant_granularity** (:class:`mindspore_gs.ptq.QuantGranularity`) - 用于配置weight的量化粒度。目前weight只支持QuantGranularity.PER_CHANNEL和QuantGranularity.PER_GROUP。
-        - **group_size** (int，可选) - per_group量化时的group_size大小，建议使用64或128。默认值： ``0``。
+        - **group_size** (int，可选) - per_group量化时的group_size大小，建议使用64、128或256。默认值： ``0``。
+        - **weight_clip** (bool，可选) - 用于配置是否使用clip策略，使用AWQ及OSL量化算法时会强制为True。默认值： ``False``。
 
     异常：
         - **ValueError** - `mode` 输入不在 [PTQMode.QUANTIZE, PTQMode.DEPLOY] 中。
@@ -34,6 +35,7 @@ mindspore_gs.ptq.PTQConfig
         - **ValueError** - `act_quant_granularity` 是QuantGranularity.PER_TOKEN, 但weight_quant_dtype != msdtype.int8或act_quant_dtype != msdtype.int8。
         - **ValueError** - `kvcache_quant_granularity` 是QuantGranularity.PER_TOKEN, 但kvcache_quant_dtype != msdtype.int8。
         - **ValueError** - `weight_quant_granularity` 输入不在[QuantGranularity.PER_CHANNEL, QuantGranularity.PER_GROUP]中。
-        - **ValueError** - `weight_quant_granularity` 是QuantGranularity.PER_GROUP，但 `group_size` 不在[64, 128]中。
+        - **ValueError** - `weight_quant_granularity` 是QuantGranularity.PER_GROUP，但 `group_size` 不在[64, 128, 256]中。
         - **ValueError** - `weight_quant_granularity` 不是QuantGranularity.PER_GROUP，但 `group_size` 不等于0。
         - **TypeError** - `group_size` 不是Int类型。
+        - **TypeError** - `weight_clip` 不是Bool类型。

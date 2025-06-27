@@ -67,7 +67,7 @@ def get_args():
                         help="Available: per_channel/per_group")
     parser.add_argument('--kvcache_quant_granularity', '-kvg', type=str, default="per_channel",
                         help="Available: per_channel/per_token")
-    parser.add_argument('--group_size', '-g', type=int, default=0, help="Available: 64/128")
+    parser.add_argument('--group_size', '-g', type=int, default=0, help="Available: 64/128/256")
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo. "

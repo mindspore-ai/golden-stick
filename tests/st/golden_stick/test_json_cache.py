@@ -58,19 +58,6 @@ class TestJSONCache(unittest.TestCase):
     @pytest.mark.level0
     @pytest.mark.platform_x86_cpu
     @pytest.mark.env_onecard
-    def test_singleton_different_paths(self):
-        """
-        Feature: test_singleton_different_paths.
-        Description: test_singleton_different_paths.
-        Expectation: test_singleton_different_paths.
-        """
-        JSONCache(self.test_file)
-        with self.assertRaises(ValueError):
-            JSONCache("different_path.json")
-
-    @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
-    @pytest.mark.env_onecard
     @patch.object(logger, 'warning')
     def test_empty_filepath_warning(self, mock_warning):
         """

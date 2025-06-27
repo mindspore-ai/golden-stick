@@ -71,7 +71,9 @@ class LinearClipper(Algorithm):
                 is_satisfied = layer_policy.outliers_suppression == OutliersSuppressionType.AWQ or \
                     layer_policy.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE or \
                         is_inner_osp
-                if not layer_policy or not is_satisfied:
+                if is_satisfied:
+                    layer_policy.weight_clip = True
+                if not layer_policy or not layer_policy.weight_clip:
                     return cell, False
                 if (any(opname in cell_name for opname in layer_policy.opname_blacklist) or
                         any(opname in cell_name for opname in clip_skip_layer)):
