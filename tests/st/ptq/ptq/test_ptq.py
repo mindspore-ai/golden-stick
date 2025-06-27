@@ -746,12 +746,10 @@ def test_ptq_llama2_predict_2stage_1p_run_level0(quant_algo):
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     return_code = os.system(
-        f"msrun --worker_num=1 --local_worker_num=1 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_llama2_1p_logs "
-        f"python {run_file} -m 1 -a {quant_algo}"
+        f"python {run_file} -m 1 -a {quant_algo} > test_ptq_{quant_algo}_predict_llama2_1p.log"
     )
     if return_code != 0:
-        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
+        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_1p.log", "r", encoding="utf-8")
         for line in log_file:
             print(line, flush=True)
         log_file.close()
