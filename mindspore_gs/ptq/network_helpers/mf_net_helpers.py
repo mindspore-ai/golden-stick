@@ -23,6 +23,7 @@ import numpy as np
 import mindspore as ms
 from mindspore import dtype as mstype
 from mindspore import Tensor, Model
+from mindspore.nn.utils import no_init_parameters
 
 from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
 from mindformers.models.modeling_utils import PreTrainedModel
@@ -63,7 +64,8 @@ class MFNetworkHelper(NetworkHelper):
             Network of type LlamaForCasualLM.
         """
         build_context(self.mf_config)
-        network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
+        with no_init_parameters():
+            network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
         network.set_train(False)
         ckpt_path = self.mf_config.load_checkpoint
         if ckpt_path:
