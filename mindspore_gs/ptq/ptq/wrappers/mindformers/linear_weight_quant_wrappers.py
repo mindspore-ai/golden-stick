@@ -50,6 +50,10 @@ class WeightQuantLinearCell(WrapperLinearCell):
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
+            from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            Quantizer.reg_layer_map(DSColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(DSRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, WeightQuantLinearCell, A16WxChecker())
@@ -59,13 +63,25 @@ class WeightQuantLinearCell(WrapperLinearCell):
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
-        if isinstance(self.layer, RowParallelLinear):
-            self.parallel_type = ParallelType.ROW_PARALLEL
-        elif isinstance(self.layer, ColumnParallelLinear):
-            self.parallel_type = ParallelType.COL_PARALLEL
-        elif isinstance(self.layer, Linear):
-            self.parallel_type = ParallelType.NO_PARALLEL
-        else:
+
+        type_map = {RowParallelLinear: ParallelType.ROW_PARALLEL,
+                    ColumnParallelLinear: ParallelType.COL_PARALLEL,
+                    Linear: ParallelType.NO_PARALLEL}
+        try:
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
+                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
+            from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
+            type_map[ColumnParallelLinearWorldRegion] = ParallelType.COL_PARALLEL
+            type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
+            type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
+            type_map[RowParallelLinearWorldRegion] = ParallelType.ROW_PARALLEL
+        except ImportError:
+            pass
+        self.parallel_type = type_map.get(type(self.layer), None)
+        if not self.parallel_type:
             raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
                              f"but {linear_name} type is {type(linear)}.")
         if self.cfg.act_per_channel:
