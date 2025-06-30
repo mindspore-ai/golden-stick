@@ -24,6 +24,9 @@ from mindspore.communication import get_rank
 from mindspore.communication.management import GlobalComm
 from mindspore.ops import sub as aclnn_sub, add as aclnn_add
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
@@ -40,6 +43,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
 
     @staticmethod
     def reg_self():
+        """reg_self"""
         class A16WxChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 support_dtype = [dtype.int8, dtype.qint4x2]
@@ -47,6 +51,9 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                         and config.precision_recovery == PrecisionRecovery.GPTQ)
 
         Quantizer.reg_layer_map(Linear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(QKVParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
@@ -338,6 +345,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         return qweight_name, scale_name, zero_name
 
     def process(self):
+        """quant"""
         qweight_name, scale_name, zero_name = self._cache_key()
         scale = self.cache.get(scale_name)
         zero = self.cache.get(zero_name)

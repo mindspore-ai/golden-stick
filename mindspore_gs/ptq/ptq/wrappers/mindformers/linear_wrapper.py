@@ -21,12 +21,19 @@ from mindspore.ops import functional as F
 from mindspore.ops.auto_generate import GroupedMatmulV4
 from mindspore.nn import Cell
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.hal import ParallelType, QuantWithSmooth, DynamicQuantCell
 
 
 class WrapperLinearCell(WrapperCell, abc.ABC):
     """WrapperCell"""
+
+    def __init__(self, linear_name, linear, context, cfg, **kwargs):
+        super().__init__(linear_name, linear, context, cfg, **kwargs)
+        self.is_mcorelinear = isinstance(linear, (McoreColumnParallelLinear, McoreRowParallelLinear))
+
     def add_hook(self):
         class HookMatMul(msops.MatMul):
             def __call__(self, *args, **kwargs):
