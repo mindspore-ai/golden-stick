@@ -15,6 +15,7 @@
 """ds infer."""
 
 from collections import OrderedDict
+import numpy as np
 
 import mindspore as ms
 from mindspore import dtype as msdtype
@@ -22,16 +23,15 @@ from mindspore import Model, Tensor
 from mindspore.common import initializer
 from mindspore.nn.utils import no_init_parameters
 from mindformers import MindFormerConfig
-from mindformers import build_context, LlamaConfig
+from mindformers import build_context
 from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.core.parallel_config import build_parallel_config
-from research.qwen3.qwen3 import ParallelQwen3ForCausalLM
-from transformers import AutoTokenizer
-from qwen3_weight_processor import Qwen3WeightProcessor
-from qwen3_sq_weight_processor import Qwen3SQWeightProcessor
+from mindformers.models.qwen3.configuration_qwen3 import Qwen3Config
+
 from mindspore_gs.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery
+from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity
+from transformers import AutoTokenizer
 
 
 def create_ptq(quant_type: str, quant_mode: PTQMode):
@@ -39,20 +39,14 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     if quant_type.lower() == 'awq-a16w4':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
                         act_quant_dtype=None, outliers_suppression=OutliersSuppressionType.AWQ,
-                        opname_blacklist=['lm_head'], weight_quant_granularity=QuantGranularity.PER_GROUP,
+                        opname_blacklist=['output_layer'], weight_quant_granularity=QuantGranularity.PER_GROUP,
                         group_size=128)
         layer_policies = OrderedDict()
     elif quant_type.lower() == 'smoothquant':
         cfg = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                        opname_blacklist=['lm_head'])
-        w2_config = PTQConfig(mode=quant_mode, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                              act_quant_dtype=msdtype.int8,
-                              outliers_suppression=OutliersSuppressionType.NONE,
-                              precision_recovery=PrecisionRecovery.NONE,
-                              act_quant_granularity=QuantGranularity.PER_TOKEN,
-                              weight_quant_granularity=QuantGranularity.PER_CHANNEL)
-        layer_policies = OrderedDict({r'.*\.w2.*': w2_config})
+                        opname_blacklist=['output_layer', 'linear_fc2'])
+        layer_policies = OrderedDict()
     else:
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
     ptq = PTQ(config=cfg, layer_policies=layer_policies)
@@ -60,10 +54,20 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
     if 'awq' in quant_type.lower():
         # pylint: disable=protected-access
         ptq._config.weight_symmetric = False
-    ptq._config.algorithm_cache_path = {}
-    from research.qwen3.qwen3_transformers import Qwen3ParallelTransformerLayer
-    ptq.decoder_layer_types.append(Qwen3ParallelTransformerLayer)
+    ptq._config.algorithm_cache_path = ""
+    from mindformers.parallel_core.inference.transformer.transformer_layer import TransformerLayer
+    ptq.decoder_layer_types.append(TransformerLayer)
     return ptq
+
+
+def prepare_inputs_for_predict_layout(input_ids, **kwargs):
+    """ Get deepseekv3 model input tuple for transform ckpt. """
+    input_ids = Tensor(input_ids, ms.int32)
+    labels = Tensor(kwargs["labels"]) if "labels" in kwargs else None
+    bs, seq = input_ids.shape[0], input_ids.shape[1]
+    slot_mapping = Tensor(np.ones(shape=tuple([bs * seq])), ms.int32)
+    return input_ids, labels, None, None, None, None, None, None, None, None, None, \
+        slot_mapping
 
 
 def create_network(yaml_file, quant_type=None):
@@ -71,15 +75,13 @@ def create_network(yaml_file, quant_type=None):
     config = MindFormerConfig(yaml_file)
     build_context(config)
     build_parallel_config(config)
-    model_config = config.model.model_config
-    model_config.parallel_config = config.parallel_config
-    model_config.moe_config = config.moe_config
     auto_online_trans = config.auto_trans_ckpt
     print('=' * 50, f"if using auto_online_trans: {auto_online_trans}", flush=True)
-    model_config = LlamaConfig(**model_config)
+    model_config = Qwen3Config(**config.model.model_config)
 
     with no_init_parameters():
-        network = ParallelQwen3ForCausalLM(model_config)
+        from mindformers import AutoModel
+        network = AutoModel.from_config(yaml_file)
     if quant_type:
         ptq = create_ptq(quant_type, PTQMode.DEPLOY)
         ptq.apply(network)
@@ -87,21 +89,16 @@ def create_network(yaml_file, quant_type=None):
 
     if config.load_checkpoint:
         if auto_online_trans:
-            if not quant_type:
-                model_parallelism = Qwen3WeightProcessor(config, network, None)
-                model_parallelism.load_safetensors_shard(config.load_checkpoint)
-            elif quant_type == 'smoothquant':
-                model_parallelism = Qwen3SQWeightProcessor(config, network, quant_type)
-                model_parallelism.load_safetensors_shard(config.load_checkpoint)
+            if not quant_type or quant_type == 'smoothquant':
+                network.load_weights(config.load_checkpoint)
             else:
                 raise NotImplementedError(f'Not supported quant_type: {quant_type}')
         else:
             ms_model = Model(network)
             seq_length = model_config.seq_length
             input_ids = Tensor(shape=(model_config.batch_size, seq_length), dtype=ms.int32, init=initializer.One())
-            infer_data = network.prepare_inputs_for_predict_layout(input_ids)
+            infer_data = prepare_inputs_for_predict_layout(input_ids)
             transform_and_load_checkpoint(config, ms_model, network, infer_data, do_predict=True)
 
     tokenizer = AutoTokenizer.from_pretrained(config.load_checkpoint)
-    tokenizer.pad_token = tokenizer.eos_token
     return tokenizer, network

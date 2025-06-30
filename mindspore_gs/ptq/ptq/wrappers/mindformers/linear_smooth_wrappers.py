@@ -28,6 +28,9 @@ from mindspore import dtype as msdtype
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
@@ -51,6 +54,9 @@ class SmoothLinearCell(WrapperLinearCell):
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
         type_map = {Linear: ParallelType.NO_PARALLEL}
+        type_map[McoreColumnParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
+        type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -202,6 +208,9 @@ class SmoothQuantLinearCell(SmoothLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.SMOOTH
 
         LinearSmoothQuant.reg_layer_map(Linear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(McoreColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(McoreRowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(QKVParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -277,6 +286,9 @@ class AWQLinearCell(SmoothLinearCell):
                 return False
 
         LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(McoreColumnParallelLinear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(McoreRowParallelLinear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(QKVParallelLinear, AWQLinearCell, AWQChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -372,6 +384,12 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE
 
         LinearAutoSmoother.reg_layer_map(Linear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(McoreColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(QKVParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
@@ -627,6 +645,9 @@ class AWQSmoothLinearCell(AWQLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.AWQ
 
         LinearAutoSmoother.reg_layer_map(Linear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(McoreColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(QKVParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -877,6 +898,12 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
 
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(McoreColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(QKVParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -1109,6 +1136,12 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
                     not config.use_inner_osp
 
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusLinearCell, OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(McoreColumnParallelLinear, OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(QKVParallelLinear, OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear

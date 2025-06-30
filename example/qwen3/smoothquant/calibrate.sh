@@ -18,10 +18,12 @@ export GSLOG=1
 export ENFORCE_EAGER=True
 
 mf_path=$1
-ceval_path=$2
-quant_type=${3:-smoothquant}
-worker_num=${4:-2}
-yaml=${5:-../predict_qwen3_8b_instruct_calibrate.yaml}
+quant_type=${2:-smoothquant}
+worker_num=${3:-2}
+yaml=${4:-../predict_qwen3_8b_instruct_calibrate.yaml}
+
+base_path=$(cd "$(dirname $0)"; pwd)
+ceval_path=${base_path}/../../../tests/data/ceval-dataset/dev/
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 

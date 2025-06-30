@@ -19,6 +19,9 @@ from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
@@ -29,6 +32,7 @@ from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
 from .linear_wrapper import WrapperLinearCell, LinearInferCell
+from .mcore_linear_wrapper import McoreLinearInferCell
 
 
 class WeightQuantLinearCell(WrapperLinearCell):
@@ -62,11 +66,20 @@ class WeightQuantLinearCell(WrapperLinearCell):
             Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
+        try:
+            Quantizer.reg_layer_map(McoreColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(McoreRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(QKVParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
 
         type_map = {Linear: ParallelType.NO_PARALLEL}
+        type_map[McoreColumnParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
+        type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -169,11 +182,40 @@ class WeightQuantLinearCell(WrapperLinearCell):
 
     def deploy(self):
         w_qparam = QuantParam(self.w_scale, self.w_zp, self.cfg.group_size, self.cfg.weight_quant_dtype)
+        if self.is_mcorelinear:
+            return WeightQuantMcoreLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight, w_qparam,
+                                                   self.compute_type, self.parallel_type)
         return WeightQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight, w_qparam,
                                           self.compute_type, self.parallel_type)
 
 
 class WeightQuantLinearInferCell(LinearInferCell):
+    """WeightQuantLinearInferCell"""
+
+    def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
+                 parallel_type: ParallelType):
+        super().__init__(linear, parallel_type)
+        self.cfg = cfg
+        is_deploy = cfg.mode == PTQMode.DEPLOY
+        if not is_deploy:
+            logger.debug(f"WeightQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
+            logger.debug(f"WeightQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+        if w_qparam.quant_dtype == dtype.int8:
+            qmm = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                           self.layer.transpose_b, compute_type)
+        elif w_qparam.quant_dtype == dtype.qint4x2:
+            qmm, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                                         self.layer.transpose_b, compute_type)
+            self.layer.transpose_b = False
+        else:
+            raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
+        self.layer.matmul = qmm
+        del self.layer.weight
+        self.layer.weight = q_weight
+
+
+class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
     """WeightQuantLinearInferCell"""
 
     def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,

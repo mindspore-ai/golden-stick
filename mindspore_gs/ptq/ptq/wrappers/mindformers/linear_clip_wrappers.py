@@ -20,6 +20,9 @@ from types import MethodType
 
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -42,6 +45,9 @@ class ClipLinearCell(WrapperLinearCell):
                 return config.algo_args.get("weight_clip_ratio", [1 - i/20 for i in range(10)])
 
         LinearClipper.reg_layer_map(Linear, ClipLinearCell, AutoClipChecker())
+        LinearClipper.reg_layer_map(McoreColumnParallelLinear, ClipLinearCell, AutoClipChecker())
+        LinearClipper.reg_layer_map(McoreRowParallelLinear, ClipLinearCell, AutoClipChecker())
+        LinearClipper.reg_layer_map(QKVParallelLinear, ClipLinearCell, AutoClipChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear

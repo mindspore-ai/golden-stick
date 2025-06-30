@@ -22,7 +22,7 @@ base_path=$(cd "$(dirname $0)"; pwd)
 strategy_ckpt_save_dir=${base_path}
 export DEVICE_NUM_PER_NODE=${worker_num}
 yaml=${base_path}/../predict_qwen3_8b_instruct_infer.yaml
-gen_strategy_path=${base_path}/gen_strategy.py
+gen_strategy_path=${base_path}/../gen_strategy.py
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 

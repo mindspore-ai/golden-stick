@@ -15,6 +15,9 @@
 """ptq wrapper cells for mindformers."""
 
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindspore import dtype, Parameter
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
@@ -24,6 +27,7 @@ from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
+from .mcore_linear_wrapper import McoreLinearInferCell
 
 
 class DynamicQuantLinearCell(WeightQuantLinearCell):
@@ -31,12 +35,16 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
 
     @staticmethod
     def reg_self():
+        """reg_self"""
         class DynamicA8W8Checker(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.weight_quant_dtype == dtype.int8 and config.act_quant_dtype == dtype.int8 and \
                        config.act_quant_granularity is QuantGranularity.PER_TOKEN
 
         Quantizer.reg_layer_map(Linear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(McoreColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(McoreRowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(QKVParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -63,8 +71,13 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         raise RuntimeError(f"Unexpected act_quant_dtype: {self.cfg.act_quant_dtype}.")
 
     def deploy(self):
+        """deploy"""
         use_all_to_all = hasattr(self.layer, 'use_alltoall') and self.layer.use_alltoall
         if not use_all_to_all:
+            if self.is_mcorelinear:
+                return DynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
+                                                        QuantParam(self.w_scale, self.w_zp), self.compute_type,
+                                                        self.parallel_type)
             return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
                                                QuantParam(self.w_scale, self.w_zp), self.compute_type,
                                                self.parallel_type)
@@ -76,6 +89,25 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
 
 
 class DynamicQuantLinearInferCell(LinearInferCell):
+    """DynamicQuantLinearInferCell"""
+
+    def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
+                 parallel_type: ParallelType):
+        super().__init__(linear, parallel_type)
+        self.cfg = cfg
+        is_deploy = cfg.mode == PTQMode.DEPLOY
+        if not is_deploy:
+            logger.debug(f"DynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
+            logger.debug(f"DynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+        qmm, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy, False,
+                                                          self.layer.transpose_b, compute_type)
+        self._set_act_dynamic_quant(dynamic_quant_op)
+        self.layer.matmul = qmm
+        self.layer.weight = q_weight
+
+
+class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
     """DynamicQuantLinearInferCell"""
 
     def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
