@@ -57,8 +57,15 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         raise RuntimeError(f"Unexpected act_quant_dtype: {self.cfg.act_quant_dtype}.")
 
     def deploy(self):
-        return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
-                                           QuantParam(self.w_scale, self.w_zp), self.compute_type, self.parallel_type)
+        use_all_to_all = hasattr(self.layer, 'use_alltoall') and self.layer.use_alltoall
+        if not use_all_to_all:
+            return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
+                                               QuantParam(self.w_scale, self.w_zp), self.compute_type,
+                                               self.parallel_type)
+        # for all_to_all, quant is absorbed into dispatch-op
+        self.layer.weight = self.q_weight
+        self.layer.weight_scale = self.w_scale
+        return self.layer
 
 
 class DynamicQuantLinearInferCell(LinearInferCell):

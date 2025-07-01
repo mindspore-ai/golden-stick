@@ -40,6 +40,7 @@ class WrapperCell(abc.ABC, Cell):
     def __init__(self, layer_name: str, layer, context: InnerPTQConfig, cfg: InnerPTQConfig,
                  **kwargs):
         super().__init__()
+        self.context = context
         self.cfg = cfg
         self._layer_name = layer_name
         self._layer = layer
