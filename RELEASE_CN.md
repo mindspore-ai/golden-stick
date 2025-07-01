@@ -2,6 +2,33 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 1.2.0 Release Notes
+
+### 主要特性和增强
+
+* 训练后量化算法 `PTQ` 中 `SmoothQuant-A8W8` 量化和 `GPTQ-A16W4` 低比特量化支持MOE结构，已针对DeepSeekV3/R1模型进行适配。
+
+* [Demo] 训练后量化算法 `PTQ` 支持 `A8W4` 量化算法，已针对DeepSeekV3/R1模型进行适配。
+
+* 新增 `wikitext`、`boolq`、`ceval`和 `gsm8k`数据集的加载与评测。
+
+* DeepSeekR1数据集精度:
+
+    |  method  | ceval  | gsm8k  |
+    |  ----  | ----  | ----  |
+    | BF16  | 89.67 | 91.74 |
+    | SmoothQuant-A8W8  | 89.45 | 92.42 |
+    | GPTQ-A16W4  | 89.52 | 91.12 |
+    | A8W4 | 89.6 | 91.51 |
+
+### 贡献者
+
+感谢以下人员做出的贡献：
+
+tongl, zhuxiaochen, guoguopot, huangzhuo, ccsszz, yyyyrf, hangangqiang
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 1.0.0 Release Notes
 
 ### 主要特性和增强
