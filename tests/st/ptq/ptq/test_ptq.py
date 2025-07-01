@@ -24,7 +24,7 @@ from mindspore.dataset import GeneratorDataset
 from mindspore.ops.auto_generate import SiLU, SplitWithSize
 from mindspore.ops import operations as P
 from mindformers.modules import Linear
-from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,

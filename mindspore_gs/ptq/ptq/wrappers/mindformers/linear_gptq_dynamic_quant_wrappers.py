@@ -15,8 +15,6 @@
 """ptq wrapper cells for mindformers."""
 
 from mindformers.modules.layers import Linear
-from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-
 from mindspore import dtype, ops
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
@@ -40,8 +38,6 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
                        config.precision_recovery is PrecisionRecovery.GPTQ
 
         Quantizer.reg_layer_map(Linear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
-        Quantizer.reg_layer_map(ColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
-        Quantizer.reg_layer_map(RowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
@@ -55,6 +51,13 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
                                     GptqDynamicA8W8Checker())
         except ImportError:
             pass
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            Quantizer.reg_layer_map(ColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+            Quantizer.reg_layer_map(RowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        except ImportError:
+            pass
+
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
         self.weight_need_allgather = False
