@@ -23,8 +23,8 @@ from mindspore import dtype as msdtype
 from mindspore import nn, Tensor
 from mindspore.dataset import GeneratorDataset
 from mindformers.modules.layers import Linear
-from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.mappings import ScatterToModelParallelRegion
+from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
 

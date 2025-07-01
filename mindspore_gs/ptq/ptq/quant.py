@@ -161,9 +161,19 @@ class PTQ(CompAlgo):
             algorithm.load_mindformers_plugin()
             self._target_layer_type += algorithm.target_layer_type()
         from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
-        from mindformers.experimental.infer.core.transformer import ParallelTransformerLayer
         self.decoder_layer_types.append(LLamaDecodeLayer)
-        self.decoder_layer_types.append(ParallelTransformerLayer)
+        try:
+            from mindformers.experimental.infer.core.transformer import ParallelTransformerLayer
+            self.decoder_layer_types.append(ParallelTransformerLayer)
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.transformer import ParallelTransformerLayer as LlamaParallelTransformerLayer
+            from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
+            self.decoder_layer_types.append(DeepseekV3DecodeLayer)
+            self.decoder_layer_types.append(LlamaParallelTransformerLayer)
+        except ImportError:
+            pass
 
         def generate(network, input_ids, helper=None):
             if isinstance(helper, NetworkHelper):
