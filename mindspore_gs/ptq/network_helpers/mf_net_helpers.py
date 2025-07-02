@@ -288,7 +288,8 @@ class MFParallelTeleChat2Helper(MFParallelLlama2Helper):
             raise ImportError('Please add mindformers repo root dir into PYTHONPATH.')
         build_context(self.mf_config)
         model_config = TelechatConfig(**self.mf_config.model.model_config)
-        network = ParallelTelechatForCausalLM(model_config)
+        with no_init_parameters():
+            network = ParallelTelechatForCausalLM(model_config)
         network.set_train(False)
         network.phase = 'predict'
         ckpt_path = self.mf_config.load_checkpoint

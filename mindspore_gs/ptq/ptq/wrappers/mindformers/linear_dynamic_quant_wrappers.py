@@ -50,6 +50,10 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            Quantizer.reg_layer_map(TC2ColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+            Quantizer.reg_layer_map(TC2RowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
             Quantizer.reg_layer_map(LlamaColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
             Quantizer.reg_layer_map(LlamaRowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
