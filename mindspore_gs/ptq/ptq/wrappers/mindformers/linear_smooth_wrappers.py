@@ -53,8 +53,8 @@ class SmoothLinearCell(WrapperLinearCell):
         type_map = {Linear: ParallelType.NO_PARALLEL}
         try:
             from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-            type_map[RowParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[ColumnParallelLinear] = ParallelType.ROW_PARALLEL
+            type_map[RowParallelLinear] = ParallelType.ROW_PARALLEL
+            type_map[ColumnParallelLinear] = ParallelType.COL_PARALLEL
         except ImportError:
             pass
         try:

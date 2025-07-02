@@ -16,6 +16,7 @@
 import argparse
 
 import os
+import sys
 import numpy as np
 
 import mindspore as ms
@@ -34,6 +35,8 @@ from mindspore_gs.ptq.context import LayerQuantizeAlgo
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 
 
 def create_hello_ds(tokenizer, repeat=1):
