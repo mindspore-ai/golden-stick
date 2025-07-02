@@ -174,6 +174,11 @@ class PTQ(CompAlgo):
             self.decoder_layer_types.append(LlamaParallelTransformerLayer)
         except ImportError:
             pass
+        try:
+            from research.telechat2.infer.telechat_transformers import TelechatParallelTransformerLayer
+            self.decoder_layer_types.append(TelechatParallelTransformerLayer)
+        except ImportError:
+            pass
 
         def generate(network, input_ids, helper=None):
             if isinstance(helper, NetworkHelper):

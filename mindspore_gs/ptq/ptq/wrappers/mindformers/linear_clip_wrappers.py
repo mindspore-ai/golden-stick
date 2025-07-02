@@ -55,6 +55,10 @@ class ClipLinearCell(WrapperLinearCell):
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            LinearClipper.reg_layer_map(TC2ColumnParallelLinear, ClipLinearCell, AutoClipChecker())
+            LinearClipper.reg_layer_map(TC2RowParallelLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(LlamaColumnParallelLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(LlamaRowParallelLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(DSColumnParallelLinear, ClipLinearCell, AutoClipChecker())
@@ -85,6 +89,9 @@ class ClipLinearCell(WrapperLinearCell):
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            type_map[TC2ColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
@@ -93,6 +100,7 @@ class ClipLinearCell(WrapperLinearCell):
             type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelLinearWorldRegion] = ParallelType.ROW_PARALLEL
+            type_map[TC2RowParallelLinear] = ParallelType.ROW_PARALLEL
         except ImportError:
             pass
         parallel_type = type_map.get(type(self.layer), None)
