@@ -207,7 +207,8 @@ class Qwen3SQWeightProcessor(BaseWeightProcessor):
     def load_safetensors_shard(self, src_hf_dir):
         """qwen load safetensors and shard """
         param_json_path = os.path.join(src_hf_dir, 'param_name_map.json')
-        assert os.path.exists(param_json_path)
+        if not os.path.exists(param_json_path):
+            raise RuntimeError(f"Not found param map file: {param_name_map.json}")
         self._src_dir = src_hf_dir
         with open(param_json_path, "r") as fp:
             self._param_map = json.load(fp)

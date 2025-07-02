@@ -63,7 +63,8 @@ class ConcreteGate(nn.Cell):
         self.uniformreal = ops.UniformReal()
         self.shape = self.log_a.shape
         low, high = self.stretch_limits
-        assert low < 0.0, "p_gate_closed can be computed only if lower stretch limit is negative"
+        if low >= 0.0:
+            raise ValueError("p_gate_closed can be computed only if lower stretch limit is negative")
         self.bias = Tensor(temperature * math.log(-low / high))
         self.gqa_rep = gqa_rep
         if gqa_rep > 1:
