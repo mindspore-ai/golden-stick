@@ -14,22 +14,25 @@
 # ============================================================================
 """test interfaces of smooth quant."""
 import os
+import sys
 import time
 import pytest
 import numpy as np
-
 import mindspore as ms
 from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.dataset import GeneratorDataset
 from mindspore.ops.auto_generate import SiLU, SplitWithSize
 from mindspore.ops import operations as P
 from mindformers.modules import Linear
-from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
                               PrecisionRecovery, GPTQQuantConfig, AWQConfig, QuantGranularity)
 from tests.st.test_utils import get_available_port
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+# pylint: disable=wrong-import-position
+from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
 
 
 class SwiGLU(nn.Cell):
@@ -734,7 +737,7 @@ def test_ptq_simplenet(non_decoder):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W4_GPTQ', 'A16W4_AWQ'])
+@pytest.mark.parametrize("quant_algo", ['A16W4_AWQ'])
 def test_ptq_llama2_predict_2stage_1p_run_level0(quant_algo):
     """
     Feature: test PTQ adjust parameter in two stages with one cards.

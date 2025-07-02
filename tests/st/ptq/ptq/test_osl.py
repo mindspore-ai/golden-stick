@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Unit Tests for Outlier Suppression Lite"""
+import sys
 import os
 import argparse
 import json
@@ -24,9 +25,12 @@ from mindspore import nn, Tensor
 from mindspore.dataset import GeneratorDataset
 from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.mappings import ScatterToModelParallelRegion
-from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+# pylint: disable=wrong-import-position
+from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
 
 
 #############################################################################
