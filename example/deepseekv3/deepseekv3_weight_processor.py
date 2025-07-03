@@ -1570,8 +1570,8 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                                                               split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
         w2_scale_param, _ = self.get_routed_safetensor_3_dim(w2_scale_name, src_hf_dir, hf_weight_map, tp_axis=1,
                                                              split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
-        w2_bias_param, _ = self.get_routed_safetensor_2_dim(w2_bias_name, src_hf_dir, hf_weight_map, tp_axis=1,
-                                                            split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
+        w2_bias_param, _ = self.get_routed_safetensor_2_dim(w2_bias_name, src_hf_dir, hf_weight_map,
+                                                            split_ep=self.moe_split_ep, split_tp=False)
 
         if ffn_concat:
             concat_weight_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.weight"
