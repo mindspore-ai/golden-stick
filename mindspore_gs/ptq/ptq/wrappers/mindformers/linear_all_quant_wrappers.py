@@ -18,7 +18,6 @@ from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
-from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -43,13 +42,21 @@ class AllQuantLinearCell(WeightQuantLinearCell):
                        config.act_quant_granularity is QuantGranularity.PER_TENSOR
 
         Quantizer.reg_layer_map(Linear, AllQuantLinearCell, A8W8Checker())
-        Quantizer.reg_layer_map(ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
-        Quantizer.reg_layer_map(RowParallelLinear, AllQuantLinearCell, A8W8Checker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            Quantizer.reg_layer_map(ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(RowParallelLinear, AllQuantLinearCell, A8W8Checker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            Quantizer.reg_layer_map(LlamaColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(LlamaRowParallelLinear, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(DSRowParallelLinear, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, AllQuantLinearCell, A8W8Checker())

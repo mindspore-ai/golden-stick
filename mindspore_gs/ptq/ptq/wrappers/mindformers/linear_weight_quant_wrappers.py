@@ -19,7 +19,6 @@ from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 
 from mindformers.modules.layers import Linear
-from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
@@ -45,13 +44,21 @@ class WeightQuantLinearCell(WrapperLinearCell):
                         and config.precision_recovery == PrecisionRecovery.NONE)
 
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
-        Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
-        Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            Quantizer.reg_layer_map(LlamaColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(LlamaRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(DSRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
@@ -64,17 +71,25 @@ class WeightQuantLinearCell(WrapperLinearCell):
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
 
-        type_map = {RowParallelLinear: ParallelType.ROW_PARALLEL,
-                    ColumnParallelLinear: ParallelType.COL_PARALLEL,
-                    Linear: ParallelType.NO_PARALLEL}
+        type_map = {Linear: ParallelType.NO_PARALLEL}
+        try:
+            from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
+            type_map[RowParallelLinear] = ParallelType.ROW_PARALLEL
+            type_map[ColumnParallelLinear] = ParallelType.COL_PARALLEL
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelLinearWorldRegion] = ParallelType.COL_PARALLEL
+            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelLinearWorldRegion] = ParallelType.ROW_PARALLEL

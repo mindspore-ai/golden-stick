@@ -28,7 +28,6 @@ from mindspore import dtype as msdtype
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindformers.modules.layers import Linear
-from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
@@ -51,17 +50,25 @@ class SmoothLinearCell(WrapperLinearCell):
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
-        type_map = {RowParallelLinear: ParallelType.ROW_PARALLEL,
-                    ColumnParallelLinear: ParallelType.COL_PARALLEL,
-                    Linear: ParallelType.NO_PARALLEL}
+        type_map = {Linear: ParallelType.NO_PARALLEL}
+        try:
+            from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
+            type_map[RowParallelLinear] = ParallelType.ROW_PARALLEL
+            type_map[ColumnParallelLinear] = ParallelType.COL_PARALLEL
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelLinearWorldRegion] = ParallelType.COL_PARALLEL
+            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelLinearWorldRegion] = ParallelType.ROW_PARALLEL
@@ -200,13 +207,21 @@ class SmoothQuantLinearCell(SmoothLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.SMOOTH
 
         LinearSmoothQuant.reg_layer_map(Linear, SmoothQuantLinearCell, SmoothChecker())
-        LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
-        LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearSmoothQuant.reg_layer_map(LlamaColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+            LinearSmoothQuant.reg_layer_map(LlamaRowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
             LinearSmoothQuant.reg_layer_map(DSColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
             LinearSmoothQuant.reg_layer_map(DSRowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
             LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, SmoothQuantLinearCell, SmoothChecker())
@@ -272,13 +287,21 @@ class AWQLinearCell(SmoothLinearCell):
                 return False
 
         LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
-        LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
-        LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
+            LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearSmoothQuant.reg_layer_map(LlamaColumnParallelLinear, AWQLinearCell, AWQChecker())
+            LinearSmoothQuant.reg_layer_map(LlamaRowParallelLinear, AWQLinearCell, AWQChecker())
             LinearSmoothQuant.reg_layer_map(DSColumnParallelLinear, AWQLinearCell, AWQChecker())
             LinearSmoothQuant.reg_layer_map(DSRowParallelLinear, AWQLinearCell, AWQChecker())
             LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, AWQLinearCell, AWQChecker())
@@ -365,15 +388,25 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
 
         LinearAutoSmoother.reg_layer_map(Linear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
-        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                         SearchOutlierSuppressionLiteChecker())
-        LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                         SearchOutlierSuppressionLiteChecker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
             LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                              SearchOutlierSuppressionLiteChecker())
             LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
@@ -537,7 +570,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
             self.x_zp = Tensor(x_zp)
             self._layer.weight.set_data(msops.cast(q_weight, self._layer.weight.dtype))
             self.y_zp = q_weight.sum(axis=self.ic_axis, dtype=msdtype.int32) * self.x_zp.astype(msdtype.int32)
-            if isinstance(self._layer, RowParallelLinear):
+            if self.is_rowparallel:
                 self.y_zp = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(self.y_zp)
             quant_output = self._module_forward(True)
             msops.assign(self._layer.weight, fp16_weight)
@@ -614,13 +647,21 @@ class AWQSmoothLinearCell(AWQLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.AWQ
 
         LinearAutoSmoother.reg_layer_map(Linear, AWQSmoothLinearCell, AWQSmoothChecker())
-        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
-        LinearAutoSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
             LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, AWQSmoothLinearCell, AWQSmoothChecker())
@@ -860,15 +901,25 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
 
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
-        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                         OutlierSuppressionPlusSmoothChecker())
-        LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                         OutlierSuppressionPlusSmoothChecker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
                                              OutlierSuppressionPlusSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
@@ -967,7 +1018,7 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
                 else self._layer.weight.astype("float32")
             ),
         )
-        if isinstance(self._layer, RowParallelLinear):
+        if self.is_rowparallel:
             self.osp_bias_t = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(self.osp_bias_t)
 
         group_size = self.cfg.group_size if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP \
@@ -1013,7 +1064,7 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
             self._layer.weight.set_data(msops.cast(q_weight, self.compute_type))
             y_zp = q_weight.sum(axis=self.ic_axis, dtype=msdtype.int32) * self.x_zp.astype(msdtype.int32)
             y_zp_with_deq = y_zp * self.deq_scale
-            if isinstance(self._layer, RowParallelLinear):
+            if self.is_rowparallel:
                 y_zp_with_deq = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(y_zp_with_deq)
             self.all_bias = -y_zp_with_deq + self.osp_bias_t
             quant_output = self._module_forward(True)
@@ -1088,13 +1139,29 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
                     not config.use_inner_osp
 
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusLinearCell, OutlierSuppressionPlusChecker())
-        LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusLinearCell,
-                                         OutlierSuppressionPlusChecker())
-        LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusLinearCell,
-                                         OutlierSuppressionPlusChecker())
+        try:
+            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
+            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+        except ImportError:
+            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
+            from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
             LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, OutlierSuppressionPlusLinearCell,
                                              OutlierSuppressionPlusChecker())
             LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, OutlierSuppressionPlusLinearCell,
