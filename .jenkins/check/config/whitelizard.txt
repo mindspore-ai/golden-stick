@@ -1,3 +1,4 @@
 golden-stick/mindspore_gs/ptq/transformer_inspect.py:_get_layer_type
 golden-stick/example/deepseekv3/deepseekv3_weight_processor.py:load_safetensors_shard
 golden-stick/example/deepseekv3/ds_utils.py:create_ptq 
+golden-stick/example/deepseekv3/deepseekv3_weight_processor.py:infer_gptq_quant_net_ms_convert_layer_weight
