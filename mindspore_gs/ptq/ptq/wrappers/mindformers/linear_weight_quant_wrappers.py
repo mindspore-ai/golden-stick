@@ -57,6 +57,10 @@ class WeightQuantLinearCell(WrapperLinearCell):
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            Quantizer.reg_layer_map(TC2ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(TC2RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(LlamaColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(LlamaRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
@@ -85,6 +89,10 @@ class WeightQuantLinearCell(WrapperLinearCell):
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            type_map[TC2ColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[TC2RowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
