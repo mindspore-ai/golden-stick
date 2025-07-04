@@ -53,6 +53,11 @@ class QuantPageAttentionMgrCell(WrapperCell):
             Quantizer.reg_layer_map(ParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
         except ImportError:
             pass
+        try:
+            from research.llama3_1.infer.parallel_paged_attention_mgr import LlameParallelPagedAttentionMgr
+            Quantizer.reg_layer_map(LlameParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, layer, context: InnerPTQConfig, cfg, **kwargs):
         super().__init__(linear_name, layer, cfg, context, **kwargs)
@@ -191,6 +196,11 @@ class DynamicQuantPageAttentionMgrCell(WrapperCell):
         try:
             from mindformers.experimental.infer.core.parallel_paged_attention_mgr import ParallelPagedAttentionMgr
             Quantizer.reg_layer_map(ParallelPagedAttentionMgr, DynamicQuantPageAttentionMgrCell, KVCacheInt8())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.parallel_paged_attention_mgr import LlameParallelPagedAttentionMgr
+            Quantizer.reg_layer_map(LlameParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
         except ImportError:
             pass
 
