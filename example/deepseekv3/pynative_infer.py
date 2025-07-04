@@ -26,8 +26,8 @@ from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.quant import InputCatcher
 
-from mindformers.experimental.infer.core.norm import RMSNorm
-from mindformers.experimental.infer.core.layers import ColumnParallelLinear
+from research.deepseek3.infer.norm import RMSNorm
+from research.deepseek3.infer.layers import ColumnParallelLinear
 from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
 from ds_utils import create_network
 
