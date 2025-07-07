@@ -911,7 +911,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
             gmm_bias_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
             t_scale_shard = (1, tensor_parallel_num, 1) if self.is_group_mm else (tensor_parallel_num, 1)
-            gmm_bias_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
+            gmm_bias_shard = (1, 1) if self.is_group_mm else (1,)
         else:
             return {}
         shard_state = {
