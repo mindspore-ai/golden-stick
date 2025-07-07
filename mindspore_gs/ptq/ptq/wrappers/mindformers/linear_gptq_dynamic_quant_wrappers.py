@@ -89,7 +89,8 @@ class GptqDynamicQuantLinearInferCell(LinearInferCell):
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
         qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
                                                                         w_qparam, is_deploy, False,
-                                                                        self.layer.transpose_b, compute_type)
+                                                                        self.layer.transpose_b, compute_type,
+                                                                        self.cfg.save_gmm_bias_in_quant_phase)
         self._set_act_dynamic_quant(dynamic_quant_op)
         self.layer.matmul = qmm
         self.layer.weight = q_weight

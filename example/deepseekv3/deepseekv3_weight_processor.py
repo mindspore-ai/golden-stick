@@ -26,6 +26,8 @@ import mindspore as ms
 from mindspore import dtype
 from mindspore.communication.management import get_rank
 from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_rank
+from mindspore_gs.ptq.basic_quant_func import np_int8data_unpack_to_int4_3d, convert_uint64_to_fp32
+
 from weight_processor import BaseWeightProcessor, EPMethod
 
 
@@ -1556,22 +1558,34 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                                                               split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
         w1_scale_param, _ = self.get_routed_safetensor_3_dim(w1_scale_name, src_hf_dir, hf_weight_map, tp_axis=2,
                                                              split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
-        w1_bias_param, _ = self.get_routed_safetensor_2_dim(w1_bias_name, src_hf_dir, hf_weight_map, tp_axis=1,
-                                                            split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
+        w1_scale_repeat = convert_uint64_to_fp32(
+            np.repeat(w1_scale_param,
+                      w1_weight_param.shape[1] // w1_scale_param.shape[1],
+                      axis=1))
+        w1_weight_unpack = np_int8data_unpack_to_int4_3d(w1_weight_param)
+        w1_bias_param = 8 * np.sum(w1_weight_unpack.astype(np.float32) * w1_scale_repeat, axis=1)
 
         w3_weight_param, _ = self.get_routed_safetensor_3_dim(w3_weight_name, src_hf_dir, hf_weight_map, tp_axis=2,
                                                               split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
         w3_scale_param, _ = self.get_routed_safetensor_3_dim(w3_scale_name, src_hf_dir, hf_weight_map, tp_axis=2,
                                                              split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
-        w3_bias_param, _ = self.get_routed_safetensor_2_dim(w3_bias_name, src_hf_dir, hf_weight_map, tp_axis=1,
-                                                            split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
+        w3_scale_repeat = convert_uint64_to_fp32(
+            np.repeat(w3_scale_param,
+                      w3_weight_param.shape[1] // w3_scale_param.shape[1],
+                      axis=1))
+        w3_weight_unpack = np_int8data_unpack_to_int4_3d(w3_weight_param)
+        w3_bias_param = 8 * np.sum(w3_weight_unpack.astype(np.float32) * w3_scale_repeat, axis=1)
 
         w2_weight_param, _ = self.get_routed_safetensor_3_dim(w2_weight_name, src_hf_dir, hf_weight_map, tp_axis=1,
                                                               split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
         w2_scale_param, _ = self.get_routed_safetensor_3_dim(w2_scale_name, src_hf_dir, hf_weight_map, tp_axis=1,
                                                              split_ep=self.moe_split_ep, split_tp=self.moe_split_tp)
-        w2_bias_param, _ = self.get_routed_safetensor_2_dim(w2_bias_name, src_hf_dir, hf_weight_map,
-                                                            split_ep=self.moe_split_ep, split_tp=False)
+        w2_scale_repeat = convert_uint64_to_fp32(
+            np.repeat(w2_scale_param,
+                      w2_weight_param.shape[1] // w2_scale_param.shape[1],
+                      axis=1))
+        w2_weight_unpack = np_int8data_unpack_to_int4_3d(w2_weight_param)
+        w2_bias_param = 8 * np.sum(w2_weight_unpack.astype(np.float32) * w2_scale_repeat, axis=1)
 
         if ffn_concat:
             concat_weight_name = f"model.layers.{layer_id}.{layer_type}.w_gate_hidden._layer.weight"
