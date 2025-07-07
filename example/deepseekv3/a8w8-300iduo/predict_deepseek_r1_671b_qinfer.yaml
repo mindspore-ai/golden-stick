@@ -85,7 +85,7 @@ model:
     top_p: 1
     theta: 10000.0
     quantization_config:
-      quant_method: "dsquant-300iduo"
+      quant_method: "dsquant"
     do_sample: False
     is_dynamic: True
     qkv_concat: True

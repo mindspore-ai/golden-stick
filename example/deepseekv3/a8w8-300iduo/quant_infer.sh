@@ -52,4 +52,4 @@ msrun --worker_num=24 \
       --log_dir=300iduo_infer_log \
       python ${quant_infer_path} \
              --config ${yaml} \
-             --approach dsquant-300iduo > log_300iduo_infer 2>&1 &
+             --approach dsquant > log_300iduo_infer 2>&1 &

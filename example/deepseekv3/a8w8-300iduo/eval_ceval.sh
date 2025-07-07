@@ -54,4 +54,4 @@ msrun --worker_num=24 \
       python ${eval_ceval_path} \
              --config ${yaml} \
              --dataset_path ${dataset_path} \
-             --approach dsquant-300iduo > log_eval_ceval_300iduo 2>&1 &
+             --approach dsquant > log_eval_ceval_300iduo 2>&1 &
