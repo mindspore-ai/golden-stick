@@ -101,6 +101,8 @@ ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_qu
                        outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
+> Since the ParallelLlamaForCausalLM network in MindSpore Transformers has been deprecated, in MindSpore Golden Stick version 1.2.0, this network does not support KVCache Int8 quantization. Future versions will support KVCache Int8 quantization on a new network.
+
 #### SmoothQuant Algorithm
 
 It is found that, unlike CNNs and small transformer networks, when the number of parameters of the large language model exceeds 6.8B, "systematic outliers with large magnitude" appear in the activation of the network, which is difficult to quantify due to the wide and heterogeneous distribution of floating points.
@@ -203,6 +205,8 @@ At this time, the corresponding calculation formula for KVCache is as follows:
 $$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
 
 $$KVCache_{int} = round(KVCache_{float} \div scale)$$
+
+> Since the ParallelLlamaForCausalLM network in MindSpore Transformers has been deprecated, in MindSpore Golden Stick version 1.2.0, this network does not support KVCache Int8 quantization. Future versions will support KVCache Int8 quantization on a new network.
 
 #### GPTQ Algorithm
 

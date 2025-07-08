@@ -101,6 +101,8 @@ ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_qu
                         outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
+> 因MindSpore Transformers的ParallelLlamaForCausalLM网络已经日落，在金箍棒1.2.0版本中，该网络不支持KVCache Int8量化，后续版本会在新的网络上支持KVCache Int8量化。
+
 #### SmoothQuant算法
 
 研究发现，不同于CNN和小型的transformer网络，当大语言模型参数量超过6.8B时，网络的激活中出现“systematic outliers with large magnitude”，由于浮点的分布很广且不均匀，导致难以量化。
@@ -296,6 +298,8 @@ ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
 $$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
 
 $$KVCache_{int} = round(KVCache_{float} \div scale)$$
+
+> 因MindSpore Transformers的ParallelLlamaForCausalLM网络已经日落，在金箍棒1.2.0版本中，该网络不支持KVCache Int8量化，后续版本会在新的网络上支持KVCache Int8量化。
 
 #### 组合量化
 
