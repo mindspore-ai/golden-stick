@@ -23,7 +23,7 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_deepseek_r1_671b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250702/master_20250702010018_9b00bb9fd44cf31733e4e78c1fe098b2e2187ff2_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
+MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250709/master_20250709010019_0737648dbea2303d71168f5f5e5b235e4ff204a6_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
 
 export GSLOG=1
 export MS_ENABLE_LCCL=off
@@ -60,7 +60,7 @@ prepare_env()
   wget --no-check-certificate -c $MS_PKG_LINK || exit 1
 
   echo "clone mf repo and install mf."
-  git clone -b dev https://gitee.com/mindspore/mindformers.git mf || exit 1
+  git clone -b r1.6.0 https://gitee.com/mindspore/mindformers.git mf || exit 1
   cd mf || exit 1
   echo "build mf."
   bash build.sh || exit 1
