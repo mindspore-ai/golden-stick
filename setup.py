@@ -20,7 +20,6 @@ import sys
 import re
 import stat
 import shutil
-import time
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
@@ -106,13 +105,11 @@ def version_from_file():
 
 
 version_num = version_from_file()
-date_str = time.strftime('%Y%m%d', time.localtime())
-version = f"{version_num}.dev{date_str}"
 
 
 setup(
     name='mindspore_gs',
-    version=version,
+    version=version_num,
     author='The MindSpore Authors',
     author_email='contact@mindspore.cn',
     description='A MindSpore model optimization algorithm set..',
