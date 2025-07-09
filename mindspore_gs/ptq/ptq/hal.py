@@ -798,7 +798,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
             self.weight_scale = Parameter(initializer("ones", w_qparam.scale.shape, weight_scale_dtype))
             if is_group_mm:
                 self.gmm_bias = Parameter(initializer("zeros", (w_qparam.scale.shape[0], w_qparam.scale.shape[-1]),
-                                                    dtype.float32))
+                                                      dtype.float32))
         else:
             if not is_group_mm:
                 self.weight_scale = Parameter(w_qparam.scale.astype(weight_scale_dtype))
@@ -845,7 +845,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, q_weight, linear, w_qparam: QuantParam, is_deploy, transpose_a=False,
-               transpose_b=False, dst_dtype=dtype.float16):
+               transpose_b=False, dst_dtype=dtype.float16, save_gmm_bias=False):
         """create"""
         if isinstance(linear.matmul, msops.MatMul):
             gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam,
@@ -882,7 +882,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                 q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
             logger.debug(f"GptqDynamicQuantMatmul: pack q_weight of Layer({layer_name}) is "
                          f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
-            if gdqmm.is_group_mm:
+            if gdqmm.is_group_mm and save_gmm_bias:
                 scale = msops.repeat_elements(w_qparam.scale, rep=w_qparam.group_size, axis=1)
                 gmm_bias = msops.mul(8,
                                     msops.sum(
@@ -908,15 +908,12 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
         if parallel_type == ParallelType.COL_PARALLEL:
             t_scale_shard = (1, 1, tensor_parallel_num) if self.is_group_mm else (1, tensor_parallel_num)
-            gmm_bias_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
             t_scale_shard = (1, tensor_parallel_num, 1) if self.is_group_mm else (tensor_parallel_num, 1)
-            gmm_bias_shard = (1, 1) if self.is_group_mm else (1,)
         else:
             return {}
         shard_state = {
             self.weight_scale.name: {'shape': self.weight_scale.shape, 'shard': t_scale_shard},
-            self.gmm_bias.name: {'shape': self.gmm_bias.shape, 'shard': gmm_bias_shard},
         }
         return shard_state
 

@@ -119,6 +119,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     always_use_fp_input_in_processer: bool = False
     use_inner_osp: bool = False
     skip_offload_in_processing: bool = False
+    save_gmm_bias_in_quant_phase: bool = False
 
     dump_path: str = ""
     dumper: Dumper = Dumper()

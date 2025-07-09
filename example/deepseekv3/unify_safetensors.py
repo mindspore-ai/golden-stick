@@ -120,21 +120,6 @@ def split_3_dim_w_gate_hidden(value, rank_num):
     w3 = reshape_array[:, :, :, half_len:]
     return np.reshape(w1, (value.shape[0], value.shape[1], -1)), np.reshape(w3, (value.shape[0], value.shape[1], -1))
 
-
-def split_w_gate_hidden_gmm_bias(value, rank_num):
-    '''split_3_dim_w_gate_hidden'''
-    if len(value.shape) > 2:
-        raise ValueError(f"value.shape:{value.shape} 's dim > 2.")
-    if value.shape[1]%rank_num != 0:
-        raise ValueError(f"value.shape:{value.shape}[1] % {rank_num} != 0.")
-    per_rank_len = int(value.shape[1] / rank_num)
-    reshape_array = np.reshape(value, (value.shape[0], rank_num, per_rank_len))
-    half_len = int(per_rank_len / 2)
-    w1 = reshape_array[:, :, :half_len]
-    w3 = reshape_array[:, :, half_len:]
-    return np.reshape(w1, (value.shape[0], -1)), np.reshape(w3, (value.shape[0], -1))
-
-
 def process_feed_forward_w_gate_hidden(name, ori_param, rank_num):
     '''process_feed_forward_w_gate_hidden'''
     if "matmul" in name:
@@ -259,10 +244,7 @@ def process_routed_experts_w_gate_hidden_pergroup_quant(name, ori_param, rank_nu
     else:
         value = ori_param[name].asnumpy()
 
-    if "gmm_bias" in name:
-        w1, w3 = split_w_gate_hidden_gmm_bias(value, rank_num)
-    else:
-        w1, w3 = split_3_dim_w_gate_hidden(value, rank_num)
+    w1, w3 = split_3_dim_w_gate_hidden(value, rank_num)
     w1_name = name.replace("w_gate_hidden", "w1")
     w3_name = name.replace("w_gate_hidden", "w3")
     ori_param.pop(name)

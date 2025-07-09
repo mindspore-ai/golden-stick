@@ -44,6 +44,15 @@ def np_int4data_pack_to_int8_3d(np_data):
     np_int4_data = np_data[::, ::, 0::2] | np_data[::, ::, 1::2]
     return np_int4_data
 
+def np_int8data_unpack_to_int4_3d(np_data):
+    np_data = np_data.astype(np.uint8)
+    np_data_low = ((np_data & 0x0F) << 4).astype(np.int8) >> 4
+    np_data_high = ((np_data >> 4) << 4).astype(np.int8) >> 4
+
+    np_int4_data = np.zeros((np_data.shape[0], np_data.shape[1], np_data.shape[2] * 2), dtype=np.int8)
+    np_int4_data[:, :, ::2] = np_data_low
+    np_int4_data[:, :, 1::2] = np_data_high
+    return np_int4_data
 
 def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
     if 0 <= quant_dtype.value() <= 15:
@@ -179,6 +188,12 @@ def convert_fp32_to_uint64(scale) -> np.ndarray:
     """convert_fp32_to_int64"""
     new_scale = np.frombuffer(scale.tobytes(), dtype=np.uint32)
     return new_scale.astype(np.uint64)
+
+
+def convert_uint64_to_fp32(uint64_data: np.ndarray) -> np.ndarray:
+    """Convert uint64 data to float32"""
+    uint32_data = uint64_data.astype(np.uint32)
+    return uint32_data.view(np.float32)
 
 
 def get_quant_min_max(num_bits=8, signed=True, narrow_range=False):
