@@ -52,12 +52,6 @@ class SmoothLinearCell(WrapperLinearCell):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
         type_map = {Linear: ParallelType.NO_PARALLEL}
         try:
-            from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-            type_map[RowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[ColumnParallelLinear] = ParallelType.COL_PARALLEL
-        except ImportError:
-            pass
-        try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -212,12 +206,6 @@ class SmoothQuantLinearCell(SmoothLinearCell):
 
         LinearSmoothQuant.reg_layer_map(Linear, SmoothQuantLinearCell, SmoothChecker())
         try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
-            LinearSmoothQuant.reg_layer_map(RowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
-        except ImportError:
-            pass
-        try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -295,12 +283,6 @@ class AWQLinearCell(SmoothLinearCell):
                 return False
 
         LinearSmoothQuant.reg_layer_map(Linear, AWQLinearCell, AWQChecker())
-        try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            LinearSmoothQuant.reg_layer_map(ColumnParallelLinear, AWQLinearCell, AWQChecker())
-            LinearSmoothQuant.reg_layer_map(RowParallelLinear, AWQLinearCell, AWQChecker())
-        except ImportError:
-            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
@@ -400,14 +382,6 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
 
         LinearAutoSmoother.reg_layer_map(Linear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
-        try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                             SearchOutlierSuppressionLiteChecker())
-            LinearAutoSmoother.reg_layer_map(RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                             SearchOutlierSuppressionLiteChecker())
-        except ImportError:
-            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
@@ -666,12 +640,6 @@ class AWQSmoothLinearCell(AWQLinearCell):
 
         LinearAutoSmoother.reg_layer_map(Linear, AWQSmoothLinearCell, AWQSmoothChecker())
         try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
-        except ImportError:
-            pass
-        try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -925,14 +893,6 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
         try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                             OutlierSuppressionPlusSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                             OutlierSuppressionPlusSmoothChecker())
-        except ImportError:
-            pass
-        try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -1168,14 +1128,6 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
                     not config.use_inner_osp
 
         LinearAutoSmoother.reg_layer_map(Linear, OutlierSuppressionPlusLinearCell, OutlierSuppressionPlusChecker())
-        try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            LinearAutoSmoother.reg_layer_map(ColumnParallelLinear, OutlierSuppressionPlusLinearCell,
-                                             OutlierSuppressionPlusChecker())
-            LinearAutoSmoother.reg_layer_map(RowParallelLinear, OutlierSuppressionPlusLinearCell,
-                                             OutlierSuppressionPlusChecker())
-        except ImportError:
-            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)

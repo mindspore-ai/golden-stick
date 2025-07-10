@@ -45,12 +45,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
 
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
         try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            Quantizer.reg_layer_map(ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
-        except ImportError:
-            pass
-        try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -76,12 +70,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
 
         type_map = {Linear: ParallelType.NO_PARALLEL}
-        try:
-            from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
-            type_map[RowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[ColumnParallelLinear] = ParallelType.COL_PARALLEL
-        except ImportError:
-            pass
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)

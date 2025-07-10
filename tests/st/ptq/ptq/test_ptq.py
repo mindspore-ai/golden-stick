@@ -737,7 +737,7 @@ def test_ptq_simplenet(non_decoder):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A16W4_AWQ'])
+@pytest.mark.parametrize("quant_algo", ['A8W4_GPTQ', 'A16W4_AWQ'])
 def test_ptq_llama2_predict_2stage_1p_run_level0(quant_algo):
     """
     Feature: test PTQ adjust parameter in two stages with one cards.

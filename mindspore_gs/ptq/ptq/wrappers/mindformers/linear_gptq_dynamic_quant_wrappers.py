@@ -41,34 +41,29 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
-            Quantizer.reg_layer_map(ColumnParallelGroupLinear, GptqDynamicQuantLinearCell,
-                                    GptqDynamicA8W8Checker())
-            Quantizer.reg_layer_map(RowParallelGroupLinear, GptqDynamicQuantLinearCell,
-                                    GptqDynamicA8W8Checker())
-            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, GptqDynamicQuantLinearCell,
-                                    GptqDynamicA8W8Checker())
-            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, GptqDynamicQuantLinearCell,
-                                    GptqDynamicA8W8Checker())
-        except ImportError:
-            pass
-        try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            Quantizer.reg_layer_map(ColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
-            Quantizer.reg_layer_map(RowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
-        except ImportError:
-            pass
-        try:
-            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            Quantizer.reg_layer_map(DSColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
-            Quantizer.reg_layer_map(DSRowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
             Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, GptqDynamicQuantLinearCell,
                                     GptqDynamicA8W8Checker())
             Quantizer.reg_layer_map(RowParallelLinearWorldRegion, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+            Quantizer.reg_layer_map(DSColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+            Quantizer.reg_layer_map(DSRowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            Quantizer.reg_layer_map(LlamaColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+            Quantizer.reg_layer_map(LlamaRowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            Quantizer.reg_layer_map(TC2ColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+            Quantizer.reg_layer_map(TC2RowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         except ImportError:
             pass
 

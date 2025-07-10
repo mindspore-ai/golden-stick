@@ -38,12 +38,6 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
 
         Quantizer.reg_layer_map(Linear, DynamicQuantLinearCell, DynamicA8W8Checker())
         try:
-            from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
-            Quantizer.reg_layer_map(ColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
-            Quantizer.reg_layer_map(RowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
-        except ImportError:
-            pass
-        try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
                                                 ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear

@@ -31,7 +31,7 @@
 | 规格 | 规格说明 |
 | --- | --- |
 | 硬件支持 | Atlas 800I A2 |
-| 网络支持 | ParallelLlamaForCausalLM，具体请参见[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/experimental/infer/models/llama/llama.py) |
+| 网络支持 | ParallelLlamaForCausalLM，具体请参见[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py) |
 | 运行模式支持 | 量化checkpoint阶段仅支持PyNative模式，量化推理阶段不限定模式，建议GraphMode获得更好的性能 |
 
 > 当前PTQ算法依赖于完整的DecoderLayer做网络拓扑分析，所以不支持任意基于MindFormers的Linear层构造的网络，我们计划在后续版本改进这一点，以提升PTQ算法的网络泛化能力。
@@ -182,7 +182,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
 
 [Activation-Aware Weight Quantization，简称AWQ](https://arxiv.org/pdf/2306.00978)基于激活值分布挑选显著权重，并且考虑到硬件效率，通过缩放的方式来保护显著权重，避免同一个权重张量使用不同数据类型存储，从而实现了硬件友好的高精度权重量化算法，可以实现4bit甚至更低bit的量化。除了显著权重的保护，AWQ还引入了动态权重截断技术进一步提升量化的精度。
 
-金箍棒通过新增一种异常值抑制方法来支持AWQ，当前仅支持[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/experimental/infer/models/llama/llama.py#L40)。
+金箍棒通过新增一种异常值抑制方法来支持AWQ，当前仅支持[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py)。
 
 AWQ同时支持PerChannel量化和PerGroup量化，可以通过如下配置项使能PTQ的PerChannel AWQ算法:
 
