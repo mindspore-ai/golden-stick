@@ -20,6 +20,7 @@ import os
 import numpy as np
 from mindspore.communication import get_rank
 
+
 class Dumper:
     """Dumper for GoldenStick."""
     _instance = None
@@ -31,9 +32,11 @@ class Dumper:
 
     def __init__(self):
         self.path = ""
+        self.layer_name = ""
         self.nsamples = 0
 
     def set_dump_path(self, path):
+        """set_dump_path"""
         if path != "":
             self.path = os.path.join(path, f"rank_{get_rank()}/")
             os.makedirs(self.path, exist_ok=True)

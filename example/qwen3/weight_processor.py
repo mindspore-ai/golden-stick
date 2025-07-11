@@ -41,15 +41,18 @@ class BaseWeightProcessor:
         self.file_handles = {}
 
     def get_file_handles(self, filename):
+        """get_file_handles"""
         if filename not in self.file_handles:
             fp = safe_open(filename, framework="np")
             self.file_handles[filename] = fp
         return self.file_handles[filename]
 
     def release_file_handles(self):
+        """release_file_handles"""
         del self.file_handles
 
     def get_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map, is_split_param=False, split_axis=0):
+        """get_safetensor_from_file"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
         sf_file = self.get_file_handles(filename)
@@ -82,6 +85,7 @@ class BaseWeightProcessor:
         return split_data, qint4
 
     def split_weight_by_rank(self, weight, split_axis=0):
+        """split_weight_by_rank"""
         shape = weight.shape
         if split_axis == 0:
             split_size = shape[0] // self.tp_group_size

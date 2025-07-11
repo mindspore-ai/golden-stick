@@ -59,13 +59,13 @@ class JSONCache:
 
     def _should_skip_io(self) -> bool:
         """_should_skip_io"""
-        return self.__class__._filepath == ''
+        return self._filepath == ''
 
     def _ensure_directory_exists(self):
         if self._should_skip_io():
             return
 
-        dir_path = os.path.dirname(self.__class__._filepath)
+        dir_path = os.path.dirname(self._filepath)
         if dir_path:
             os.makedirs(dir_path, exist_ok=True)
 
@@ -77,7 +77,7 @@ class JSONCache:
 
         try:
             self._ensure_directory_exists()
-            with open(self.__class__._filepath, 'r') as f:
+            with open(self._filepath, 'r') as f:
                 raw_data = json.load(f)
                 self._data = {str(k): v for k, v in raw_data.items()}
         except (FileNotFoundError, json.JSONDecodeError):
@@ -89,10 +89,11 @@ class JSONCache:
             return
 
         self._ensure_directory_exists()
-        with open(self.__class__._filepath, 'w') as f:
+        with open(self._filepath, 'w') as f:
             json.dump(self._data, f, indent=2)
 
     def get(self, key: str) -> Optional[float]:
+        """get"""
         value = self._data.get(key, None)
         if not value:
             return value
@@ -113,12 +114,13 @@ class JSONCache:
                 self._data[key] = str(os.path.join(cache_path, f'{key}.npy'))
             else:
                 self._data[key] = float(value)
-        except ValueError:
-            raise TypeError("Value must be a number")
+        except ValueError as e:
+            raise TypeError("Value must be a number") from e
         self._save_data()
 
     @classmethod
     def get_filepath(cls) -> str:
+        """get_filepath"""
         return cls._filepath
 
     def __contains__(self, key: str) -> bool:
@@ -126,4 +128,5 @@ class JSONCache:
 
     @property
     def size(self) -> int:
+        """size"""
         return len(self._data)

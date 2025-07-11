@@ -42,6 +42,7 @@ class Processor(abc.ABC):
                 _ = self.process(new_cell, full_cell_name)
         return root
 
+
 def network_replace(network: Cell, src_layer: type, dst_layer: type, dst_layer_fn: callable, opname_blacklist: list,
                     network_root_name="root"):
     """network replace"""
