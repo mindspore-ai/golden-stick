@@ -24,6 +24,7 @@ from mindspore.communication.management import get_rank, get_group_size
 from mindformers.parallel_core.inference.utils import get_tp_world_size
 from mindformers.parallel_core.inference.parallel_state import get_data_parallel_world_size
 
+
 class EPMethod(Enum):
     """
     EP method enums
@@ -31,6 +32,7 @@ class EPMethod(Enum):
     DEFAULT = 'default'
     ALLTOALL = 'alltoall'
     ALLGATHER = 'allgather'
+
 
 class BaseWeightProcessor:
     r"""
@@ -76,16 +78,19 @@ class BaseWeightProcessor:
         self.file_handles = {}
 
     def get_file_handles(self, filename):
+        """get_file_handles"""
         if filename not in self.file_handles:
             fp = safe_open(filename, framework="np")
             self.file_handles[filename] = fp
         return self.file_handles[filename]
 
     def release_file_handles(self):
+        """release_file_handles"""
         del self.file_handles
 
     def get_moe_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map,
                                      is_split_param=False, split_axis=0):
+        """get_moe_safetensor_from_file"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
         sf_file = self.get_file_handles(filename)
@@ -114,7 +119,7 @@ class BaseWeightProcessor:
 
     def get_routed_safetensor_3_dim(self, hf_param_name, src_hf_dir, hf_weight_map, split_ep=False,
                                     split_tp=False, tp_axis=-1):
-        '''get_routed_safetensor_3_dim'''
+        """get_routed_safetensor_3_dim"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
         sf_file = self.get_file_handles(filename)
@@ -147,7 +152,7 @@ class BaseWeightProcessor:
 
     def get_routed_safetensor_2_dim(self, hf_param_name, src_hf_dir, hf_weight_map, split_ep=False,
                                     split_tp=False, tp_axis=-1):
-        '''get_moe_routed_safetensor_2_dim'''
+        """get_moe_routed_safetensor_2_dim"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
         sf_file = self.get_file_handles(filename)
@@ -175,6 +180,7 @@ class BaseWeightProcessor:
 
     def get_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map, is_split_param=False, split_axis=0,
                                  split_num=-1, rank_id=-1):
+        """get_safetensor_from_file"""
         rank_id = rank_id if rank_id != -1 else self.tp_rank_id
         split_num = split_num if split_num != -1 else self.tp_group_size
         safetensor_file = hf_weight_map[hf_param_name]
@@ -209,6 +215,7 @@ class BaseWeightProcessor:
         return split_data, qint4
 
     def split_weight_by_rank(self, weight, split_axis=0):
+        """split_weight_by_rank"""
         if self.tp_group_size == 1:
             return weight
 

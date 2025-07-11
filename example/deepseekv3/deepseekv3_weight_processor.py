@@ -45,6 +45,7 @@ def convert_np_to_ms_dtype(value):
         value_dtype = ms.bfloat16
     return value_dtype
 
+
 class DeepseekV3WeightProcessor(BaseWeightProcessor):
     r"""
     Provide DeepseekV3/R1 Model weight load and shards.
@@ -135,6 +136,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         return weight
 
     def infer_quant_process_moe_with_tp(self, src_hf_dir, hf_weight_map, num_router_experts, layer_id):
+        """infer_quant_process_moe_with_tp"""
         w1_list = []
         w2_list = []
         w3_list = []
@@ -180,6 +182,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     # pylint: disable=W0613
     def infer_quant_process_moe_with_ep(self, src_hf_dir, hf_weight_map, num_router_experts, layer_id):
+        """infer_quant_process_moe_with_ep"""
         w1_list = []
         w2_list = []
         w3_list = []
@@ -222,6 +225,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     # pylint: disable=W0613
     def infer_quant_process_moe_with_ep_tp(self, src_hf_dir, hf_weight_map, num_router_experts, layer_id):
+        """infer_quant_process_moe_with_ep_tp"""
         w1_list = []
         w2_list = []
         w3_list = []
@@ -270,6 +274,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     #pylint: disable=R1705
     def infer_quant_process_moe(self, src_hf_dir, hf_weight_map, num_router_experts, layer_id):
+        """infer_quant_process_moe"""
         if self.moe_ep_size > 1 and self.moe_tp_size > 1:
             return self.infer_quant_process_moe_with_ep_tp(src_hf_dir, hf_weight_map, num_router_experts, layer_id)
         elif self.moe_tp_size > 1:
@@ -366,6 +371,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             requires_grad=False)
 
     def get_moe_shared_expert_split_info(self):
+        """get_moe_shared_expert_split_info"""
         split_num = -1
         rank_id = -1
         if self.ep_method == EPMethod.ALLGATHER:
@@ -568,6 +574,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
     def quant_special_attention_weight(self, layer_id, src_hf_dir, hf_weight_map, name, is_trans_rope_weigh=False,
                                        is_split_param=False):
+        """quant_special_attention_weight"""
         # q_a_proj->q2l_proj
         # kv_a_proj_with_mqa->kv2l
         # q_a_layernorm->lq_norm
@@ -645,6 +652,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             requires_grad=False)
 
     def infer_quant_bias_weight(self, src_hf_dir, layer_id, hf_weight_map):
+        """infer_quant_bias_weight"""
         # quant_op.beta
         q2l_proj_bias_hf_name = f"model.layers.{layer_id}.input_layernorm.bias"
         q2l_proj_bias_ms_name = self.quant_convert_weight_name(q2l_proj_bias_hf_name)
@@ -809,6 +817,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         return weight_name
 
     def convert_mtp_weight_name(self, weight_name: str):
+        """convert_mtp_weight_name"""
         layer = 0 if 'layers.' not in weight_name else int(weight_name[weight_name.find('layers.'):].split('.')[1])
         if layer < self.num_layers:
             return weight_name
@@ -1111,6 +1120,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             requires_grad=False)
 
     def infer_process_mtp_layer_weight(self, src_hf_dir, layer_id, hf_weight_map):
+        """infer_process_mtp_layer_weight"""
         parameter_dict = {}
         mtp_layer_names = ["embed_tokens.weight", "enorm.weight", "hnorm.weight", "eh_proj.weight",
                            "shared_head.norm.weight", "shared_head.head.weight"]
@@ -1127,7 +1137,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                                                    name=ms_name,
                                                    requires_grad=False)
 
-        _, ckpt_not_load = ms.load_param_into_net(self.network, parameter_dict)
+        _, _ = ms.load_param_into_net(self.network, parameter_dict)
 
     def infer_convert_layer_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer convert layer weight"""
@@ -1552,8 +1562,9 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         for file in os.listdir(src_hf_dir):
             if file.endswith('index.json'):
                 # mtp model do not support quantization, needs to load bf16 weight.
-                if ('quant' in file and self.is_quant) or \
-                        ('quant' not in file and (not self.is_quant or is_mtp_model)):
+                is_quant = 'quant' in file and self.is_quant
+                is_no_quant_mtp = 'quant' not in file and (not self.is_quant or is_mtp_model)
+                if is_quant or is_no_quant_mtp:
                     param_json_path = os.path.join(src_hf_dir, file)
                     with open(param_json_path, "r") as fp:
                         hf_weight_map = json.load(fp)['weight_map']

@@ -22,11 +22,11 @@ import mindspore as ms
 from mindspore.communication import get_rank
 from mindspore import dataset
 from mindformers import MindFormerConfig
+from ds_utils import create_ptq, create_network
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import Qwen3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq import PTQMode
-from ds_utils import create_ptq, create_network
 
 
 def get_args():
@@ -101,8 +101,9 @@ if __name__ == "__main__":
     save_ckpt_path = os.path.join(helper.mf_config.output_dir, f"{model_name}_{uargs.approach}_safetensors")
     save_path = os.path.join(save_ckpt_path, f"rank_{rank_id}")
     os.makedirs(save_path, exist_ok=True)
+    choice_func = lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x
     ms.save_checkpoint(network.parameters_dict(), os.path.join(save_path, f"{uargs.approach}"),
-                       choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x,
+                       choice_func=choice_func,
                        format="safetensors")
     logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
     print(f'Checkpoint saved to {save_path}', flush=True)

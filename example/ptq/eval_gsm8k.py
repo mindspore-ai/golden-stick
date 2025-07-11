@@ -20,10 +20,10 @@ import re
 import math
 from decimal import Decimal, InvalidOperation
 import numpy as np
+from mindformers import MindFormerConfig
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_gsm8k_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
-from mindformers import MindFormerConfig
 
 
 def cal_acc_gsm8k(answer, res_data):

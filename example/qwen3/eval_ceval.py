@@ -41,7 +41,7 @@ def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
     total_count = ds.get_dataset_size()
     for _, ds_item in enumerate(ds.create_dict_iterator()):
         subject = ds_item['subjects'].asnumpy()[0]
-        if subject not in total_score.keys():
+        if subject not in total_score:
             total_score[subject] = {"correct nums": 0, "total nums": 0}
 
         data_count += 1
