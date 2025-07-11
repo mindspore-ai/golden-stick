@@ -20,12 +20,13 @@ import os
 import mindspore as ms
 import numpy as np
 
-q_lora_rank = 1536
-kv_lora_rank = 512
-qk_rope_head_dim = 64
+Q_LORA_RANK = 1536
+KV_LORA_RANK = 512
+QK_ROPE_HEAD_DIM = 64
+
 
 def trans_int8_to_int4(ckpt_path):
-    '''trans_int8_to_int4'''
+    """trans_int8_to_int4"""
     for folder_name in os.listdir(ckpt_path):
         if folder_name.endswith(".safetensors"):
             folder_path = os.path.join(ckpt_path, folder_name)
@@ -41,7 +42,7 @@ def trans_int8_to_int4(ckpt_path):
 
 
 def split_1_dim_w_gate_hidden(value, rank_num):
-    '''split_1_dim_w_gate_hidden'''
+    """split_1_dim_w_gate_hidden"""
     if len(value.shape) != 1:
         raise ValueError(f"value.shape:{value.shape} 's dim != 1.")
     if value.shape[0]%rank_num != 0:
@@ -55,7 +56,7 @@ def split_1_dim_w_gate_hidden(value, rank_num):
 
 
 def split_2_dim_w_gate_hidden(value, rank_num):
-    '''split_2_dim_w_gate_hidden'''
+    """split_2_dim_w_gate_hidden"""
     if len(value.shape) != 2:
         raise ValueError(f"value.shape:{value.shape} 's dim != 2.")
     if value.shape[0]%rank_num != 0:
@@ -69,32 +70,32 @@ def split_2_dim_w_gate_hidden(value, rank_num):
 
 
 def split_1_dim_qkv(value):
-    '''split_1_dim_qkv'''
+    """split_1_dim_qkv"""
     if len(value.shape) != 1:
         raise ValueError(f"value.shape:{value.shape} 's dim != 1.")
-    if value.shape[0] != q_lora_rank + kv_lora_rank + qk_rope_head_dim:
-        raise ValueError(f"value.shape[0]:{value.shape[0]} != {q_lora_rank + kv_lora_rank + qk_rope_head_dim}.")
-    q2l = value[:q_lora_rank]
-    kv2l = value[q_lora_rank:]
+    if value.shape[0] != Q_LORA_RANK + KV_LORA_RANK + QK_ROPE_HEAD_DIM:
+        raise ValueError(f"value.shape[0]:{value.shape[0]} != {Q_LORA_RANK + KV_LORA_RANK + QK_ROPE_HEAD_DIM}.")
+    q2l = value[:Q_LORA_RANK]
+    kv2l = value[Q_LORA_RANK:]
     return q2l, kv2l
 
 
 def split_2_dim_qkv(value):
-    '''split_2_dim_qkv'''
-    global kv_lora_rank
-    global q_lora_rank
-    global qk_rope_head_dim
+    """split_2_dim_qkv"""
+    global KV_LORA_RANK
+    global Q_LORA_RANK
+    global QK_ROPE_HEAD_DIM
     if len(value.shape) != 2:
         raise ValueError(f"value.shape:{value.shape} 's dim != 2.")
-    if value.shape[0] != q_lora_rank + kv_lora_rank + qk_rope_head_dim:
-        raise ValueError(f"value.shape[0]:{value.shape[0]} != {q_lora_rank + kv_lora_rank + qk_rope_head_dim}.")
-    q2l = value[:q_lora_rank, :]
-    kv2l = value[q_lora_rank:, :]
+    if value.shape[0] != Q_LORA_RANK + KV_LORA_RANK + QK_ROPE_HEAD_DIM:
+        raise ValueError(f"value.shape[0]:{value.shape[0]} != {Q_LORA_RANK + KV_LORA_RANK + QK_ROPE_HEAD_DIM}.")
+    q2l = value[:Q_LORA_RANK, :]
+    kv2l = value[Q_LORA_RANK:, :]
     return q2l, kv2l
 
 
 def split_routed_expert_2_dim_w_gate_hidden(value, rank_num):
-    '''split_routed_expert_2_dim_w_gate_hidden'''
+    """split_routed_expert_2_dim_w_gate_hidden"""
     if len(value.shape) != 2:
         raise ValueError(f"value.shape:{value.shape} 's dim != 2.")
     if value.shape[1]%rank_num != 0:
@@ -108,7 +109,7 @@ def split_routed_expert_2_dim_w_gate_hidden(value, rank_num):
 
 
 def split_3_dim_w_gate_hidden(value, rank_num):
-    '''split_3_dim_w_gate_hidden'''
+    """split_3_dim_w_gate_hidden"""
     if len(value.shape) != 3:
         raise ValueError(f"value.shape:{value.shape} 's dim != 3.")
     if value.shape[2]%rank_num != 0:
@@ -122,7 +123,7 @@ def split_3_dim_w_gate_hidden(value, rank_num):
 
 
 def process_feed_forward_w_gate_hidden(name, ori_param, rank_num):
-    '''process_feed_forward_w_gate_hidden'''
+    """process_feed_forward_w_gate_hidden"""
     if "matmul" in name:
         param_dtype = ori_param[name].dtype
         if param_dtype == ms.bfloat16:
@@ -156,10 +157,10 @@ def process_feed_forward_w_gate_hidden(name, ori_param, rank_num):
 
 
 def process_qkv_split(name, ori_param):
-    '''process_qkv_split'''
-    global kv_lora_rank
-    global q_lora_rank
-    global qk_rope_head_dim
+    """process_qkv_split"""
+    global KV_LORA_RANK
+    global Q_LORA_RANK
+    global QK_ROPE_HEAD_DIM
 
     if "matmul" in name:
         param_dtype = ori_param[name].dtype
@@ -205,7 +206,7 @@ def process_qkv_split(name, ori_param):
 
 
 def process_routed_experts_w_gate_hidden(name, ori_param, rank_num):
-    '''process_routed_experts_w_gate_hidden'''
+    """process_routed_experts_w_gate_hidden"""
     if "matmul" in name:
         param_dtype = ori_param[name].dtype
         if param_dtype == ms.bfloat16:
@@ -238,7 +239,7 @@ def process_routed_experts_w_gate_hidden(name, ori_param, rank_num):
 
 
 def split_for_smooth_quant(ckpt_path, rank_num, ffn_split, qkv_split):
-    '''trans_int8_to_int4'''
+    """trans_int8_to_int4"""
     for folder_name in os.listdir(ckpt_path):
         if folder_name.endswith(".safetensors"):
             folder_path = os.path.join(ckpt_path, folder_name)

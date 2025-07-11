@@ -27,14 +27,13 @@ from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.core.parallel_config import build_parallel_config
 from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
 
+from deepseekv3_weight_processor import DeepseekV3WeightProcessor
+from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
+from research.deepseek3.deepseek3_config import DeepseekV3Config
 from mindspore_gs.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery, \
     GPTQQuantConfig
-from deepseekv3_weight_processor import DeepseekV3WeightProcessor
-
-from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
-from research.deepseek3.deepseek3_config import DeepseekV3Config
 
 
 def create_ptq(quant_type: str, quant_mode: PTQMode):
