@@ -28,6 +28,7 @@ QUANT_DTYPE_NUM_BITS = {
 
 
 def np_int4data_pack_to_int8(np_data):
+    """Pack 2D int4 numpy data into int8 format."""
     np_data = np_data.astype(np.int8)
     np_data &= 0x000F
     np_data[::, 0::2] <<= 0
@@ -37,6 +38,7 @@ def np_int4data_pack_to_int8(np_data):
 
 
 def np_int4data_pack_to_int8_3d(np_data):
+    """Pack 3D int4 numpy data into int8 format."""
     np_data = np_data.astype(np.int8)
     np_data &= 0x000F
     np_data[::, ::, 0::2] <<= 0
@@ -46,6 +48,7 @@ def np_int4data_pack_to_int8_3d(np_data):
 
 
 def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
+    """Get the number of bits corresponding to a given QuantDtype."""
     if 0 <= quant_dtype.value() <= 15:
         return quant_dtype.value() + 1
     if 100 <= quant_dtype.value() <= 115:
@@ -97,6 +100,7 @@ def cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetri
         zp = ms.ops.round(zp_double).astype(msdtype.float64 if high_precision else msdtype.float32)
     return scale, zp
 
+
 def get_float_max_min(rank, tensor, min_op, max_op, quant_axis):
     """get_float_max_min"""
     if rank not in (2, 3):
@@ -116,11 +120,12 @@ def get_float_max_min(rank, tensor, min_op, max_op, quant_axis):
 
     return float_max, float_min
 
+
 def quant_tensor(tensor: Tensor, min_op, max_op, narrow_range, symmetric, need_group, group_size,
                  quant_dtype=msdtype.int8, quant_axis=-1, if_quant_data: bool = True, if_pesudo_quant: bool = False,
                  is_transpose: bool = True, high_precision_params=True):
     """quant_tensor"""
-    if quant_dtype not in QUANT_DTYPE_NUM_BITS.keys():
+    if quant_dtype not in QUANT_DTYPE_NUM_BITS:
         raise ValueError(f"Only support quant to {QUANT_DTYPE_NUM_BITS.keys()}, but got {quant_dtype}")
     num_bits = QUANT_DTYPE_NUM_BITS[quant_dtype]
 

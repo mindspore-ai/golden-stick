@@ -124,6 +124,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     dumper: Dumper = Dumper()
 
     def report_quant_info(self, layer_name: str, quant_type: str):
+        """report quant information"""
         info = self.layer_quant_info_collect.get(layer_name)
         if info:
             info += f"-{quant_type}"
@@ -132,6 +133,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
         self.layer_quant_info_collect[layer_name] = info
 
     def update_comm_info(self):
+        """update common information"""
         try:
             self.tp_size = get_group_size()
         except RuntimeError:
@@ -142,6 +144,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
             self.rank_id = 0
 
     def set_dump_path(self, dump_path: str):
+        """set dump path"""
         self.dumper.set_dump_path(dump_path)
 
     def __post_init__(self):
@@ -173,29 +176,39 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
 
     def _check_rtn(self):
         """_check_rtn"""
-        if self.approach is PTQApproach.RTN and self.act_quant_dtype == msdtype.int8 and self.act_quant_granularity is not QuantGranularity.PER_TOKEN:
-            raise ValueError(f"{self.approach} is not support act_quant_dtype == mindspore.dtype.int8 when act_quant_granularity is not QuantGranularity.PER_TOKEN.")
-        if self.approach is PTQApproach.RTN and self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
-            raise ValueError(f"weight_quant_dtype and kvcache_quant_dtype are None, {self.approach} can't take effect.")
-        if self.approach is PTQApproach.RTN and self.weight_quant_dtype == msdtype.int8 and self.kvcache_quant_dtype == msdtype.int8 \
-                        and self.kvcache_quant_granularity is not QuantGranularity.PER_TOKEN:
-            raise ValueError("when self.kvcache_quant_granularity not QuantGranularity.PER_TOKEN, weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, "
-                             f"{self.approach} isn't supported.")
-        if self.approach is PTQApproach.RTN and self.kvcache_quant_dtype == msdtype.int8:
-            raise ValueError("The 'kvcache-int8' quant in RTN is deprecated. Please replace the value of the 'approach' parameter with 'PTQ'.")
+        if self.approach is PTQApproach.RTN:
+            if self.act_quant_dtype == msdtype.int8 and self.act_quant_granularity is not QuantGranularity.PER_TOKEN:
+                raise ValueError(f"{self.approach} is not support act_quant_dtype == mindspore.dtype.int8 "
+                                 "when act_quant_granularity is not QuantGranularity.PER_TOKEN.")
+            if self.weight_quant_dtype is None and self.kvcache_quant_dtype is None:
+                raise ValueError("weight_quant_dtype and kvcache_quant_dtype are None, "
+                                 f"{self.approach} can't take effect.")
+            if self.weight_quant_dtype == msdtype.int8 and self.kvcache_quant_dtype == msdtype.int8 \
+                            and self.kvcache_quant_granularity is not QuantGranularity.PER_TOKEN:
+                raise ValueError("when self.kvcache_quant_granularity not QuantGranularity.PER_TOKEN, "
+                                 "weight_quant_dtype and kvcache_quant_dtype are mindspore.dtype.int8, "
+                                 f"{self.approach} isn't supported.")
+            if self.kvcache_quant_dtype == msdtype.int8:
+                raise ValueError("The 'kvcache-int8' quant in RTN is deprecated."
+                                 "Please replace the value of the 'approach' parameter with 'PTQ'.")
 
     def _check_quant_granularity(self):
         """_check_quant_granularity"""
-        if self.approach is PTQApproach.RTN and (self.act_quant_granularity is QuantGranularity.PER_TOKEN or \
-                                                 self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN) and self.mode is PTQMode.QUANTIZE:
-            raise ValueError("self.mode is PTQMode.QUANTIZE, self.act_quant_granularity is QuantGranularity.PER_TOKEN or "
-                             f"self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, {self.approach} can't take effect.")
-        if (self.act_quant_granularity is QuantGranularity.PER_TOKEN or self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN) and \
-            self.approach is not PTQApproach.RTN and self.approach is not PTQApproach.PTQ:
+        is_per_token = (
+            self.act_quant_granularity is QuantGranularity.PER_TOKEN
+            or self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN
+        )
+        if self.approach is PTQApproach.RTN and is_per_token and self.mode is PTQMode.QUANTIZE:
+            raise ValueError("self.mode is PTQMode.QUANTIZE, self.act_quant_granularity is QuantGranularity.PER_TOKEN "
+                             "or self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, "
+                             f"{self.approach} can't take effect.")
+        if is_per_token and self.approach is not PTQApproach.RTN and self.approach is not PTQApproach.PTQ:
             raise ValueError("self.act_quant_granularity is QuantGranularity.PER_TOKEN or "
-                             f"self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, {self.approach} can't take effect.")
+                             "self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN, "
+                             f"{self.approach} can't take effect.")
         if self.act_quant_granularity is QuantGranularity.PER_TOKEN and self.weight_symmetric is False:
-            raise ValueError("when self.act_quant_granularity is QuantGranularity.PER_TOKEN, self.weight_symmetric must be True.")
+            raise ValueError("when self.act_quant_granularity is QuantGranularity.PER_TOKEN, "
+                             "self.weight_symmetric must be True.")
 
     def _parse_dict(self):
         """ parse data class to readable dicts"""

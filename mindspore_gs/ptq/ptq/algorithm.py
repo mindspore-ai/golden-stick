@@ -56,6 +56,7 @@ class Algorithm:
         return new_config
 
     def target_layer_type(self) -> tuple:
+        """target layer type"""
         raise NotImplementedError
 
     def get_layer_policy(self, layer_name) -> InnerPTQConfig:
