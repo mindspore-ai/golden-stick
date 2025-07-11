@@ -98,6 +98,7 @@ class Logger:
         return level_map.get(os.environ.get("GSLOG", "2"), logging.WARNING)
 
     def set_level(self, level):
+        """set_level"""
         self.logger.setLevel(level)
         for handler in self.logger.handlers:
             handler.setLevel(level)
@@ -159,15 +160,19 @@ class Logger:
 
     # Public logging methods
     def debug(self, msg, *args, **kwargs):
+        """debug"""
         self._log(logging.DEBUG, msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
+        """info"""
         self._log(logging.INFO, msg, *args, **kwargs)
 
     def warning(self, msg, *args, **kwargs):
+        """warning"""
         self._log(logging.WARNING, msg, *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
+        """error"""
         self._log(logging.ERROR, msg, *args, **kwargs)
 
 

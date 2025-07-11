@@ -14,8 +14,8 @@
 # ============================================================================
 """Network helper for network from MindFormers."""
 
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from LRD import LRD
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 
 
 class LRDDeployMFParallelLlama2Helper(MFParallelLlama2Helper):

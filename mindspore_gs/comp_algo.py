@@ -215,6 +215,7 @@ class CompAlgo(abc.ABC):
         if not isinstance(network, Cell):
             raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")
         results = []
+
         def process(root: Cell, name_prefix):
             """Iterate the whole network and call callback function `process_cell`."""
             if root is None:

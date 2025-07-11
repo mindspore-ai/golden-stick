@@ -33,10 +33,12 @@ from mindspore_gs.long_context_compress.processor import (
     Processor,
     network_replace)
 from mindspore_gs.long_context_compress.razor_attention.ra_config import RAMode, RAConfig
-from mindspore_gs.long_context_compress.razor_attention.wrappers.vllm_mindspore import DeployRACompressCell, RACompressCell
+from mindspore_gs.long_context_compress.razor_attention.wrappers.vllm_mindspore import (
+    DeployRACompressCell, RACompressCell)
 
 DUMMY_INPUT_LENGTH = 2500
 REPET_TIMES = 4
+
 
 class RazorAttention(CompAlgo):
     """RazorAttention algorithm"""
@@ -88,12 +90,15 @@ class RazorAttention(CompAlgo):
             A list of tuples (cell_name, `Cell`) as attention layers of network.
         """
         value_check('network', network, Cell)
+
         class NetworkWalker(Processor):
+            """NetworkWalker"""
             def __init__(self, attention_layer_types_):
                 self.layers = []
                 self._attention_layer_types = attention_layer_types_
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                """"process_cell"""
                 if isinstance(cell, self._attention_layer_types):
                     self.layers.append((cell_name, cell))
                     return cell, True

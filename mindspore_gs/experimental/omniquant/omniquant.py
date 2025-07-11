@@ -1,3 +1,17 @@
+# Copyright 2024 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
 """OmniQuant algorithm."""
 import argparse
 import gc
@@ -23,6 +37,7 @@ def get_args():
     print(f"-------------------------------------------------quant args: {args}", flush=True)
     return args
 
+
 def _set_config(config_path, device_id):
     """setup MindFormerConfig"""
     mfconfig = MindFormerConfig(config_path)
@@ -37,6 +52,7 @@ def _set_config(config_path, device_id):
     mfconfig.model.model_config.checkpoint_name_or_path = mfconfig.load_checkpoint
     print(mfconfig)
     return mfconfig
+
 
 def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt_path=""):
     """Create mindformers config for llama2 network for example."""
@@ -53,14 +69,15 @@ def create_mfconfig(config_path, device_id, bs, seq_len, tokenizer_path="", ckpt
     config.model.model_config.checkpoint_name_or_path = ckpt_path
     return config
 
+
 def apply(net: Cell) -> Cell:
     """Apply"""
     op_types = [nn.Dense, nn.Conv2d, Linear]
+
     def _replace(root: Cell):
         if root is None:
             return
         for name, cell in root.name_cells().items():
-            # if type(cell) in op_types:
             if isinstance(cell, tuple(op_types)):
                 cell_wrapper = OQLinearWrapper(cell)
                 root.insert_child_to_cell(name, cell_wrapper)
@@ -88,7 +105,6 @@ def calibrate(model, tokenizer_: LlamaTokenizer, max_length, prompts):
         fpin = h
         quantin = h
         for i in range(model.num_layers):
-            # print(f'num_layers的值为{i}')
             layer = model.layers[i]
             all_params1 = layer.get_parameters()
             all_params2 = layer.get_parameters()
@@ -182,6 +198,7 @@ def calibrate(model, tokenizer_: LlamaTokenizer, max_length, prompts):
             del logits
             gc.collect()
 
+
 def omniquant(model, tokernizer=None, max_length=None, prompts=None):
     """omniquant"""
     qnet = apply(model)
@@ -195,7 +212,6 @@ def omniquant(model, tokernizer=None, max_length=None, prompts=None):
 
 if __name__ == "__main__":
     uargs = get_args()
-    # context.set_context(device_target="Ascend", mode=ms.GRAPH_MODE, device_id=uargs.device_id)
     cfg = create_mfconfig(uargs.config_path, uargs.device_id, 1, 512, ckpt_path=uargs.fp_ckpt_path)
     network = LlamaForCausalLM(cfg.model.model_config)
     tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
