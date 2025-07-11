@@ -23,10 +23,10 @@ from mindspore.common.initializer import initializer
 from mindspore import Tensor
 from mindspore.ops import Svd
 import mindspore.nn as nn
+from mindformers.experimental.infer.core import RowParallelLinear, ColumnParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.ptq.processor import Processor
-from mindformers.experimental.infer.core import RowParallelLinear, ColumnParallelLinear
 
 
 class DoubleMM(nn.Cell):

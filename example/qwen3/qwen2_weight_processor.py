@@ -23,7 +23,6 @@ import numpy as np
 from tqdm import tqdm
 from safetensors import safe_open
 import mindspore as ms
-# from mindspore.communication.management import get_rank
 
 from weight_processor import BaseWeightProcessor
 
@@ -237,7 +236,7 @@ class Qwen2WeightProcessor(BaseWeightProcessor):
 
     def load_safetensors_shard(self, src_hf_dir):
         """qwen load safetensors and shard """
-        rank_id = 0 #get_rank()
+        rank_id = 0 # get_rank()
         param_json_path = ""
         for file in os.listdir(src_hf_dir):
             if file.endswith('index.json'):

@@ -47,7 +47,6 @@ class BaseDataset:
                 self.tokenizer.add_eos_token = True
         self.input_ids = []
         self.labels = []
-        # self._load()
         self.iter_input_ids = None
         self.iter_labels = None
 

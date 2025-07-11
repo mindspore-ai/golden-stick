@@ -19,15 +19,16 @@ from mindspore import ops, mint
 from mindspore.nn import Cell
 from mindspore.ops.auto_generate import ReshapeAndCache, PagedAttention
 
-from mindspore_gs.common import logger
-from mindspore_gs.long_context_compress.razor_attention import RAConfig
-
 from vllm.attention import Attention
 from vllm.attention.backends.abstract import AttentionType, AttentionMetadata
+
+from mindspore_gs.common import logger
+from mindspore_gs.long_context_compress.razor_attention import RAConfig
 
 
 DUMMY_INPUT_LENGTH = 2500
 REPET_TIMES = 4
+
 
 class RACompressCell(Cell):
     """razor attention compress kvcache"""
@@ -49,7 +50,7 @@ class RACompressCell(Cell):
     def _calc_attn_score(self):
         "_calc_attn_score"
         query, key, value = self.attn_inputs_args[0:3]
-        
+
         seq_len = query.shape[-2]
         query = ops.transpose(query.reshape(-1, seq_len, self.num_heads, self.head_size), (0, 2, 1, 3))
         key = ops.transpose(key.reshape(-1, seq_len, self.num_kv_heads, self.head_size), (0, 2, 1, 3))
@@ -59,8 +60,8 @@ class RACompressCell(Cell):
         value = self._repeat_kv(value, self.kv_groups)
 
         attn_score = self._attn_dot_product(query, key)
-        logger.debug(f"RACompressCell: attn_score of Layer({self.layer_name}) is {{{attn_score.shape}, {attn_score.dtype}, "
-                     f"{attn_score.asnumpy()}}}")
+        logger.debug(f"RACompressCell: attn_score of Layer({self.layer_name}) is {{{attn_score.shape},"
+                     f" {attn_score.dtype}, {attn_score.asnumpy()}}}")
         return attn_score
 
     def _repeat_kv(self, x, rep):
@@ -124,7 +125,8 @@ class RACompressCell(Cell):
             self._echo_score.append(echo_score)
             self._induction_score.append(induction_score)
             logger.debug(f"RACompressCell: echo_score of Layer({self.layer_name}) head [{i}] is {echo_score.asnumpy()}")
-            logger.debug(f"RACompressCell: induction_score of Layer({self.layer_name}) head [{i}] is {induction_score.asnumpy()}")
+            logger.debug(f"RACompressCell: induction_score of Layer({self.layer_name}) head [{i}] is "
+                         f"{induction_score.asnumpy()}")
 
     def _max_every_group(self, data, n):
         "_max_every_group"
@@ -143,6 +145,7 @@ class RACompressCell(Cell):
         logger.debug(f"RACompressCell: induction_score of Layer({self.layer_name}) is {self._induction_score}")
 
     def construct(self, *args, **kwargs):
+        """construct"""
         # 获取attn的输入，用于计算attn_score
         if not self.attn_inputs_args:
             self.attn_inputs_args = args
@@ -177,7 +180,7 @@ class DeployRACompressCell(Cell):
     def _load_retrieval_head(self, retrieval_head):
         self.kv_retri_heads = retrieval_head
         self.kv_non_retri_heads = [i for i in range(self.layer.num_kv_heads) if i not in self.kv_retri_heads]
-        self.q_retri_heads = [i for h in self.kv_retri_heads for i in range(h * self.num_kv_group, 
+        self.q_retri_heads = [i for h in self.kv_retri_heads for i in range(h * self.num_kv_group,
                                                                             (h+1) * self.num_kv_group)]
         self.q_non_retri_heads = [i for h in self.kv_non_retri_heads for i in range(h * self.num_kv_group,
                                                                                     (h+1) * self.num_kv_group)]
@@ -212,6 +215,7 @@ class DeployRACompressCell(Cell):
         attn_metadata: AttentionMetadata,
         attn_type: str = AttentionType.DECODER,
     ):
+        """construct"""
         query = query.reshape((-1, self.layer.num_heads, self.layer.head_size))
         key = key.reshape((-1, self.layer.num_kv_heads, self.layer.head_size))
         value = value.reshape((-1, self.layer.num_kv_heads, self.layer.head_size))
@@ -234,7 +238,7 @@ class DeployRACompressCell(Cell):
             # we still need to break out key_cache and value_cache
             # i.e. for later use by paged attention
             key_cache_retri, value_cache_retri, key_cache_non_retri, value_cache_non_retri = \
-                self.split_kv_cache(kv_cache, self.layer.num_kv_heads, 
+                self.split_kv_cache(kv_cache, self.layer.num_kv_heads,
                                           self.layer.head_size)
 
             if (key is not None) and (value is not None):
@@ -298,7 +302,7 @@ class DeployRACompressCell(Cell):
             self.apply_decoder_num += 1
             (
                 seq_lens_arg,
-                max_seq_len_arg,
+                _,
                 block_tables_arg,
             ) = decode_meta.get_seq_len_block_table_args(attn_type)
 
@@ -316,13 +320,11 @@ class DeployRACompressCell(Cell):
         return output
 
     def _run_decode_attention(
-        self, query, key_cache_retri, value_cache_retri, 
-        key_cache_non_retri, value_cache_non_retri, 
+        self, query, key_cache_retri, value_cache_retri,
+        key_cache_non_retri, value_cache_non_retri,
         seq_lens_arg, block_tables, alibi_mask=None
     ):
         # TODO: to support alibi mask
-        # if self.use_alibi_mask:
-        #     return self.paged_attention(query, key_cache, value_cache, batch_valid_length, block_tables, alibi_mask)
 
         bsz = block_tables.shape[0]
         seq_len = query.shape[0]
@@ -361,8 +363,8 @@ class DeployRACompressCell(Cell):
         num_kv_heads: int,
         head_size: int,
     ):
+        """split_kv_cache"""
         # TODO: to support view operation on mindspore.
-        # num_blocks = kv_cache.shape[1]
 
         key_cache_retri = kv_cache[0]
         value_cache_retri = kv_cache[1]

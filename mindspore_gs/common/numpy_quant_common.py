@@ -16,6 +16,7 @@
 
 import numpy as np
 
+
 class NumpyQuantOps:
     """
     numpy quant ops for test.
@@ -72,6 +73,7 @@ class NumpyQuantOps:
         i64_scale_deq = ui32_scale_deq.astype(np.int64)
         return i64_scale_deq.tolist()
 
+
 class NumpyFullQuant:
     """full quant process using numpy"""
     def __init__(self,
@@ -83,6 +85,7 @@ class NumpyFullQuant:
         self.act_offset = act_offset
 
     def process(self, activation, weight, bias):
+        """process"""
         quant_act = NumpyQuantOps.quant(activation, self.act_scale, self.act_offset)
         quant_weight = NumpyQuantOps.quant(weight, self.weight_scale, 0)
         quant_bias = (bias / (self.act_scale * self.weight_scale)).astype(np.int32)
@@ -91,5 +94,7 @@ class NumpyFullQuant:
         dequant_result = quant_result * self.act_scale * self.weight_scale
         return dequant_result
 
-    def orin_process(self, activation, weight, bias):
+    @staticmethod
+    def orin_process(activation, weight, bias):
+        """orin_process"""
         return np.matmul(activation, weight) +  bias

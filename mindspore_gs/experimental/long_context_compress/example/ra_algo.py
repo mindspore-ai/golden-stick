@@ -18,10 +18,14 @@ import argparse
 from mindspore_gs.long_context_compress.razor_attention import RAMode, RAConfig
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.long_context_compress.razor_attention import RazorAttention as RA
+
+
 def get_args():
+    """get_args"""
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', '-m', type=str, required=True)
     return parser.parse_args()
+
 
 class LLMNetworkHelper:
     """LLMNetworkHelper"""
@@ -33,17 +37,22 @@ class LLMNetworkHelper:
         self._create_llm()
 
     # pylint: disable=W0611
-    def _load_vllm_ms_plugin(self):
+    @staticmethod
+    def _load_vllm_ms_plugin():
+        """_load_vllm_ms_plugin"""
         import vllm_mindspore
 
     def _create_llm(self):
+        """_create_llm"""
         from vllm import LLM
         self.llm = LLM(model=self.model_path, max_model_len=31500)
 
     def get_network(self):
+        """get_network"""
         return self.llm.llm_engine.model_executor.driver_worker.model_runner.model
 
     def generate(self, *args, **kwargs):
+        """generate"""
         from vllm import SamplingParams
         sampling_params = SamplingParams(temperature=0.0, top_p=0.95, max_tokens=1)
         outputs = self.llm.generate(sampling_params=sampling_params, *args, **kwargs)

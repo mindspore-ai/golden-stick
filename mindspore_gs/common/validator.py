@@ -14,9 +14,9 @@
 # ============================================================================
 """Validator for check validation of input argument."""
 
+__all__ = ["Validator", "Rel", "twice"]
+
 #pylint: disable=W0404
 from mindspore import _checkparam as Validator
 from mindspore import _checkparam as Rel
 from mindspore._checkparam import twice
-
-__all__ = ["Validator", "Rel", "twice"]
