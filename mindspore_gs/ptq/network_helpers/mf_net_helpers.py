@@ -96,8 +96,24 @@ class MFNetworkHelper(NetworkHelper):
         """
         Get network tokenizer.
 
+        Args:
+            kwargs (Dict): Extensible parameter for subclasses.
+
         Returns:
             Object as network tokenizer.
+
+        Examples:
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> helper.create_tokenizer()
+            LlamaTokenizer(name_or_path='', vocab_size=32000, model_max_length=100000,  added_tokens_decoder={
+                0: AddedToken("<unk>", rstrip=False, lstrip=False, normalized=True, special=True),
+                1: AddedToken("<s>", rstrip=False, lstrip=False, normalized=True, special=True),
+                2: AddedToken("</s>", rstrip=False, lstrip=False, normalized=True, special=True),
+            })
         """
         return build_tokenizer(self.mf_config.processor.tokenizer)
 
@@ -108,13 +124,28 @@ class MFNetworkHelper(NetworkHelper):
         Invoke `network` and generate tokens.
 
         Args:
-            mf_network (Cell): Network to generate tokens.
+            network (Cell): Network to generate tokens.
             input_ids (numpy.ndarray): Input tokens for generate.
-            max_new_tokens (int): Max number of tokens to be generated, default ``1``.
+            max_new_tokens (int): Max number of tokens to be generated, default 1.
             kwargs (Dict): Extensible parameter for subclasses.
 
         Returns:
             A list as generated tokens.
+
+        Examples:
+            >>> import numpy as np
+            >>> from mindspore import context
+            >>> from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
+            >>> from mindformers import LlamaForCausalLM, LlamaConfig
+            >>> from mindformers.tools.register.config import MindFormerConfig
+            >>> context.set_context(mode=context.GRAPH_MODE, device_target="Ascend")
+            >>> mf_yaml_config_file = "/path/to/mf_yaml_config_file"
+            >>> mfconfig = MindFormerConfig(mf_yaml_config_file)
+            >>> helper = MFLlama2Helper(mfconfig)
+            >>> network = LlamaForCausalLM(LlamaConfig(**mfconfig.model.model_config))
+            >>> input_ids = np.array([[1, 10000]], dtype = np.int32)
+            >>> helper.generate(network, input_ids)
+            array([[    1, 10000, 10001]], dtype=int32)
         """
         value_check('mf_network', mf_network, PreTrainedModel)
         value_check('input_ids', input_ids, (np.ndarray, List))
@@ -246,8 +277,8 @@ class MFParallelLlama2Helper(MFLlama2Helper):
         try:
             # pylint: disable=unused-import
             from research.llama3_1.llama import ParallelLlamaForCausalLM
-        except ImportError:
-            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.')
+        except ImportError as e:
+            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.') from e
 
     def _load_ckpt(self, network):
         """_load_ckpt"""
@@ -284,8 +315,8 @@ class MFParallelTeleChat2Helper(MFParallelLlama2Helper):
         try:
             from research.telechat2.infer.telechat import ParallelTelechatForCausalLM
             from research.telechat2.telechat_config import TelechatConfig
-        except ImportError:
-            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.')
+        except ImportError as e:
+            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.') from e
         build_context(self.mf_config)
         model_config = TelechatConfig(**self.mf_config.model.model_config)
         with no_init_parameters():
@@ -315,8 +346,8 @@ class MFDSV3Helper(MFNetworkHelper):
         try:
             from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
             from research.deepseek3.deepseek3_config import DeepseekV3Config
-        except ImportError:
-            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.')
+        except ImportError as e:
+            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.') from e
         build_context(self.mf_config)
         model_config = DeepseekV3Config(**self.mf_config.model.model_config)
         network = DeepseekV3ForCausalLM(model_config)

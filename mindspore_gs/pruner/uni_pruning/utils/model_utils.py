@@ -47,6 +47,7 @@ def get_model_size(groups, layer_mask):
                 size += (shape[0] - layer_mask[layer]['cout']) * 4
     return size
 
+
 def get_layer_type(layer):
     """
     Get layer type as a string.
@@ -59,6 +60,7 @@ def get_layer_type(layer):
         return 'bn'
 
     return 'unused_type'
+
 
 def save_model_and_mask(net, output_path, exp_name, cur_step_num,
                         input_size, device_target, save_model=True, mask=None, export_air=False):
@@ -86,6 +88,7 @@ def save_model_and_mask(net, output_path, exp_name, cur_step_num,
         with open(mask_save_path, 'w+', encoding='utf8') as file_path:
             json.dump(save_mask, file_path, indent=3)
 
+
 def load_model(output_path, exp_name, cur_step_num, input_size, dtype):
     """
     Load mindir model.
@@ -95,6 +98,7 @@ def load_model(output_path, exp_name, cur_step_num, input_size, dtype):
     net = nn.GraphCell(graph)
     fake_input = Tensor(np.ones(input_size).astype(np.float32), dtype)
     logger.info(f"Pruned MINDIR output shape {net(fake_input).shape}")
+
 
 def find_ms_cell(groups, key):
     """

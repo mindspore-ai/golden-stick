@@ -34,6 +34,7 @@ class Quantizer(Algorithm):
 
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
+        """register layer map"""
         if not issubclass(quant_layer_type, WrapperCell):
             raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {quant_layer_type}.")
@@ -44,6 +45,7 @@ class Quantizer(Algorithm):
 
     @staticmethod
     def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+        """get wrapper layer"""
         wrappers = Quantizer.layer_map.get(layer_type)
         if not wrappers:
             return None

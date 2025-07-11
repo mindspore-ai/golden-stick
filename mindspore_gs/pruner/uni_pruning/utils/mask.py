@@ -44,6 +44,7 @@ def get_mask(groups, norms, step, filter_num_threshold, target_sparsity):
 
     return mask
 
+
 def get_expanded_mask(groups, mask):
     """
     Expand mask, for each layer count the number of zeroed output/input channels,
@@ -76,6 +77,7 @@ def get_expanded_mask(groups, mask):
                 passed[group] = True
                 break
     return layer_mask
+
 
 def do_mask(groups, mask):
     """

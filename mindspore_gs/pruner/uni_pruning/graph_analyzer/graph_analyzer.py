@@ -25,6 +25,7 @@ from .equichannel_group import prunable_layers
 # pylint: disable=protected-access
 # pylint: disable=broad-except
 
+
 class GraphAnalyzer:
     """
     Class for model's computational graph analysis. It parses the computation graph, find groups of
