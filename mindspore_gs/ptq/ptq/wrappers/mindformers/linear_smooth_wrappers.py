@@ -527,6 +527,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         return msops.ReduceStd()(x)
 
     def xrange(self, x, minop, maxop):
+        """xrange"""
         xmax = msops.abs(maxop(x)[0].reshape(-1)).asnumpy()
         xmin = msops.abs(minop(x)[0].reshape(-1)).asnumpy()
         norm = np.maximum(xmax, xmin)
@@ -534,6 +535,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         return norm / std
 
     def check_xrange(self, xold, xnew):
+        """check_xrange"""
         range_old = self.xrange(xold, self.x_quant_min, self.x_quant_max)
         range_new = self.xrange(xnew, self.x_quant_min, self.x_quant_max)
         logger.info(f"Range of {self.layer_name} before {range_old}, after {range_new}")
@@ -999,6 +1001,7 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
         return y
 
     def get_shift_values_for_channel(self, x):
+        """get_shift_values_for_channel"""
         max_values = msops.ReduceMax()(x, axis=0)
         min_values = msops.ReduceMin()(x, axis=0)
         return (max_values + min_values) / 2
