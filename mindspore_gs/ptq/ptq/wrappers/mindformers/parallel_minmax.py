@@ -26,6 +26,7 @@ class MinFromTensorParallelRegion(nn.Cell):
         self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group())
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
+        """construct"""
         output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
         output = self.all_reduce(output_parallel)
         return output, _
@@ -38,6 +39,7 @@ class MaxFromTensorParallelRegion(nn.Cell):
         self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group())
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
+        """construct"""
         output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
         output = self.all_reduce(output_parallel)
         return output, _
@@ -50,12 +52,14 @@ class SumFromTensorParallelRegion(nn.Cell):
         self.all_reduce = msops.AllReduce(op=msops.ReduceOp.SUM, group=get_tensor_model_parallel_group())
 
     def construct(self, input_, axis=None, keepdims=False, *, dtype=None):
+        """construct"""
         output_parallel = msops.sum(input_, axis, keepdims, dtype=dtype)
         output = self.all_reduce(output_parallel)
         return output
 
 
 def get_smooth_x_obs_min_max_op():
+    """get_smooth_x_obs_min_max_op"""
     return msops.max, msops.min
 
 
@@ -72,6 +76,7 @@ def get_min_max_op(tensor_parallel, is_split):
 
 
 def get_w_sum_op(tensor_parallel, is_split):
+    """get_w_sum_op"""
     need_comm = tensor_parallel is not None and tensor_parallel > 1
     if need_comm and is_split:
         return SumFromTensorParallelRegion()

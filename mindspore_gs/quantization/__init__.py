@@ -16,11 +16,11 @@
 MindSpore golden stick quantization module.
 """
 
+from .simulated_quantization import SimulatedQuantizationAwareTraining
+from .slb import SlbQuantAwareTraining
 from ..version import __version__, mindspore_version_check
 mindspore_version_check()
 
-from .simulated_quantization import SimulatedQuantizationAwareTraining
-from .slb import SlbQuantAwareTraining
 
 __all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining"]
 __all__.extend(__version__)

@@ -23,6 +23,7 @@ from mindspore_gs.ptq.context import InnerPTQConfig
 
 class Checker:
     def check(self, config: InnerPTQConfig):
+        """check"""
         raise NotImplementedError
 
 
@@ -62,6 +63,7 @@ class WrapperCell(abc.ABC, Cell):
         return self._layer_name
 
     def process(self):
+        """process"""
         if not self.samples:
             raise RuntimeError(f"Please catch matmul inputs before quantization.")
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)

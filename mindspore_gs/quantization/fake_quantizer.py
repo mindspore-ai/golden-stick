@@ -51,6 +51,7 @@ class FakeQuantizer(Cell):
 
     @abc.abstractmethod
     def name(self) -> str:
+        """name"""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -59,10 +60,12 @@ class FakeQuantizer(Cell):
 
     @abc.abstractmethod
     def is_per_channel(self) -> bool:
+        """is_per_channel"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def quant_params(self) -> dict:
+        """quant_params"""
         raise NotImplementedError
 
     def set_attr(self, key, value):
@@ -93,6 +96,7 @@ class LinearFakeQuantizer(FakeQuantizer):
         return FakeQuantParam.attr_value_linear_quant_algo_name
 
     def foo_init(self):
+        """foo_init"""
         raise NotImplementedError
 
     @abc.abstractmethod
