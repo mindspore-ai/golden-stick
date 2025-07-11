@@ -21,15 +21,15 @@ import tqdm
 from mindspore.nn import Cell
 from mindspore import Tensor, mint, ops
 
-from mindspore_gs.common.utils import offload_network, value_check
-from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq.quant import InputCatcher
-
 from research.deepseek3.infer.norm import RMSNorm
 from research.deepseek3.infer.layers import ColumnParallelLinear
 from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
 from ds_utils import create_network
+
+from mindspore_gs.common.utils import offload_network, value_check
+from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.common import logger
+from mindspore_gs.ptq.ptq.quant import InputCatcher
 
 
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']

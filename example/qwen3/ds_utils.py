@@ -25,14 +25,13 @@ from mindformers import MindFormerConfig
 from mindformers import build_context, LlamaConfig
 from mindformers.trainer.utils import transform_and_load_checkpoint
 from mindformers.core.parallel_config import build_parallel_config
-
+from research.qwen3.qwen3 import ParallelQwen3ForCausalLM
+from transformers import AutoTokenizer
+from qwen3_weight_processor import Qwen3WeightProcessor
+from qwen3_sq_weight_processor import Qwen3SQWeightProcessor
 from mindspore_gs.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType, QuantGranularity, PrecisionRecovery
-from qwen3_weight_processor import Qwen3WeightProcessor
-from qwen3_sq_weight_processor import Qwen3SQWeightProcessor
-from research.qwen3.qwen3 import ParallelQwen3ForCausalLM
-from transformers import AutoTokenizer
 
 
 def create_ptq(quant_type: str, quant_mode: PTQMode):
