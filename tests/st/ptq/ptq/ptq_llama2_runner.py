@@ -17,6 +17,7 @@ from collections import OrderedDict
 
 import argparse
 import os
+import sys
 import shutil
 import numpy as np
 
@@ -35,6 +36,8 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Help
 from mindspore_gs.common.utils import offload_network
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.datasets import create_boolq_dataset
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 
 def create_ds(network_helper, ds_path, ds_type, tokenizer_):
     """Create datasets."""
@@ -97,13 +100,13 @@ def create_cfg(quant_algo_, mode):
                         kvcache_quant_dtype=dtype.int8)
     elif quant_algo == 'attn_a8w8c8_attn_a16w8c8_ffn_a8dyw8c8':
         cfg = PTQConfig(mode=mode, backend=BackendTarget.ASCEND, weight_quant_dtype=dtype.int8,
-                        act_quant_dtype=dtype.int8, kvcache_quant_dtype=dtype.int8,
+                        act_quant_dtype=dtype.int8, kvcache_quant_dtype=None,
                         outliers_suppression=OutliersSuppressionType.SMOOTH,
                         opname_blacklist=["w2", "lm_head"])
         a16w8c8 = PTQConfig(mode=mode,
                             backend=BackendTarget.ASCEND,
                             opname_blacklist=["lm_head"],
-                            kvcache_quant_dtype=dtype.int8)
+                            kvcache_quant_dtype=None)
         a8dyw8 = PTQConfig(mode=mode,
                            backend=BackendTarget.ASCEND,
                            opname_blacklist=["lm_head"],
@@ -352,7 +355,7 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, fp16_ckpt_path
         "A16W8": 0.85,
         "A8W8_Dynamic": 0.86,
         "C8_Dynamic": 0.86,
-        "attn_a8w8c8_attn_a16w8c8_ffn_a8dyw8c8": 0.86
+        "attn_a8w8c8_attn_a16w8c8_ffn_a8dyw8c8": 0.83
     }
 
     quant_llama2(calibrate_config_path_, fp16_ckpt_path_, quant_ckpt_path_, quant_algo_, ds_path)

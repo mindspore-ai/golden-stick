@@ -18,7 +18,7 @@ import json
 import time
 from functools import partial
 from typing import Tuple
-import random
+import secrets
 import tqdm
 
 from mindspore.nn import Cell
@@ -130,8 +130,8 @@ class RazorAttention(CompAlgo):
 
         logger.info("Using random input to eval...")
         start_time = time.time()
-        random.seed(2025)
-        prompt_token_ids = [random.randint(10000, 10000+DUMMY_INPUT_LENGTH) \
+        secrets_gen = secrets.SystemRandom()
+        prompt_token_ids = [secrets_gen.randint(10000, 10000+DUMMY_INPUT_LENGTH) \
                             for _ in range(DUMMY_INPUT_LENGTH)]*REPET_TIMES
         bos_token_id = net_helper.llm.llm_engine.get_model_config().hf_config.bos_token_id
         prompt_token_ids.insert(0, bos_token_id)

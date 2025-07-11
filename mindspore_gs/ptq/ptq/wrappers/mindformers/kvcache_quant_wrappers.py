@@ -24,7 +24,6 @@ from mindspore.ops.auto_generate import DynamicQuantExt, KVCacheScatterUpdate
 from mindspore.common.initializer import initializer, Zero
 from mindspore.nn import Cell
 
-from mindformers.experimental.infer.core.parallel_paged_attention_mgr import ParallelPagedAttentionMgr
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
 from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_world_size
 
@@ -42,13 +41,18 @@ class QuantPageAttentionMgrCell(WrapperCell):
 
     @staticmethod
     def reg_self():
+        """reg_self"""
         class KVCacheInt8(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.kvcache_quant_dtype == dtype.int8 and config.kvcache_quant_granularity == \
                         QuantGranularity.PER_CHANNEL
 
         Quantizer.reg_layer_map(PagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
-        Quantizer.reg_layer_map(ParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
+        try:
+            from research.llama3_1.infer.parallel_paged_attention_mgr import LlameParallelPagedAttentionMgr
+            Quantizer.reg_layer_map(LlameParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
+        except ImportError:
+            pass
 
     def __init__(self, linear_name, layer, context: InnerPTQConfig, cfg, **kwargs):
         super().__init__(linear_name, layer, cfg, context, **kwargs)
@@ -177,13 +181,18 @@ class DynamicQuantPageAttentionMgrCell(WrapperCell):
 
     @staticmethod
     def reg_self():
+        """reg_self"""
         class KVCacheInt8(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.kvcache_quant_dtype == dtype.int8 and config.kvcache_quant_granularity == \
                         QuantGranularity.PER_TOKEN
 
         Quantizer.reg_layer_map(PagedAttentionMgr, DynamicQuantPageAttentionMgrCell, KVCacheInt8())
-        Quantizer.reg_layer_map(ParallelPagedAttentionMgr, DynamicQuantPageAttentionMgrCell, KVCacheInt8())
+        try:
+            from research.llama3_1.infer.parallel_paged_attention_mgr import LlameParallelPagedAttentionMgr
+            Quantizer.reg_layer_map(LlameParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
+        except ImportError:
+            pass
 
     def _quant_info(self):
         if self.cfg.kvcache_quant_dtype == dtype.int8:

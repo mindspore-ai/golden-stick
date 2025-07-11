@@ -217,9 +217,11 @@ class DeployRACompressCell(Cell):
         value = value.reshape((-1, self.layer.num_kv_heads, self.layer.head_size))
 
         if key is not None:
-            assert value is not None
+            if value is None:
+                raise ValueError("value should not be None when key is not None.")
         else:
-            assert value is None
+            if value is not None:
+                raise ValueError("value should be None when key is None.")
 
         if attn_type != AttentionType.ENCODER and (
             kv_cache is not None and kv_cache[0].numel() > 0
@@ -276,7 +278,8 @@ class DeployRACompressCell(Cell):
                     )
 
         if prefill_meta := attn_metadata.prefill_metadata:
-            assert attn_metadata.seq_lens is not None
+            if attn_metadata.seq_lens is None:
+                raise ValueError("attn_metadata.seq_lens should not be None")
             if not prefill_meta.prefill_metadata.chunked_prefill:  # type: ignore
                 query = query.reshape((query.shape[0], -1))
                 key = key.reshape((key.shape[0], -1))
@@ -289,9 +292,8 @@ class DeployRACompressCell(Cell):
                 raise NotImplementedError("not support CPP yet")
 
         if decode_meta := attn_metadata.decode_metadata:
-            assert (
-                attn_type != AttentionType.ENCODER_ONLY
-            ), "Encoder-only models should not have decode metadata."
+            if attn_type == AttentionType.ENCODER_ONLY:
+                raise ValueError("Encoder-only models should not have decode metadata.")
             # Decoding run.
             self.apply_decoder_num += 1
             (

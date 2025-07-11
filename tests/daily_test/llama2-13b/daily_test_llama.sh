@@ -32,8 +32,8 @@ sleep_time=60
 
 checkpoint_path=${1}
 vocab_file=${2}
-MS_PKG_LINK=${3:-"https://repo.mindspore.cn/mindspore/mindspore/version/202505/20250507/master_20250507010016_8ed48766ed50bb506b8422a5ece21d9104692196_newest/unified/aarch64/mindspore-2.6.0-cp310-cp310-linux_aarch64.whl"}
-MF_PKG_LINK=${4-"https://repo.mindspore.cn/mindspore/mindformers/version/202505/20250507/dev_20250507031508_52aaafb134332b1e2118d91e943f0ffabbad0312_newest/any/mindformers-1.6.0-py3-none-any.whl"}
+MS_PKG_LINK=${3:-"https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250709/master_20250709010019_0737648dbea2303d71168f5f5e5b235e4ff204a6_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"}
+MF_PKG_LINK=${4-"https://repo.mindspore.cn/mindspore/mindformers/version/202507/20250710/r1.6.0_20250710031508_1d90c7fb465294a8fadcc2b59ba3e9af4cae0b71_newest/any/mindformers-1.6.0-py3-none-any.whl"}
 
 prepare_env()
 {

@@ -14,22 +14,25 @@
 # ============================================================================
 """test interfaces of smooth quant."""
 import os
+import sys
 import time
 import pytest
 import numpy as np
-
 import mindspore as ms
 from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.dataset import GeneratorDataset
 from mindspore.ops.auto_generate import SiLU, SplitWithSize
 from mindspore.ops import operations as P
 from mindformers.modules import Linear
-from mindformers.experimental.infer.core.layers import RowParallelLinear, ColumnParallelLinear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
                               PrecisionRecovery, GPTQQuantConfig, AWQConfig, QuantGranularity)
 from tests.st.test_utils import get_available_port
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+# pylint: disable=wrong-import-position
+from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
 
 
 class SwiGLU(nn.Cell):

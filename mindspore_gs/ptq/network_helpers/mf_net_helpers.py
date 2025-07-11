@@ -23,6 +23,7 @@ import numpy as np
 import mindspore as ms
 from mindspore import dtype as mstype
 from mindspore import Tensor, Model
+from mindspore.nn.utils import no_init_parameters
 
 from mindformers import MindFormerConfig, build_context, AutoModel, build_parallel_config
 from mindformers.models.modeling_utils import PreTrainedModel
@@ -63,7 +64,8 @@ class MFNetworkHelper(NetworkHelper):
             Network of type LlamaForCasualLM.
         """
         build_context(self.mf_config)
-        network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
+        with no_init_parameters():
+            network = AutoModel.from_config(self.mf_config, download_checkpoint=False)
         network.set_train(False)
         ckpt_path = self.mf_config.load_checkpoint
         if ckpt_path:
@@ -241,8 +243,11 @@ class MFParallelLlama2Helper(MFLlama2Helper):
     """
     def __init__(self, config: Union[str, MindFormerConfig] = None):
         super().__init__(config)
-        # pylint: disable=unused-import
-        from mindformers.experimental.infer.models.llama import ParallelLlamaForCausalLM
+        try:
+            # pylint: disable=unused-import
+            from research.llama3_1.llama import ParallelLlamaForCausalLM
+        except ImportError:
+            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.')
 
     def _load_ckpt(self, network):
         """_load_ckpt"""
@@ -276,11 +281,15 @@ class MFParallelTeleChat2Helper(MFParallelLlama2Helper):
     """MFParallelTeleChat2Helper"""
 
     def create_network(self):
-        from research.telechat2.infer.telechat import ParallelTelechatForCausalLM
-        from research.telechat2.telechat_config import TelechatConfig
+        try:
+            from research.telechat2.infer.telechat import ParallelTelechatForCausalLM
+            from research.telechat2.telechat_config import TelechatConfig
+        except ImportError:
+            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.')
         build_context(self.mf_config)
         model_config = TelechatConfig(**self.mf_config.model.model_config)
-        network = ParallelTelechatForCausalLM(model_config)
+        with no_init_parameters():
+            network = ParallelTelechatForCausalLM(model_config)
         network.set_train(False)
         network.phase = 'predict'
         ckpt_path = self.mf_config.load_checkpoint
@@ -303,8 +312,11 @@ class MFDSV3Helper(MFNetworkHelper):
         self._decoder_infos = OrderedDict()
 
     def create_network(self):
-        from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
-        from research.deepseek3.deepseek3_config import DeepseekV3Config
+        try:
+            from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
+            from research.deepseek3.deepseek3_config import DeepseekV3Config
+        except ImportError:
+            raise ImportError('Please add mindformers repo root dir into PYTHONPATH.')
         build_context(self.mf_config)
         model_config = DeepseekV3Config(**self.mf_config.model.model_config)
         network = DeepseekV3ForCausalLM(model_config)

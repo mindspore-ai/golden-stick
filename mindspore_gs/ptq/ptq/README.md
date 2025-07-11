@@ -31,7 +31,7 @@ Table 1: PTQ algorithm specifications
 | Specifications | Specification Descriptions |
 | --- | --- |
 | Hardware Support | Atlas 800I A2 |
-| Network Support | ParallelLlamaForCausalLM. For details, refer to [ParallelLlamaForCausalLM Network](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/experimental/infer/models/llama/llama.py). |
+| Network Support | ParallelLlamaForCausalLM. For details, refer to [ParallelLlamaForCausalLM Network](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py). |
 | Operation Mode Support | The quantization checkpoint phase supports only PyNative mode, and the quantization inference phase is not limited to modes, suggesting GraphMode for better performance. |
 
 > The current PTQ algorithm relies on the complete DecoderLayer to do the network topology analysis, so it does not support any network constructed based on the Linear layer of MindFormers. We plan to improve this in the subsequent version to enhance the network generalization ability of the PTQ algorithm.
@@ -100,6 +100,8 @@ from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
                        outliers_suppression=OutliersSuppressionType.NONE)
 ```
+
+> Since the ParallelLlamaForCausalLM network in MindSpore Transformers has been deprecated, in MindSpore Golden Stick version 1.2.0, this network does not support KVCache Int8 quantization. Future versions will support KVCache Int8 quantization on a new network.
 
 #### SmoothQuant Algorithm
 
@@ -204,6 +206,8 @@ $$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
 
 $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
+> Since the ParallelLlamaForCausalLM network in MindSpore Transformers has been deprecated, in MindSpore Golden Stick version 1.2.0, this network does not support KVCache Int8 quantization. Future versions will support KVCache Int8 quantization on a new network.
+
 #### GPTQ Algorithm
 
 The [GPTQ](https://arxiv.org/abs/2210.17323) (Gradient-based Post-training Quantization) algorithm is a step-by-step evolution of the OBD, OBS, OBC (OBQ) algorithm, and the GPTQ algorithm is an accelerated version of the OBQ algorithm.
@@ -248,7 +252,7 @@ The [Research](https://arxiv.org/pdf/2306.00978) finds that weights are not equa
 
 In [Activation-Aware Weight Quantization, AWQ](https://arxiv.org/pdf/2306.00978), the salient weights are selected based on the distribution of activation values, and considering the hardware efficiency, the salient weights are protected by scaling to avoid the same weight tensor from being stored by different data types, so as to realize the hardware-friendly and high-precision weighting algorithm, which can realize the quantization to 4bits or even lower bits. In addition to the protection of significant weights, AWQ also introduces dynamic weight truncation technology to further improve the accuracy of quantization.
 
-MindSpore Golden Stick supports AWQ by adding an `OutliersSuppressionType` method called `OutliersSuppressionType.AWQ`, which is currently only supported the [ParallelLlamaForCausalLM network](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/experimental/infer/models/llama/llama.py#L40).
+MindSpore Golden Stick supports AWQ by adding an `OutliersSuppressionType` method called `OutliersSuppressionType.AWQ`, which is currently only supported the [ParallelLlamaForCausalLM network](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py).
 
 AWQ algorithm supports both PerChannel quantization and PerGroup quantization, and user can enable the PerChannel AWQ algorithm of PTQ by using the following configuration items:
 

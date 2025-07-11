@@ -20,8 +20,7 @@ import pytest
 import numpy as np
 
 from mindformers import MindFormerConfig, LlamaForCausalLM, LlamaTokenizer
-from mindformers.experimental.infer.models.llama.llama import ParallelLlamaForCausalLM
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper
+from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
 
 
 @pytest.mark.level0
@@ -135,51 +134,6 @@ def test_mf_parallel_llama_net_helper_inputs_1p():
     assert return_code == 0
 
 
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-def test_mf_parallel_llama_net_helper_inputs():
-    """
-    Feature: test each function inputs of MFParallelLlama2Helper class.
-    Description: MFParallelLlama2Helper class used to create LlamaForCausalLM network and provide network detail infos.
-    Expectation: correct output of each function
-    """
-    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
-    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    if not ascend_path:
-        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    cur_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml")
-    with pytest.raises(TypeError):
-        MFParallelLlama2Helper(1)
-    cfg = MindFormerConfig(config_path)
-    assert isinstance(MFParallelLlama2Helper(cfg).mf_config, MindFormerConfig)
-    helper = MFParallelLlama2Helper(config_path)
-    assert isinstance(MFParallelLlama2Helper(cfg).mf_config, MindFormerConfig)
-
-    with pytest.raises(TypeError):
-        helper.get_spec(1)
-
-    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
-    helper.mf_config.processor.tokenizer.vocab_file = tokenizer_path
-    tokenizer = helper.create_tokenizer()
-    assert isinstance(tokenizer, LlamaTokenizer)
-    input_ids = tokenizer.encode('Hello', add_special_tokens=True)
-    assert isinstance(input_ids, List)
-
-    network = helper.create_network()
-    assert isinstance(network, ParallelLlamaForCausalLM)
-    with pytest.raises(TypeError, match="Type of mf_network should be "):
-        helper.generate(1, input_ids, 1)
-    with pytest.raises(TypeError, match="Type of input_ids should be "):
-        helper.generate(network, 1, 1)
-    with pytest.raises(TypeError, match="Type of max_new_tokens should be "):
-        helper.generate(network, input_ids, '1')
-    helper.generate(network, input_ids, 2)
-
-    with pytest.raises(TypeError, match="Type of input_ids should be "):
-        helper.assemble_inputs(1)
-
-
 @pytest.mark.skip(reason="Network helper is Deprecated.")
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
@@ -204,38 +158,3 @@ def test_mf_parallel_llama_net_helper_1p():
         log_file.close()
 
     assert return_code == 0
-
-
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-def test_mf_parallel_llama_net_helper():
-    """
-    Feature: test each function of MFParallelLlama2Helper class.
-    Description: MFParallelLlama2Helper class used to create ParallelLlamaForCausalLM network
-                 and provide network detail infos.
-    Expectation: correct output of each function.
-    """
-    os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
-    ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    if not ascend_path:
-        os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
-    cur_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml")
-    with pytest.raises(TypeError):
-        MFParallelLlama2Helper(1)
-    cfg = MindFormerConfig(config_path)
-    assert isinstance(MFParallelLlama2Helper(cfg).mf_config, MindFormerConfig)
-    helper = MFParallelLlama2Helper(config_path)
-    assert isinstance(MFParallelLlama2Helper(cfg).mf_config, MindFormerConfig)
-
-    network = helper.create_network()
-    assert isinstance(network, ParallelLlamaForCausalLM)
-
-    assert helper.get_spec('batch_size') == 1
-    assert helper.get_spec('seq_length') == 1024
-    # pylint: disable=singleton-comparison
-    assert helper.get_spec('use_flash_attention') == True
-
-    inputs = helper.assemble_inputs(np.ones((1, 1024), dtype=np.int32))
-    assert isinstance(inputs, tuple)
-    network(*inputs)
