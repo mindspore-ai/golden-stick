@@ -15,11 +15,13 @@
 """fake llama2 network for st."""
 
 import numpy as np
+from mindspore import context
 from mindspore import nn, Tensor, Parameter
 from mindspore.common.initializer import initializer
 from mindspore.ops import operations as ops
 from mindspore.ops import functional as func
 from mindspore import dtype as msdtype
+from mindspore_gs.common import logger
 
 
 class Linear(nn.Cell):
@@ -34,6 +36,7 @@ class Linear(nn.Cell):
         self.bias_add = ops.Add()
 
     def construct(self, x):
+        """construct"""
         out_shape = func.shape(x)[:-1] + (self.oc,)
         x = func.reshape(x, (-1, self.ic))
         x = self.mm(x, self.weight)
@@ -71,8 +74,7 @@ class Attention(nn.Cell):
         probs = func.softmax(score)
         weight_values = self.mm_v(probs, v)
         weight = func.transpose(weight_values, (0, 2, 1, 3))
-        bs, seq, head, head_dim = func.shape(weight)
-        context_layer = func.reshape(weight, (bs, seq, head * head_dim))
+        context_layer = func.reshape(weight, (bs, seq, -1))
         return self.proj_o(context_layer)
 
 
@@ -88,12 +90,13 @@ class RMSNorm(nn.Cell):
         self.rsqrt = ops.Rsqrt()
 
     def construct(self, x):
+        """construct"""
         norm_factor = self.square(x)
         norm_factor = self.mean(norm_factor, -1)
         norm_factor = self.add(norm_factor, 1e-6)
         norm_factor = self.rsqrt(norm_factor)
-        output = self.mul(x, norm_factor)
-        output = self.mul(output, self.weight)
+        x = self.mul(x, norm_factor)
+        output = self.mul(x, self.weight)
         return output
 
 
@@ -108,6 +111,7 @@ class FeedForward(nn.Cell):
         self.proj_w2 = Linear(hidden_dim, dim)
 
     def construct(self, x):
+        """construct"""
         gate = self.proj_gate(x)
         hidden = self.proj_hidden(x)
         hidden = gate * hidden
@@ -124,6 +128,7 @@ class DecoderLayer(nn.Cell):
         self.ffn = FeedForward(hidden_size, 4 * hidden_size, multi_of)
 
     def construct(self, x):
+        """construct"""
         x = self.attn_norm(x)
         h = self.attention(x)
         h = self.ffn_norm(h)
@@ -139,6 +144,7 @@ class Embedding(nn.Cell):
         self.gather = ops.Gather()
 
     def construct(self, input_ids):
+        """construct"""
         return self.gather(self.embed_weight, input_ids, 0)
 
 
@@ -156,7 +162,7 @@ class LlamaModel(nn.Cell):
         self.norm_out = RMSNorm(hidden_size)
 
     def construct(self, tokens: Tensor):
-        # bs, seq = func.shape(tokens)
+        """construct"""
         h = func.cast(self.tok_embeddings(tokens), self.dtype)
         h = func.reshape(h, (1, 1024, self.hidden_size))
         for i in range(self.num_layers):
@@ -173,15 +179,16 @@ def create_llama(num_layers=1):
     return LlamaModel(vocab_size, num_layers, hidden_size, num_heads, multi_of)
 
 
-def create_input(bs=1, seq=1024):
+def create_input(batch_size=1, seq_len=1024):
     """create_input"""
-    return Tensor(np.ones((bs, seq), dtype=np.int32), dtype=msdtype.int32)
+    return Tensor(np.ones((batch_size, seq_len), dtype=np.int32), dtype=msdtype.int32)
 
 
 if __name__ == "__main__":
-    from mindspore import context
     context.set_context(mode=context.GRAPH_MODE)
     bs, seq = 1, 1024
     network = create_llama()
     output = network(create_input()).asnumpy()
-    print(output.shape, output.dtype, output, flush=True)
+    logger.debug(f'output shape: {output.shape},'
+                 f'output dtype: {output.dtype},'
+                 f'output value: {output}')
