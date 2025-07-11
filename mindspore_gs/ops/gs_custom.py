@@ -291,9 +291,10 @@ class GSCustom(Custom):
 
     def _get_custom_attr(self, attr_name: str):
         """_get_custom_attr"""
-        if attr_name not in self.custom_op_attr.keys():
+        op_value = self.custom_op_attr.get(attr_name, None)
+        if not op_value:
             raise RuntimeError(f"Custom op {self._get_custom_op_name()} do not have attr {attr_name}")
-        return self.custom_op_attr.get(attr_name).value
+        return op_value.value
 
     def _infer_shape(self, *inputs):
         """

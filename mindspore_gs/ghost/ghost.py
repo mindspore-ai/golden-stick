@@ -186,13 +186,13 @@ class GhostAlgo(CompAlgo):
                 if isinstance(modules[k], nn.Conv2d):
                     try:
                         kernel_size_0 = modules[k].kernel_size[0]
-                    except RuntimeError:
-                        raise RuntimeError(f"For GoldenStick Ghost algo, get kernel_size of modules[{k}] failed.")
+                    except RuntimeError as e:
+                        raise RuntimeError(f"For GoldenStick Ghost algo, get kernel_size of modules[{k}] failed.\n{e}")
                     if kernel_size_0 == 1:
                         try:
                             stride_0 = modules[k].stride[0]
-                        except RuntimeError:
-                            raise RuntimeError(f"For GoldenStick Ghost algo, get stride of modules[{k}] failed.")
+                        except RuntimeError as e:
+                            raise RuntimeError(f"For GoldenStick Ghost algo, get stride of modules[{k}] failed.\n{e}")
                         if modules[k].in_channels == modules[k].out_channels and stride_0 == 1:
                             modules[k] = GhostModule(modules[k].in_channels, modules[k].out_channels,
                                                      kernel_size=modules[k].kernel_size,

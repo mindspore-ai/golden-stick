@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """LRP Head Pruner"""
+import os
 import pickle
 import random
 from abc import ABC, abstractmethod
@@ -89,7 +90,6 @@ class AbstractHeadPrunerLRP(AbstractHeadPruner, ABC):
         Validator.check_value_type("path", path, [str], self.__class__.__name__)
         Validator.check_value_type("gates_dict,", gates_dict, [dict], self.__class__.__name__)
         Validator.check_value_type("model", model, [Cell], self.__class__.__name__)
-        save_checkpoint(model, path + '/gated_model.ckpt')
-
-        with open(path + '/gates_dictionary', 'ab') as f:
+        save_checkpoint(model, os.path.join(path, "gated_model.ckpt"))
+        with open(os.path.join(path, 'gates_dictionary'), 'ab') as f:
             pickle.dump(gates_dict, f)

@@ -18,6 +18,7 @@ Provide pruning type enumeration
 
 import enum
 
+
 class PruningType(enum.Enum):
     """
     pruning type enum

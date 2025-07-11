@@ -212,7 +212,6 @@ class EmbeddingPostprocessor(nn.Cell):
             position_embeddings = self.full_position_embedding(position_ids)
             output = self.add(output, position_embeddings)
         output = self.layernorm(output)
-        # self.dropout.training=True
         output = self.dropout(output)
         return output
 
@@ -245,8 +244,8 @@ class BertOutput(nn.Cell):
         self.cast = P.Cast()
 
     def construct(self, hidden_status, input_tensor):
+        """construct"""
         output = self.dense(hidden_status)
-        # self.dropout.training=True
         output = self.dropout(output)
         output = self.add(input_tensor, output)
         output = self.layernorm(output)
@@ -368,6 +367,7 @@ class SaturateCast(nn.Cell):
         self.src_type = src_type
 
     def construct(self, x):
+        """construct"""
         out = self.max_op(x, self.tensor_min_type)
         out = self.min_op(out, self.tensor_max_type)
         return self.cast(out, self.dst_type)
@@ -468,17 +468,20 @@ class BertAttention(nn.Cell):
         self.gate = ConcreteGate(shape=[1, self.num_attention_heads, 1, 1])
 
     def get_gate_values(self):
+        """get_gate_values"""
         gate_values = None
         if self.gate is not None:
             gate_values = self.gate.get_gates(False).flatten()
         return gate_values
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         if not self.has_gates:
             self.has_gates = True
             self.gate.l0_penalty = l0_penalty
 
     def remove_gates(self):
+        """remove_gates"""
         self.has_gates = False
 
     def construct(self, from_tensor, to_tensor, attention_mask):
@@ -638,15 +641,19 @@ class BertSelfAttention(nn.Cell):
         self.shape = (-1, hidden_size)
 
     def get_gate_values(self):
+        """get_gate_values"""
         return self.attention.get_gate_values()
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.attention.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.attention.remove_gates()
 
     def construct(self, input_tensor, attention_mask):
+        """construct"""
         attention_output = self.attention(input_tensor, input_tensor, attention_mask)
         output = self.output(attention_output[0], input_tensor)
 
@@ -707,12 +714,15 @@ class BertEncoderCell(nn.Cell):
                                  compute_type=compute_type)
 
     def get_gate_values(self):
+        """get_gate_values"""
         return self.attention.get_gate_values()
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.attention.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.attention.remove_gates()
 
     def construct(self, hidden_states, attention_mask):
@@ -789,17 +799,20 @@ class BertTransformer(nn.Cell):
         self.has_gates = False
 
     def get_gate_values(self):
+        """get_gate_values"""
         gate_values = []
         for _, layer_module in enumerate(self.layers):
             gate_values.append(layer_module.get_gate_values())
         return gate_values
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.has_gates = True
         for _, layer_module in enumerate(self.layers):
             layer_module.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.has_gates = False
         for _, layer_module in enumerate(self.layers):
             layer_module.remove_gates()
@@ -848,6 +861,7 @@ class CreateAttentionMaskFromInputMask(nn.Cell):
         self.config = config
 
     def construct(self, input_mask):
+        """construct"""
         seq_length = F.shape(input_mask)[1]
         attention_mask = self.cast(self.reshape(input_mask, (-1, 1, seq_length)), mstype.float32)
         return attention_mask
@@ -926,13 +940,16 @@ class BertModel(nn.Cell):
         self._create_attention_mask_from_input_mask = CreateAttentionMaskFromInputMask(config)
 
     def get_gate_values(self):
+        """get_gate_values"""
         gates = self.bert_encoder.get_gate_values()
         return self.stack(gates) if gates[0] is not None else gates
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.bert_encoder.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.bert_encoder.remove_gates()
 
     def construct(self, input_ids, token_type_ids, input_mask):

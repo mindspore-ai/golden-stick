@@ -1,3 +1,17 @@
+# Copyright 2025 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
 """ptq quant cells."""
 import abc
 import numpy as np
@@ -11,6 +25,7 @@ from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_bias_
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
 from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
+
 
 def create_observer_perchannel(perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
     """create_observer_perchannel."""
@@ -26,11 +41,13 @@ def create_observer_perchannel(perchannel_args: PerChannelArgs = PerChannelArgs(
                                            strategy=strategy)
     return perchannel_observer
 
+
 class PTQCell(QuantCell):
     """Wrapper Cell to PTQCell with FakeQuantizer"""
 
     @abc.abstractmethod
     def calibrate(self):
+        """calibrate"""
         raise NotImplementedError
 
     @staticmethod
@@ -61,7 +78,8 @@ class PTQCell(QuantCell):
         bias_strategy = scale_strategy
         return act_strategy, weight_strategy, scale_strategy, offset_strategy, bias_strategy
 
-class OQLinearWrapper(PTQCell):
+
+class OqLinearWrapper(PTQCell):
     """Linear layer wrapper with min max"""
 
     def __init__(self, linear: Linear, policy=None, cfg=None):
@@ -180,6 +198,7 @@ class OQLinearWrapper(PTQCell):
         pass
 
     def set_use_temporary_parameter(self):
+        """set_use_temporary_parameter"""
         self.use_temporary_parameter = True
 
     def paramstore(self):
@@ -229,13 +248,9 @@ class OQLinearWrapper(PTQCell):
         """
         fakequant.
         """
-        x = self.x
-        weight = self._linear.weight
-        bias = None
-        temp_bias = None
         quant_min, quant_max = get_quant_min_max(num_bits=8, signed=True)
         #x量化 scale zp
-        temp_x = self._act_mul(x, self._div(1.0, self.smoothscale))
+        temp_x = self._act_mul(self.x, self._div(1.0, self.smoothscale))
         min_values_out_x = temp_x.min(axis=1)
         max_values_out_x = temp_x.max(axis=1)
         shape = max_values_out_x.shape[0]
@@ -248,10 +263,9 @@ class OQLinearWrapper(PTQCell):
         self.scale_x = t_scale_x
         self.zp_x = t_zp_x
         #weight 量化
-        temp_weight = self._weight_mul(weight, self.smoothscale)
+        weight = self._weight_mul(self._linear.weight, self.smoothscale)
         if self._linear.has_bias:
             bias = self._linear.bias
-        weight = temp_weight
         min_values_out = weight.min(axis=1)
         max_values_out = weight.max(axis=1)
         min_values_out = ops.reshape(Tensor(min_values_out), (self._linear.out_channels, 1))
@@ -267,12 +281,12 @@ class OQLinearWrapper(PTQCell):
         self.scale = t_scale
         self.zp = t_zp
         if self._linear.has_bias:
-            self.temp_bias = quant_bias_data(bias, scale)
+            temp_bias = quant_bias_data(bias, scale)
         temp_weight = self._sub(quant_weight, t_zp)
         temp_weight = self._weight_mul(temp_weight, t_scale)
         temp_weight = self._cast(temp_weight, dtype.float16)
         if self._linear.has_bias:
-            self.temp_bias = self._weight_mul(self.temp_bias, t_scale)
+            temp_bias = self._weight_mul(temp_bias, t_scale)
         return temp_x, temp_weight, temp_bias
 
     def construct(self, x):

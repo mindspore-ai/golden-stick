@@ -14,11 +14,12 @@
 # ============================================================================
 """MindSpore golden stick pruner module."""
 
+__all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo", "UniPruner"]
+
 from ..version import __version__, mindspore_version_check
 mindspore_version_check()
 
 from .scop import PrunerFtCompressAlgo, PrunerKfCompressAlgo
 from .uni_pruning import UniPruner
 
-__all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo", "UniPruner"]
 __all__.extend(__version__)

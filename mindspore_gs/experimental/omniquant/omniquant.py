@@ -8,7 +8,7 @@ from mindspore import Tensor
 from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig, \
     LlamaTokenizer
 from mindformers.modules import Linear
-from OQLinearWrapper import OQLinearWrapper
+from OQLinearWrapper import OqLinearWrapper
 import numpy as np
 
 
@@ -62,7 +62,7 @@ def apply(net: Cell) -> Cell:
         for name, cell in root.name_cells().items():
             # if type(cell) in op_types:
             if isinstance(cell, tuple(op_types)):
-                cell_wrapper = OQLinearWrapper(cell)
+                cell_wrapper = OqLinearWrapper(cell)
                 root.insert_child_to_cell(name, cell_wrapper)
             else:
                 _replace(cell)
@@ -108,7 +108,7 @@ def calibrate(model, tokenizer_: LlamaTokenizer, max_length, prompts):
                 if root is None:
                     return
                 for _, cell in root.name_cells().items():
-                    if isinstance(cell, OQLinearWrapper):
+                    if isinstance(cell, OqLinearWrapper):
                         cell.set_use_temporary_parameter()
                     else:
                         setflag(cell)
@@ -117,7 +117,7 @@ def calibrate(model, tokenizer_: LlamaTokenizer, max_length, prompts):
                 if root is None:
                     return
                 for _, cell in root.name_cells().items():
-                    if isinstance(cell, OQLinearWrapper):
+                    if isinstance(cell, OqLinearWrapper):
                         cell.paramstore()
                     else:
                         paramstore(cell)
@@ -126,7 +126,7 @@ def calibrate(model, tokenizer_: LlamaTokenizer, max_length, prompts):
                 if root is None:
                     return
                 for _, cell in root.name_cells().items():
-                    if isinstance(cell, OQLinearWrapper):
+                    if isinstance(cell, OqLinearWrapper):
                         cell.paramconfirm()
                     else:
                         paramconfirm(cell)

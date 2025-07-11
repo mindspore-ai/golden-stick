@@ -14,9 +14,8 @@
 # ============================================================================
 """MindSpore GoldenStick operations for Pruning."""
 
+__all__ = ["MaskedCell", "MaskedConv2d", "MaskedDense"]
 
 from .masked_cell import MaskedCell
 from .masked_conv2d import MaskedConv2d
 from .masked_dense import MaskedDense
-
-__all__ = ["MaskedCell", "MaskedConv2d", "MaskedDense"]

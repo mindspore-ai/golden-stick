@@ -53,7 +53,7 @@ tokenizer = LlamaTokenizer(vocab_file=uargs.tokenizer_path)
 
 ### 应用量化算法
 
-量化网络是指在原网络定义的基础上，修改需要量化的网络层后，生成带有量化方法的网络，通过构造MindSpore Golden Stick下的`OQLinearWrapper`类，并将其应用到原网络上将原网络转换为量化网络。
+量化网络是指在原网络定义的基础上，修改需要量化的网络层后，生成带有量化方法的网络，通过构造MindSpore Golden Stick下的`OqLinearWrapper`类，并将其应用到原网络上将原网络转换为量化网络。
 
 ```python
 def apply( network: Cell) -> Cell:
@@ -64,7 +64,7 @@ def apply( network: Cell) -> Cell:
                 return
             for name, cell in root.name_cells().items():
                 if type(cell) in op_types:
-                    cell_wrapper = OQLinearWrapper(cell)
+                    cell_wrapper = OqLinearWrapper(cell)
                     root.insert_child_to_cell(name, cell_wrapper)
                 else:
                     _replace(cell)
@@ -75,7 +75,7 @@ def apply( network: Cell) -> Cell:
 qnet = apply(model)
 ```
 
-量化网络结构如下，其中OQLinearWrapper为感知量化训练对原有Linear的封装类，包括了原有的算子以及输入输出和权重的量化方法所对应的函数。在OQLinearWrapper中定义了激活和权重平滑操作的LET训练参数smoothscale和权重裁剪范围的LWC训练参数lowbound，upbound。
+量化网络结构如下，其中OqLinearWrapper为感知量化训练对原有Linear的封装类，包括了原有的算子以及输入输出和权重的量化方法所对应的函数。在OqLinearWrapper中定义了激活和权重平滑操作的LET训练参数smoothscale和权重裁剪范围的LWC训练参数lowbound，upbound。
 
 ### 定义优化器、损失函数和训练的参数
 
