@@ -20,6 +20,7 @@ from enum import Enum
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.gs_enum import BackendTarget
 
+
 class RAMode(Enum):
     """
     Mode for razorattention algorithm.

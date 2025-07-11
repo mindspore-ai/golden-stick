@@ -21,15 +21,14 @@ import tqdm
 from mindspore.nn import Cell
 from mindspore import Tensor, mint, ops
 
+from ds_utils import create_network
+from mindformers.experimental.infer.core.layers import ColumnParallelLinear
+from mindformers.experimental.infer.core.norm import RMSNorm
+from research.qwen3.qwen3_transformers import Qwen3ParallelTransformerLayer
 from mindspore_gs.common.utils import offload_network, value_check
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.quant import InputCatcher
-
-from mindformers.experimental.infer.core.norm import RMSNorm
-from mindformers.experimental.infer.core.layers import ColumnParallelLinear
-from research.qwen3.qwen3_transformers import Qwen3ParallelTransformerLayer
-from ds_utils import create_network
 
 
 input_questions = ['介绍下北京故宫', 'I love Beijing, because']

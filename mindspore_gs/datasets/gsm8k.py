@@ -25,6 +25,7 @@ from mindspore.dataset import GeneratorDataset
 from mindspore_gs.common import logger
 from mindspore_gs.datasets.base import BaseDataset
 
+
 class GSM8KDataset(BaseDataset):
     """gsm8k dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
@@ -113,6 +114,7 @@ class GSM8KDataset(BaseDataset):
                 self.input_ids.append(Tensor(input_ids, dtype=dtype.int32))
                 self.labels.append(Tensor(label_id_new, dtype=dtype.int32))
         return total_items
+
 
 def create_gsm8k_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
                          ignore_token_id=-100, repeat=1, need_pad=False, n_samples=-1,

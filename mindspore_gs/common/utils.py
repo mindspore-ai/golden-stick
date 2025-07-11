@@ -56,6 +56,7 @@ def list_value_check(name, src, item_supported_type, value_choices=None):
 
 
 def offload_network(network: nn.Cell):
+    """offload_network"""
     for _, param in network.parameters_dict().items():
         # pylint: disable=protected-access
         param._offload()
@@ -117,12 +118,14 @@ def deprecated(version, substitute=None):
 
 
 def check_nan_inf(arr: np.ndarray):
+    """check_nan_inf"""
     has_nan = np.any(np.isnan(arr))
     has_inf = np.any(np.isinf(arr))
     return has_nan, has_inf
 
 
 def get_memory_info():
+    """get_memory_info"""
     process = psutil.Process()
     memory_info = process.memory_info()
     print(f"RSS (Resident Set Size): {memory_info.rss / 1024 / 1024:.2f} MB") # 物理内存
