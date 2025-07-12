@@ -292,6 +292,7 @@ class DynamicQuantPagedAttentionDeploy(Cell):
             self.concat_scale.shard(((1, dp, 1), (1, dp, 1)))
 
     def weight_quantizer(self):
+        """weight_quantizer"""
         return None
 
     def core_construct(self, *args):

@@ -504,6 +504,7 @@ class SmoothMatmul(QuantUnitCell):
                      f"{self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}")
 
     def update(self, layer_name, mm, smooth_scale_):
+        """update"""
         self.layer_name = layer_name
         self.mm = mm
         self.smooth_scale.set_data(msops.div(1, smooth_scale_))
@@ -549,6 +550,7 @@ class SmoothMatmulForDeploy(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, src, ic, compute_dtype):
+        """create"""
         if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
             return SmoothMatmulForDeploy(layer_name, src, ic, compute_dtype)
         raise ValueError(f"Not support creating SmoothMatmulForDeploy from {src}.")
@@ -586,6 +588,7 @@ class OutlierSuppressionPlusMatmulForDeploy(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, src, ic, compute_dtype):
+        """create"""
         if isinstance(src, msops.MatMul):
             return OutlierSuppressionPlusMatmulForDeploy(layer_name, src, ic, compute_dtype)
         raise ValueError(f"Not support creating OutlierSuppressionPlusMatmulForDeploy from {src}.")
@@ -629,6 +632,7 @@ class OutlierSuppressionPlusSmoothMatmul(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, src, smooth_scale, beta_osp):
+        """create"""
         if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
             return OutlierSuppressionPlusSmoothMatmul(layer_name, src, smooth_scale, beta_osp)
         raise ValueError(f"Not support creating OutlierSuppressionPlusSmoothMatmul from {src}.")
@@ -675,6 +679,7 @@ class OutlierSuppressionPlusSmoothMatmulForDeploy(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, src, ic, compute_dtype):
+        """create"""
         if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
             return OutlierSuppressionPlusSmoothMatmulForDeploy(layer_name, src, ic, compute_dtype)
         raise ValueError(f"Not support creating OutlierSuppressionPlusSmoothMatmulForDeploy from {src}.")
@@ -1527,6 +1532,7 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
         return scale_i64
 
     def construct(self, qx, quant_weight, group_list=None):
+        """construct"""
         # x: fp16 quant_weight: int8
         if self.is_group_mm:
             output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,

@@ -102,8 +102,10 @@ class GPTQQuantConfig:
     Args:
         block_size (int, optional): The size of block compensation in precision recovery. Default value: ``128``.
         desc_act (bool, optional): Whether to perform importance sorting on the Hessian matrix. Default value: ``False``.
-        damp_percent (float, optional): The percentage of the average of the diagonal elements of the Hessian matrix during numerical stable computations. Default value: ``0.01``.
-        static_groups (bool, optional): Whether to perform per_group calculation before precision recovery in the GPTQ algorithm. Default value: ``False``.
+        damp_percent (float, optional): The percentage of the average of the diagonal elements of the Hessian matrix
+            during numerical stable computations. Default value: ``0.01``.
+        static_groups (bool, optional): Whether to perform per_group calculation before precision recovery in the GPTQ
+            algorithm. Default value: ``False``.
 
     Raises:
         TypeError: If `block_size` is not type int.
@@ -150,9 +152,12 @@ class AWQConfig:
     Config for awq quant algorithm.
 
     Args:
-        duo_scaling (bool, optional): Use activation and weight to compute scale. Default value: ``True``.
-        smooth_alpha (List[float], optional): The hyper-parameter of smooth search. Default value: ``[i/20 for i in range(20)]``.
-        weight_clip_ratio (List[float], optional): The hyper-parameter of clip search. Default value: ``[1-i/20 for i in range(10)]``.
+        duo_scaling (bool, optional): Use activation and weight to compute scale.
+            Default value: ``True``.
+        smooth_alpha (List[float], optional): The hyper-parameter of smooth search.
+            Default value: ``[i/20 for i in range(20)]``.
+        weight_clip_ratio (List[float], optional): The hyper-parameter of clip search.
+            Default value: ``[1-i/20 for i in range(10)]``.
 
     Raises:
         TypeError: If `duo_scaling` is not type bool.
@@ -254,11 +259,14 @@ class PTQConfig:
         precision_recovery (:class:`mindspore_gs.ptq.PrecisionRecovery`): Used to precision compensation of
             weights during quantization. PrecisionRecovery.GPTQ indicates using GPTQ method to compensate precision,
             and PrecisionRecovery.NONE as default indicates doing nothing for precision recovery.
-        act_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of activation.
-            Currently only QuantGranularity.PER_TENSOR and QuantGranularity.PER_TOKEN are supported.
-        kvcache_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of kvcache.
-            Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_TOKEN are supported.
-        weight_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization granularity of weight.
+        act_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization
+            granularity of activation. Currently only QuantGranularity.PER_TENSOR and QuantGranularity.PER_TOKEN are
+            supported.
+        kvcache_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization
+            granularity of kvcache. Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_TOKEN are
+            supported.
+        weight_quant_granularity (:class:`mindspore_gs.ptq.QuantGranularity`): Used to configure the quantization
+            granularity of weight.
             Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_GROUP are supported.
         group_size (int, optional): group_size of per_group quantization, suggest using 64 or 128. Default value: ``0``.
 
@@ -273,8 +281,10 @@ class PTQConfig:
         TypeError: If `precision_recovery` is not a PrecisionRecovery.
         ValueError: If `act_quant_granularity` is not QuantGranularity.PER_TENSOR or QuantGranularity.PER_TOKEN.
         ValueError: If `kvcache_quant_granularity` is not QuantGranularity.PER_CHANNEL or QuantGranularity.PER_TOKEN.
-        ValueError: If `act_quant_granularity` is QuantGranularity.PER_TOKEN but weight_quant_dtype != msdtype.int8 or act_quant_dtype != msdtype.int8.
-        ValueError: If `kvcache_quant_granularity` is QuantGranularity.PER_TOKEN but kvcache_quant_dtype != msdtype.int8.
+        ValueError: If `act_quant_granularity` is QuantGranularity.PER_TOKEN but weight_quant_dtype != msdtype.int8 or
+            act_quant_dtype != msdtype.int8.
+        ValueError: If `kvcache_quant_granularity` is QuantGranularity.PER_TOKEN but
+            kvcache_quant_dtype != msdtype.int8.
         ValueError: If `weight_quant_granularity` is not QuantGranularity.PER_CHANNEL or QuantGranularity.PER_GROUP.
         ValueError: If `weight_quant_granularity` is QuantGranularity.PER_GROUP but `group_size` is not in [64, 128].
         ValueError: If `weight_quant_granularity` is not QuantGranularity.PER_GROUP but `group_size` != 0.
@@ -354,14 +364,17 @@ class PTQConfig:
                              f'but got {self.kvcache_quant_granularity}.')
         if (self.weight_quant_dtype not in (msdtype.int8, msdtype.qint4x2) or self.act_quant_dtype != msdtype.int8) and \
             self.act_quant_granularity is QuantGranularity.PER_TOKEN:
-            raise ValueError(f'when act_quant_granularity is QuantGranularity.PER_TOKEN, weight_quant_dtype: {self.weight_quant_dtype} must be mindspore.dtype.int8 or mindspore.dtype.int4, '
+            raise ValueError(f'when act_quant_granularity is QuantGranularity.PER_TOKEN, weight_quant_dtype: '
+                             f'{self.weight_quant_dtype} must be mindspore.dtype.int8 or mindspore.dtype.int4, '
                              f'and act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')
         if (self.weight_quant_dtype == msdtype.int8 and self.act_quant_dtype == msdtype.int8) and \
             self.weight_quant_granularity != QuantGranularity.PER_CHANNEL:
-            raise ValueError(f'when weight_quant_dtype is int8 and act_quant_dtype is int8, the weight_quant_granularity must be QuantGranularity.PER_CHANNEL,'
+            raise ValueError(f'when weight_quant_dtype is int8 and act_quant_dtype is int8,'
+                             f' the weight_quant_granularity must be QuantGranularity.PER_CHANNEL,'
                              f' but got {self.weight_quant_granularity}.')
         if self.kvcache_quant_dtype != msdtype.int8 and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
-            raise ValueError('when kvcache_quant_granularity is QuantGranularity.PER_TOKEN, kvcache_quant_dtype must be mindspore.dtype.int8.')
+            raise ValueError('when kvcache_quant_granularity is QuantGranularity.PER_TOKEN, '
+                             'kvcache_quant_dtype must be mindspore.dtype.int8.')
         if self.mode == PTQMode.QUANTIZE and self.kvcache_quant_granularity is QuantGranularity.PER_TOKEN:
             logger.warning('kvcache_quant_granularity is QuantGranularity.PER_TOKEN, not need quantize for kvcache.')
         if self.weight_quant_granularity != QuantGranularity.PER_GROUP and self.group_size != 0:

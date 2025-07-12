@@ -260,4 +260,5 @@ class SmoothQuant(CompAlgo):
         return net_opt
 
     def set_deploy(self, is_deploy: bool = False):
+        """set_deploy"""
         self._config.algo_args['is_deploy'] = is_deploy

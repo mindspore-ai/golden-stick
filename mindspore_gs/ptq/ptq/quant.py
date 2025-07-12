@@ -50,6 +50,7 @@ class InputCatcher(Cell):
         self.patched = False
 
     def patch(self, handler):
+        """patch"""
         if self.patched:
             raise RuntimeError("Only support patch one cell for one time. please invoke recover before invoking patch "
                                "again.")
@@ -59,11 +60,13 @@ class InputCatcher(Cell):
         self.patched = True
 
     def recover(self):
+        """recover"""
         if self.patched and self.handler and self.old_construct:
             self.handler.construct = self.old_construct
         self.patched = False
 
     def construct(self, *args, **kwargs):
+        """construct"""
         self.args.append(list(args))
         self.kwargs.append(kwargs)
         raise GeneratorExit("already catch first layer inputs, do not need continue.")
@@ -217,24 +220,26 @@ class PTQ(CompAlgo):
     @staticmethod
     def _ptq_config_check(config):
         """_ptq_config_check"""
-        if config.outliers_suppression is None and \
-            config.weight_quant_dtype == dtype.int8 and \
-                config.act_quant_dtype == dtype.int8:
+        use_w8 = config.weight_quant_dtype == dtype.int8
+        use_a8 = config.act_quant_dtype == dtype.int8
+        if config.outliers_suppression is None and use_a8 and use_w8:
             logger.warning("When outliers_suppression is None, A8W8 algorithm accuracy is expected to decline.")
-        if config.weight_quant_dtype is None and \
-                config.act_quant_dtype == dtype.int8:
+        if config.weight_quant_dtype is None and use_a8:
             raise ValueError("PTQ algorithm do not support only quant activation.")
-        if config.weight_quant_dtype == dtype.int8 and \
-                config.act_quant_dtype == dtype.int8 and \
-                (config.outliers_suppression == OutliersSuppressionType.AWQ or
-                 config.precision_recovery == PrecisionRecovery.GPTQ):
+
+        use_ptq_or_awq = (config.outliers_suppression == OutliersSuppressionType.AWQ or
+                          config.precision_recovery == PrecisionRecovery.GPTQ)
+        if use_w8 and use_a8 and use_ptq_or_awq:
             raise ValueError("AWQ algorithm and GPTQ algorithm do not support quant activation.")
-        if (config.weight_quant_dtype != dtype.int8 or \
-                config.act_quant_dtype != dtype.int8 or \
-                config.kvcache_quant_dtype is not None) and \
-                config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE:
+
+        use_a8w8_only = use_a8 and use_w8 and config.kvcache_quant_dtype is None
+        use_osl = config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE
+        if not use_a8w8_only and use_osl:
             raise ValueError("OUTLIER_SUPPRESSION_LITE algorithm only support W8A8 quant.")
-        if config.weight_quant_dtype == dtype.qint4x2 and config.kvcache_quant_dtype == dtype.int8:
+
+        use_w4 = config.weight_quant_dtype == dtype.qint4x2
+        use_c8 = config.kvcache_quant_dtype == dtype.int8
+        if use_w4 and use_c8:
             raise ValueError("PTQ algorithm only support quant weight in int4 alone."
                              "Please not to use with c8 at the same time.")
 
@@ -265,7 +270,8 @@ class PTQ(CompAlgo):
                     self.layer_policies[key] = InnerPTQConfig().inner_config(config_, approach=PTQApproach.PTQ)
                     PTQ._ptq_config_check(self.layer_policies[key])
         except re.error:
-            raise TypeError('The regular string of layer_policies not correct, please check and try again.')
+            raise TypeError('The regular string of layer_policies not correct, please check and try again.') \
+                from re.error
 
     # pylint: disable=arguments-differ
     # pylint: disable=unused-argument
