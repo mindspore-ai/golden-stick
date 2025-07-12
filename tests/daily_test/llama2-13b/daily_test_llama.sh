@@ -24,7 +24,6 @@ echo "Make sure load_checkpoint is settled in predict_llama2_13b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
 ds_type="boolq"
-dataset="${BASEPATH}/ws/gs/tests/data/boolq-dataset/dev.jsonl"
 eval_script="eval_boolq.py"
 export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export GSLOG=1
@@ -32,8 +31,9 @@ sleep_time=60
 
 checkpoint_path=${1}
 vocab_file=${2}
-MS_PKG_LINK=${3:-"https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250708/r2.7.rc1_20250708024507_497949a8c21f1bdfb8b1f77f51314ef65a24125d/unified/aarch64/mindspore-2.7.0rc1-cp310-cp310-linux_aarch64.whl"}
-MF_PKG_LINK=${4-"https://repo.mindspore.cn/mindspore/mindformers/version/202507/20250708/r1.6.0_20250708031508_2d79b904bd970702f358070337ff0375fcfa3e8c_newest/any/mindformers-1.6.0-py3-none-any.whl"}
+dataset=${3}
+MS_PKG_LINK=${4:-"https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250708/r2.7.rc1_20250708024507_497949a8c21f1bdfb8b1f77f51314ef65a24125d/unified/aarch64/mindspore-2.7.0rc1-cp310-cp310-linux_aarch64.whl"}
+MF_PKG_LINK=${5:-"https://repo.mindspore.cn/mindspore/mindformers/version/202507/20250708/r1.6.0_20250708031508_2d79b904bd970702f358070337ff0375fcfa3e8c_newest/any/mindformers-1.6.0-py3-none-any.whl"}
 
 prepare_env()
 {

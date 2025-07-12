@@ -70,8 +70,8 @@ def test_squad(device):
     """
     context.set_context(device_target=device)
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    squad_ds = os. path.join(cur_dir, "../../../data/squad-dataset/dev-v1.1.json")
-    vocab_file = os. path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    squad_ds = os. path.join(cur_dir, "/nfs/dataset/workspace/mindspore_dataset/squad/dev-v1.1.json")
+    vocab_file = os. path.join(cur_dir, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
     check_ds(squad_ds, 1, 500, vocab_file, 1)
     check_ds(squad_ds, 2, 501, vocab_file, 1)
     check_ds(squad_ds, 1, 502, vocab_file, 2)

@@ -33,7 +33,7 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFPa
 def add_rmsnorm_quant_fusion_test(approach):
     """test_add_rmsnorm_quant_fusion"""
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    tokenizer_path = os.path.join(cur_dir, "../../data/llama2-tokenizer.model")
+    tokenizer_path = os.path.join(cur_dir, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
     if approach == "smooth-quant":
         w8a8_config_path = "../../data/test_llama2/predict_llama2_13b_fp16_910b_1p_common_config.yaml"
         w8a8_config_path = os.path.join(cur_dir, w8a8_config_path)
