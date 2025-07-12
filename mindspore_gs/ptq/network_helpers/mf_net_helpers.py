@@ -92,7 +92,7 @@ class MFNetworkHelper(NetworkHelper):
         raise KeyError(f"Can not find network specific: {name}.")
 
     # pylint: disable=arguments-differ
-    def create_tokenizer(self):
+    def create_tokenizer(self, **kwargs):
         """
         Get network tokenizer.
 
@@ -118,7 +118,7 @@ class MFNetworkHelper(NetworkHelper):
         return build_tokenizer(self.mf_config.processor.tokenizer)
 
     # pylint: disable=arguments-differ
-    def generate(self, mf_network, input_ids: Union[np.ndarray, List[int], List[List[int]]],
+    def generate(self, network, input_ids: Union[np.ndarray, List[int], List[List[int]]],
                  max_new_tokens=None, **kwargs):
         """
         Invoke `network` and generate tokens.
@@ -147,7 +147,7 @@ class MFNetworkHelper(NetworkHelper):
             >>> helper.generate(network, input_ids)
             array([[    1, 10000, 10001]], dtype=int32)
         """
-        value_check('mf_network', mf_network, PreTrainedModel)
+        value_check('network', network, PreTrainedModel)
         value_check('input_ids', input_ids, (np.ndarray, List))
         if max_new_tokens:
             value_check('max_new_tokens', max_new_tokens, int)
@@ -155,8 +155,8 @@ class MFNetworkHelper(NetworkHelper):
         seq = self.get_spec('seq_length')
         top_p = self.get_spec('top_p')
         top_k = self.get_spec('top_k')
-        return mf_network.generate(input_ids, do_sample=do_sample, max_length=seq, max_new_tokens=max_new_tokens,
-                                   top_p=top_p, top_k=top_k)
+        return network.generate(input_ids, do_sample=do_sample, max_length=seq, max_new_tokens=max_new_tokens,
+                                top_p=top_p, top_k=top_k)
 
     def assemble_inputs(self, input_ids: np.ndarray, **kwargs):
         raise NotImplementedError
@@ -330,7 +330,7 @@ class MFParallelTeleChat2Helper(MFParallelLlama2Helper):
         network.phase = 'predict'
         return network
 
-    def create_tokenizer(self):
+    def create_tokenizer(self, **kwargs):
         """create_tokenizer."""
         from research.telechat2.telechat_tokenizer import TelechatTokenizer
         return TelechatTokenizer(vocab_file=self.get_spec('vocab_file'))
@@ -360,7 +360,7 @@ class MFDSV3Helper(MFNetworkHelper):
         network.phase = 'predict'
         return network
 
-    def create_tokenizer(self):
+    def create_tokenizer(self, **kwargs):
         """create_tokenizer."""
         from mindformers.models.llama.llama_tokenizer_fast import LlamaTokenizerFast
         return LlamaTokenizerFast(vocab_file=self.get_spec('vocab_file'),
