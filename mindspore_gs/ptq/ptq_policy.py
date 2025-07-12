@@ -35,4 +35,5 @@ class PTQNetPolicy(NetPolicy):
 
     @staticmethod
     def register_policy(algorithm, layer_type, policy_partial):
+        """register_policy"""
         PTQNetPolicy.register_policy_map[(algorithm, layer_type)] = policy_partial

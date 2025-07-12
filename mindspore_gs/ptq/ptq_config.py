@@ -101,7 +101,8 @@ class GPTQQuantConfig:
 
     Args:
         block_size (int, optional): The size of block compensation in precision recovery. Default value: ``128``.
-        desc_act (bool, optional): Whether to perform importance sorting on the Hessian matrix. Default value: ``False``.
+        desc_act (bool, optional): Whether to perform importance sorting on the Hessian matrix.
+            Default value: ``False``.
         damp_percent (float, optional): The percentage of the average of the diagonal elements of the Hessian matrix
             during numerical stable computations. Default value: ``0.01``.
         static_groups (bool, optional): Whether to perform per_group calculation before precision recovery in the GPTQ
@@ -341,9 +342,10 @@ class PTQConfig:
             logger.warning('GPTQQuantConfig is not configured, it will apply the default parameters.')
         if self.precision_recovery != PrecisionRecovery.GPTQ and isinstance(self.algo_args, GPTQQuantConfig):
             logger.warning(f'GPTQQuantConfig is configured, but the precision recovery is {self.precision_recovery}.')
-        if self.weight_quant_dtype == msdtype.qint4x2 and self.act_quant_dtype == msdtype.int8 and \
-            (self.act_quant_granularity != QuantGranularity.PER_TOKEN or \
-             self.precision_recovery != PrecisionRecovery.GPTQ):
+        use_a8w4 = self.act_quant_dtype == msdtype.int8 and self.weight_quant_dtype == msdtype.qint4x2
+        use_gptq_per_token = (self.act_quant_granularity == QuantGranularity.PER_TOKEN and
+                              self.precision_recovery == PrecisionRecovery.GPTQ)
+        if use_a8w4 and not use_gptq_per_token:
             raise ValueError('PTQ algorithm only support act_quant_granularity with per_token and precision_recovery "'
                              'with GPTQ for a8w4 quantization.')
         value_check('precision_recovery', self.precision_recovery, PrecisionRecovery)
@@ -362,8 +364,10 @@ class PTQConfig:
         if self.kvcache_quant_granularity not in kvcache_quant_granularity_support:
             raise ValueError(f'kvcache_quant_granularity support {kvcache_quant_granularity_support}, '
                              f'but got {self.kvcache_quant_granularity}.')
-        if (self.weight_quant_dtype not in (msdtype.int8, msdtype.qint4x2) or self.act_quant_dtype != msdtype.int8) and \
-            self.act_quant_granularity is QuantGranularity.PER_TOKEN:
+        use_w8_or_w4 = self.weight_quant_dtype in (msdtype.int8, msdtype.qint4x2)
+        use_a8 = self.act_quant_dtype == msdtype.int8
+        act_quant_per_token = self.act_quant_granularity is QuantGranularity.PER_TOKEN
+        if (not use_w8_or_w4 or not use_a8) and act_quant_per_token:
             raise ValueError(f'when act_quant_granularity is QuantGranularity.PER_TOKEN, weight_quant_dtype: '
                              f'{self.weight_quant_dtype} must be mindspore.dtype.int8 or mindspore.dtype.int4, '
                              f'and act_quant_dtype: {self.act_quant_dtype} must be mindspore.dtype.int8.')

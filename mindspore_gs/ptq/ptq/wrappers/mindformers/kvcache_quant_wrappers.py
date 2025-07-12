@@ -306,7 +306,7 @@ class DynamicQuantPagedAttentionDeploy(Cell):
         return None
 
     def core_construct(self, *args):
-        pass
+        """core_construct"""
 
     # pylint: disable=W0221
     # pylint: disable=W0613
