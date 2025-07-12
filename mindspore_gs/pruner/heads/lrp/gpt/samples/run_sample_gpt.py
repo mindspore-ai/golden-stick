@@ -30,16 +30,17 @@ from mindspore.parallel._transformer import TransformerOpParallelConfig
 import mindspore.common.dtype as mstype
 from mindspore.common import set_seed
 
-from mindspore_gs.pruner.heads import PruningType, HeadPruningFactory
-from mindspore_gs.pruner.heads.supported import SupportedModels
-from mindspore_gs.pruner.heads.lrp.gpt.samples import GPTWithLossForGates, GPTForGates, GPTWithModel
-
 from official.nlp.GPT.src.dataset import create_dataset
 from official.nlp.GPT.src.gpt import GPTWithLoss
 from official.nlp.GPT.src.utils import GPTConfig, LearningRate
 
+from mindspore_gs.pruner.heads import PruningType, HeadPruningFactory
+from mindspore_gs.pruner.heads.supported import SupportedModels
+from mindspore_gs.pruner.heads.lrp.gpt.samples import GPTWithLossForGates, GPTForGates, GPTWithModel
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
 
 def run_train():
     """train function for GPT"""
@@ -136,7 +137,8 @@ def run_train():
     model = Model(gpt_with_grads)
     model.train(actual_epoch_num, ds, callbacks=callback, dataset_sink_mode=True, sink_size=callback_size)
 
-    save_dir_path = '' #with empty  string doesn't save the model.
+    # with empty string doesn't save the model.
+    save_dir_path = ''
     prune_model = pruner.convert(model.train_network.network.network, save_dir_path)
 
     eval_dataset = create_dataset(config.batch_size, data_path=args_opt.eval_data_path, drop=False)

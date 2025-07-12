@@ -16,6 +16,22 @@
 Note:
     Transformer Networks. This is interface that is subject to change or deletion.
 """
+
+__all__ = [
+    "AttentionMask",
+    "VocabEmbedding",
+    "MultiHeadAttention",
+    "FeedForward",
+    "TransformerEncoder",
+    "TransformerDecoder",
+    "TransformerEncoderLayer",
+    "TransformerDecoderLayer",
+    "Transformer",
+    "TransformerOpParallelConfig",
+    "EmbeddingOpParallelConfig",
+    "TransformerRecomputeConfig"]
+
+# pylint: disable=W0410
 from __future__ import absolute_import
 
 import math
@@ -43,20 +59,6 @@ from mindspore_gs.common.validator import Validator
 
 from mindspore_gs.pruner.heads.lrp.utils import ConcreteGate
 from mindspore_gs.common import logger
-
-__all__ = [
-    "AttentionMask",
-    "VocabEmbedding",
-    "MultiHeadAttention",
-    "FeedForward",
-    "TransformerEncoder",
-    "TransformerDecoder",
-    "TransformerEncoderLayer",
-    "TransformerDecoderLayer",
-    "Transformer",
-    "TransformerOpParallelConfig",
-    "EmbeddingOpParallelConfig",
-    "TransformerRecomputeConfig"]
 
 
 class EmbeddingOpParallelConfig(_Config):
@@ -89,6 +91,7 @@ class EmbeddingOpParallelConfig(_Config):
 
     @property
     def data_parallel(self):
+        """data_parallel"""
         return self._dp_mp_config.data_parallel
 
     @data_parallel.setter
@@ -97,6 +100,7 @@ class EmbeddingOpParallelConfig(_Config):
 
     @property
     def model_parallel(self):
+        """model_parallel"""
         return self._dp_mp_config.model_parallel
 
     @model_parallel.setter
@@ -105,6 +109,7 @@ class EmbeddingOpParallelConfig(_Config):
 
     @property
     def vocab_emb_dp(self):
+        """vocab_emb_dp"""
         return self._vocab_emb_dp
 
     @vocab_emb_dp.setter
@@ -114,6 +119,7 @@ class EmbeddingOpParallelConfig(_Config):
 
     @property
     def dp_mp_config(self):
+        """dp_mp_config"""
         return self._dp_mp_config
 
 
@@ -152,6 +158,7 @@ class TransformerRecomputeConfig(_Config):
 
     @property
     def recompute(self):
+        """recompute"""
         return self._recompute
 
     @recompute.setter
@@ -161,6 +168,7 @@ class TransformerRecomputeConfig(_Config):
 
     @property
     def parallel_optimizer_comm_recompute(self):
+        """parallel_optimizer_comm_recompute"""
         return self._parallel_optimizer_comm_recompute
 
     @parallel_optimizer_comm_recompute.setter
@@ -170,6 +178,7 @@ class TransformerRecomputeConfig(_Config):
 
     @property
     def mp_comm_recompute(self):
+        """mp_comm_recompute"""
         return self._mp_comm_recompute
 
     @mp_comm_recompute.setter
@@ -179,6 +188,7 @@ class TransformerRecomputeConfig(_Config):
 
     @property
     def recompute_slice_activation(self):
+        """recompute_slice_activation"""
         return self._recompute_slice_activation
 
     @recompute_slice_activation.setter
@@ -242,6 +252,7 @@ class TransformerOpParallelConfig(_Config):
 
     @property
     def recompute(self):
+        """recompute"""
         return self._recompute
 
     @recompute.setter
@@ -254,6 +265,7 @@ class TransformerOpParallelConfig(_Config):
 
     @property
     def vocab_emb_dp(self):
+        """vocab_emb_dp"""
         return self._embed_dp_mp_config.vocab_emb_dp
 
     @vocab_emb_dp.setter
@@ -262,6 +274,7 @@ class TransformerOpParallelConfig(_Config):
 
     @property
     def gradient_aggregation_group(self):
+        """gradient_aggregation_group"""
         return self._gradient_aggregation_group
 
     @gradient_aggregation_group.setter
@@ -271,6 +284,7 @@ class TransformerOpParallelConfig(_Config):
 
     @property
     def micro_batch_num(self):
+        """micro_batch_num"""
         return self._pp_config.micro_batch_num
 
     @micro_batch_num.setter
@@ -279,6 +293,7 @@ class TransformerOpParallelConfig(_Config):
 
     @property
     def model_parallel(self):
+        """model_parallel"""
         return self._embed_dp_mp_config.model_parallel
 
     @model_parallel.setter
@@ -288,10 +303,12 @@ class TransformerOpParallelConfig(_Config):
 
     @property
     def data_parallel(self):
+        """data_parallel"""
         return self._embed_dp_mp_config.data_parallel
 
     @data_parallel.setter
     def data_parallel(self, value):
+        """data_parallel"""
         self._embed_dp_mp_config.data_parallel = value
         self._moe_config.data_parallel = value
 
@@ -301,6 +318,7 @@ class TransformerOpParallelConfig(_Config):
 
     @expert_parallel.setter
     def expert_parallel(self, value):
+        """expert_parallel"""
         self._moe_config.expert_parallel = value
 
     @property
@@ -309,6 +327,7 @@ class TransformerOpParallelConfig(_Config):
 
     @pipeline_stage.setter
     def pipeline_stage(self, value):
+        """pipeline_stage"""
         self._pp_config.pipeline_stage = value
 
     @property
@@ -323,14 +342,17 @@ class TransformerOpParallelConfig(_Config):
 
     @property
     def embedding_dp_mp_config(self):
+        """embedding_dp_mp_config"""
         return self._embed_dp_mp_config
 
     @property
     def dp_mp_config(self):
+        """dp_mp_config"""
         return self._embed_dp_mp_config.dp_mp_config
 
     @property
     def moe_parallel_config(self):
+        """moe_parallel_config"""
         return self._moe_config
 
 
@@ -743,6 +765,7 @@ class VocabEmbedding(Cell):
                         f"model parallel for the embedding lookup.")
 
     def construct(self, input_ids):
+        """construct"""
         _check_input_dtype(F.dtype(input_ids), "input_ids", [mstype.int32], self.cls_name)
         output = self.gather(self.embedding_table, input_ids, 0)
         return output, self.embedding_table.value()
@@ -1123,16 +1146,19 @@ class MultiHeadAttention(Cell):
         self.has_gates = False
 
     def get_gate_values(self):
+        """get_gate_values"""
         gate_values = None
         if self.gate is not None:
             gate_values = self.gate.get_gates(False).flatten()
         return gate_values
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.has_gates = True
         self.gate.l0_penalty = l0_penalty
 
     def remove_gates(self):
+        """remove_gates"""
         self.has_gates = False
 
     def construct(self, query_tensor, key_tensor, value_tensor, attention_mask, key_past=None,
@@ -1551,7 +1577,7 @@ class TransformerEncoderLayer(Cell):
                     "and parallel_config. model_parallel is {}."
                     .format(ffn_hidden_size, parallel_config.model_parallel))
             _check_moe_config(moe_config, parallel_config)
-            self.use_moe = (moe_config.expert_num > 1)
+            self.use_moe = moe_config.expert_num > 1
             self.use_past = use_past
             self.seq_length = seq_length
             self.hidden_size = hidden_size
@@ -1626,7 +1652,7 @@ class TransformerEncoderLayer(Cell):
                     "and parallel_config. model_parallel is {}."
                     .format(ffn_hidden_size, parallel_config.model_parallel))
             _check_moe_config(moe_config, parallel_config)
-            self.use_moe = (moe_config.expert_num > 1)
+            self.use_moe = moe_config.expert_num > 1
             self.use_past = use_past
             self.seq_length = seq_length
             self.hidden_size = hidden_size
@@ -1689,12 +1715,15 @@ class TransformerEncoderLayer(Cell):
                                f"semi-auto parallel mode now.")
 
     def get_gate_values(self):
+        """get_gate_values"""
         return self.attention.get_gate_values()
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.attention.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.attention.remove_gates()
 
     def construct(self, x, input_mask=None, init_reset=True, batch_valid_length=None):
@@ -1932,7 +1961,7 @@ class TransformerDecoderLayer(Cell):
                  parallel_config=default_dpmp_config):
         super(TransformerDecoderLayer, self).__init__()
         _check_moe_config(moe_config, parallel_config)
-        self.use_moe = (moe_config.expert_num > 1)
+        self.use_moe = moe_config.expert_num > 1
         config_to_attention = parallel_config.dpmp if self.use_moe else parallel_config
         if batch_size or use_past:
             Validator.check_positive_int(batch_size)
@@ -2139,7 +2168,7 @@ class TransformerDecoderLayer(Cell):
         '''
         construct Method
         '''
-        self._check_input(hidden_stats, decoder_mask, encoder_output, memory_mask, init_reset, batch_valid_length)
+        _ = self._check_input(hidden_stats, decoder_mask, encoder_output, memory_mask, init_reset, batch_valid_length)
         # the returned shape is [bs, seq_length, embedding_size] or [bs * seq_length, embedding_size]
         hidden_shape = F.shape(hidden_stats)
         hidden_stats = F.reshape(hidden_stats, (-1, hidden_shape[-1]))
@@ -2472,7 +2501,7 @@ class TransformerEncoder(Cell):
         super(TransformerEncoder, self).__init__()
         _check_config(parallel_config)
         _check_moe_config(moe_config, parallel_config)
-        self.use_moe = (moe_config.expert_num > 1)
+        self.use_moe = moe_config.expert_num > 1
         config_to_layer = parallel_config.moe_parallel_config if self.use_moe else parallel_config.dp_mp_config
         if _get_parallel_mode() in (ParallelMode.AUTO_PARALLEL,):
             self.add = P.Add()
@@ -2541,17 +2570,20 @@ class TransformerEncoder(Cell):
         self.has_gates = False
 
     def get_gate_values(self):
+        """get_gate_values"""
         gate_values = []
         for _, layer_module in enumerate(self.blocks):
             gate_values.append(layer_module.get_gate_values())
         return gate_values
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.has_gates = True
         for _, layer_module in enumerate(self.blocks):
             layer_module.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.has_gates = False
         for _, layer_module in enumerate(self.blocks):
             layer_module.remove_gates()
@@ -2731,7 +2763,7 @@ class TransformerDecoder(Cell):
         super(TransformerDecoder, self).__init__()
         _check_moe_config(moe_config, parallel_config)
         _check_config(parallel_config)
-        self.use_moe = (moe_config.expert_num > 1)
+        self.use_moe = moe_config.expert_num > 1
         config_to_layer = parallel_config.moe_parallel_config if self.use_moe else parallel_config.dp_mp_config
         if _get_parallel_mode() in (ParallelMode.AUTO_PARALLEL,):
             self.add = P.Add()
@@ -3015,7 +3047,7 @@ class Transformer(Cell):
             if not lambda_func:
                 lambda_func = _get_lambda_func(total_layer=encoder_layers + decoder_layers)
             _check_moe_config(moe_config, parallel_config)
-            self.use_moe = (moe_config.expert_num > 1)
+            self.use_moe = moe_config.expert_num > 1
             self.add = P.Add()
             self.aux_loss = Tensor(0.0, mstype.float32)
             if encoder_layers > 0:
@@ -3082,7 +3114,7 @@ class Transformer(Cell):
             if not lambda_func:
                 lambda_func = _get_lambda_func(total_layer=encoder_layers + decoder_layers)
             _check_moe_config(moe_config, parallel_config)
-            self.use_moe = (moe_config.expert_num > 1)
+            self.use_moe = moe_config.expert_num > 1
             self.add = P.Add().shard(((), ()))
             self.aux_loss = Tensor(0.0, mstype.float32)
             if encoder_layers > 0:

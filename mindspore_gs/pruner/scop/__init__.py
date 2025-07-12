@@ -16,6 +16,6 @@
 MindSpore golden stick scop.
 """
 
-from .scop_pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo
-
 __all__ = ["PrunerKfCompressAlgo", "PrunerFtCompressAlgo"]
+
+from .scop_pruner import PrunerKfCompressAlgo, PrunerFtCompressAlgo

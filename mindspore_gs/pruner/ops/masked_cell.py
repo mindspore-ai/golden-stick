@@ -58,6 +58,7 @@ class MaskedCell(nn.Cell):
         raise NotImplementedError("Please implement 'prune' method.")
 
     def set_in_mask(self, in_mask: np.array):
+        """set_in_mask"""
         if in_mask.dtype != np.int8:
             raise ValueError(f'Data type of `in_mask` must be numpy.int8, but got {in_mask.dtype}.')
         if in_mask.shape != self.in_mask.asnumpy().shape:
@@ -66,6 +67,7 @@ class MaskedCell(nn.Cell):
         self.in_mask.set_data(Tensor(in_mask), True)
 
     def set_out_mask(self, out_mask: np.array):
+        """set_out_mask"""
         if out_mask.dtype != np.int8:
             raise ValueError(f'Data type of `out_mask` must be numpy.int8, but got {out_mask.dtype}.')
         if out_mask.shape != self.out_mask.asnumpy().shape:
@@ -74,4 +76,5 @@ class MaskedCell(nn.Cell):
         self.out_mask.set_data(Tensor(out_mask), True)
 
     def construct(self, *inputs):
+        """construct"""
         return self.handler(*inputs)

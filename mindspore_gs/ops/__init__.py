@@ -16,9 +16,9 @@
 MindSpore golden stick ops.
 """
 
-from .gs_custom import GSCustom, custom_op_attr_register
-
 __all__ = [
     "GSCustom",
     "custom_op_attr_register"
 ]
+
+from .gs_custom import GSCustom, custom_op_attr_register

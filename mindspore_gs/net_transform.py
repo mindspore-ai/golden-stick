@@ -41,25 +41,29 @@ class NetTransformer:
             except (RuntimeError, ValueError, TypeError, NotImplementedError):
                 raise RuntimeError(f"For MindSpore Golden Stick, input network type '{type(net).__name__}' "
                                    f"is not supported right now.")
-            except Exception:
-                raise Exception("For MindSpore Golden Stick, analysis input network fail.")
+            except Exception as e:
+                raise Exception(f"For MindSpore Golden Stick, analysis input network fail.\n{e}")
             return
         self._symbol_tree = symbol_tree
 
     @staticmethod
     def create_from_tree_node(node):
+        """create_from_tree_node"""
         modify_tree = node.get_sub_tree()
         return NetTransformer(None, modify_tree)
 
     @staticmethod
     def create_node(cell: Cell, targets: [Union[ScopedValue, str]], args: [ScopedValue] = None,
                     kwargs: {str: ScopedValue}=None, name: str = "") -> Node:
+        """create_node"""
         return Node.create_call_cell(cell, targets, args, kwargs, name)
 
     def get_network(self) -> Cell:
+        """get_network"""
         return self._symbol_tree.get_network()
 
     def get_code(self):
+        """get_code"""
         return self._symbol_tree.get_code()
 
     def unfolded_nodes(self) -> {}:
@@ -80,12 +84,15 @@ class NetTransformer:
         return self._symbol_tree.nodes()
 
     def before(self, node_or_name: Union[Node, str]):
+        """before"""
         return self._symbol_tree.before(node_or_name)
 
     def after(self, node_or_name: Union[Node, str]):
+        """after"""
         return self._symbol_tree.after(node_or_name)
 
     def insert(self, position, node: Node) -> Optional[Node]:
+        """insert"""
         return self._symbol_tree.insert(position, node)
 
     def erase_node(self, node_or_name: Union[Node, str]) -> Optional[Node]:
@@ -98,7 +105,8 @@ class NetTransformer:
         """
         return self._symbol_tree.erase_node(node_or_name)
 
-    def replace(self, old_node: Node, new_nodes: [Node]) -> Node:
+    @staticmethod
+    def replace(old_node: Node, new_nodes: [Node]) -> Node:
         """
         Replace an old_node with new_node from rewrite. Can only erase a node not being depended on.
 
@@ -116,6 +124,7 @@ class NetTransformer:
         return stree.replace(old_node, new_nodes)
 
     def dump(self):
+        """dump"""
         self._symbol_tree.dump()
 
     # replace src_pattern with target_nodes.

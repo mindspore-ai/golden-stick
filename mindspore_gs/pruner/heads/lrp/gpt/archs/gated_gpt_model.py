@@ -50,6 +50,7 @@ class EmbeddingLookup(nn.Cell):
         self.shape = (-1, config.seq_length, config.embedding_size)
 
     def construct(self, input_ids):
+        """construct"""
         output = self.gather(self.embedding_table, input_ids, 0)
         return output, self.embedding_table.value()
 
@@ -91,14 +92,17 @@ class GPTModel(nn.Cell):
         self.num_layers = config.num_layers
 
     def get_gate_values(self):
+        """get_gate_values"""
         self.stack = ops.Stack()
         gates = self.encoder.get_gate_values()
         return self.stack(gates) if gates[0] is not None else gates
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.encoder.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.encoder.remove_gates()
 
     def construct(self, input_ids, input_mask):
@@ -144,6 +148,7 @@ class GPTHead(nn.Cell):
         self.cast = P.Cast()
 
     def construct(self, state, embedding_table):
+        """construct"""
         state = P.Reshape()(state, (-1, self.embedding_size))
         logits = self.matmul(state, self.cast(embedding_table, self.dtype))
         return logits
@@ -172,15 +177,19 @@ class GPT(nn.Cell):
         self.use_past = None     # unused param
 
     def get_gate_values(self):
+        """get_gate_values"""
         return self.backbone.get_gate_values()
 
     def apply_gates(self, l0_penalty):
+        """apply_gates"""
         self.backbone.apply_gates(l0_penalty=l0_penalty)
 
     def remove_gates(self):
+        """remove_gates"""
         self.backbone.remove_gates()
 
     def construct(self, input_ids, input_mask, past=None):
+        """construct"""
         self.use_past = past  # unused param
         output_states, _, embedding_table, total_reg = self.backbone(input_ids, input_mask)
         logits = self.head(output_states, embedding_table)
@@ -209,6 +218,7 @@ class GPTWithModel(nn.Cell):
         self.head = GPTHead(config)
 
     def construct(self, input_ids, input_mask, past=None):
+        """construct"""
         output_states, _, embedding_table, total_reg = self.backbone(input_ids, input_mask, past)
         logits = self.head(output_states, embedding_table)
         return logits, total_reg
@@ -238,6 +248,7 @@ class GPTWithLoss(nn.Cell):
         self.eos_token = eos_token
 
     def construct(self, input_ids, past=None):
+        """construct"""
         tokens = input_ids[:, :-1]
         input_mask = F.cast(F.not_equal(tokens, self.eos_token), mstype.float32)
         logits, total_reg = self.network(tokens, input_mask, past)

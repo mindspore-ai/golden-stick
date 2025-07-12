@@ -44,6 +44,7 @@ class GPTForGates(nn.Cell):
         self.head = GPT_Head(config)
 
     def construct(self, input_ids, input_mask):
+        """construct"""
         output_states, _, embedding_table, total_reg = self.backbone(input_ids, input_mask)
         logits = self.head(output_states, embedding_table)
         return logits, total_reg
@@ -72,6 +73,7 @@ class GPTWithLossForGates(nn.Cell):
         self.eos_token = eos_token
 
     def construct(self, input_ids, past=None):
+        """construct"""
         tokens = input_ids[:, :-1]
         input_mask = F.cast(F.not_equal(tokens, self.eos_token), mstype.float32)
         logits, total_reg = self.network(tokens, input_mask, past)
@@ -103,6 +105,7 @@ class GPTWithModel(nn.Cell):
         self.head = GPT_Head(config)
 
     def construct(self, input_ids, input_mask, past=None):
+        """construct"""
         output_states, _, embedding_table = self.backbone(input_ids, input_mask, past)
         logits = self.head(output_states, embedding_table)
         return logits
