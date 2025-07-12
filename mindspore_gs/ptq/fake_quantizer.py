@@ -34,24 +34,30 @@ class FakeQuantizer(Cell):
 
     @abc.abstractmethod
     def name(self) -> str:
+        """name"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def quant_dtype(self) -> mstype:
+        """quant dtype"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def is_per_channel(self) -> bool:
+        """is per channel"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def quant_params(self) -> dict:
+        """quant params"""
         raise NotImplementedError
 
     def set_attr(self, key, value):
+        """set attr"""
         self._attrs[key] = value
 
     def get_attr(self, key, default=None):
+        """get attr"""
         return self._attrs.get(key, default)
 
 
@@ -75,35 +81,44 @@ class LinearFakeQuantizer(FakeQuantizer):
         return LinearFakeQuantizer.attr_value_quant_algo_name
 
     def foo_init(self):
+        """foo init"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def mins(self) -> Union[list, tuple]:
+        """mins"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def maxs(self) -> Union[list, tuple]:
+        """maxs"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def num_bits(self) -> int:
+        """num bits"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def narrow_range(self) -> bool:
+        """narrow range"""
         raise NotImplementedError
 
     @abc.abstractmethod
     def symmetric(self) -> bool:
+        """symmetric"""
         raise NotImplementedError
 
     def signed(self) -> bool:
+        """signed"""
         return self.symmetric()
 
     def channel_axis(self) -> int:
+        """get channel axis"""
         return -1
 
     def get_scale_zp(self):
+        """get scale zp"""
         quant_min, quant_max = get_quant_min_max(self.num_bits(), self.signed(), self.narrow_range())
         input_mins = np.array(self.mins(), dtype=np.float32)
         input_maxs = np.array(self.maxs(), dtype=np.float32)
@@ -135,10 +150,17 @@ class MinMaxHolder(nn.Cell):
         self._max = max_
 
     def construct(self, x):
+        """
+        Defines the computation of MinMaxHolder to be performed.
+
+        Returns:
+            Tensor, returns the computed result.
+        """
         return self._fq(x, self._min, self._max)
 
     # pylint: disable=W0613
     def shard(self, in_strategy):
+        """shard strategy for fq"""
         self._fq = self._fq.shard(in_strategy)
 
 

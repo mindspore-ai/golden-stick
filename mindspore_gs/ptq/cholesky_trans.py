@@ -43,6 +43,7 @@ else:
     spotri.argtypes = [ctypes.POINTER(ctypes.c_char), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_float),
                        ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
 
+
 def cholesky_compute(h, damp_percent=0.01):
     """compute cholesky decomposition"""
     damp = damp_percent * msops.mean(numpy.diag(h))
@@ -71,6 +72,7 @@ def cholesky_compute(h, damp_percent=0.01):
         h = np.linalg.inv(h.T) @ np.linalg.inv(h)
         hinv = Tensor(np.linalg.cholesky(h).T)
     return hinv
+
 
 def cholesky_transform(h):
     """

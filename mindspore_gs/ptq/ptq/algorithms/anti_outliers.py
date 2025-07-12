@@ -43,6 +43,7 @@ class LinearSmoothQuant(LinearSmoother):
 
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
+        """register layer map"""
         if not issubclass(quant_layer_type, WrapperCell):
             raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {quant_layer_type}.")
@@ -53,6 +54,7 @@ class LinearSmoothQuant(LinearSmoother):
 
     @staticmethod
     def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+        """get wrapper layer"""
         wrappers = LinearSmoothQuant.linear_map.get(layer_type)
         if not wrappers:
             return None
@@ -102,6 +104,7 @@ class LinearAWQ(LinearSmoother):
 
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
+        """register layer map"""
         if not issubclass(quant_layer_type, WrapperCell):
             raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {quant_layer_type}.")
@@ -112,6 +115,7 @@ class LinearAWQ(LinearSmoother):
 
     @staticmethod
     def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+        """get wrapper layer"""
         wrappers = LinearAWQ.linear_map.get(layer_type)
         if not wrappers:
             return None
@@ -159,6 +163,7 @@ class LinearAutoSmoother(LinearSmoother):
 
     @staticmethod
     def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
+        """register layer map"""
         if not issubclass(quant_layer_type, WrapperCell):
             raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
                                f"but got {quant_layer_type}.")
@@ -169,6 +174,7 @@ class LinearAutoSmoother(LinearSmoother):
 
     @staticmethod
     def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+        """get wrapper layer"""
         wrappers = LinearAutoSmoother.linear_map.get(layer_type)
         if not wrappers:
             return None

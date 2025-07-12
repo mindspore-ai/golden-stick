@@ -43,6 +43,7 @@ from mindspore_gs.ptq.basic_quant_func import (
 
 RANK_ID = get_rank()
 
+
 class KernelType(enum.Enum):
     ASD = 0
     ACLNN = 1
@@ -143,11 +144,13 @@ class DynamicQuantCell(QuantUnitCell):
         return DynamicQuantCell(layer_name, is_deploy, smooth_scale)
 
     def construct(self, x):
+        """forward for DynamicQuant"""
         qx, x_scale = self.dynamic_quant(x, self.smooth_scale)
         return qx, x_scale
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """QuantUnitCell"""
         if parallel_type == ParallelType.COL_PARALLEL:
             smooth_scale_shard = (1,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
@@ -199,6 +202,7 @@ class QuantWithSmoothHighPrecision(QuantWithSmooth):
                          f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
 
     def construct(self, x):
+        """forward for QuantWithSmoothHighPrecision"""
         out = x / self.input_scale
         out = msops.round(out)
         out = msops.clip(out, -128., 127.)
@@ -247,6 +251,7 @@ class QuantWithSmoothHighPerformance(QuantWithSmooth):
                          f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
 
     def construct(self, x):
+        """forward for QuantWithSmoothHighPerformance"""
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
 
 
@@ -303,6 +308,7 @@ class QuantWithOutlierSuppressionPlusHighPrecision(QuantWithOutlierSuppressionPl
             return
 
     def construct(self, x):
+        """forward for QuantWithOutlierSuppressionPlusHighPrecision"""
         x = msops.add(x, self.beta)
         out = x / self.input_scale
         out = msops.round(out)
@@ -324,6 +330,7 @@ class QuantWithOutlierSuppressionPlusHighPerformance(QuantWithOutlierSuppression
             return
 
     def construct(self, x):
+        """forward for QuantWithOutlierSuppressionPlusHighPerformance"""
         x = msops.add(x, self.beta)
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
 
@@ -427,6 +434,7 @@ class QuantWithOutlierSuppressionPlusHighPrecisionSmooth(QuantWithOutlierSuppres
                          f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
 
     def construct(self, x):
+        """forward for QuantWithOutlierSuppressionPlusHighPrecisionSmooth"""
         x = msops.add(x, self.beta_osp)
         out = x / self.input_scale
         out = msops.round(out)
@@ -480,6 +488,7 @@ class QuantWithOutlierSuppressionPlusHighPerformanceSmooth(QuantWithOutlierSuppr
                          f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
 
     def construct(self, x):
+        """forward for QuantWithOutlierSuppressionPlusHighPerformanceSmooth"""
         x = msops.add(x, self.beta_osp)
         return self.quant(x, self.input_scale, self.input_zp, False, "ROUND", dtype.int8)
 
@@ -501,11 +510,13 @@ class SmoothMatmul(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, src, smooth_scale):
+        """create SmoothMatmul"""
         if isinstance(src, (msops.MatMul, GroupedMatmulV4)):
             return SmoothMatmul(layer_name, src, smooth_scale)
         raise ValueError(f"Not support creating SmoothMatmul from {src}.")
 
     def construct(self, *args, **kwargs):
+        """forward for SmoothMatmul"""
         args = list(args)
         x = args[0][0] if self.is_group_mm else args[0]
         smooth_scale = msops.cast(self.smooth_scale, x.dtype)
@@ -518,6 +529,7 @@ class SmoothMatmul(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             smooth_scale_shard = (1,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
@@ -542,6 +554,7 @@ class SmoothMatmulForDeploy(QuantUnitCell):
         raise ValueError(f"Not support creating SmoothMatmulForDeploy from {src}.")
 
     def construct(self, *args, **kwargs):
+        """forward for SmoothMatmul"""
         args = list(args)
         x = args[0][0] if self.is_group_mm else args[0]
         smooth_scale = msops.cast(self.smooth_scale, x.dtype)
@@ -554,6 +567,7 @@ class SmoothMatmulForDeploy(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             smooth_scale_shard = (1,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
@@ -577,11 +591,13 @@ class OutlierSuppressionPlusMatmulForDeploy(QuantUnitCell):
         raise ValueError(f"Not support creating OutlierSuppressionPlusMatmulForDeploy from {src}.")
 
     def construct(self, x, weight):
+        """forward for OutlierSuppressionPlusMatmul"""
         x = msops.add(x, self.beta)
         return self.mm(x, weight)
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             beta_shard = (1,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
@@ -605,6 +621,7 @@ class OutlierSuppressionPlusSmoothMatmul(QuantUnitCell):
         )
 
     def update(self, layer_name, mm, smooth_scale_, beta_):
+        """update data"""
         self.layer_name = layer_name
         self.mm = mm
         self.smooth_scale.set_data(msops.div(1, smooth_scale_))
@@ -633,6 +650,7 @@ class OutlierSuppressionPlusSmoothMatmul(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             smooth_scale_shard = (1,)
             beta_shared = (1,)
@@ -678,6 +696,7 @@ class OutlierSuppressionPlusSmoothMatmulForDeploy(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             smooth_scale_shard = (1,)
             beta_shared = (1,)
@@ -762,6 +781,7 @@ class DynamicQuantMatmul(QuantUnitCell):
         raise ValueError(f"Not support creating DynamicQuantMatmul from {src}.")
 
     def construct(self, qx, quant_weight, group_list=None, x_scale=None):
+        """forward for DynamicQuantMatmul"""
         if self.is_group_mm:
             output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
                                group_list, split_item=3, group_type=0, group_list_type=1)[0]
@@ -771,6 +791,7 @@ class DynamicQuantMatmul(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             weight_scale_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
@@ -888,6 +909,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             weight_scale_shard = (1, tensor_parallel_num) if self.is_group_mm else (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
@@ -980,6 +1002,7 @@ class WeightQuantMatmul(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             smooth_scale_shard = (1,)
             t_scale_shard = (1, tensor_parallel_num) if self.is_grouped_mm else (tensor_parallel_num,)
@@ -1390,6 +1413,7 @@ class AllQuantMatmul(QuantUnitCell):
 
     # pylint: disable=arguments-differ
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         if parallel_type == ParallelType.COL_PARALLEL:
             q_shard = (tensor_parallel_num,)
         elif parallel_type == ParallelType.ROW_PARALLEL:
@@ -1527,6 +1551,7 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
 
         return shard_state
 
+
 class C8PagedAttentionCell(QuantUnitCell):
     """C8PagedAttentionMgrCell"""
     def __init__(self, layer_name, cfg: InnerPTQConfig, compute_type, n, d, k_qparam: QuantParam,
@@ -1628,6 +1653,7 @@ class C8PagedAttentionCell(QuantUnitCell):
     # pylint: disable=arguments-differ
     # pylint: disable=W0613
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         state_dict = {}
         if self.enable_deploy_fusion:
             key_value_t_scale_shard = (1, tensor_parallel_num)
@@ -1687,6 +1713,7 @@ class QuantV2Cell(QuantUnitCell):
     # pylint: disable=arguments-differ
     # pylint: disable=W0613
     def param_shard_state(self, tensor_parallel_num=1, parallel_type: ParallelType = ParallelType.NO_PARALLEL):
+        """param_shard_state"""
         state_dict = {}
         t_scale_shard = (tensor_parallel_num,)
         t_zp_shard = (tensor_parallel_num,)

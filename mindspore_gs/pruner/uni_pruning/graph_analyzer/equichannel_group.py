@@ -120,4 +120,4 @@ class EquichannelGroup:
 
     def __closure(self, nodes):
         """Get all paths from start layer."""
-        self.__get_all_paths(self.__initial_layer, nodes)
+        _ = self.__get_all_paths(self.__initial_layer, nodes)

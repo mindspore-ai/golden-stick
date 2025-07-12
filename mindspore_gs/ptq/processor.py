@@ -44,6 +44,7 @@ class Processor(abc.ABC):
 
 
 def transform_network_inplace(network: Cell, target_layer_type: type, transform_fn, network_root_name="root"):
+    """transform network inplace"""
     class Transformer(Processor):
         def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
             if not isinstance(cell, target_layer_type):

@@ -228,6 +228,7 @@ class DequantCell(Cell):
         return self.dequant(x, self.scale)
 
     def shard(self, strategy):
+        """shard strategy for dequant"""
         self.dequant.shard(strategy)
 
 
