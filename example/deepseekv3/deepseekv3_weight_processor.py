@@ -310,6 +310,14 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         w1_scale_ms_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w1._layer.matmul.weight_scale"
         w2_scale_ms_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w2._layer.matmul.weight_scale"
         w3_scale_ms_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w3._layer.matmul.weight_scale"
+        if self.ep_method == EPMethod.ALLTOALL:
+            # use dispatch_quant and dequantSwiGluQuant which supports group_list to optimize performance
+            w1_ms_name = w1_ms_name.replace("._layer.weight", ".weight")
+            w2_ms_name = w2_ms_name.replace("._layer.weight", ".weight")
+            w3_ms_name = w3_ms_name.replace("._layer.weight", ".weight")
+            w1_scale_ms_name = w1_scale_ms_name.replace("._layer.matmul.weight_scale", ".weight_scale")
+            w2_scale_ms_name = w2_scale_ms_name.replace("._layer.matmul.weight_scale", ".weight_scale")
+            w3_scale_ms_name = w3_scale_ms_name.replace("._layer.matmul.weight_scale", ".weight_scale")
 
         w1_list, w2_list, w3_list, w1_scale_list, w2_scale_list, w3_scale_list = \
             self.infer_quant_process_moe(src_hf_dir, hf_weight_map, num_router_experts, layer_id)
@@ -325,16 +333,23 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         if ffn_concat:
             # w_gate_hidden
             w_gate_hidden_name = f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w_gate_hidden._layer.weight"
-            w_gate_hidden_np = np.concatenate([w1_ms_stack_param, w3_ms_stack_param], axis=1)
-            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).permute(0, 2, 1).astype(ms.int8)
-            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
-                                                                   requires_grad=False)
             # w_scale_gate_hidden
             w_scale_gate_hidden_name = \
                 f"model.layers.{layer_id}.feed_forward.routed_experts.ffn.w_gate_hidden._layer.matmul.weight_scale"
 
+            if self.ep_method == EPMethod.ALLTOALL:
+                w_gate_hidden_name = w_gate_hidden_name.replace("._layer.weight", ".weight")
+                w_scale_gate_hidden_name = w_scale_gate_hidden_name.replace("._layer.matmul.weight_scale",
+                                                                            ".weight_scale")
+
+            w_gate_hidden_np = np.concatenate([w1_ms_stack_param, w3_ms_stack_param], axis=1)
+            w_gate_hidden_param = ms.from_numpy(w_gate_hidden_np).permute(0, 2, 1).astype(ms.int8)
+            self.parameter_dict[w_gate_hidden_name] = ms.Parameter(w_gate_hidden_param, name=w_gate_hidden_name,
+                                                                   requires_grad=False)
+
             w_scale_gate_hidden_np = np.concatenate([w1_scale_ms_stack_param, w3_scale_ms_stack_param], axis=1)
-            w_scale_gate_hidden_param = ms.from_numpy(w_scale_gate_hidden_np).astype(ms.bfloat16)
+            weight_scale_dtype = ms.bfloat16 if not self.ep_method == EPMethod.ALLTOALL else ms.float32
+            w_scale_gate_hidden_param = ms.from_numpy(w_scale_gate_hidden_np).astype(weight_scale_dtype)
             self.parameter_dict[w_scale_gate_hidden_name] = ms.Parameter(w_scale_gate_hidden_param,
                                                                          name=w_scale_gate_hidden_name,
                                                                          requires_grad=False)
