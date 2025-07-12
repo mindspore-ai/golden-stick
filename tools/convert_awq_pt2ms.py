@@ -43,6 +43,7 @@ def name_replace(name: str):
     name = name.replace('.qweight', '.weight')
     return name
 
+
 def trans_int32_to_int4(np_data):
     """split int32 matrix to int4, i.e. use int8 matrix to save int4 data."""
     n, m = np_data.shape

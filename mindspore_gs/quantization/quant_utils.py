@@ -24,6 +24,17 @@ __all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", 
 
 
 def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
+    """Get number of bits for quantization data type.
+
+    Args:
+        quant_dtype (QuantDtype): The quantization data type.
+
+    Returns:
+        int: The number of bits for the given quantization data type.
+
+    Raises:
+        ValueError: If the quantization data type is not supported.
+    """
     if 0 <= quant_dtype.value() <= 15:
         return quant_dtype.value() + 1
     if 100 <= quant_dtype.value() <= 115:

@@ -47,19 +47,39 @@ class QuantCell(Cell):
         self._converted = False
 
     def handler(self):
+        """
+        Get handler.
+
+        """
         return self._handler
 
     def policy(self):
+        """
+        Get policy.
+
+        """
         return self._policy
 
     def input_quantizer(self):
+        """
+        Get input quantizer.
+
+        """
         return self._input_quantizer
 
     def output_quantizer(self):
+        """
+        Get output quantizer.
+
+        """
         return self._output_quantizer
 
     @abc.abstractmethod
     def weight_quantizer(self):
+        """
+        Get weight quantizer.
+
+        """
         raise NotImplementedError
 
     # pylint: disable=W0613
@@ -88,8 +108,8 @@ class QuantCell(Cell):
                 raise ValueError(f"The num of cell inputs is incorrect, set input number: "
                                  f"{len(self._inputs_insert_fq)}, real input number: {len(inputs)}")
             fq_inputs = []
-            for i in range(0, len(self._inputs_insert_fq)):
-                if self._inputs_insert_fq[i]:
+            for i, flag in enumerate(self._inputs_insert_fq):
+                if flag:
                     ori_input = inputs[i]
                     fq_inputs.append(self._input_quantizer(ori_input))
                 else:
@@ -102,7 +122,7 @@ class QuantCell(Cell):
         if not isinstance(outputs, list):
             return self._output_quantizer(outputs)
         fq_outputs = []
-        for i in range(0, len(outputs)):
+        for i, ori_output in enumerate(outputs):
             ori_output = outputs[i]
             fq_outputs.append(self._output_quantizer(ori_output))
         return fq_outputs

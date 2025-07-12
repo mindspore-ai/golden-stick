@@ -16,10 +16,10 @@
 MindSpore golden stick grad operations.
 """
 
-from .fake_quant_perlayer_grad import FakeQuantPerLayerGrad
-from .fake_quant_perchannel_grad import FakeQuantPerChannelGrad
-
 __all__ = [
     "FakeQuantPerLayerGrad",
     "FakeQuantPerChannelGrad"
 ]
+
+from .fake_quant_perlayer_grad import FakeQuantPerLayerGrad
+from .fake_quant_perchannel_grad import FakeQuantPerChannelGrad
