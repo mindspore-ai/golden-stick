@@ -25,7 +25,7 @@ import mindspore.ops.functional as F
 from mindspore import context
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.common import logger
-from llama2 import create_llama
+from mindspore_gs.experimental.trace.llama2 import create_llama
 
 
 class TraceGraph:
@@ -333,12 +333,12 @@ def trace_magic_methods():
 
 if __name__ == "__main__":
     context.set_context(mode=context.PYNATIVE_MODE)
-    network = create_llama(5)
+    net = create_llama(5)
     trace_magic_methods()
     trace_functional()
-    trace_cell(network)
-    fn, args = trace_inputs(network)
-    output = fn(*args)
+    trace_cell(net)
+    fn_, args_ = trace_inputs(net)
+    output = fn_(*args_)
     return_node = Node([], 'return', None, [output], {})
     graph.append(return_node)
     logger.debug(graph)

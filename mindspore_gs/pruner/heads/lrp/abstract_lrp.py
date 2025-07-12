@@ -67,7 +67,6 @@ class AbstractHeadPrunerLRP(AbstractHeadPruner, ABC):
         Returns: dict with prune able heads.
 
         """
-        Validator.check_value_type("head_mask", head_mask, [StubTensor], self.__class__.__name__)
         heads_dict = {}
         num_heads = len(head_mask[0])
         for i in range(len(head_mask)):
