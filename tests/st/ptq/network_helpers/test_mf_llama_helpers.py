@@ -57,7 +57,7 @@ def test_mf_llama_net_helper_inputs():
 
     network = helper.create_network()
     assert isinstance(network, LlamaForCausalLM)
-    with pytest.raises(TypeError, match="Type of mf_network should be "):
+    with pytest.raises(TypeError, match="Type of network should be "):
         helper.generate(1, input_ids, 1)
     with pytest.raises(TypeError, match="Type of input_ids should be "):
         helper.generate(network, 1, 1)
