@@ -17,10 +17,10 @@
 import argparse
 import time
 import numpy as np
+from ds_utils import create_network
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_ceval_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
-from ds_utils import create_network
 
 
 def evaluate(net, dataset_path, tokenizer, network_helper, n_samples):
