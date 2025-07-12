@@ -78,18 +78,18 @@ class FakeQuantPerChannel(GSCustom):
         self._check_support_device_target(support_device)
         if num_bits not in self.support_quant_bit:
             raise ValueError(
-                f"For '{self._get_custom_op_name()}' Attr \'num_bits\' is not support.")
+                f"For '{self.get_custom_op_name()}' Attr \'num_bits\' is not support.")
         if ema and not ema_decay:
             raise ValueError(
-                f"For '{self._get_custom_op_name()}' attr \'ema\' and \'ema_decay\' should set together.")
-        validator.check_value_type('ema', ema, (bool,), self._get_custom_op_name())
-        validator.check_value_type('symmetric', symmetric, (bool,), self._get_custom_op_name())
-        validator.check_value_type('narrow_range', narrow_range, (bool,), self._get_custom_op_name())
-        validator.check_value_type('training', training, (bool,), self._get_custom_op_name())
-        validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', self._get_custom_op_name())
-        validator.check_positive_int(num_bits, 'num_bits', self._get_custom_op_name())
-        validator.check_non_negative_int(quant_delay, 'quant_delay', self._get_custom_op_name())
-        validator.check_non_negative_int(channel_axis, 'channel_axis', self._get_custom_op_name())
+                f"For '{self.get_custom_op_name()}' attr \'ema\' and \'ema_decay\' should set together.")
+        validator.check_value_type('ema', ema, (bool,), self.get_custom_op_name())
+        validator.check_value_type('symmetric', symmetric, (bool,), self.get_custom_op_name())
+        validator.check_value_type('narrow_range', narrow_range, (bool,), self.get_custom_op_name())
+        validator.check_value_type('training', training, (bool,), self.get_custom_op_name())
+        validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', self.get_custom_op_name())
+        validator.check_positive_int(num_bits, 'num_bits', self.get_custom_op_name())
+        validator.check_non_negative_int(quant_delay, 'quant_delay', self.get_custom_op_name())
+        validator.check_non_negative_int(channel_axis, 'channel_axis', self.get_custom_op_name())
 
     def _infer_shape(self, x, x_min, x_max):
         """infer_shape."""
@@ -135,10 +135,10 @@ class FakeQuantPerChannel(GSCustom):
         """
         dir_path = os.path.dirname(os.path.abspath(__file__))
         func_path = os.path.join(dir_path, "../kernel/gpu/fake_quant_per_channel_impl.cu")
-        func_name = "Custom" + self._get_custom_op_name()
+        func_name = "Custom" + self.get_custom_op_name()
         if not os.path.exists(func_path):
-            error_str = f"For {self._get_custom_op_name()}, cu file not exist, the path is {func_path}"
+            error_str = f"For {self.get_custom_op_name()}, cu file not exist, the path is {func_path}"
             logger.error(error_str)
             raise RuntimeError(error_str)
-        logger.info(f"Custom op {self._get_custom_op_name()} func: {func_path}:{func_name}")
+        logger.info(f"Custom op {self.get_custom_op_name()} func: {func_path}:{func_name}")
         return func_path + ":" + func_name

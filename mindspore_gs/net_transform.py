@@ -42,7 +42,8 @@ class NetTransformer:
                 raise RuntimeError(f"For MindSpore Golden Stick, input network type '{type(net).__name__}' "
                                    f"is not supported right now.")
             except Exception as e:
-                raise Exception(f"For MindSpore Golden Stick, analysis input network fail.\n{e}")
+                raise Exception(
+                    f"For MindSpore Golden Stick, analysis input network fail.") from e
             return
         self._symbol_tree = symbol_tree
 

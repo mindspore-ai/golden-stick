@@ -251,11 +251,9 @@ class OqLinearWrapper(PTQCell):
         quant_min, quant_max = get_quant_min_max(num_bits=8, signed=True)
         #x量化 scale zp
         temp_x = self._act_mul(self.x, self._div(1.0, self.smoothscale))
-        min_values_out_x = temp_x.min(axis=1)
-        max_values_out_x = temp_x.max(axis=1)
-        shape = max_values_out_x.shape[0]
-        min_values_out_x = ops.reshape(Tensor(min_values_out_x), (shape, 1))
-        max_values_out_x = ops.reshape(Tensor(max_values_out_x), (shape, 1))
+        shape = temp_x.shape[0]
+        min_values_out_x = ops.reshape(Tensor(temp_x.min(axis=1)), (shape, 1))
+        max_values_out_x = ops.reshape(Tensor(temp_x.max(axis=1)), (shape, 1))
         symmetric = True
         scale_x, zp_x = self.cal_param(min_values_out_x, max_values_out_x, quant_min, quant_max, symmetric)
         t_scale_x = ops.reshape(Tensor(scale_x), (shape, 1))

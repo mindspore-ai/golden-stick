@@ -127,7 +127,7 @@ def custom_op_attr_register(fn):
     Custom op attributes register.
     Firstly, initialize an instance of Custom. Secondly, fetch custom ops attributes from function '__init__'
     automatically. Get attributes' name, value and param_type (if attribute has default value in '__init__', then its
-    param_type is 'optional', otherwise is 'required'). Finally, call '_init_custom_op' to initialize OP.
+    param_type is 'optional', otherwise is 'required'). Finally, call 'init_custom_op' to initialize OP.
     """
 
     @functools.wraps(fn)
@@ -145,10 +145,10 @@ def custom_op_attr_register(fn):
             param_type = "required" if type(ops_params[name]).__name__ != 'type' else 'optional'
             single_attr = GSOpAttr(name, value, param_type)
             self.custom_op_attr[name] = single_attr
-            logger.info(f"Custom op {self._get_custom_op_name()} adding attr {single_attr}")
-        logger.info(f"Custom op {self._get_custom_op_name()} begin to init op.")
-        self._init_custom_op()
-        logger.info(f"Custom op {self._get_custom_op_name()} init op success.")
+            logger.info(f"Custom op {self.get_custom_op_name()} adding attr {single_attr}")
+        logger.info(f"Custom op {self.get_custom_op_name()} begin to init op.")
+        self.init_custom_op()
+        logger.info(f"Custom op {self.get_custom_op_name()} init op success.")
         fn(self, *args, **kwargs)
 
     deco.decorated_func = fn
@@ -190,7 +190,7 @@ class GSCustom(Custom):
         """
         for single_name in names:
             if not isinstance(single_name, str):
-                raise TypeError(f"For {self._get_custom_op_name()}, op input name must be str, but got {single_name} "
+                raise TypeError(f"For {self.get_custom_op_name()}, op input name must be str, but got {single_name} "
                                 f"which type is {type(single_name).__name__}")
 
     def _check_op_dtype_format(self, io_dtype: [[DataType]]):
@@ -199,7 +199,7 @@ class GSCustom(Custom):
         """
         for one_format in io_dtype:
             if not isinstance(one_format, list):
-                raise ValueError(f"For {self._get_custom_op_name()} op dtype format should be list, but got "
+                raise ValueError(f"For {self.get_custom_op_name()} op dtype format should be list, but got "
                                  f"{type(one_format).__name__}")
 
     def _get_op_reg_info(self):
@@ -214,31 +214,31 @@ class GSCustom(Custom):
                 .target("GPU") \
                 .get_op_info()
         """
-        info_name = GSCustom._get_lower_name(self._get_custom_op_name()) + "_kernel"
+        info_name = GSCustom._get_lower_name(self.get_custom_op_name()) + "_kernel"
         op_info = CustomRegOp(info_name)
 
         op_input_names = self._get_op_input_names()
         self._check_op_io_names(op_input_names)
         for index, single_name in enumerate(op_input_names):
             op_info = op_info.input(index, single_name)
-        logger.info(f"Custom op {self._get_custom_op_name()} reg input names success")
+        logger.info(f"Custom op {self.get_custom_op_name()} reg input names success")
 
         op_output_names = self._get_op_output_names()
         self._check_op_io_names(op_output_names)
         for index, single_name in enumerate(op_output_names):
             op_info = op_info.output(index, single_name)
-        logger.info(f"Custom op {self._get_custom_op_name()} reg output names success")
+        logger.info(f"Custom op {self.get_custom_op_name()} reg output names success")
 
         op_dtype_foramts = self._get_op_dtype_formats()
         self._check_op_dtype_format(op_dtype_foramts)
         for single_dtype_format in op_dtype_foramts:
             op_info = op_info.dtype_format(*single_dtype_format)
-        logger.info(f"Custom op {self._get_custom_op_name()} reg dtype format success")
+        logger.info(f"Custom op {self.get_custom_op_name()} reg dtype format success")
 
         for attr_name in self.custom_op_attr:
             gs_op_attr = self.custom_op_attr[attr_name]
             op_info = op_info.attr(gs_op_attr.name, gs_op_attr.param_type, gs_op_attr.type, value=gs_op_attr.value)
-        logger.info(f"Custom op {self._get_custom_op_name()} reg attr success")
+        logger.info(f"Custom op {self.get_custom_op_name()} reg attr success")
 
         op_info = op_info.target(context.get_context('device_target'))
         return op_info.get_op_info()
@@ -264,16 +264,16 @@ class GSCustom(Custom):
         lower_name = lower_name.strip('_')
         return lower_name
 
-    def _init_custom_op(self):
+    def init_custom_op(self):
         """
         Init custom op, called in decorator 'custom_op_attr_register'.
         """
         forward_func = self._get_forward_func()
-        logger.info(f"Custom op {self._get_custom_op_name()} get forward_func success.")
+        logger.info(f"Custom op {self.get_custom_op_name()} get forward_func success.")
         op_bprop = self._get_op_bprop() if self._get_op_bprop() else None
-        logger.info(f"Custom op {self._get_custom_op_name()} get op_bprop success.")
+        logger.info(f"Custom op {self.get_custom_op_name()} get op_bprop success.")
         op_reg_info = self._get_op_reg_info()
-        logger.info(f"Custom op {self._get_custom_op_name()} get op_reg_info success.")
+        logger.info(f"Custom op {self.get_custom_op_name()} get op_reg_info success.")
         super(GSCustom, self).__init__(func=forward_func, out_shape=self._infer_shape, out_dtype=self._infer_dtype,
                                        bprop=op_bprop, reg_info=op_reg_info, func_type='aot')
 
@@ -285,15 +285,15 @@ class GSCustom(Custom):
             logger.error(error_str)
             raise ValueError(error_str)
 
-    def _get_custom_op_name(self) -> str:
-        """_get_custom_op_name"""
+    def get_custom_op_name(self) -> str:
+        """get_custom_op_name"""
         return self.__class__.__name__
 
     def _get_custom_attr(self, attr_name: str):
         """_get_custom_attr"""
         op_value = self.custom_op_attr.get(attr_name, None)
         if not op_value:
-            raise RuntimeError(f"Custom op {self._get_custom_op_name()} do not have attr {attr_name}")
+            raise RuntimeError(f"Custom op {self.get_custom_op_name()} do not have attr {attr_name}")
         return op_value.value
 
     def _infer_shape(self, *inputs):
