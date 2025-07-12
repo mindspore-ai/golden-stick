@@ -205,7 +205,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir_, config_path_)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    vocab_file = os.path.join(cur_dir_, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path)
@@ -257,7 +257,7 @@ def eval_llama2(input_, is_quant, config_path_, ckpt_path_, quant_algo_=""):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir_, config_path_)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    vocab_file = os.path.join(cur_dir_, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = "" #os.path.join(cur_dir_, ckpt_path_)

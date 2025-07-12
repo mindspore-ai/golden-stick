@@ -35,12 +35,12 @@ export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
 ds_type="ceval"
-dataset="${BASEPATH}/ws/gs/tests/data/ceval-dataset/dev"
 bfp16_model_path=${1}
 atb_a8w8_model_path=${2}
 vocab_file=${3}
 tokenizer_file=${4}
-mode=${5:-0} # 0: 4 layer for first token check 1: 61 layer for ceval_test (need 16 card)
+dataset=${5}
+mode=${6:-0} # 0: 4 layer for first token check 1: 61 layer for ceval_test (need 16 card)
 sleep_time=10
 
 prepare_env()
