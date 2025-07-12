@@ -15,15 +15,15 @@
 """OmniQuant algorithm."""
 import argparse
 import gc
+import numpy as np
 import mindspore as ms
 import mindspore.nn as nn
 from mindspore.nn import Cell
 from mindspore import Tensor
-from mindformers import LlamaForCausalLM, MindFormerConfig, LlamaConfig, init_context, TransformerOpParallelConfig, \
-    LlamaTokenizer
+from mindformers import (LlamaForCausalLM, MindFormerConfig, LlamaConfig,
+                         init_context, TransformerOpParallelConfig, LlamaTokenizer)
 from mindformers.modules import Linear
-from OQLinearWrapper import OqLinearWrapper
-import numpy as np
+from mindspore_gs.experimental.omniquant.OqLinearWrappers import OqLinearWrapper
 
 
 def get_args():

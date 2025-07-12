@@ -20,7 +20,6 @@ __all__ = ["GhostAlgo"]
 
 from ..version import __version__, mindspore_version_check
 mindspore_version_check()
+__all__.extend(__version__)
 
 from .ghost import GhostAlgo
-
-__all__.extend(__version__)

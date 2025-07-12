@@ -96,8 +96,7 @@ class RMSNorm(nn.Cell):
         norm_factor = self.add(norm_factor, 1e-6)
         norm_factor = self.rsqrt(norm_factor)
         x = self.mul(x, norm_factor)
-        output = self.mul(x, self.weight)
-        return output
+        return self.mul(x, self.weight)
 
 
 class FeedForward(nn.Cell):
@@ -186,7 +185,6 @@ def create_input(batch_size=1, seq_len=1024):
 
 if __name__ == "__main__":
     context.set_context(mode=context.GRAPH_MODE)
-    bs, seq = 1, 1024
     network = create_llama()
     output = network(create_input()).asnumpy()
     logger.debug(f'output shape: {output.shape},'

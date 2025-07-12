@@ -40,12 +40,12 @@ class FakeQuantPerLayerGrad(GSCustom):
         self._check_support_device_target(support_device)
         if num_bits not in self.support_quant_bit:
             raise ValueError(
-                f"For '{self._get_custom_op_name()}' attr \'num_bits\' is not support.")
+                f"For '{self.get_custom_op_name()}' attr \'num_bits\' is not support.")
 
-        validator.check_value_type('symmetric', symmetric, (bool,), self._get_custom_op_name())
-        validator.check_value_type('narrow_range', narrow_range, (bool,), self._get_custom_op_name())
-        validator.check_positive_int(num_bits, 'num_bits', self._get_custom_op_name())
-        validator.check_non_negative_int(quant_delay, 'quant_delay', self._get_custom_op_name())
+        validator.check_value_type('symmetric', symmetric, (bool,), self.get_custom_op_name())
+        validator.check_value_type('narrow_range', narrow_range, (bool,), self.get_custom_op_name())
+        validator.check_positive_int(num_bits, 'num_bits', self.get_custom_op_name())
+        validator.check_non_negative_int(quant_delay, 'quant_delay', self.get_custom_op_name())
 
     def _infer_shape(self, dx, x, x_min, x_max):
         """infer_shape."""
@@ -77,10 +77,10 @@ class FakeQuantPerLayerGrad(GSCustom):
         """
         dir_path = os.path.dirname(os.path.abspath(__file__))
         func_path = os.path.join(dir_path, "../../kernel/gpu/fake_quant_per_layer_grad_impl.cu")
-        func_name = "Custom" + self._get_custom_op_name()
+        func_name = "Custom" + self.get_custom_op_name()
         if not os.path.exists(func_path):
-            error_str = f"For {self._get_custom_op_name()}, cu file not exist, the path is {func_path}"
+            error_str = f"For {self.get_custom_op_name()}, cu file not exist, the path is {func_path}"
             logger.error(error_str)
             raise RuntimeError(error_str)
-        logger.info(f"Custom op {self._get_custom_op_name()} func: {func_path}:{func_name}")
+        logger.info(f"Custom op {self.get_custom_op_name()} func: {func_path}:{func_name}")
         return func_path + ":" + func_name
