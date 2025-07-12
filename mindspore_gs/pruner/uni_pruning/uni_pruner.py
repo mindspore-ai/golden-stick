@@ -85,6 +85,7 @@ class UniPrunerCallback(Callback):
             os.makedirs(self.output_path, exist_ok=True)
 
     def epoch_begin(self, run_context):
+        """epoch begin"""
         if self.prune_flag == 0:
             return
         origin_args = run_context.original_args()
@@ -94,6 +95,7 @@ class UniPrunerCallback(Callback):
             self.uni_zeroing(run_context)
 
     def epoch_end(self, run_context):
+        """epoch end"""
         if self.prune_flag == 0:
             return
         origin_args = run_context.original_args()

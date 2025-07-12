@@ -15,6 +15,6 @@
 """MindSpore GoldenStick UniPruning."""
 
 
-from .uni_pruner import UniPruner
-
 __all__ = ["UniPruner"]
+
+from .uni_pruner import UniPruner

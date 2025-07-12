@@ -34,6 +34,7 @@ def get_medians(norms, step):
                     medians[idx][key].append(median)
     return medians
 
+
 def get_channel_importances(groups, filter_num_thr):
     """
     For each layer count 2 arrays: one with channel importances, second with sorted channel indexes.
@@ -51,6 +52,7 @@ def get_channel_importances(groups, filter_num_thr):
             norms[-1][layer] = [filter_norms, norms_idx]
 
     return norms
+
 
 def choose_channel_group_to_zero(medians, norms, step, filter_num_threshold):
     """

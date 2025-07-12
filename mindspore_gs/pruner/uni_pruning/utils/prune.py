@@ -39,6 +39,7 @@ def update_channel_out(cell, new_val):
             data_format=cell.conv2d.format
         )
 
+
 def prune_net(groups, mask):
     """
     Pruning function of network according to mask.
