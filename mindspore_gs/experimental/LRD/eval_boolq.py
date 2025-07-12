@@ -18,9 +18,9 @@ import argparse
 import time
 import numpy as np
 from mindformers import MindFormerConfig
+from lrd_mf_net_helpers import LRDDeployMFParallelLlama2Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_boolq_dataset
-from lrd_mf_net_helpers import LRDDeployMFParallelLlama2Helper
 
 
 def evaluate(net, dataset_path, network_helper, n_samples):
