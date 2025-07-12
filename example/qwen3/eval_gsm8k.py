@@ -20,10 +20,10 @@ import re
 import math
 from decimal import Decimal, InvalidOperation
 import numpy as np
+from ds_utils import create_network
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import create_gsm8k_dataset
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
-from ds_utils import create_network
 
 
 def cal_acc_gsm8k(answer, res_data):
