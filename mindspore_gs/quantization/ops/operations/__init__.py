@@ -16,14 +16,14 @@
 MindSpore golden stick operations.
 """
 
-from .fake_quant_perchannel import FakeQuantPerChannel
-from .fake_quant_perlayer import FakeQuantPerLayer
-from .min_max_update_perchannel import MinMaxUpdatePerChannel
-from .min_max_update_perlayer import MinMaxUpdatePerLayer
-
 __all__ = [
     "MinMaxUpdatePerLayer",
     "FakeQuantPerLayer",
     "FakeQuantPerChannel",
     "MinMaxUpdatePerChannel",
 ]
+
+from .fake_quant_perchannel import FakeQuantPerChannel
+from .fake_quant_perlayer import FakeQuantPerLayer
+from .min_max_update_perchannel import MinMaxUpdatePerChannel
+from .min_max_update_perlayer import MinMaxUpdatePerLayer

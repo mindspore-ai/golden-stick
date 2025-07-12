@@ -67,6 +67,10 @@ class LearnedStepSizeFakeQuantizerPerLayer(LinearFakeQuantizer):
         self._float_min = Parameter(Tensor([min_init], mindspore.float32), name="float_min")
         self._float_max = Parameter(Tensor([max_init], mindspore.float32), name="float_max")
 
+    def foo_init(self):
+        """foo_init"""
+        raise NotImplementedError
+
     def mins(self) -> Union[list, tuple]:
         return self._float_min.data.asnumpy().tolist()
 
@@ -95,6 +99,7 @@ class LearnedStepSizeFakeQuantizerPerLayer(LinearFakeQuantizer):
         self._float_max.set_data(Tensor(self._get_init_array(min_init)))
 
     def construct(self, x):
+        """Forward pass for learned step size quantization."""
         if self.training:
             out = self.fake_quant_train(x, self._float_max, self.quant_max)
         else:
@@ -134,6 +139,10 @@ class LearnedStepSizeFakeQuantizePerChannel(LinearFakeQuantizer):
         self._float_min = Parameter(Tensor(self._get_init_array(float_min), mindspore.float32), name="float_min")
         self._float_max = Parameter(Tensor(self._get_init_array(float_max), mindspore.float32), name="float_max")
 
+    def foo_init(self):
+        """foo_init"""
+        raise NotImplementedError
+
     def compute_quant_param(self, weight_param):
         max_init = [compute_kl_threshold(weight_para_each.asnumpy(), self._num_bits)
                     for weight_para_each in weight_param]
@@ -157,6 +166,7 @@ class LearnedStepSizeFakeQuantizePerChannel(LinearFakeQuantizer):
         return min_max_array
 
     def construct(self, x):
+        """Forward pass for learned step size quantization."""
         if self.training:
             out = self.fake_quant_train(x, self._float_max, self.quant_max)
         else:

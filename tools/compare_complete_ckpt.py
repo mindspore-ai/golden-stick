@@ -31,6 +31,7 @@ def statistic_error(corr_array, new_array):
     sum_error = np.sum(np.abs(corr_array - new_array))
     return mean_error, sum_error
 
+
 def compare_ckpt(correct_ckpt_file, new_ckpt_file):
     """compare_ckpt"""
     print(f"Trying to compare ckpt with '{correct_ckpt_file}' and '{new_ckpt_file}'.", flush=True)
@@ -65,6 +66,7 @@ def compare_ckpt(correct_ckpt_file, new_ckpt_file):
             print(f"compare {name} error!-----")
         else:
             print(f"all equal, compare {name} success!-----")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

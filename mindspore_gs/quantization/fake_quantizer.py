@@ -69,9 +69,15 @@ class FakeQuantizer(Cell):
         raise NotImplementedError
 
     def set_attr(self, key, value):
+        """
+        Set an attribute for the quantization algorithm.
+        """
         self._attrs[key] = value
 
     def get_attr(self, key, default=None):
+        """
+        Get an attribute for the quantization algorithm.
+        """
         return self._attrs.get(key, default)
 
     def convert_to_fakequantparam(self) -> FakeQuantParamCell:
@@ -93,6 +99,11 @@ class LinearFakeQuantizer(FakeQuantizer):
     attr_key_channel_axis = "channel_axis"
 
     def name(self) -> str:
+        """Get the name of the quantization algorithm.
+
+        Returns:
+            str: The name of the quantization algorithm.
+        """
         return FakeQuantParam.attr_value_linear_quant_algo_name
 
     def foo_init(self):
@@ -101,31 +112,72 @@ class LinearFakeQuantizer(FakeQuantizer):
 
     @abc.abstractmethod
     def mins(self) -> Union[list, tuple]:
+        """Get the minimum values for quantization.
+
+        Returns:
+            Union[list, tuple]: The minimum values for quantization.
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     def maxs(self) -> Union[list, tuple]:
+        """Get the maximum values for quantization.
+
+        Returns:
+            Union[list, tuple]: The maximum values for quantization.
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     def num_bits(self) -> int:
+        """Get the number of bits for quantization.
+
+        Returns:
+            int: The number of bits for quantization.
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     def narrow_range(self) -> bool:
+        """Check if the quantization is narrow range.
+
+        Returns:
+            bool: True if quantization is narrow range, False if wide range.
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     def symmetric(self) -> bool:
+        """Check if the quantization is symmetric.
+
+        Returns:
+            bool: True if quantization is symmetric, False if asymmetric.
+        """
         raise NotImplementedError
 
     def signed(self) -> bool:
+        """Check if the quantization is signed.
+
+        Returns:
+            bool: True if quantization is signed, False if unsigned.
+        """
         return self.symmetric()
 
     def channel_axis(self) -> int:
+        """Get the channel axis for per-channel quantization.
+
+        Returns:
+            int: The channel axis (-1 for per-tensor quantization).
+        """
         return -1
 
     def get_scale_zp(self):
+        """Calculate scale and zero point for quantization.
+
+        Returns:
+            tuple: A tuple containing (scale, zp) where scale is the
+                   quantization scale and zp is the zero point.
+        """
         quant_min, quant_max = get_quant_min_max(self.num_bits(), self.signed(), self.narrow_range())
         input_mins = np.array(self.mins(), dtype=np.float32)
         input_maxs = np.array(self.maxs(), dtype=np.float32)
