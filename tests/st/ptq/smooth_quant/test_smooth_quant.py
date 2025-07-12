@@ -600,7 +600,7 @@ def sq_predict_llama2_2stage():
 
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(cur_dir_, config_path)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    vocab_file = os.path.join(cur_dir_, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
     fp16_ckpt_path = os.path.join(cur_dir_, fp16_ckpt_path)
     w8a8_ckpt_path = os.path.join(cur_dir_, w8a8_ckpt_path)
 

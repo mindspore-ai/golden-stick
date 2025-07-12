@@ -64,8 +64,8 @@ def test_wikitext2(device):
     """
     context.set_context(device_target=device)
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    wiki_ds = os. path.join(cur_dir, "../../../data/wikitext2-dataset/wiki.test.tokens")
-    vocab_file = os. path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    wiki_ds = os. path.join(cur_dir, "/nfs/dataset/workspace/mindspore_dataset/wikitext2/wiki.test.tokens")
+    vocab_file = os. path.join(cur_dir, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
     check_ds(wiki_ds, 1, 500, 100, vocab_file, 1)
     check_ds(wiki_ds, 2, 501, 100, vocab_file, 1)
     check_ds(wiki_ds, 1, 502, 100, vocab_file, 2)

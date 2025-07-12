@@ -48,7 +48,7 @@ def test_mf_llama_net_helper_inputs():
     with pytest.raises(TypeError):
         _ = helper.get_spec(1)
 
-    tokenizer_path = os.path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    tokenizer_path = os.path.join(cur_dir, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
     helper.mf_config.processor.tokenizer.vocab_file = tokenizer_path
     tokenizer = helper.create_tokenizer()
     assert isinstance(tokenizer, LlamaTokenizer)

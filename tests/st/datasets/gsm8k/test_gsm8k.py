@@ -72,7 +72,7 @@ def test_gsm8k(device):
     context.set_context(device_target=device)
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     gsm8k_ds = os. path.join(cur_dir, "../../../data/gsm8k-dataset/test.jsonl")
-    vocab_file = os. path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    vocab_file = os. path.join(cur_dir, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
     check_ds(gsm8k_ds, 1, 500, vocab_file, 1)
     check_ds(gsm8k_ds, 2, 501, vocab_file, 1)
     check_ds(gsm8k_ds, 1, 502, vocab_file, 2)

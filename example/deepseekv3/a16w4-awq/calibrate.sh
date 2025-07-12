@@ -24,10 +24,10 @@ export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
 mf_path=$1
-worker_num=${2:-16}
+ceval_path=$2
+worker_num=${3:-16}
 base_path=$(cd "$(dirname $0)"; pwd)
 yaml=${base_path}/predict_deepseek_r1_671b_calibrate.yaml
-ceval_path=${base_path}/../../../tests/data/ceval-dataset/dev/
 calibrate_path=${base_path}/../calibrate.py
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
