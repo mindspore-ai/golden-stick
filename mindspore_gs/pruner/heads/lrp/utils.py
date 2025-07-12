@@ -231,6 +231,7 @@ def prune_heads_for_bert_self_attention(self, heads):
 
 
 def prune_heads_for_gpt_model(self, heads_to_prune):
+    """prune_heads_for_gpt_model"""
     for layer, heads in heads_to_prune.items():
         self.encoder.blocks[layer].attention.prune_heads(heads)
 
