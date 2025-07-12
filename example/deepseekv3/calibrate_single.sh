@@ -25,10 +25,10 @@ export MS_ENABLE_SYNC_COPY_INPUT=1
 
 mf_path=$1
 quant_type=$2
-worker_num=${3:-16}
-yaml=${4:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
-base_path=$(cd "$(dirname $0)"; pwd)
-ceval_path=${base_path}/../../tests/data/ceval-dataset/dev/
+ceval_path=$3
+worker_num=${4:-16}
+yaml=${5:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671b.yaml}
+
 
 export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 

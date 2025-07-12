@@ -283,10 +283,10 @@ if __name__ == "__main__":
 
     if quant_algo == 'a16w8':
         ds_type = 'boolq'
-        dataset_path = os.path.join(cur_dir, f'../../../data/boolq-dataset/dev.jsonl')
+        dataset_path = os.path.join(cur_dir, f'/nfs/dataset/workspace/mindspore_dataset/boolq/dev.jsonl')
     elif quant_algo == 'smoothquant':
         ds_type = 'ceval'
-        dataset_path = os.path.join(cur_dir, f'../../../data/ceval-dataset/dev')
+        dataset_path = os.path.join(cur_dir, f'/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     elif quant_algo == 'gptq-pergroup':
         ds_type = 'calibrate'
         dataset_path = os.path.join(cur_dir, f'../../../data/calibrate-dataset/calibrate.jsonl')

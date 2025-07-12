@@ -171,7 +171,7 @@ def quant_llama2(config_path_, ckpt_path, output_dir_, quant_algo_, ds_path):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir_, config_path_)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    vocab_file = os.path.join(cur_dir_, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path)
@@ -215,7 +215,7 @@ def eval_llama2(config_path_, ckpt_path_, quant_algo_, ds_path):
     ms.set_context(mode=0, jit_config={"jit_level": "O0", "infer_boost": "on"})
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir_, config_path_)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    vocab_file = os.path.join(cur_dir_, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = ""
@@ -253,7 +253,7 @@ def infer_float(config_path_, ckpt_path_, example):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir_, config_path_)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    vocab_file = os.path.join(cur_dir_, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = os.path.join(cur_dir_, ckpt_path_)
@@ -281,7 +281,7 @@ def infer_quant(config_path_, ckpt_path_, quant_algo_, example):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
     cur_dir_ = os.path.dirname(os.path.abspath(__file__))
     config_path_ = os.path.join(cur_dir_, config_path_)
-    vocab_file = os.path.join(cur_dir_, "../../../data/llama2-tokenizer.model")
+    vocab_file = os.path.join(cur_dir_, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
 
     helper = MFParallelLlama2Helper(config_path_)
     helper.mf_config.load_checkpoint = ""
@@ -384,6 +384,6 @@ if __name__ == "__main__":
     infer_config_path = os.path.join(cur_dir, "../../../data/test_llama2/infer_parallelLlama2_13b.yaml")
     fp16_ckpt_2p_path = os.path.join(cur_dir, "/home/workspace/mindspore_ckpt/ckpt/llama2/llama2-13b-fp16-2p")
     quant_ckpt_path = os.path.join(cur_dir, f"output/parallelLlama2-quant-2p-{quant_algo}")
-    dataset_path = os.path.join(cur_dir, f'../../../data/boolq-dataset/dev.jsonl')
+    dataset_path = os.path.join(cur_dir, f'/nfs/dataset/workspace/mindspore_dataset/boolq/dev.jsonl')
     datasets_accuracy(calibrate_config_path, infer_config_path, fp16_ckpt_2p_path,
                       quant_ckpt_path, quant_algo, dataset_path)

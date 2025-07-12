@@ -74,8 +74,8 @@ def test_ceval(device):
     """
     context.set_context(device_target=device)
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
-    ceval_ds = os. path.join(cur_dir, "../../../data/ceval-dataset/dev")
-    vocab_file = os. path.join(cur_dir, "../../../data/llama2-tokenizer.model")
+    ceval_ds = os. path.join(cur_dir, "/nfs/dataset/workspace/mindspore_dataset/ceval/dev")
+    vocab_file = os. path.join(cur_dir, "/nfs/dataset/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
     check_ds(ceval_ds, 1, 500, vocab_file, 1)
     check_ds(ceval_ds, 2, 501, vocab_file, 1)
     check_ds(ceval_ds, 1, 502, vocab_file, 2)
