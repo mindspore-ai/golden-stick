@@ -90,6 +90,7 @@ class ConcreteGate(nn.Cell):
         return values * gates
 
     def zero_gates(self, gates):
+        """zero_gates"""
         return gates*(gates >= 0.5)
 
 
@@ -115,7 +116,6 @@ class ConcreteGate(nn.Cell):
         (usually activations or weights) before they are multiplied by the gate
         Returns the regularizer value that should to be MINIMIZED (negative logprior)
         """
-        # compute p(gate_is_closed) = cdf(stretched_sigmoid < 0)
         p_open = self.sigmoid(self.log_a - self.bias)
         p_open = ops.clip_by_value(p_open, self.eps, 1.0 - self.eps)
 
@@ -196,9 +196,9 @@ def prune_linear_layer(layer, index, dim: int = 0):
 
 def prune_heads_for_bert_model(self, heads_to_prune):
     """
-        Prune heads for bert
-        @heads: heads to prune for model
-        """
+    Prune heads for bert
+    @heads: heads to prune for model
+    """
     for layer, heads in heads_to_prune.items():
         self.bert_encoder.layers[layer].attention.prune_heads(heads)
 

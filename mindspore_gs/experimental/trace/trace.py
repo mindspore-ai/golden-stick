@@ -24,6 +24,7 @@ from mindspore.nn import Cell
 import mindspore.ops.functional as F
 from mindspore import context
 from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.common import logger
 from llama2 import create_llama
 
 
@@ -58,7 +59,7 @@ class TraceGraph:
 
     def dump(self, indent=0):
         """dump"""
-        print(f"{' ' * indent}{self.name} {self.type}", flush=True)
+        logger.debug(f"{' ' * indent}{self.name} {self.type}", flush=True)
         for node in self.nodes:
             node.dump(indent + 4)
 
@@ -260,8 +261,9 @@ def trace_cell(network: Cell):
         def _is_leaf_cell(cell) -> bool:
             if cell.__module__.startswith("mindspore.nn"):
                 return True
-            if any(name in type(cell).__name__ for name in
-                   ['Embedding', 'FeedForward', 'RMSNorm', 'Attention', 'Linear']):
+            layer_name = ['Embedding', 'FeedForward', 'RMSNorm',
+                          'Attention', 'Linear']
+            if any(name in type(cell).__name__ for name in layer_name):
                 return True
             return False
 
@@ -339,4 +341,4 @@ if __name__ == "__main__":
     output = fn(*args)
     return_node = Node([], 'return', None, [output], {})
     graph.append(return_node)
-    print(graph)
+    logger.debug(graph)

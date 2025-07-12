@@ -1,3 +1,5 @@
+# Copyright 2025 Huawei Technologies Co., Ltd
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -28,13 +30,8 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.train.train_thor import ConvertModelUtils
 from mindspore.nn.optim import Lamb, Momentum, AdamWeightDecay, thor
 from mindspore.common import set_seed
-from mindspore_gs.pruner.heads.lrp.bert.samples.bert_pretrain_gates_sample import BertPreTrainingForGates
-from mindspore_gs.pruner.heads import PruningType, HeadPruningFactory
-from mindspore_gs.pruner.heads.supported import SupportedModels
-from mindspore_gs.common import logger
 
 from official.nlp.Bert.src.dataset import create_bert_dataset, create_eval_dataset
-
 from official.nlp.Bert.src import BertNetworkMatchBucket, \
     BertTrainOneStepCell, \
     BertTrainOneStepWithLossScaleCell, \
@@ -47,6 +44,11 @@ from official.nlp.Bert.src.utils import LossCallBack, BertLearningRate, EvalCall
 from official.nlp.Bert.src.model_utils.config import config as cfg, bert_net_cfg
 from official.nlp.Bert.src.model_utils.moxing_adapter import moxing_wrapper
 from official.nlp.Bert.src.model_utils.device_adapter import get_device_id, get_device_num
+
+from mindspore_gs.pruner.heads.lrp.bert.samples.bert_pretrain_gates_sample import BertPreTrainingForGates
+from mindspore_gs.pruner.heads import PruningType, HeadPruningFactory
+from mindspore_gs.pruner.heads.supported import SupportedModels
+from mindspore_gs.common import logger
 _current_dir = os.path.dirname(os.path.realpath(__file__))
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
@@ -316,4 +318,4 @@ def run_pretrain():
 
 if __name__ == '__main__':
     set_seed(0)
-    run_pretrain()
+    _ = run_pretrain()
