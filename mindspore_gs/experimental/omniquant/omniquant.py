@@ -23,7 +23,7 @@ from mindspore import Tensor
 from mindformers import (LlamaForCausalLM, MindFormerConfig, LlamaConfig,
                          init_context, TransformerOpParallelConfig, LlamaTokenizer)
 from mindformers.modules import Linear
-from mindspore_gs.experimental.omniquant.OqLinearWrappers import OqLinearWrapper
+from mindspore_gs.experimental.omniquant.oq_linear_wrappers import OqLinearWrapper
 
 
 def get_args():

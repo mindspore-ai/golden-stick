@@ -18,8 +18,8 @@ MindSpore golden stick ghost.
 
 __all__ = ["GhostAlgo"]
 
+from .ghost import GhostAlgo
 from ..version import __version__, mindspore_version_check
+
 mindspore_version_check()
 __all__.extend(__version__)
-
-from .ghost import GhostAlgo
