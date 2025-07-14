@@ -93,6 +93,9 @@ class LearnedStepSizeFakeQuantizerPerLayer(LinearFakeQuantizer):
         return False
 
     def compute_quant_param(self, weight_param):
+        """
+        Computes and sets the quantization parameters (min and max) for the given weight tensor.
+        """
         max_init = [compute_kl_threshold(weight_param, self._num_bits)]
         min_init = [-x for x in max_init]
         self._float_min.set_data(Tensor(self._get_init_array(max_init)))
@@ -144,6 +147,9 @@ class LearnedStepSizeFakeQuantizePerChannel(LinearFakeQuantizer):
         raise NotImplementedError
 
     def compute_quant_param(self, weight_param):
+        """
+        Computes and sets the quantization parameters (min and max) for the given weight tensor.
+        """
         max_init = [compute_kl_threshold(weight_para_each.asnumpy(), self._num_bits)
                     for weight_para_each in weight_param]
         min_init = [-x for x in max_init]

@@ -18,7 +18,7 @@ from typing import Optional
 from mindspore.rewrite import Node
 from mindspore.nn import Cell
 from .net_policy import NetPolicy
-from .layer_policy import LayerPolicy, layer_policy_key
+from .layer_policy import LayerPolicy, LAYER_POLICY_KEY
 from .transformer import Transformer
 from ..comp_algo import CompAlgo
 from ..net_transform import NetTransformer
@@ -51,7 +51,7 @@ class QuantizationAwareTraining(CompAlgo):
         net_layer_policy: Optional[LayerPolicy] = self._qat_policy.get_net_layer_policy()
         if net_layer_policy:
             for node in net_transformer.unfolded_nodes():
-                node.set_attribute(layer_policy_key, copy.copy(net_layer_policy))
+                node.set_attribute(LAYER_POLICY_KEY, copy.copy(net_layer_policy))
         # step2 then apply layer-policy map, override policy if need
         layer_policy_map = self._qat_policy.get_layer_policy_map()
         for node in net_transformer.unfolded_nodes():
@@ -62,7 +62,7 @@ class QuantizationAwareTraining(CompAlgo):
                 layer_policy = layer_policy_map.get(node.get_instance_type())
             if isinstance(layer_policy, LayerPolicy):
                 new_layer_policy = copy.deepcopy(layer_policy)
-                node.set_attribute(layer_policy_key, new_layer_policy)
+                node.set_attribute(LAYER_POLICY_KEY, new_layer_policy)
 
     @staticmethod
     def _reduce_redundant_fake_quant(net_transformer: NetTransformer):
@@ -77,7 +77,7 @@ class QuantizationAwareTraining(CompAlgo):
         for node in net_transformer.unfolded_nodes():
             if not isinstance(node, Node):
                 continue
-            cur_policy: LayerPolicy = node.get_attribute(layer_policy_key)
+            cur_policy: LayerPolicy = node.get_attribute(LAYER_POLICY_KEY)
             # cur-node has no quant policy, so no fq will insert into its inputs
             if cur_policy is None:
                 continue
@@ -86,9 +86,8 @@ class QuantizationAwareTraining(CompAlgo):
             if cur_in_quantizer is None:
                 continue
             input_nodes = node.get_inputs()
-            for i in range(0, len(input_nodes)):
-                input_node: Node = input_nodes[i]
-                pre_policy: LayerPolicy = input_node.get_attribute(layer_policy_key)
+            for i, input_node in enumerate(input_nodes):
+                pre_policy: LayerPolicy = input_node.get_attribute(LAYER_POLICY_KEY)
                 # pre-node has no quant policy, so no fq will insert into its outputs
                 if pre_policy is None:
                     continue
@@ -140,7 +139,7 @@ class QuantizationAwareTraining(CompAlgo):
         """
         nodes = list(net_transformer.unfolded_nodes())
         for node in nodes:
-            layer_policy = node.get_attribute(layer_policy_key)
+            layer_policy = node.get_attribute(LAYER_POLICY_KEY)
             if isinstance(layer_policy, LayerPolicy):
                 quant_cell = layer_policy.wrap_cell(node.get_instance())
                 quant_cell.update_parameters_name(node.get_name() + '.')

@@ -80,6 +80,9 @@ class SimulatedFakeQuantizerPerLayer(LinearFakeQuantizer):
             self._fake_quant_train = quant_func(training=True)
             self._fake_quant_infer = quant_func(training=False)
 
+    def foo_init(self):
+        pass
+
     def extend_repr(self):
         """Display instance object as string."""
         s = 'bit_num={}, symmetric={}, narrow_range={}, ema={}({}), per_channel={}, ' \
@@ -112,6 +115,9 @@ class SimulatedFakeQuantizerPerLayer(LinearFakeQuantizer):
         return False
 
     def extract_quant_param(self):
+        """
+        Extracts quantization parameters from the current min and max values.
+        """
         quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._signed,
                                                  narrow_range=self._narrow_range)
         input_min = self._float_min.data.asnumpy()
@@ -120,6 +126,9 @@ class SimulatedFakeQuantizerPerLayer(LinearFakeQuantizer):
         return input_min, input_max, scale, zp
 
     def construct(self, x):
+        """
+        Forward pass for the simulated fake quantizer.
+        """
         if self.training:
             self._float_min, self._float_max = \
                 self._min_max_update_func(x, self._float_min, self._float_max)
@@ -163,6 +172,9 @@ class SimulatedFakeQuantizerPerChannel(SimulatedFakeQuantizerPerLayer):
         input_max = self._float_max.data.asnumpy()
         scale, zp = cal_quantization_params(input_min, input_max, quant_min, quant_max, symmetric=self._symmetric)
         return input_min, input_max, scale, zp
+
+    def foo_init(self):
+        pass
 
     def mins(self) -> Union[list, tuple]:
         return self._float_min.data.asnumpy().tolist()

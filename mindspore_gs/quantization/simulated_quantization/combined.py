@@ -103,6 +103,9 @@ class Conv2dBn(Conv2d):
             self.batchnorm = BatchNorm2d(out_channels, eps, momentum)
 
     def construct(self, x):
+        """
+        Forward pass for the Conv2dBn layer.
+        """
         x = super(Conv2dBn, self).construct(x)
         if self.has_bn:
             x = self.batchnorm(x)

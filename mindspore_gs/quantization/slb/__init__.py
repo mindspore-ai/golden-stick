@@ -16,7 +16,7 @@
 MindSpore golden stick SLB(Searching for Low-Bit Weights) QAT-algorithm.
 """
 
+__all__ = ["SlbQuantAwareTraining"]
+
 
 from .slb_quant_aware_training import SlbQuantAwareTraining
-
-__all__ = ["SlbQuantAwareTraining"]

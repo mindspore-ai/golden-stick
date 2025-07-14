@@ -57,6 +57,7 @@ def trans_int32_to_int4(np_data):
     np_int4_data[:, :] = split_data[:, new_order]
     return np_int4_data
 
+
 def trans_int4_to_qint4x2(np_data):
     """pack int4 data to int8"""
     np_data = np_data.astype(np.int8)
@@ -71,16 +72,17 @@ def convert_hf_ckpt(torch_ckpt_dir, ms_ckpt_file, dtype=ms.float16):
     """convert hf weight to ms."""
     print(f"Trying to convert huggingface checkpoint in '{torch_ckpt_dir}'.", flush=True)
 
-    try:
-        param_dict = {}
-        for file_name in os.listdir(torch_ckpt_dir):
-            if file_name.endswith('.safetensors'):
+    param_dict = {}
+    for file_name in os.listdir(torch_ckpt_dir):
+        if file_name.endswith('.safetensors'):
+            try:
                 param_dict.update(
                     load_checkpoint(os.path.join(torch_ckpt_dir, file_name), format='safetensors'))
-    # pylint: disable=W0703
-    except Exception as e:
-        print(f"Do not find huggingface checkpoint in '{torch_ckpt_dir}', Error {e.message}.", flush=True)
-        return False
+            # pylint: disable=W0703
+            except Exception as e:
+                print(f"Do not find huggingface checkpoint in '{torch_ckpt_dir}', Error {e.message}.", flush=True)
+                return False
+
     ckpt_list = []
     time_start = time.time()
     for name, value in param_dict.items():

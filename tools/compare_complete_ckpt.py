@@ -27,6 +27,7 @@ layers = ['w_qkv', 'wq', 'wk', 'wv', 'wo', 'w1', 'w2', 'w_gate_hidden']
 
 
 def statistic_error(corr_array, new_array):
+    """statistic_error"""
     mean_error = np.mean(np.abs(corr_array - new_array))
     sum_error = np.sum(np.abs(corr_array - new_array))
     return mean_error, sum_error
