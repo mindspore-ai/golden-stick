@@ -15,7 +15,7 @@
 """ptq wrapper cells for mindformers."""
 
 from mindformers.modules.layers import Linear
-from mindspore import dtype
+from mindspore import dtype, Parameter
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -73,7 +73,8 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
                                                self.parallel_type)
         # for all_to_all, quant is absorbed into dispatch-op
         self.layer.weight = self.q_weight
-        self.layer.weight_scale = self.w_scale
+        weight_scale_dtype = self.compute_type if self.parallel_type == ParallelType.ROW_PARALLEL else dtype.float32
+        self.layer.weight_scale = Parameter(self.w_scale.astype(weight_scale_dtype))
         return self.layer
 
 
