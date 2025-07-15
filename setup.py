@@ -94,6 +94,12 @@ class BuildPy(build_py):
 
 
 def version_from_file():
+    """
+    Reads the version string from mindspore_gs/version.py.
+
+    Returns:
+        str: The version string extracted from the version.py file.
+    """
     current_dir = os.path.dirname(os.path.abspath(__file__))
     version_py_file = os.path.join(current_dir, 'mindspore_gs', 'version.py')
     version_pattern = r"^__version__.*=.*'([0-9,.]+)'"

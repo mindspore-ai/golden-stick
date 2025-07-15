@@ -18,7 +18,7 @@ from typing import Optional
 from mindspore.nn import Cell
 from .fake_quantizer import FakeQuantizer
 
-layer_policy_key = "layer_quant_policy"
+LAYER_POLICY_KEY = "layer_quant_policy"
 
 
 class PerChannelArgs:

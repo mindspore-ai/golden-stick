@@ -84,6 +84,9 @@ class QuantCell(Cell):
 
     # pylint: disable=W0613
     def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
+        """
+        Convert the quantization cell for deployment or backend-specific usage.
+        """
         if self._converted:
             return
         self._converted = True
@@ -95,6 +98,7 @@ class QuantCell(Cell):
     # pylint: disable=arguments-differ
     @abc.abstractmethod
     def core_construct(self, *args):
+        """core_construct"""
         raise NotImplementedError
 
     def construct(self, *inputs):

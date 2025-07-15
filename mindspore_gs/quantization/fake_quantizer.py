@@ -34,10 +34,12 @@ class FakeQuantParamCell(Cell):
         self.fq = op
 
     def construct(self, x):
+        """Forward pass for learned step size quantization."""
         return self.fq(x)
 
     # pylint: disable=W0613
     def shard(self, in_strategy, out_strategy=None, parameter_plan=None, device="Ascend", level=0):
+        """Shards the fake quantizer according to the provided strategies."""
         self.fq = self.fq.shard(in_strategy=in_strategy, out_strategy=out_strategy)
 
 
@@ -56,6 +58,7 @@ class FakeQuantizer(Cell):
 
     @abc.abstractmethod
     def quant_dtype(self) -> QuantDtype:
+        """quant_dtype"""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -81,6 +84,9 @@ class FakeQuantizer(Cell):
         return self._attrs.get(key, default)
 
     def convert_to_fakequantparam(self) -> FakeQuantParamCell:
+        """
+        Converts the current fake quantizer configuration to a FakeQuantParamCell object.
+        """
         fq_param = FakeQuantParam(self.quant_dtype(), self.name(), self.is_per_channel(), **self.quant_params())
         return FakeQuantParamCell(fq_param)
 

@@ -40,19 +40,21 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
     Networks <https://arxiv.org/pdf/2009.08695.pdf>`_.
 
     Note:
-        This method will call other set functions to set special values, please refer to the set function about the error.
+        This method will call other set functions to set special values,
+        please refer to the set function about the error.
         For example, `quant_dtype` need refer to `set_weight_quant_dtype` and `set_act_quant_dtype`.
 
     Args:
         config (dict): store attributes for quantization aware training, keys are attribute names,
             values are attribute values. Default: ``None``. Supported attribute are listed below:
 
-            - quant_dtype (Union[QuantDtype, list(QuantDtype), tuple(QuantDtype)]): Datatype used to quantize weights and
-              activations. The type is a QuantDtype, a list of two QuantDtype or a tuple of two QuantDtype. If quant_dtype is a
-              QuantDtype, it will be duplicated to a list of two QuantDtype. The first element represents the type of activations
-              and the second element represents the type of weights. It is necessary to consider the precision support of
-              hardware devices in the practical quantization infer scenaries. Weights quantization support int4|int2|int1,
-              and activations quantization support int8 now.
+            - quant_dtype (Union[QuantDtype, list(QuantDtype), tuple(QuantDtype)]): Datatype used to
+              quantize weights and activations. The type is a QuantDtype, a list of two QuantDtype or
+              a tuple of two QuantDtype. If quant_dtype is a QuantDtype, it will be duplicated to a list
+              of two QuantDtype. The first element represents the type of activations and the second
+              element represents the type of weights. It is necessary to consider the precision support of
+              hardware devices in the practical quantization infer scenaries. Weights quantization support
+              int4|int2|int1, and activations quantization support int8 now.
               Default: ``(QuantDtype.INT8, QuantDtype.INT1)``.
             - enable_act_quant (bool): Whether apply activation quantization while training.
               Default: ``False``.
@@ -105,8 +107,8 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> ## 2) Define SLB QAT-Algorithm
         >>> slb_quantization = SlbQuantAwareTraining()
         >>> ## 3) Use set functions to change config
-        >>> ## 3.1) set_weight_quant_dtype is used to set the weight quantization bit, and support QuantDtype.INT4, QuantDtype.INT2,
-        >>> ## QuantDtype.INT1 now.
+        >>> ## 3.1) set_weight_quant_dtype is used to set the weight quantization bit,
+        >>> and support QuantDtype.INT4, QuantDtype.INT2, QuantDtype.INT1 now.
         >>> slb_quantization.set_weight_quant_dtype(QuantDtype.INT1)
         >>> ## 3.2) set_act_quant_dtype is used to set the activation quantization bit, and support QuantDtype.INT8 now.
         >>> slb_quantization.set_act_quant_dtype(QuantDtype.INT8)
@@ -120,14 +122,17 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> slb_quantization.set_has_trained_epoch(0)
         >>> ## 3.7) set_t_start_val is used to set the initial value of temperature hyperparameters.
         >>> slb_quantization.set_t_start_val(1.0)
-        >>> ## 3.8) set_t_start_time is used to set the fraction of epochs after which temperature hyperparameters starting changing.
+        >>> ## 3.8) set_t_start_time is used to set the fraction of epochs after which temperature
+        >>> hyperparameters starting changing.
         >>> slb_quantization.set_t_start_time(0.2)
-        >>> ## 3.9) set_t_end_time is used to set the fraction of epochs after which temperature hyperparameters stopping changing.
+        >>> ## 3.9) set_t_end_time is used to set the fraction of epochs after which temperature
+        >>> hyperparameters stopping changing.
         >>> slb_quantization.set_t_end_time(0.6)
         >>> ## 3.10) set_t_factor is used to set the multiplicative factor of temperature hyperparameters changing.
         >>> slb_quantization.set_t_factor(1.2)
         >>> ## 4) Print SLB QAT-Algorithm object and check the config setting result
-        >>> ## Since we set weight_quant_dtype to be QuantDtype.INT1, the value of the attribute weight_quant_dtype is INT1
+        >>> ## Since we set weight_quant_dtype to be QuantDtype.INT1, the value of the attribute
+        >>> weight_quant_dtype is INT1
         >>> ## Since we set act_quant_dtype to be QuantDtype.INT8, the value of the attribute weight_quant_dtype is INT8
         >>> ## Since we set enable_act_quant to be True, the value of the attribute enable_act_quant is True
         >>> ## Since we set enable_bn_calibration to be True, the value of the attribute enable_bn_calibration is True
@@ -138,7 +143,9 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> ## Since we set t_end_time to be 0.6, the value of the attribute t_end_time is 0.6
         >>> ## Since we set t_factor to be 1.2, the value of the attribute t_factor is 1.2
         >>> print(slb_quantization)
-        SlbQuantAwareTraining<weight_quant_dtype=INT1, act_quant_dtype=INT8, enable_act_quant=True, enable_bn_calibration=True, epoch_size=100, has_trained_epoch=0, t_start_val=1.0, t_start_time=0.2, t_end_time=0.6, t_factor=1.2>
+        SlbQuantAwareTraining<weight_quant_dtype=INT1, act_quant_dtype=INT8, enable_act_quant=True,
+            enable_bn_calibration=True, epoch_size=100, has_trained_epoch=0, t_start_val=1.0,
+            t_start_time=0.2, t_end_time=0.6, t_factor=1.2>
         >>> ## 5) Apply SLB QAT-algorithm to origin network
         >>> net_qat = slb_quantization.apply(net)
         >>> ## 6) Print network and check the result. Conv2d should be transformed to QuantizeWrapperCells.
@@ -147,17 +154,36 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         >>> print(net_qat)
         NetToQuantOpt<
           (_handler): NetToQuant<
-            (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
-            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9, gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.]), beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.])>
+            (conv): Conv2d<input_channels=1, output_channels=6, kernel_size=(5, 5), stride=(1, 1), pad_mode=valid,
+                padding=0, dilation=(1, 1), group=1, has_bias=False, weight_init=normal, bias_init=zeros, format=NCHW>
+            (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9,
+                gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32,
+                    value= [1., 1., 1., 1., 1., 1.]),
+                beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32,
+                    value= [0., 0., 0., 0., 0., 0.]),
+                moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32,
+                    value= [0., 0., 0., 0., 0., 0.]),
+                moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32,
+                    value= [1., 1., 1., 1., 1., 1.])>
             >
-          (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9, gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.]), beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]), moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32, value= [1., 1., 1., 1., 1., 1.])>
+          (bn): BatchNorm2d<num_features=6, eps=1e-05, momentum=0.9,
+            gamma=Parameter(name=bn.gamma, requires_grad=True, shape=[6], dtype=Float32,
+                value= [1., 1., 1., 1., 1., 1.]),
+            beta=Parameter(name=bn.beta, requires_grad=True, shape=[6], dtype=Float32, value= [0., 0., 0., 0., 0., 0.]),
+            moving_mean=Parameter(name=bn.moving_mean, requires_grad=False, shape=[6], dtype=Float32,
+                value= [0., 0., 0., 0., 0., 0.]),
+            moving_variance=Parameter(name=bn.moving_variance, requires_grad=False, shape=[6], dtype=Float32,
+                value= [1., 1., 1., 1., 1., 1.])>
           (Conv2dSlbQuant): QuantCell<
             (_handler): Conv2dSlbQuant<
-              in_channels=1, out_channels=6, kernel_size=(5, 5), weight_bit_num=1, stride=(1, 1), pad_mode=valid, padding=0, dilation=(1, 1), group=1, has_bias=False
+              in_channels=1, out_channels=6, kernel_size=(5, 5), weight_bit_num=1, stride=(1, 1), pad_mode=valid,
+                padding=0, dilation=(1, 1), group=1, has_bias=False
               (fake_quant_weight): SlbFakeQuantizerPerLayer<bit_num=1>
               >
-            (_input_quantizer): SlbActQuantizer<bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900>
-            (_output_quantizer): SlbActQuantizer<bit_num=8, symmetric=False, narrow_range=False, ema=False(0.999), per_channel=False, quant_delay=900>
+            (_input_quantizer): SlbActQuantizer<bit_num=8, symmetric=False, narrow_range=False,
+                ema=False(0.999), per_channel=False, quant_delay=900>
+            (_output_quantizer): SlbActQuantizer<bit_num=8, symmetric=False, narrow_range=False,
+                ema=False(0.999), per_channel=False, quant_delay=900>
             >
           >
         >>> ## 7) convert a compressed network to a standard network before exporting to MindIR.
@@ -371,6 +397,7 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         self.set_t_end_time(config.get("t_end_time", 0.6))
         self.set_t_factor(config.get("t_factor", 1.2))
 
+    # pylint: disable=arguments-differ
     def callbacks(self, model: Model, dataset: Dataset) -> [Callback]:
         """
         Define TemperatureScheduler callback for SLB QAT-algorithm.
@@ -464,7 +491,9 @@ class SlbQuantAwareTraining(QuantizationAwareTraining):
         if not isinstance(ckpt_path, str):
             raise TypeError(f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
         if ckpt_path != "" and not os.path.isfile(ckpt_path):
-            raise ValueError(f'The parameter `ckpt_path` can only be empty or a valid file, but got {os.path.realpath(ckpt_path)}.')
+            raise ValueError(
+                f'The parameter `ckpt_path` can only be empty or a valid file, but got {os.path.realpath(ckpt_path)}.'
+            )
         ckpt_path = os.path.realpath(ckpt_path)
         if os.path.isfile(ckpt_path):
             param_dict = load_checkpoint(ckpt_path)

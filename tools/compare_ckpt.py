@@ -26,6 +26,7 @@ layers = ['w_qkv', 'wq', 'wk', 'wv', 'wo', 'w1', 'w2', 'w_gate_hidden']
 
 
 def update_param_name(param_dict):
+    """update_param_name"""
     ckpt_list = {}
     for name in sorted(param_dict.keys()):
         if all([_ not in name for _ in layers]):
@@ -37,6 +38,7 @@ def update_param_name(param_dict):
 
 
 def statistic_error(corr_array, wrong_array):
+    """statistic_error"""
     mean_error = np.mean(np.abs(corr_array - wrong_array))
     return mean_error
 

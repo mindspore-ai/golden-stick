@@ -64,10 +64,12 @@ class MinMaxUpdatePerLayer(GSCustom):
         validator.check_value_type('ema', ema, (bool,), self.get_custom_op_name())
         validator.check_float_range(ema_decay, 0, 1, Rel.INC_BOTH, 'ema_decay', self.get_custom_op_name())
 
+    # pylint: disable=arguments-differ
     def _infer_shape(self, x, x_min, x_max):
         """infer_shape."""
         return x_min, x_max
 
+    # pylint: disable=arguments-differ
     def _infer_dtype(self, x, x_min, x_max):
         """infer_dtype."""
         return x_min, x_max

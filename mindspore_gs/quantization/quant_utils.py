@@ -14,13 +14,14 @@
 # ============================================================================
 """Quantization utils."""
 
+__all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max",
+           "get_quant_dtype_num_bits"]
+
+
 import numpy as np
 import mindspore as ms
 from mindspore.common.dtype import QuantDtype
 from mindspore import Tensor
-
-__all__ = ["compute_kl_threshold", "fold_batchnorm", "cal_quantization_params", "get_quant_min_max",
-           "get_quant_dtype_num_bits"]
 
 
 def get_quant_dtype_num_bits(quant_dtype: QuantDtype):
