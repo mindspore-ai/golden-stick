@@ -14,13 +14,14 @@
 # ============================================================================
 """Define version of MindSpore Golden Stick and check version matching between MindSpore and MindSpore Golden Stick."""
 
-import time
-
-#pylint: disable=C0111
+# pylint: disable=C0111
 __version__ = '1.2.0'
 
 
 __checked__ = False
+
+
+import time
 
 
 def mindspore_version_check():
@@ -56,7 +57,7 @@ def mindspore_version_check():
                              '1.2': ('2.6',),
                              }
 
-    required_mindspore_verisions = ms_msgs_version_match[__version__[:3]]
+    required_mindspore_verisions = ms_msgs_version_match.get(__version__[:3])
     ms_version = ms.__version__
     match = False
     for required_mindspore_verision in required_mindspore_verisions:

@@ -91,10 +91,12 @@ class FakeQuantPerChannel(GSCustom):
         validator.check_non_negative_int(quant_delay, 'quant_delay', self.get_custom_op_name())
         validator.check_non_negative_int(channel_axis, 'channel_axis', self.get_custom_op_name())
 
+    # pylint: disable=arguments-differ
     def _infer_shape(self, x, x_min, x_max):
         """infer_shape."""
         return x
 
+    # pylint: disable=arguments-differ
     def _infer_dtype(self, x, x_min, x_max):
         """infer_dtype."""
         return x

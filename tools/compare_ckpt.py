@@ -24,7 +24,9 @@ import mindspore as ms
 # layers include the quantized layer name
 layers = ['w_qkv', 'wq', 'wk', 'wv', 'wo', 'w1', 'w2', 'w_gate_hidden']
 
+
 def update_param_name(param_dict):
+    """update_param_name"""
     ckpt_list = {}
     for name in sorted(param_dict.keys()):
         if all([_ not in name for _ in layers]):
@@ -34,9 +36,12 @@ def update_param_name(param_dict):
         ckpt_list.update({new_name: param_dict[name]})
     return ckpt_list
 
+
 def statistic_error(corr_array, wrong_array):
+    """statistic_error"""
     mean_error = np.mean(np.abs(corr_array - wrong_array))
     return mean_error
+
 
 def compare_ckpt(correct_ckpt_file, wrong_ckpt_file):
     """compare_ckpt"""

@@ -18,7 +18,7 @@ from typing import Optional
 from mindspore.nn import Cell
 from .fake_quantizer import FakeQuantizer
 
-layer_policy_key = "layer_quant_policy"
+LAYER_POLICY_KEY = "layer_quant_policy"
 
 
 class PerChannelArgs:
@@ -128,15 +128,41 @@ class LayerPolicy(abc.ABC):
 
     @abc.abstractmethod
     def get_config(self):
+        """
+        Get the configuration of the layer policy. This method must be overridden by all subclasses.
+
+        Returns:
+            Configuration dictionary or object containing the layer policy settings.
+        """
         raise NotImplementedError
 
     def set_input_number(self, input_num: int):
+        """
+        Set the number of inputs for the layer and initialize fake quantization flags.
+
+        Args:
+            input_num (int): The number of inputs to the layer.
+
+        Note:
+            This method initializes the internal state for managing input quantization.
+            All inputs are set to require fake quantization by default.
+        """
         self._inputs_insert_fq.clear()
         self._input_num = input_num
         for _ in range(0, self._input_num):
             self._inputs_insert_fq.append(True)
 
     def set_input_not_insert_fq(self, index: Optional[int] = None):
+        """
+        Configure which inputs should not have fake quantization inserted.
+
+        Args:
+            index (Optional[int]): The index of the input to disable fake quantization for.
+                If None, disables fake quantization for all inputs.
+
+        Raises:
+            RuntimeError: If the provided index is out of range of the input number.
+        """
         if index is None:
             for i in range(0, self._input_num):
                 self._inputs_insert_fq[i] = False
@@ -147,7 +173,21 @@ class LayerPolicy(abc.ABC):
                 raise RuntimeError("Index out of range of input number")
 
     def get_input_need_insert_fq(self) -> list:
+        """
+        Get the list of boolean flags indicating which inputs need fake quantization.
+
+        Returns:
+            list: A list of boolean values where True indicates the corresponding input
+                should have fake quantization inserted, False indicates it should not.
+        """
         return self._inputs_insert_fq
 
     def set_output_not_insert_fq(self):
+        """
+        Disable fake quantization for the output of this layer.
+
+        Note:
+            This method sets the internal flag to prevent fake quantization from being
+            inserted at the output of the layer.
+        """
         self._output_insert_fq = False

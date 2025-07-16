@@ -197,6 +197,9 @@ class SlbActQuantizer(LinearFakeQuantizer):
         return s
 
     def extract_quant_param(self):
+        """
+        Extracts quantization parameters from the current min and max values.
+        """
         quant_min, quant_max = get_quant_min_max(num_bits=self._num_bits, signed=self._symmetric,
                                                  narrow_range=self._narrow_range)
         input_min = self._float_min.data.asnumpy()
@@ -229,6 +232,9 @@ class SlbActQuantizer(LinearFakeQuantizer):
         return False
 
     def construct(self, x):
+        """
+        Forward pass for the SLB fake quantizer.
+        """
         if self.training:
             self._float_min, self._float_max = \
                 self._min_max_update_func(x, self._float_min, self._float_max)

@@ -15,7 +15,7 @@
 """Transformer."""
 from typing import List, Union
 from mindspore.rewrite import PatternEngine, PatternNode, Node, SymbolTree
-from .layer_policy import LayerPolicy, layer_policy_key
+from .layer_policy import LayerPolicy, LAYER_POLICY_KEY
 
 
 # Only support for fusion currently
@@ -57,7 +57,7 @@ class Transformer(PatternEngine):
                 inputs.append(matched_node)
         # remove inter-matched-node-policy
         for matched_node in matched_list:
-            node_policy: LayerPolicy = matched_node.get_attribute(layer_policy_key)
+            node_policy: LayerPolicy = matched_node.get_attribute(LAYER_POLICY_KEY)
             if node_policy is None:
                 continue
             is_input = matched_node in inputs
@@ -72,9 +72,8 @@ class Transformer(PatternEngine):
             if is_output and not is_input:
                 node_policy.set_input_not_insert_fq()
                 continue
-            for i in range(0, len(matched_node.inputs)):
-                node_input = matched_node.inputs[i]
-                if node_input in inputs_of_matched:
+            for i, node_input in enumerate(matched_node):
+                if node_input in inputs:
                     continue
                 node_policy.set_input_not_insert_fq(i)
 
