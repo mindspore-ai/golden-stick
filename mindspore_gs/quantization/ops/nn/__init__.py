@@ -16,17 +16,6 @@
 MindSpore Golden Stick nn ops.
 """
 
-from .act_quant import ActQuant
-from .batchnorm_fold_cell import BatchNormFoldCell
-from .conv2d_bn_fold_quant import Conv2dBnFoldQuant
-from .conv2d_bn_without_fold_quant import Conv2dBnWithoutFoldQuant
-from .conv2d_bn_fold_quant_one_conv import Conv2dBnFoldQuantOneConv
-from .conv2d_quant import Conv2dQuant
-from .dense_quant import DenseQuant
-from .fake_quant_with_min_max_observer import FakeQuantWithMinMaxObserver
-from .mul_quant import MulQuant
-from .tensor_add_quant import TensorAddQuant
-
 __all__ = [
     'FakeQuantWithMinMaxObserver',
     'Conv2dBnFoldQuantOneConv',
@@ -38,3 +27,14 @@ __all__ = [
     'TensorAddQuant',
     'MulQuant',
 ]
+
+from .act_quant import ActQuant
+from .batchnorm_fold_cell import BatchNormFoldCell
+from .conv2d_bn_fold_quant import Conv2dBnFoldQuant
+from .conv2d_bn_without_fold_quant import Conv2dBnWithoutFoldQuant
+from .conv2d_bn_fold_quant_one_conv import Conv2dBnFoldQuantOneConv
+from .conv2d_quant import Conv2dQuant
+from .dense_quant import DenseQuant
+from .fake_quant_with_min_max_observer import FakeQuantWithMinMaxObserver
+from .mul_quant import MulQuant
+from .tensor_add_quant import TensorAddQuant

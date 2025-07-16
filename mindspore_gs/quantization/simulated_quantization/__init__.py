@@ -16,6 +16,6 @@
 MindSpore golden stick simulated-quantization.
 """
 
-from .simulated_quantization_aware_training import SimulatedQuantizationAwareTraining
-
 __all__ = ["SimulatedQuantizationAwareTraining"]
+
+from .simulated_quantization_aware_training import SimulatedQuantizationAwareTraining

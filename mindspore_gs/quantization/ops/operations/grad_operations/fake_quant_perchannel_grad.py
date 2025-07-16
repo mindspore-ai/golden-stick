@@ -47,10 +47,12 @@ class FakeQuantPerChannelGrad(GSCustom):
         validator.check_positive_int(num_bits, 'num_bits', self.get_custom_op_name())
         validator.check_non_negative_int(quant_delay, 'quant_delay', self.get_custom_op_name())
 
+    # pylint: disable=arguments-differ
     def _infer_shape(self, dx, x, x_min, x_max):
         """infer_shape."""
         return x
 
+    # pylint: disable=arguments-differ
     def _infer_dtype(self, dx, x, x_min, x_max):
         """infer_dtype."""
         return x

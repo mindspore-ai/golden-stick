@@ -36,13 +36,29 @@ class NetPolicy:
         self._net_layer_policy: Optional[LayerPolicy] = None
 
     def get_transformers(self) -> [Transformer]:
+        """
+        Get transformers.
+
+        """
         return self._pattern_engines
 
     def get_layer_policy_map(self) -> {str, LayerPolicy}:
+        """
+        Get layer policy map.
+
+        """
         return self._layer_policy_map
 
     def get_layer_policy(self, layer_type) -> Optional[LayerPolicy]:
+        """
+        Get layer policy by type.
+
+        """
         return self._layer_policy_map.get(layer_type)
 
     def get_net_layer_policy(self) -> Optional[LayerPolicy]:
+        """
+        Get network layer policy.
+
+        """
         return self._net_layer_policy
