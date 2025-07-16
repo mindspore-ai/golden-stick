@@ -49,12 +49,11 @@ class ConvertToQuantInferNetwork:
     def _convert_quant2deploy(self, network):
         """Convert network's all quant subcell to deploy subcell."""
         cells = network.name_cells()
-        for name in cells:
-            subcell = cells.get(name)
-            if subcell is None or subcell == network:
+        for _, subcell in cells.items():
+            if subcell == network:
                 continue
             if isinstance(subcell, QuantCell):
                 subcell.convert()
             else:
-                self._convert_quant2deploy(subcell)
+                _ = self._convert_quant2deploy(subcell)
         return network
