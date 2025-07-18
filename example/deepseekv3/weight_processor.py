@@ -19,10 +19,32 @@ transform huggingface safetensor.
 
 import os
 from enum import Enum
+import numpy as np
 from safetensors import safe_open
+import mindspore as ms
 from mindspore.communication.management import get_rank, get_group_size
 #from mindformers.parallel_core.inference.utils import get_tp_world_size
+from mindformers.version_control import is_310p
+from mindformers.experimental.infer.core.utils import get_pp_world_size
 from mindformers.experimental.parallel_core.pynative.parallel_state import get_data_parallel_world_size
+
+def convert_np_to_ms_dtype(value):
+    """convert_np_to_ms_dtype"""
+    if value.dtype == np.int8:
+        value_dtype = ms.int8
+    elif value.dtype == np.int32:
+        value_dtype = ms.int32
+    elif value.dtype == np.int64:
+        value_dtype = ms.int64
+    elif value.dtype == np.float64:
+        value_dtype = ms.float64
+    elif value.dtype == np.float32:
+        value_dtype = ms.float32
+    elif value.dtype == np.float16:
+        value_dtype = ms.float16
+    else:
+        value_dtype = ms.bfloat16
+    return value_dtype
 
 class EPMethod(Enum):
     """
@@ -48,16 +70,20 @@ class BaseWeightProcessor:
         self.global_rank_id = get_rank()
         self.global_group_size = get_group_size()
         self.tp_group_size = 4
+        self.pp_group_size = self.global_group_size // self.tp_group_size
+        self.is_310 = is_310p()
         self.dp_group_size = get_data_parallel_world_size()
         self.moe_ep_size = self.config.parallel_config.expert_parallel
-        self.moe_tp_size = self.global_group_size // self.moe_ep_size
+        self.moe_tp_size = self.global_group_size // self.moe_ep_size if self.pp_group_size == 1 else \
+                           self.global_group_size // self.pp_group_size
         self.ep_method = EPMethod.DEFAULT
         self.tp_rank_id = self.global_rank_id % self.tp_group_size
 
         num_router_experts = self.config.moe_config.expert_num
         self.ep_group_nums = num_router_experts // self.moe_ep_size
         self.moe_ep_rank_id = self.global_rank_id // self.moe_tp_size
-        self.moe_tp_rank_id = self.global_rank_id % self.moe_tp_size
+        self.moe_tp_rank_id = self.global_rank_id % self.moe_tp_size if self.pp_group_size == 1 else \
+                              self.global_rank_id % self.tp_group_size
         self.ep_start = self.moe_ep_rank_id * self.ep_group_nums
         self.ep_stop = (self.moe_ep_rank_id + 1) * self.ep_group_nums
 
@@ -74,6 +100,26 @@ class BaseWeightProcessor:
 
         self.parameter_dict = {}
         self.file_handles = {}
+
+    def get_layer_index(self, num_layers):
+        pp_nums = get_pp_world_size()
+        tp_nums = self.tp_group_size
+        offset = self.config.model.model_config.offset
+        offset_index = self.global_rank_id // tp_nums
+        stage_layers = num_layers // pp_nums
+        start_layer_index = offset_index * stage_layers
+        end_layer_index = start_layer_index + stage_layers
+
+        if pp_nums > 1 and num_layers % pp_nums != 0:
+            if isinstance(offset, list):
+                raise ValueError(f"The parameter 'offset' is expected to be a list, but got {offset} instead."
+                                 f" Please check whether your offset parameter is set correctly!")
+            for num in range(0, offset_index):
+                start_layer_index += offset[num]
+                end_layer_index += offset[num]
+            end_layer_index += offset[offset_index]
+
+        return start_layer_index, end_layer_index
 
     def get_file_handles(self, filename):
         if filename not in self.file_handles:
@@ -94,6 +140,9 @@ class BaseWeightProcessor:
             qint4 = True
         if not is_split_param or self.moe_tp_size == 1:
             np_data = sf_file.get_tensor(hf_param_name)
+            data_dtype = convert_np_to_ms_dtype(np_data)
+            if self.is_310 and data_dtype == ms.bfloat16:
+                np_data = np_data.astype(np.float32).astype(np.float16)
             return np_data, qint4
 
         np_data = sf_file.get_slice(hf_param_name)
@@ -110,6 +159,9 @@ class BaseWeightProcessor:
             split_data = np_data[:, start:stop]
         else:
             raise ValueError("split_axis:{} is not supported.".format(split_axis))
+        data_dtype = convert_np_to_ms_dtype(split_data)
+        if self.is_310 and data_dtype == ms.bfloat16:
+            split_data = split_data.astype(np.float32).astype(np.float16)
         return split_data, qint4
 
     def get_routed_safetensor_3_dim(self, hf_param_name, src_hf_dir, hf_weight_map, split_ep=False,
@@ -123,6 +175,9 @@ class BaseWeightProcessor:
             qint4 = True
         if not split_tp and not split_ep:
             np_data = sf_file.get_tensor(hf_param_name)
+            data_dtype = convert_np_to_ms_dtype(np_data)
+            if self.is_310 and data_dtype == ms.bfloat16:
+                np_data = np_data.astype(np.float32).astype(np.float16)
             return np_data, qint4
 
         np_data = sf_file.get_slice(hf_param_name)
@@ -143,6 +198,9 @@ class BaseWeightProcessor:
             split_data = np_data[self.ep_start:self.ep_stop, :, start:stop] if split_ep else np_data[:, :, start:stop]
         else:
             raise ValueError("tp_axis:{} is not supported.".format(tp_axis))
+        data_dtype = convert_np_to_ms_dtype(split_data)
+        if self.is_310 and data_dtype == ms.bfloat16:
+            split_data = split_data.astype(np.float32).astype(np.float16)
         return split_data, qint4
 
     def get_routed_safetensor_2_dim(self, hf_param_name, src_hf_dir, hf_weight_map, split_ep=False,
@@ -156,6 +214,9 @@ class BaseWeightProcessor:
             qint4 = True
         if not split_tp and not split_ep:
             np_data = sf_file.get_tensor(hf_param_name)
+            data_dtype = convert_np_to_ms_dtype(np_data)
+            if self.is_310 and data_dtype == ms.bfloat16:
+                np_data = np_data.astype(np.float32).astype(np.float16)
             return np_data, qint4
 
         np_data = sf_file.get_slice(hf_param_name)
@@ -171,6 +232,9 @@ class BaseWeightProcessor:
             split_data = np_data[self.ep_start:self.ep_stop, start:stop] if split_ep else np_data[:, start:stop]
         else:
             raise ValueError("split_tp is True but tp_axis:{} is not supported.".format(tp_axis))
+        data_dtype = convert_np_to_ms_dtype(split_data)
+        if self.is_310 and data_dtype == ms.bfloat16:
+            split_data = split_data.astype(np.float32).astype(np.float16)
         return split_data, qint4
 
     def get_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map, is_split_param=False, split_axis=0,
@@ -185,6 +249,9 @@ class BaseWeightProcessor:
             qint4 = True
         if not is_split_param or split_num == 1:
             np_data = sf_file.get_tensor(hf_param_name)
+            data_dtype = convert_np_to_ms_dtype(np_data)
+            if self.is_310 and data_dtype == ms.bfloat16:
+                np_data = np_data.astype(np.float32).astype(np.float16)
             return np_data, qint4
 
         np_data = sf_file.get_slice(hf_param_name)
@@ -206,6 +273,9 @@ class BaseWeightProcessor:
             split_data = np_data[:, :, start:stop]
         else:
             raise ValueError("split_axis:{} is not supported.".format(split_axis))
+        data_dtype = convert_np_to_ms_dtype(split_data)
+        if self.is_310 and data_dtype == ms.bfloat16:
+            split_data = split_data.astype(np.float32).astype(np.float16)
         return split_data, qint4
 
     def split_weight_by_rank(self, weight, split_axis=0):
@@ -225,6 +295,9 @@ class BaseWeightProcessor:
             split_data = weight[:, start:stop]
         else:
             raise ValueError("split_axis:{} is not supported.".format(split_axis))
+        data_dtype = convert_np_to_ms_dtype(split_data)
+        if self.is_310 and data_dtype == ms.bfloat16:
+            split_data = split_data.astype(np.float32).astype(np.float16)
         return split_data
 
     def load_safetensors_shard(self, src_hf_dir):
