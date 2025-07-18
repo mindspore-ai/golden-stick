@@ -20,6 +20,7 @@ from typing import Optional
 import warnings
 
 import numpy as np
+from mindformers.version_control import is_310p
 from mindspore import Tensor, dtype
 from mindspore.nn import Cell
 from mindspore import Parameter
@@ -29,7 +30,8 @@ from mindspore.common.initializer import initializer
 from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.communication import get_rank
-from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt, GroupedMatmulV4
+from mindspore.ops.auto_generate import (WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt,
+                                         GroupedMatmulV4, GroupedMatmulV4Transpose, GroupedMatmul)
 from mindspore_gs.common.utils import value_check
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
@@ -80,6 +82,7 @@ class QuantUnitCell(abc.ABC, Cell):
     def __init__(self, layer_name):
         super().__init__()
         self.layer_name = layer_name
+        self.is_310p = is_310p()
 
     @abc.abstractmethod
     def param_shard_state(self, tensor_parallel_num=1, **kwargs) -> dict:
@@ -708,7 +711,10 @@ class DynamicQuantMatmul(QuantUnitCell):
                          f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
         self.is_group_mm = is_group_mm
         if is_group_mm:
-            self.qbmm = GroupedMatmulV4()
+            if not self.is_310p:
+                self.qbmm = GroupedMatmulV4()
+            else:
+                self.qbmm = GroupedMatmulV4Transpose()
         else:
             self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=dst_dtype)
 
@@ -751,7 +757,7 @@ class DynamicQuantMatmul(QuantUnitCell):
         if isinstance(src, msops.MatMul):
             return DynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam, transpose_a, transpose_b,
                                                         dst_dtype)
-        if isinstance(src, GroupedMatmulV4):
+        if isinstance(src, (GroupedMatmulV4, GroupedMatmul)):
             return DynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam, transpose_a, transpose_b,
                                                         dst_dtype, True)
         if isinstance(src, SmoothMatmul):
@@ -763,9 +769,16 @@ class DynamicQuantMatmul(QuantUnitCell):
         raise ValueError(f"Not support creating DynamicQuantMatmul from {src}.")
 
     def construct(self, qx, quant_weight, group_list=None, x_scale=None):
+        """construct"""
         if self.is_group_mm:
-            output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
-                               group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            if not self.is_310p:
+                output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
+                                   group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            else:
+                group_list = msops.cast(group_list, dtype=dtype.int32)
+                output = self.qbmm([qx], [quant_weight], None, [self.weight_scale], None, None, None, [x_scale],
+                                   group_list, split_item=3, group_type=0, group_list_type=0, act_type=0,
+                                   transpose_a=False, transpose_b=True)[0]
         else:
             output = self.qbmm(qx, quant_weight, self.weight_scale, None, None, x_scale)
         return output.astype(self.dst_dtype)
@@ -793,7 +806,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
         if not is_group_mm:
             weight_scale_dtype = dtype.bfloat16 if dst_dtype == dtype.bfloat16 else dtype.float32
         else:
-            weight_scale_dtype = dtype.uint64
+            weight_scale_dtype = dtype.uint64 if not self.is_310p else dtype.float32
         if is_deploy:
             self.weight_scale = Parameter(initializer("ones", w_qparam.scale.shape, weight_scale_dtype))
             if is_group_mm:
@@ -811,7 +824,10 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                          f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
         transpose_b = False
         if is_group_mm:
-            self.gmm = GroupedMatmulV4()
+            if self.is_310p:
+                self.gmm = GroupedMatmulV4Transpose()
+            else:
+                self.gmm = GroupedMatmulV4()
         else:
             self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
 
@@ -850,7 +866,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
         if isinstance(linear.matmul, msops.MatMul):
             gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam,
                                                                        transpose_a, transpose_b, dst_dtype)
-        elif isinstance(linear.matmul, GroupedMatmulV4):
+        elif isinstance(linear.matmul, (GroupedMatmul, GroupedMatmulV4)):
             gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam,
                                                                        transpose_a, transpose_b, dst_dtype, True)
         elif isinstance(linear.matmul, SmoothMatmul):
@@ -895,8 +911,14 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
     def construct(self, qx, quant_weight, group_list=None, x_scale=None):
         """forward for GptqDynamicQuantCell"""
         if self.is_group_mm:
-            output = self.gmm([qx], [quant_weight], [self.gmm_bias], [self.weight_scale], None, None, None,
-                              [x_scale], group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            if not self.is_310p:
+                output = self.gmm([qx], [quant_weight], [self.gmm_bias], [self.weight_scale], None, None, None,
+                                  [x_scale], group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            else:
+                group_list = msops.cast(group_list, dtype=dtype.int32)
+                output = self.gmm([qx], [quant_weight], None, [self.gmm_bias], None, [self.weight_scale], None,
+                                  [x_scale], group_list, split_item=3, group_type=0, group_list_type=0, act_type=1,
+                                  transpose_a=False, transpose_b=True)[0]
         else:
             qx = msops.cast(qx, self.dst_dtype)
             weight_scale = msops.cast(self.weight_scale, dtype.float16)
@@ -937,7 +959,10 @@ class WeightQuantMatmul(QuantUnitCell):
                          f"{{{self.weight_zp.shape}, {self.weight_zp.dtype}, {self.weight_zp.asnumpy()}}}")
         self.is_grouped_mm = is_grouped_mm
         if self.is_grouped_mm:
-            self.weight_qbmm = GroupedMatmulV4()
+            if not self.is_310p:
+                self.weight_qbmm = GroupedMatmulV4()
+            else:
+                self.weight_qbmm = GroupedMatmulV4Transpose()
         else:
             self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
         self.has_smooth = smooth_scale is not None
@@ -992,8 +1017,14 @@ class WeightQuantMatmul(QuantUnitCell):
         if self.has_smooth:
             x = msops.mul(x, self.smooth_scale)
         if self.is_grouped_mm:
-            output = self.weight_qbmm([x], [weight], None, None, None, [self.weight_scale], [self.weight_zp], None,
-                                      group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            if not self.is_310p:
+                output = self.weight_qbmm([x], [weight], None, None, None, [self.weight_scale], [self.weight_zp], None,
+                                          group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            else:
+                group_list = msops.cast(group_list, dtype=dtype.int32)
+                output = self.weight_qbmm([x], [weight], None, None, None, [self.weight_scale], [self.weight_zp], None,
+                                   group_list, split_item=3, group_type=0, group_list_type=0, act_type=0,
+                                   transpose_a=False, transpose_b=False)[0]
         else:
             output = self.weight_qbmm(x, weight, self.weight_scale, self.weight_zp, None, None, None)
         return output.astype(self.dst_dtype)
@@ -1063,7 +1094,7 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         if isinstance(linear.matmul, msops.MatMul):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
                                                             linear.transpose_b, dst_dtype, False)
-        elif isinstance(linear.matmul, GroupedMatmulV4):
+        elif isinstance(linear.matmul, (GroupedMatmul, GroupedMatmulV4)):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
                                                             linear.transpose_b, dst_dtype, True)
         elif isinstance(linear.matmul, SmoothMatmul):
@@ -1501,7 +1532,10 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
                          f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}, {self.dequant_scale.asnumpy()}}}")
 
         if self.is_group_mm:
-            self.gmm = GroupedMatmulV4()
+            if self.is_310p:
+                self.gmm = GroupedMatmul(split_item=3, group_type=0, transpose_b=True)
+            else:
+                self.gmm = GroupedMatmulV4()
         else:
             self.qbmm = QuantBatchMatmul(transpose_x1=transpose_a, transpose_x2=transpose_b, dtype=self.dst_dtype)
 
@@ -1523,10 +1557,16 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
         return scale_i64
 
     def construct(self, qx, quant_weight, group_list=None):
+        """construct network forward"""
         # x: fp16 quant_weight: int8
         if self.is_group_mm:
-            output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,
-                               None, None, None, group_list, split_item=3, group_type=0, group_list_type=1)[0]
+            if self.is_310p:
+                group_list = msops.cast(group_list, dtype=dtype.int32)
+                output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,
+                                  None, None, group_list)[0]
+            else:
+                output = self.gmm([qx], [quant_weight], self.g_quant_bias, [self.dequant_scale], self.g_offset,
+                                  None, None, None, group_list, split_item=3, group_type=0, group_list_type=1)[0]
         else:
             output = self.qbmm(qx, quant_weight, self.dequant_scale, self.offset, self.quant_bias, None)
         return output.astype(self.dst_dtype)
