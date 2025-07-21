@@ -25,6 +25,7 @@ from mindspore.communication.management import GlobalComm
 from mindspore.ops import sub as aclnn_sub, add as aclnn_add
 from mindformers.modules.layers import Linear
 from mindformers.experimental.infer.core.layers import ColumnParallelLinear, RowParallelLinear
+
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
@@ -222,13 +223,13 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 scale, zero, _ = quant_tensor(weight[:, i : i + self.cfg.group_size], self.w_quant_min,
                                               self.w_quant_max, self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                               False, 0, self.cfg.weight_quant_dtype,
-                                              self.weight_quantizer_axis, False)
+                                              0, False)
                 self.group_scale.append(Tensor(scale, dtype.float32).T)
                 self.group_zero.append(Tensor(zero, dtype.float32).T)
         quant_tick = time.time()
         self._gptq_precision_recovery(weight, hinv, scale, zero, perm)
         logger.info(f'[TIME]quant layers with time {time.time() - quant_tick}s')
-        if self.cfg.algo_args["desc_act"] and self.weight_need_allgather:
+        if self.cfg.algo_args["desc_act"]:
             self.qweight = self.qweight[:, invperm]
         if self.weight_need_allgather:
             self.qweight = self.qweight[:, self.rank_id * self.ic : self.rank_id * self.ic + self.ic]
