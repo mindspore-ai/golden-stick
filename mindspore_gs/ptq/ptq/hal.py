@@ -901,7 +901,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
 
         if is_deploy:
             if linear.expert_num > 1:
-                weight_shape = (linear.expert_num, ic, oc // 2)
+                weight_shape = (linear.expert_num // linear.moe_ep_size, ic, oc // 2)
             else:
                 weight_shape = (ic, oc // 2)
             q_weight = Parameter(initializer("ones", weight_shape, w_qparam.quant_dtype), name=linear.weight.name)
