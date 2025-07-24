@@ -291,7 +291,7 @@ class PTQ(CompAlgo):
         self._config.update_comm_info()
         self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
-            logger.info("unset environ FORCE_EAGER and MS_JIT because of PTQMode.DEPLOY mode")
+            logger.info("unset environ ENFORCE_EAGER and MS_JIT because of PTQMode.DEPLOY mode")
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = self.decoder_layers[i]
                 for processor in self.pipeline:
@@ -300,8 +300,8 @@ class PTQ(CompAlgo):
                         processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
-        os.environ['FORCE_EAGER'] = 'true'
-        logger.info("set environ FORCE_EAGER=true and MS_JIT=0 because of PTQMode.QUANTIZE mode")
+        os.environ['ENFORCE_EAGER'] = 'true'
+        logger.info("set environ ENFORCE_EAGER=true and MS_JIT=0 because of PTQMode.QUANTIZE mode")
         if get_context("mode") != PYNATIVE_MODE:
             raise ValueError("In QUANTIZE phase, please set mode=PYNATIVE_MODE.")
         if not datasets:
