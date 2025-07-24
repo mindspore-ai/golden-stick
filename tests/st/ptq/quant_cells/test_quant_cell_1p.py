@@ -24,7 +24,8 @@ from mindspore.nn import Cell
 from mindspore.ops.operations._inner_ops import Quant
 from mindspore.ops.auto_generate import QuantBatchMatmul
 
-from mindspore_gs.ptq.convert_utils import AntiquantBMMCell, QuantCell, DequantBMMCell, SmoothAndQuantCell
+from mindspore_gs.ptq.round_to_nearest.convert_utils import (AntiquantBMMCell, QuantCell, DequantBMMCell,
+                                                             SmoothAndQuantCell)
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps, NumpyFullQuant
 from tests.st.test_utils import relative_tolerance_acceptable
 
