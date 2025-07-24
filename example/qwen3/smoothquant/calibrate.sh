@@ -15,7 +15,7 @@
 # ============================================================================
 
 export GSLOG=1
-export FORCE_EAGER=True
+export ENFORCE_EAGER=True
 
 mf_path=$1
 ceval_path=$2

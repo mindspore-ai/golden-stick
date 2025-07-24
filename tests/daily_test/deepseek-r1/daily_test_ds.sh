@@ -23,7 +23,7 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_deepseek_r1_671b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250708/r2.7.rc1_20250708024507_497949a8c21f1bdfb8b1f77f51314ef65a24125d/unified/aarch64/mindspore-2.7.0rc1-cp310-cp310-linux_aarch64.whl"
+MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250723/r2.7.rc1_20250723024507_e30909cc2f8ee5e9d66ad54c3e905a5f25084ef8/unified/aarch64/mindspore-2.7.0rc1-cp310-cp310-linux_aarch64.whl"
 
 export GSLOG=1
 export MS_ENABLE_LCCL=off
@@ -95,7 +95,7 @@ prepare_env()
 
 quant()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
@@ -115,7 +115,7 @@ quant()
 
 eval()
 {
-  unset FORCE_EAGER
+  unset ENFORCE_EAGER
   unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
@@ -133,7 +133,7 @@ eval()
 
 infer()
 {
-  unset FORCE_EAGER
+  unset ENFORCE_EAGER
   unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
