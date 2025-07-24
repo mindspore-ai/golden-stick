@@ -787,6 +787,186 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                                                        requires_grad=False)
         self.quant_special_attention_weight(layer_id, src_hf_dir, hf_weight_map, "o_proj")
 
+    def infer_quant_process_dense_qkv_weight(self, src_hf_dir, layer_id,
+                                             hf_weight_map):
+        """infer_quant_process_dense_qkv_weight"""
+        parameter_dict = {}
+        kv_lora_rank = self.config.model.model_config.kv_lora_rank
+        qk_rope_head_dim = self.config.model.model_config.qk_rope_head_dim
+        kv_head_dim = kv_lora_rank + qk_rope_head_dim
+
+        qkv_concat = self.config.model.model_config.qkv_concat
+        base_name = f"model.layers.{layer_id}.self_attn"
+        # q2l
+        q2l_hf_name = f"{base_name}.q_a_proj.weight"
+        q2l_ms_name = self.quant_convert_weight_name(q2l_hf_name)
+        q2l_ms_param, _ = self.get_safetensor_from_file(
+            q2l_hf_name, src_hf_dir, hf_weight_map)
+
+        q2l_input_scale_hf_name = f"{base_name}.q_a_proj.input_scale"
+        q2l_input_scale_ms_name = self.quant_convert_weight_name(
+            q2l_input_scale_hf_name)
+        q2l_input_scale_ms_param, _ = self.get_safetensor_from_file(
+            q2l_input_scale_hf_name, src_hf_dir, hf_weight_map)
+
+        q2l_input_zp_hf_name = f"{base_name}.q_a_proj.input_offset"
+        q2l_input_zp_ms_name = self.quant_convert_weight_name(
+            q2l_input_zp_hf_name)
+        q2l_input_zp_ms_param, _ = self.get_safetensor_from_file(
+            q2l_input_zp_hf_name, src_hf_dir, hf_weight_map)
+
+        q2l_quant_bias_hf_name = f"{base_name}.q_a_proj.quant_bias"
+        q2l_quant_bias_ms_name = self.quant_convert_weight_name(
+            q2l_quant_bias_hf_name)
+        q2l_quant_bias_ms_param, _ = self.get_safetensor_from_file(
+            q2l_quant_bias_hf_name, src_hf_dir, hf_weight_map)
+
+        q2l_dequant_scale_hf_name = f"{base_name}.q_a_proj.deq_scale"
+        q2l_dequant_scale_ms_name = self.quant_convert_weight_name(
+            q2l_dequant_scale_hf_name)
+        q2l_dequant_scale_ms_param, _ = self.get_safetensor_from_file(
+            q2l_dequant_scale_hf_name, src_hf_dir, hf_weight_map)
+        # kv2l
+        kv2l_hf_name = f"{base_name}.kv_a_proj_with_mqa.weight"
+        kv2l_ms_name = self.quant_convert_weight_name(kv2l_hf_name)
+        kv2l_ms_param, _ = self.get_safetensor_from_file(
+            kv2l_hf_name, src_hf_dir, hf_weight_map)
+        kv2l_ms_param = kv2l_ms_param.reshape(kv_head_dim, -1)
+        kv2l_ms_param = self.infer_trans_rope_weight(kv2l_ms_param,
+                                                     qk_rope_head_dim)
+
+        kv2l_input_scale_hf_name = f"{base_name}.kv_a_proj_with_mqa.input_scale"
+        kv2l_input_scale_ms_name = self.quant_convert_weight_name(
+            kv2l_input_scale_hf_name)
+        kv2l_input_scale_ms_param, _ = self.get_safetensor_from_file(
+            kv2l_input_scale_hf_name, src_hf_dir, hf_weight_map)
+
+        kv2l_input_zp_hf_name = f"{base_name}.kv_a_proj_with_mqa.input_offset"
+        kv2l_input_zp_ms_name = self.quant_convert_weight_name(
+            kv2l_input_zp_hf_name)
+        kv2l_input_zp_ms_param, _ = self.get_safetensor_from_file(
+            kv2l_input_zp_hf_name, src_hf_dir, hf_weight_map)
+
+        kv2l_quant_bias_hf_name = f"{base_name}.kv_a_proj_with_mqa.quant_bias"
+        kv2l_quant_bias_ms_name = self.quant_convert_weight_name(
+            kv2l_quant_bias_hf_name)
+        kv2l_quant_bias_ms_param, _ = self.get_safetensor_from_file(
+            kv2l_quant_bias_hf_name, src_hf_dir, hf_weight_map)
+        kv2l_quant_bias_ms_param = kv2l_quant_bias_ms_param.reshape(
+            kv_head_dim, -1)
+        kv2l_quant_bias_ms_param = self.infer_trans_rope_weight(
+            kv2l_quant_bias_ms_param, qk_rope_head_dim).reshape(-1)
+
+        kv2l_dequant_scale_hf_name = f"{base_name}.kv_a_proj_with_mqa.deq_scale"
+        kv2l_dequant_scale_ms_name = self.quant_convert_weight_name(
+            kv2l_dequant_scale_hf_name)
+        kv2l_dequant_scale_ms_param, _ = self.get_safetensor_from_file(
+            kv2l_dequant_scale_hf_name, src_hf_dir, hf_weight_map)
+        kv2l_dequant_scale_ms_param = kv2l_dequant_scale_ms_param.reshape(
+            kv_head_dim, -1)
+        kv2l_dequant_scale_ms_param = self.infer_trans_rope_weight(
+            kv2l_dequant_scale_ms_param, qk_rope_head_dim).reshape(-1)
+
+        attn_rmsnorm_beta_hf_name = \
+            f"model.layers.{layer_id}.input_layernorm.bias"
+        attn_rmsnorm_beta_ms_name = self.quant_convert_weight_name(
+            attn_rmsnorm_beta_hf_name)
+        attn_rmsnorm_beta_ms_param, _ = self.get_safetensor_from_file(
+            attn_rmsnorm_beta_hf_name, src_hf_dir, hf_weight_map)
+
+        if qkv_concat:
+            base_path = f"model.layers.{layer_id}.attention.qkv2l"
+            qkv2l_weight_name = f"{base_path}._layer.weight"
+            qkv2l_bias_name = f"{base_path}._layer.matmul.quant_bias"
+            qkv2l_scale_name = f"{base_path}._layer.matmul.dequant_scale"
+            qkv2l_quant_zp_name = f"{base_path}.quant_op.input_zp"
+            qkv2l_quant_scale_name = f"{base_path}.quant_op.input_scale"
+            qkv2l_rmsnorm_beta_name = f"{base_path}.quant_op.beta"
+
+            if hasattr(self.config.model.model_config, "use_mla_pre"
+                       ) and self.config.model.model_config.use_mla_pre:
+                qkv2l_weight = np.concatenate((kv2l_ms_param, q2l_ms_param), 0)
+                qkv2l_bias = np.concatenate(
+                    (kv2l_quant_bias_ms_param, q2l_quant_bias_ms_param), 0)
+                qkv2l_scale = np.concatenate(
+                    (kv2l_dequant_scale_ms_param, q2l_dequant_scale_ms_param),
+                    0)
+            else:
+                qkv2l_weight = np.concatenate((q2l_ms_param, kv2l_ms_param), 0)
+                qkv2l_bias = np.concatenate(
+                    (q2l_quant_bias_ms_param, kv2l_quant_bias_ms_param), 0)
+                qkv2l_scale = np.concatenate(
+                    (q2l_dequant_scale_ms_param, kv2l_dequant_scale_ms_param),
+                    0)
+
+            parameter_dict[qkv2l_weight_name] = ms.Parameter(
+                ms.Tensor(qkv2l_weight, ms.int8),
+                name=qkv2l_weight_name,
+                requires_grad=False)
+            parameter_dict[qkv2l_bias_name] = ms.Parameter(
+                ms.Tensor(qkv2l_bias, ms.int32),
+                name=qkv2l_bias_name,
+                requires_grad=False)
+            parameter_dict[qkv2l_scale_name] = ms.Parameter(
+                ms.Tensor(qkv2l_scale, ms.float32),
+                name=qkv2l_scale_name,
+                requires_grad=False)
+            parameter_dict[qkv2l_quant_zp_name] = ms.Parameter(
+                ms.Tensor(q2l_input_zp_ms_param, ms.int8), requires_grad=False)
+            parameter_dict[qkv2l_quant_scale_name] = ms.Parameter(
+                ms.Tensor(q2l_input_scale_ms_param, ms.bfloat16),
+                requires_grad=False)
+            parameter_dict[qkv2l_rmsnorm_beta_name] = ms.Parameter(
+                ms.Tensor(attn_rmsnorm_beta_ms_param, ms.float32),
+                requires_grad=False)
+        else:
+            parameter_dict[q2l_ms_name] = ms.Parameter(ms.Tensor(
+                q2l_ms_param, ms.int8),
+                                                       name=q2l_ms_name,
+                                                       requires_grad=False)
+            parameter_dict[kv2l_ms_name] = ms.Parameter(ms.Tensor(
+                kv2l_ms_param, ms.int8),
+                                                        requires_grad=False)
+            parameter_dict[q2l_quant_bias_ms_name] = ms.Parameter(
+                ms.Tensor(q2l_quant_bias_ms_param, ms.int32),
+                name=q2l_quant_bias_ms_name,
+                requires_grad=False)
+            parameter_dict[kv2l_quant_bias_ms_name] = ms.Parameter(
+                ms.Tensor(kv2l_quant_bias_ms_param, ms.int32),
+                name=kv2l_quant_bias_ms_name,
+                requires_grad=False)
+            parameter_dict[q2l_dequant_scale_ms_name] = ms.Parameter(
+                ms.Tensor(q2l_dequant_scale_ms_param, ms.float32),
+                name=q2l_dequant_scale_ms_name,
+                requires_grad=False)
+            parameter_dict[kv2l_dequant_scale_ms_name] = ms.Parameter(
+                ms.Tensor(kv2l_dequant_scale_ms_param, ms.float32),
+                name=kv2l_dequant_scale_ms_name,
+                requires_grad=False)
+            parameter_dict[q2l_input_zp_ms_name] = ms.Parameter(
+                ms.Tensor(q2l_input_zp_ms_param, ms.int8),
+                name=q2l_input_zp_ms_name,
+                requires_grad=False)
+            parameter_dict[kv2l_input_zp_ms_name] = ms.Parameter(
+                ms.Tensor(kv2l_input_zp_ms_param, ms.int8),
+                name=kv2l_input_zp_ms_name,
+                requires_grad=False)
+            parameter_dict[q2l_input_scale_ms_name] = ms.Parameter(
+                ms.Tensor(q2l_input_scale_ms_param, ms.bfloat16),
+                name=q2l_input_scale_ms_name,
+                requires_grad=False)
+            parameter_dict[kv2l_input_scale_ms_name] = ms.Parameter(
+                ms.Tensor(kv2l_input_scale_ms_param, ms.bfloat16),
+                name=kv2l_input_scale_ms_name,
+                requires_grad=False)
+            parameter_dict[attn_rmsnorm_beta_ms_name] = ms.Parameter(
+                ms.Tensor(attn_rmsnorm_beta_ms_param, ms.float32),
+                name=attn_rmsnorm_beta_ms_name,
+                requires_grad=False)
+        _, _ = ms.load_param_into_net(self.network, parameter_dict)
+        del parameter_dict
+        gc.collect()
+
     def infer_quant_net_convert_layer_weight(self, src_hf_dir, layer_id, hf_weight_map):
         """infer quant net convert layer weight"""
 
@@ -796,6 +976,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         else:
             self.infer_quant_process_dense_ffn_weight(src_hf_dir, layer_id, hf_weight_map)
 
+        self.infer_quant_process_dense_qkv_weight(src_hf_dir, layer_id, hf_weight_map)
         self.infer_quant_process_attention_weight(src_hf_dir, layer_id, hf_weight_map)
         self.infer_quant_bias_weight(src_hf_dir, layer_id, hf_weight_map)
         self.infer_process_norm_weight(src_hf_dir, layer_id, hf_weight_map)
