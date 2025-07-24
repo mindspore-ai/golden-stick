@@ -23,7 +23,8 @@ import mindspore
 from mindspore import QuantDtype, Tensor, dtype, context, GRAPH_MODE, nn, Parameter, PYNATIVE_MODE
 from mindspore.ops.operations import FakeQuantParam, BatchMatMul, MatMul
 from mindspore_gs.quantization.fake_quantizer import FakeQuantParamCell
-from mindspore_gs.ptq.convert_utils import AntiQuantCell, QuantCell, QuantCellV2
+from mindspore_gs.ptq.round_to_nearest.convert_utils import QuantCell, QuantCellV2
+from mindspore_gs.ptq.ptq.hal import AntiQuantCell
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../../../'))
 # pylint: disable=wrong-import-position

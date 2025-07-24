@@ -44,4 +44,3 @@ PTQ 配置
     :template: classtemplate.rst
 
     mindspore_gs.ptq.PTQ
-    mindspore_gs.ptq.RoundToNearest

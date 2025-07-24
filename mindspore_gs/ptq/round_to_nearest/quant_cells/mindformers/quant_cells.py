@@ -30,15 +30,14 @@ from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.basic_quant_func import get_quant_min_max, quant_tensor_data, convert_fp32_to_int64
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
-from mindspore_gs.ptq.quant_cell import PTQCell
-from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
+from mindspore_gs.ptq.round_to_nearest.quant_cell import PTQCell
+from mindspore_gs.ptq.round_to_nearest.ptq_policy import PTQLayerPolicy
 from mindspore_gs.ptq.ptq_config import OutliersSuppressionType, QuantGranularity
-from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
-from mindspore_gs.ptq.convert_utils import (
+from mindspore_gs.ptq.round_to_nearest.fake_quantizer import LinearFakeQuantizer
+from mindspore_gs.ptq.round_to_nearest.convert_utils import (
     convert_to_fusion_antiquant, convert_to_quant, convert_to_dequant,
-    convert_to_fusion_antiquant_for_deploy, convert_to_quant_for_deploy, convert_to_dynamic_quant_for_deploy,
-    convert_to_antiquant_for_deploy
-)
+    convert_to_fusion_antiquant_for_deploy, convert_to_quant_for_deploy, convert_to_dynamic_quant_for_deploy)
+from mindspore_gs.ptq.ptq.hal import convert_to_antiquant_for_deploy
 
 
 class LinearQuant(PTQCell):
@@ -83,7 +82,9 @@ class LinearQuant(PTQCell):
     def core_construct(self, *args):
         pass
 
+    # pylint: disable=unused-argument
     def convert(self, backend=BackendTarget.NONE, is_deploy=False):
+        """convert"""
         weight_only = isinstance(self._weight_quantizer, LinearFakeQuantizer) and \
                       self._policy.get_config().weight_quant_dtype == dtype.int8 and \
                       self._policy.get_config().act_quant_dtype is None
@@ -291,7 +292,9 @@ class PagedAttentionQuant(PTQCell):
     def core_construct(self, *args):
         pass
 
+    # pylint: disable=unused-argument
     def convert(self, backend: BackendTarget = BackendTarget.NONE, is_deploy=False):
+        """convert"""
         if backend == BackendTarget.ASCEND:
             key_input_qparams = self._key_input_quantizer.quant_params()
             value_input_qparams = self._value_input_quantizer.quant_params()

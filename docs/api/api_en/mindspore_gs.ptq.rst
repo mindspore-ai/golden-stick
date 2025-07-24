@@ -44,4 +44,3 @@ Post Training Quantization Algorithm
     :template: classtemplate.rst
 
     mindspore_gs.ptq.PTQ
-    mindspore_gs.ptq.RoundToNearest

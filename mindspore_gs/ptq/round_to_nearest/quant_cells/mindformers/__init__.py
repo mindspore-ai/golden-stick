@@ -19,7 +19,7 @@ from functools import partial
 
 from mindformers.modules.layers import Linear
 from mindformers.modules.paged_attention_mgr import PagedAttentionMgr
-from mindspore_gs.ptq.ptq_policy import PTQNetPolicy
+from mindspore_gs.ptq.round_to_nearest.ptq_policy import PTQNetPolicy
 from mindspore_gs.ptq.round_to_nearest.rtn_net_policy import RTNNetPolicy
 from .layer_policys import LinearLayerPolicy, PagedAttentionMgrPolicy
 
