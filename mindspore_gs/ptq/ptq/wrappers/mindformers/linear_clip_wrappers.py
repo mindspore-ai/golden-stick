@@ -49,8 +49,7 @@ class ClipLinearCell(WrapperLinearCell):
         LinearClipper.reg_layer_map(McoreRowParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(QKVParallelLinear, ClipLinearCell, AutoClipChecker())
         try:
-            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -65,8 +64,6 @@ class ClipLinearCell(WrapperLinearCell):
             LinearClipper.reg_layer_map(DSRowParallelLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(ColumnParallelGroupLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(RowParallelGroupLinear, ClipLinearCell, AutoClipChecker())
-            LinearClipper.reg_layer_map(ColumnParallelLinearWorldRegion, ClipLinearCell, AutoClipChecker())
-            LinearClipper.reg_layer_map(RowParallelLinearWorldRegion, ClipLinearCell, AutoClipChecker())
         except ImportError:
             pass
 
@@ -77,8 +74,7 @@ class ClipLinearCell(WrapperLinearCell):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
         type_map = {Linear: ParallelType.NO_PARALLEL}
         try:
-            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -89,11 +85,9 @@ class ClipLinearCell(WrapperLinearCell):
             type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
-            type_map[ColumnParallelLinearWorldRegion] = ParallelType.COL_PARALLEL
             type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
-            type_map[RowParallelLinearWorldRegion] = ParallelType.ROW_PARALLEL
             type_map[TC2RowParallelLinear] = ParallelType.ROW_PARALLEL
         except ImportError:
             pass
