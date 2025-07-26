@@ -166,7 +166,7 @@ def quant_simple_swiglu_net(non_decoder, quant_type):
     Expectation: correct quant simplenet.
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
-    os.environ['FORCE_EAGER'] = "true"
+    os.environ['ENFORCE_EAGER'] = "true"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -204,7 +204,7 @@ def eval_simple_swiglu_net(non_decoder, quant_type):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
-    os.environ.pop('FORCE_EAGER', None)
+    os.environ.pop('ENFORCE_EAGER', None)
     os.environ.pop('MS_JIT', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
@@ -247,7 +247,7 @@ def quant_simple_gmm_net(non_decoder, linear_type, quant_type):
     Expectation: correct quant simplenet.
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
-    os.environ['FORCE_EAGER'] = "true"
+    os.environ['ENFORCE_EAGER'] = "true"
     os.environ["RUN_MODE"] = "predict"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
@@ -319,7 +319,7 @@ def eval_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
-    os.environ.pop('FORCE_EAGER', None)
+    os.environ.pop('ENFORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -496,7 +496,7 @@ def test_input_catcher(device):
     Expectation: Inputs being caught correctly.
     """
     from mindspore_gs.ptq.ptq.quant import InputCatcher
-    os.environ['FORCE_EAGER'] = "true"
+    os.environ['ENFORCE_EAGER'] = "true"
     context.set_context(mode=context.PYNATIVE_MODE, device_target=device, max_device_memory="8GB")
 
     net = SimpleNet()
@@ -537,7 +537,7 @@ def test_ptq_config_error():
     Description: Feed invalid value of PTQConfig to _ptq_config_check function.
     Expectation: Except ValueError.
     """
-    os.environ['FORCE_EAGER'] = "true"
+    os.environ['ENFORCE_EAGER'] = "true"
     set_context(device_target="CPU")
     config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=None)
     with pytest.raises(ValueError):
@@ -656,7 +656,7 @@ def quant_simplenet(non_decoder):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
-    os.environ['FORCE_EAGER'] = "true"
+    os.environ['ENFORCE_EAGER'] = "true"
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
 
@@ -689,7 +689,7 @@ def eval_simplenet(non_decoder):
     """
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
-    os.environ.pop('FORCE_EAGER', None)
+    os.environ.pop('ENFORCE_EAGER', None)
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"

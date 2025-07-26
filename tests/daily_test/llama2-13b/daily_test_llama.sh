@@ -32,8 +32,8 @@ sleep_time=60
 checkpoint_path=${1}
 vocab_file=${2}
 dataset=${3}
-MS_PKG_LINK=${4:-"https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250708/r2.7.rc1_20250708024507_497949a8c21f1bdfb8b1f77f51314ef65a24125d/unified/aarch64/mindspore-2.7.0rc1-cp310-cp310-linux_aarch64.whl"}
-MF_PKG_LINK=${5:-"https://repo.mindspore.cn/mindspore/mindformers/version/202507/20250708/r1.6.0_20250708031508_2d79b904bd970702f358070337ff0375fcfa3e8c_newest/any/mindformers-1.6.0-py3-none-any.whl"}
+MS_PKG_LINK=${4:-"https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250723/r2.7.rc1_20250723024507_e30909cc2f8ee5e9d66ad54c3e905a5f25084ef8/unified/aarch64/mindspore-2.7.0rc1-cp310-cp310-linux_aarch64.whl"}
+MF_PKG_LINK=${5:-"https://repo.mindspore.cn/mindspore/mindformers/version/202507/20250724/r1.6.0_20250724031508_a99188d8919418984b827edf32ab5b007f0b996a_newest/any/mindformers-1.6.0-py3-none-any.whl"}
 
 prepare_env()
 {
@@ -160,7 +160,7 @@ get_port()
 
 eval_nocheck()
 {
-  unset FORCE_EAGER
+  unset ENFORCE_EAGER
   unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
@@ -180,7 +180,7 @@ eval_nocheck()
 
 eval()
 {
-  unset FORCE_EAGER
+  unset ENFORCE_EAGER
   echo "enter test workspace."
   cd ws || exit 1
 
@@ -215,7 +215,7 @@ eval()
 
 eval_pynative()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   export MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST=PageAttention
   echo "enter test workspace."
   cd ws || exit 1
@@ -234,7 +234,7 @@ eval_pynative()
 
 quant()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
 
@@ -252,7 +252,7 @@ quant()
 
 quant_awq()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
 
@@ -270,7 +270,7 @@ quant_awq()
 
 quant_gptq()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
 
