@@ -160,7 +160,7 @@ get_port()
 
 eval_nocheck()
 {
-  unset FORCE_EAGER
+  unset ENFORCE_EAGER
   unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
@@ -180,7 +180,7 @@ eval_nocheck()
 
 eval()
 {
-  unset FORCE_EAGER
+  unset ENFORCE_EAGER
   echo "enter test workspace."
   cd ws || exit 1
 
@@ -215,7 +215,7 @@ eval()
 
 eval_pynative()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   export MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST=PageAttention
   echo "enter test workspace."
   cd ws || exit 1
@@ -234,7 +234,7 @@ eval_pynative()
 
 quant()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
 
@@ -252,7 +252,7 @@ quant()
 
 quant_awq()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
 
@@ -270,7 +270,7 @@ quant_awq()
 
 quant_gptq()
 {
-  export FORCE_EAGER=true
+  export ENFORCE_EAGER=true
   echo "enter test workspace."
   cd ws || exit 1
 

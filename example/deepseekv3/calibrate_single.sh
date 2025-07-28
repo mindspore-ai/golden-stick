@@ -33,7 +33,7 @@ yaml=${5:-${mf_path}/research/deepseek3/deepseek_r1_671b/predict_deepseek_r1_671
 export PYTHONPATH=${mf_path}:${mf_path}/research/deepseek3:${PYTHONPATH}
 
 export MS_JIT="0"
-export FORCE_EAGER="true"
+export ENFORCE_EAGER="true"
 msrun --worker_num=${worker_num} \
       --local_worker_num=${worker_num} \
       --master_port=8188 \
