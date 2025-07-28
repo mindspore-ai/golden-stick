@@ -25,8 +25,8 @@ import mindspore
 from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, ops
 from mindspore_gs.ptq import RoundToNearest as RTN
 from mindspore_gs.ptq.round_to_nearest.quant_cells.mindformers.quant_cells import LinearQuant
-from mindspore_gs.ptq.convert_utils import AntiquantBMMCell
-from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
+from mindspore_gs.ptq.round_to_nearest.convert_utils import AntiquantBMMCell
+from mindspore_gs.ptq.round_to_nearest.fake_quantizer import MinMaxPerChannel
 from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, QuantGranularity
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindformers.modules import Linear

@@ -24,7 +24,7 @@ from mindspore_gs.quantization.quant_cell import QuantCell
 from mindspore_gs.quantization.quant_utils import get_quant_min_max, quant_bias_data, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.quantization.fake_quantizer import FakeQuantizer
-from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
+from mindspore_gs.ptq.round_to_nearest.fake_quantizer import MinMaxPerChannel
 
 
 def create_observer_perchannel(perchannel_args: PerChannelArgs = PerChannelArgs(), **kwargs) -> FakeQuantizer:
