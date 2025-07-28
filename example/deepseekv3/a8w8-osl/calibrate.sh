@@ -23,7 +23,7 @@ export MS_ALLOC_CONF="enable_vmm:True"
 export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 export MS_JIT=0
-export FORCE_EAGER=true
+export ENFORCE_EAGER=true
 
 mf_path=$1
 ceval_path=$2
