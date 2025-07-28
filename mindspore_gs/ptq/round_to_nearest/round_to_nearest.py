@@ -28,7 +28,7 @@ from mindspore_gs.common import logger
 
 from mindspore_gs import CompAlgo
 from mindspore_gs.quantization.net_policy import NetPolicy
-from mindspore_gs.ptq.quant_cell import PTQCell
+from mindspore_gs.ptq.round_to_nearest.quant_cell import PTQCell
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, QuantGranularity, OutliersSuppressionType

@@ -25,59 +25,8 @@ from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.common.initializer import initializer
 from mindspore.ops.auto_generate import WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt
-from mindspore_gs.ptq.fake_quantizer import LinearFakeQuantizer
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
-
-
-class AntiQuantCell(Cell):
-    """AntiQuantCell, warp AntiQuant to support per-channel AntiQuant."""
-    def __init__(self, n: int, d: int, dst_dtype=dtype.float16):
-        super().__init__()
-        self.outdtype = dst_dtype
-        self.div = msops.Div()
-        self.add = msops.Add()
-        self.sub = msops.Sub()
-        self.mul = msops.Mul()
-        self.cast = msops.Cast()
-        self.reshape = msops.Reshape()
-        self._pre_shape = (n, d)
-
-    def construct(self, x, zp, scale):
-        """forward for antiquant"""
-        scale = self.reshape(scale, self._pre_shape)
-        zp = self.reshape(zp, self._pre_shape)
-        x = self.cast(x, self.outdtype)
-        x = self.sub(x, zp)
-        x = self.mul(x, scale)
-        x = self.cast(x, self.outdtype)
-        return x
-
-    def shard(self, strategy):
-        """shard strategy for anti quant"""
-        self.add.shard((strategy, (strategy[-2], strategy[-1],)))
-        self.mul.shard((strategy, (strategy[-2], strategy[-1],)))
-
-
-def convert_to_antiquant(antiquant_params, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
-    """Convert FakeQuantParamCell to AntiQuantCell."""
-    scale = antiquant_params.get(LinearFakeQuantizer.attr_key_quant_scale, None)
-    zp = antiquant_params.get(LinearFakeQuantizer.attr_key_quant_zero_point, None)
-    if scale is None:
-        raise ValueError("Can not find scale in quant params.")
-    if zp is None:
-        raise ValueError("Can not find zp in quant params.")
-    anti_quant = AntiQuantCell(scale, zp, dst_dtype=dst_dtype)
-    if strategy is not None:
-        anti_quant.shard(strategy)
-    return anti_quant
-
-
-def convert_to_antiquant_for_deploy(n, d, strategy=None, dst_dtype=dtype.float16) -> AntiQuantCell:
-    """Convert to AntiQuantCell For deploy."""
-    anti_quant = AntiQuantCell(n, d, dst_dtype)
-    if strategy is not None:
-        anti_quant.shard(strategy)
-    return anti_quant
+from .fake_quantizer import LinearFakeQuantizer
 
 
 class QuantCell(Cell):

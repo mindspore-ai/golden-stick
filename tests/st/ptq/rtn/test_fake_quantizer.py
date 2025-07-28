@@ -19,7 +19,7 @@ import pytest
 from mindspore import Parameter, context, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.common.initializer import initializer
 from mindspore import dtype as mstype
-from mindspore_gs.ptq.fake_quantizer import MinMaxPerChannel
+from mindspore_gs.ptq.round_to_nearest.fake_quantizer import MinMaxPerChannel
 
 
 @pytest.mark.level1

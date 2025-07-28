@@ -19,10 +19,9 @@ import abc
 from mindspore.nn import Cell
 from mindspore import dtype as msdtype
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
-from mindspore_gs.ptq.ptq_policy import PTQLayerPolicy
-from mindspore_gs.ptq.fake_quantizer import FakeQuantizer
+from mindspore_gs.ptq.round_to_nearest.ptq_policy import PTQLayerPolicy
 from mindspore_gs.ptq.context import InnerPTQConfig
-from ..fake_quantizer import MinMaxPerChannel, MinMaxPerLayer
+from .fake_quantizer import MinMaxPerChannel, MinMaxPerLayer, FakeQuantizer
 
 
 class RTNLayerPolicy(PTQLayerPolicy, abc.ABC):
@@ -48,8 +47,10 @@ class RTNLayerPolicy(PTQLayerPolicy, abc.ABC):
         self._weight_names = weight_names
         self._act_names = act_names
 
+    # pylint: disable=unused-argument
     def get_weight_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
                              **kwargs) -> FakeQuantizer:
+        """get_weight_quantizer"""
         if self._config.weight_quant_dtype is None:
             return None
         strategy = kwargs.get('strategy', None)
@@ -74,6 +75,7 @@ class RTNLayerPolicy(PTQLayerPolicy, abc.ABC):
         weight_quantizer.set_attr("position", "weight")
         return weight_quantizer
 
+    # pylint: disable=unused-argument
     def get_kvcache_quantizer(self, weight_name="", perchannel_args: PerChannelArgs = PerChannelArgs(),
                               **kwargs) -> FakeQuantizer:
         """get_kvcache_quantizer"""
@@ -98,6 +100,7 @@ class RTNLayerPolicy(PTQLayerPolicy, abc.ABC):
         quantizer.set_attr("position", "input")
         return quantizer
 
+    # pylint: disable=unused-argument
     def _get_input_quantizer(self, input_index=-1, perchannel_args: PerChannelArgs = PerChannelArgs(),
                              **kwargs) -> FakeQuantizer:
         if self._config.act_quant_dtype is None:
