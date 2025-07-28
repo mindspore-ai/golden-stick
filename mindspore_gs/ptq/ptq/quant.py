@@ -341,7 +341,10 @@ class PTQ(CompAlgo):
                         # layers. This branch may introduces error to the next layer, because previous processors in the
                         # pipeline changes the layer, and thus, gives a inaccurate output. Set the switch to True to
                         # avoid this issue. The switch should be removed after the issue is fixed. -- @tongl2
-                        all_args[index][0] = output[0] if isinstance(output, tuple) else output
+                        if "hidden_states" in all_kwargs[index]:
+                            all_kwargs[index]["hidden_states"] = output[0] if isinstance(output, tuple) else output
+                        else:
+                            all_args[index][0] = output[0] if isinstance(output, tuple) else output
                     index += 1
 
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook())
@@ -354,7 +357,10 @@ class PTQ(CompAlgo):
             if self._config.reflash_inputs_after_each_processor:
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):
-                    all_args[index][0] = layer(*args, **kwargs)
+                    if "hidden_states" in all_kwargs[index]:
+                        all_kwargs[index]["hidden_states"] = layer(*args, **kwargs)
+                    else:
+                        all_args[index][0] = layer(*args, **kwargs)
                     index += 1
             start_time = time.time()
             offload_network(layer)

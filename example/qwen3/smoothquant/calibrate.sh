@@ -23,7 +23,7 @@ worker_num=${3:-2}
 yaml=${4:-../predict_qwen3_8b_instruct_calibrate.yaml}
 
 base_path=$(cd "$(dirname $0)"; pwd)
-ceval_path=${base_path}/../../tests/data/ceval-dataset/dev/
+ceval_path=${base_path}/../../../tests/data/ceval-dataset/dev/
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
