@@ -32,6 +32,25 @@ tongl, zhuxiaochen, guoguopot, huangzhuo, ccsszz, yyyyrf, hangangqiang, HeadSnak
 
 欢迎以任何形式对项目提供贡献！
 
+## MindSpore Golden Stick 1.1.0 Release Notes
+
+### 主要特性和增强
+
+* 训练后量化算法 `PTQ` 通过正则表达式匹配，支持混合量化策略配置。
+* 训练后量化算法 `PTQ` 新增Summary功能，校准结束后会自动打印整网量化策略。
+
+### API变更
+
+* `PTQ` 构造方法新增 `layer_policies` 入参，用于表达逐层的量化策略，类型为字典，key为正则字符串用来匹配层的名称，value为 :class:`mindspore_gs.ptq.PTQConfig` 表示一种量化策略。
+
+### 贡献者
+
+感谢以下人员做出的贡献：
+
+ccsszz，yyyyrf，hangangqiang，yu-han39，huan-xiaoling，hz2901782080
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 1.0.0 Release Notes
 
 ### 主要特性和增强
