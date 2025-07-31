@@ -54,8 +54,9 @@ class QuantPageAttentionMgrCell(WrapperCell):
         except ImportError:
             pass
         try:
-            from research.llama3_1.infer.parallel_paged_attention_mgr import LlameParallelPagedAttentionMgr
-            Quantizer.reg_layer_map(LlameParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
+            from research.llama3_1.infer.parallel_paged_attention_mgr import ParallelPagedAttentionMgr \
+                as LlamaParallelPagedAttentionMgr
+            Quantizer.reg_layer_map(LlamaParallelPagedAttentionMgr, QuantPageAttentionMgrCell, KVCacheInt8())
         except ImportError:
             pass
 
