@@ -8,7 +8,7 @@
 
 * The Post-Training Quantization algorithm `PTQ` supports the MOE structure with `SmoothQuant-A8W8` quantization algorithm and `GPTQ-A16W4` low-bit quantization algorithm. These have been adapted for the DeepSeekV3/R1 model.
 
-* Added OutlierSuppression-Lite(OSL), an outlier suppression technique. OSL is an extension of SmoothQuant that tunes the migration strength alpha through hyperparameter optimization at the matrix granularity to achieve more fine-grained network self-adaptive calibration.
+* Added OutlierSuppression-Lite(OSL), an outlier suppression technique. OSL is an extension of SmoothQuant that tunes the migration strength alpha through hyperparameter optimization at the matrix granularity to achieve more fine-grained network self-adaptive calibration. In the DeepSeek V3-0324 network function call scenario, OSL preserves higher accuracy and achieves BFCL scores on par with the official FP8 baselines.
 
 * [Demo] The Post-Training Quantization algorithm `PTQ` supports the `A8W4` quantization algorithm. These have been adapted for the DeepSeekV3/R1 model.
 
