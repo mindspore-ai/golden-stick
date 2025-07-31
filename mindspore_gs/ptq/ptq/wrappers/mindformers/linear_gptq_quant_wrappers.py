@@ -48,8 +48,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
 
         Quantizer.reg_layer_map(Linear, GptqWeightQuantLinearCell, A16WxChecker())
         try:
-            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -64,8 +63,6 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             Quantizer.reg_layer_map(DSRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, GptqWeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
 

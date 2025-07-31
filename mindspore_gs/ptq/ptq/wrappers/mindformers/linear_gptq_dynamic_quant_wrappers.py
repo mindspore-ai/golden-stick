@@ -39,15 +39,11 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
 
         Quantizer.reg_layer_map(Linear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         try:
-            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
-            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, GptqDynamicQuantLinearCell,
-                                    GptqDynamicA8W8Checker())
-            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
             Quantizer.reg_layer_map(DSRowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         except ImportError:

@@ -23,7 +23,7 @@ class MinFromTensorParallelRegion(nn.Cell):
     "Get argmin from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group())
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group().group)
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         """construct"""
@@ -36,7 +36,7 @@ class MaxFromTensorParallelRegion(nn.Cell):
     "Get argmax from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group())
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group().group)
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         """construct"""
@@ -49,7 +49,7 @@ class SumFromTensorParallelRegion(nn.Cell):
     "Get sum from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.SUM, group=get_tensor_model_parallel_group())
+        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.SUM, group=get_tensor_model_parallel_group().group)
 
     def construct(self, input_, axis=None, keepdims=False, *, dtype=None):
         """construct"""
