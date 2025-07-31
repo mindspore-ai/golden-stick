@@ -49,8 +49,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
 
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
         try:
-            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -65,8 +64,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
             Quantizer.reg_layer_map(DSRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, WeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
         try:
@@ -84,8 +81,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
         type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
         type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
         try:
-            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+            from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -97,11 +93,9 @@ class WeightQuantLinearCell(WrapperLinearCell):
             type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
-            type_map[ColumnParallelLinearWorldRegion] = ParallelType.COL_PARALLEL
             type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
-            type_map[RowParallelLinearWorldRegion] = ParallelType.ROW_PARALLEL
         except ImportError:
             pass
         self.parallel_type = type_map.get(type(self.layer), None)

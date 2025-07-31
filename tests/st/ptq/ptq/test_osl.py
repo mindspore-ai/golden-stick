@@ -24,7 +24,9 @@ from mindspore import dtype as msdtype
 from mindspore import nn, Tensor
 from mindspore.dataset import GeneratorDataset
 from mindformers.modules.layers import Linear
-from mindformers.parallel_core.inference.tensor_parallel.mappings import ScatterToModelParallelRegion
+from mindformers.parallel_core.inference.tensor_parallel.mappings import scatter_to_model_parallel_region
+from mindformers.parallel_core.inference.parallel_state import (default_pgs, get_tensor_model_parallel_group,
+                                                                is_initialized)
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
 
@@ -93,18 +95,16 @@ class SimpleNet(nn.Cell):
     """
     class DecoderCell(nn.Cell):
         """decoder cell"""
-        def __init__(self, linear):
+        def __init__(self, linear, tp_group):
             super().__init__()
             self.linear = linear
-            if isinstance(linear, RowParallelLinear):
-                self.scatter_to_mp_region = ScatterToModelParallelRegion()
-            else:
-                self.scatter_to_mp_region = None
+            self.tp_group = tp_group
+            self.scatter_to_mp_region = isinstance(linear, RowParallelLinear)
 
         def construct(self, x, *args, **kwargs):
             """linear"""
-            if self.scatter_to_mp_region is not None:
-                x = self.scatter_to_mp_region(x)
+            if self.scatter_to_mp_region:
+                x = scatter_to_model_parallel_region(x, self.tp_group)
             return self.linear(x, *args, **kwargs)
 
     class ParallelConfig(nn.Cell):
@@ -119,6 +119,7 @@ class SimpleNet(nn.Cell):
         self.config = SimpleNet.ParallelConfig()
         self.is_expert = is_expert
         self.foo_seq_length = foo_seq_length
+        tp_group = get_tensor_model_parallel_group() if is_initialized() else default_pgs
         if linear_type == 'ColumnParallelLinear':
             linear = ColumnParallelLinear(
                 foo_seq_length, foo_seq_length,
@@ -127,7 +128,8 @@ class SimpleNet(nn.Cell):
                 param_init_type=msdtype.bfloat16,
                 compute_dtype=msdtype.bfloat16,
                 is_expert=is_expert,
-                expert_num=10 if is_expert else 1
+                expert_num=10 if is_expert else 1,
+                tp_group=tp_group
             )
         elif linear_type == 'RowParallelLinear':
             linear = RowParallelLinear(
@@ -138,7 +140,8 @@ class SimpleNet(nn.Cell):
                 param_init_type=msdtype.bfloat16,
                 compute_dtype=msdtype.bfloat16,
                 is_expert=is_expert,
-                expert_num=10 if is_expert else 1
+                expert_num=10 if is_expert else 1,
+                tp_group=tp_group
             )
         elif linear_type == 'Linear':
             linear = Linear(
@@ -148,7 +151,7 @@ class SimpleNet(nn.Cell):
                 compute_dtype=msdtype.bfloat16,
             )
 
-        self.decoder = SimpleNet.DecoderCell(linear)
+        self.decoder = SimpleNet.DecoderCell(linear, tp_group)
         self.group_list = Tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 2], dtype=msdtype.int64)
 
     def construct(self, x):

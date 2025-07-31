@@ -4,5 +4,5 @@
 [submodule "tests/mindformers"]
 	path = tests/mindformers
 	url = https://gitee.com/mindspore/mindformers.git
-	branch = dev
-	commit = 0a5c6df5f1c0af59825b8f6172aa4e931d8f385
+	branch = br_feature_infer
+	commit = 73494eb1614e3652d097db8c43f9331fed245b96
