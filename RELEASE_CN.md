@@ -8,7 +8,7 @@
 
 * 训练后量化算法 `PTQ` 中 `SmoothQuant-A8W8` 量化和 `GPTQ-A16W4` 低比特量化支持MOE结构，已针对DeepSeekV3/R1模型进行适配。
 
-* 新增OutlierSuppression-Lite（OSL）异常值抑制技术。OSL是SmoothQuant的延伸，通过超参寻优在矩阵粒度进行迁移强度alpha调优，实现更精细的网络自适应校准。
+* 新增OutlierSuppression-Lite（OSL）异常值抑制技术。OSL是SmoothQuant的延伸，通过超参寻优在矩阵粒度进行迁移强度alpha调优，实现更精细的网络自适应校准。在DeepSeek V3-0324网络function call场景下能保持更高的精度，BFCL数据集的表现持平官方原始FP8结果。
 
 * [Demo] 训练后量化算法 `PTQ` 支持 `A8W4` 量化算法，已针对DeepSeekV3/R1模型进行适配。
 
