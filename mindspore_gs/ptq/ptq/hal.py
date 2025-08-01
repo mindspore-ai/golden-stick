@@ -30,7 +30,12 @@ from mindspore.ops.operations.comm_ops import ReduceOp
 from mindspore.communication.management import GlobalComm
 from mindspore.communication import get_rank
 from mindspore.ops.auto_generate import (WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt,
-                                         GroupedMatmulV4, GroupedMatmulV4Transpose, GroupedMatmul)
+                                         GroupedMatmulV4, GroupedMatmul)
+try:
+    from mindspore.ops.auto_generate import GroupedMatmulV4Transpose
+    GMM_310P = True
+except ImportError:
+    GMM_310P = False
 from mindspore_gs.common.utils import value_check, is_310p
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
@@ -710,7 +715,7 @@ class DynamicQuantMatmul(QuantUnitCell):
                          f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
         self.is_group_mm = is_group_mm
         if is_group_mm:
-            if not self.is_310p:
+            if not self.is_310p or not GMM_310P:
                 self.qbmm = GroupedMatmulV4()
             else:
                 self.qbmm = GroupedMatmulV4Transpose()
@@ -823,10 +828,10 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                          f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
         transpose_b = False
         if is_group_mm:
-            if self.is_310p:
-                self.gmm = GroupedMatmulV4Transpose()
-            else:
+            if not self.is_310p or not GMM_310P:
                 self.gmm = GroupedMatmulV4()
+            else:
+                self.gmm = GroupedMatmulV4Transpose()
         else:
             self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
 
@@ -958,7 +963,7 @@ class WeightQuantMatmul(QuantUnitCell):
                          f"{{{self.weight_zp.shape}, {self.weight_zp.dtype}, {self.weight_zp.asnumpy()}}}")
         self.is_grouped_mm = is_grouped_mm
         if self.is_grouped_mm:
-            if not self.is_310p:
+            if not self.is_310p or not GMM_310P:
                 self.weight_qbmm = GroupedMatmulV4()
             else:
                 self.weight_qbmm = GroupedMatmulV4Transpose()
