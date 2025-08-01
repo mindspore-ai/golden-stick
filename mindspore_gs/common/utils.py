@@ -21,6 +21,7 @@ import warnings
 from functools import wraps
 import psutil
 import numpy as np
+import mindspore as ms
 from mindspore import nn
 
 
@@ -127,6 +128,28 @@ def get_memory_info():
     memory_info = process.memory_info()
     print(f"RSS (Resident Set Size): {memory_info.rss / 1024 / 1024:.2f} MB") # 物理内存
     print(f"VMS (Virtual Memory Size): {memory_info.vms / 1024 / 1024:.2f} MB") # 虚拟内存
+
+
+def is_version_at_least(current_version, base_version):
+    """
+        return current_version >= base_version.
+        Check whether the current version is higher than or equal to the
+        base version.
+        for current_version: 1.8.1, base_version: 1.11.0, it return False.
+    """
+    version_split_char = '.'
+    if version_split_char not in base_version or version_split_char \
+        not in current_version:
+        raise ValueError(
+            "The version string will contain the `.`."
+            "For example, current_version 1.8.1， base_version: 1.11.0.")
+    for x, y in zip(current_version.split(version_split_char),
+                    base_version.split(version_split_char)):
+        if not x.isdigit() or not y.isdigit():
+            continue
+        if int(x) != int(y):
+            return int(x) >= int(y)
+    return True
 
 
 def get_ascend_soc_version():
