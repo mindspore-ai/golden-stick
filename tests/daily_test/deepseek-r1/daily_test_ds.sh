@@ -95,7 +95,7 @@ prepare_env()
 
 quant()
 {
-  export ENFORCE_EAGER=true
+  export FORCE_EAGER=true
   export MS_JIT=0
   echo "enter test workspace."
   cd ws || exit 1
@@ -115,7 +115,7 @@ quant()
 
 eval()
 {
-  unset ENFORCE_EAGER
+  unset FORCE_EAGER
   unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1
@@ -133,7 +133,7 @@ eval()
 
 infer()
 {
-  unset ENFORCE_EAGER
+  unset FORCE_EAGER
   unset MS_JIT
   echo "enter test workspace."
   cd ws || exit 1

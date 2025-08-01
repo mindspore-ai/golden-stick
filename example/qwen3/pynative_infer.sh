@@ -15,7 +15,7 @@
 # ============================================================================
 
 export GSLOG=1
-export ENFORCE_EAGER=True
+export FORCE_EAGER=True
 
 mf_path=$1
 quant_type=$2

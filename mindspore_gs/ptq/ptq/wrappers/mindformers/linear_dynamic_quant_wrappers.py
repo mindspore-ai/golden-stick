@@ -39,7 +39,7 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(Linear, DynamicQuantLinearCell, DynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+                                                ColumnParallelLinearTPDP, RowParallelLinearTPDP)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -54,8 +54,8 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
             Quantizer.reg_layer_map(DSRowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
-            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, DynamicQuantLinearCell, DynamicA8W8Checker())
-            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, DynamicQuantLinearCell, DynamicA8W8Checker())
+            Quantizer.reg_layer_map(ColumnParallelLinearTPDP, DynamicQuantLinearCell, DynamicA8W8Checker())
+            Quantizer.reg_layer_map(RowParallelLinearTPDP, DynamicQuantLinearCell, DynamicA8W8Checker())
         except ImportError:
             pass
 

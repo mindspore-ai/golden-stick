@@ -46,7 +46,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+                                                ColumnParallelLinearTPDP, RowParallelLinearTPDP)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -61,8 +61,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
             Quantizer.reg_layer_map(DSRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(ColumnParallelLinearWorldRegion, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(RowParallelLinearWorldRegion, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(ColumnParallelLinearTPDP, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(RowParallelLinearTPDP, WeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
 
@@ -72,7 +72,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
         type_map = {Linear: ParallelType.NO_PARALLEL}
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear,
-                                                ColumnParallelLinearWorldRegion, RowParallelLinearWorldRegion)
+                                                ColumnParallelLinearTPDP, RowParallelLinearTPDP)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
@@ -84,11 +84,11 @@ class WeightQuantLinearCell(WrapperLinearCell):
             type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
-            type_map[ColumnParallelLinearWorldRegion] = ParallelType.COL_PARALLEL
+            type_map[ColumnParallelLinearTPDP] = ParallelType.COL_PARALLEL
             type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
             type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
-            type_map[RowParallelLinearWorldRegion] = ParallelType.ROW_PARALLEL
+            type_map[RowParallelLinearTPDP] = ParallelType.ROW_PARALLEL
         except ImportError:
             pass
         self.parallel_type = type_map.get(type(self.layer), None)
@@ -122,14 +122,18 @@ class WeightQuantLinearCell(WrapperLinearCell):
             elif rank == 3:
                 scale_zp_shape = (linear.weight.shape[0],
                                   linear.weight.shape[1] // self.cfg.group_size,
-                                  linear.weight.shape[2])
+                                  linear.weight.shape[2]) if not self.layer.transpose_b else \
+                                 (linear.weight.shape[0],
+                                  linear.weight.shape[2] // self.cfg.group_size,
+                                  linear.weight.shape[1])
             else:
                 raise ValueError(f"Only support rank of weight is 2 or 3, but got {rank}.")
         else:
             if rank == 2:
                 scale_zp_shape = (self.oc,)
             elif rank == 3:
-                scale_zp_shape = (linear.weight.shape[0], linear.weight.shape[2])
+                scale_zp_shape = (linear.weight.shape[0], linear.weight.shape[2]) if not self.layer.transpose_b else \
+                                 (linear.weight.shape[0], linear.weight.shape[1])
             else:
                 raise ValueError(f"Only support rank of weight is 2 or 3, but got {rank}.")
         self.w_scale = Parameter(initializer('ones', scale_zp_shape, dtype=dtype.float64))
