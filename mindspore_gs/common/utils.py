@@ -127,3 +127,17 @@ def get_memory_info():
     memory_info = process.memory_info()
     print(f"RSS (Resident Set Size): {memory_info.rss / 1024 / 1024:.2f} MB") # 物理内存
     print(f"VMS (Virtual Memory Size): {memory_info.vms / 1024 / 1024:.2f} MB") # 虚拟内存
+
+
+def get_ascend_soc_version():
+    """Get ascend soc version."""
+    if is_version_at_least(ms.__version__, "2.2.0"):
+        from mindspore._c_expression import MSContext
+        return MSContext.get_instance().get_ascend_soc_version()
+    raise ValueError("The get_ascend_soc_version function is only "
+                     "supported on MindSpore 2.6 and above.")
+
+
+def is_310p():
+    device = get_ascend_soc_version()
+    return device in ['310p', 'ascend310p']
