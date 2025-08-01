@@ -20,7 +20,6 @@ from typing import Optional
 import warnings
 
 import numpy as np
-from mindformers.version_control import is_310p
 from mindspore import Tensor, dtype
 from mindspore.nn import Cell
 from mindspore import Parameter
@@ -32,7 +31,7 @@ from mindspore.communication.management import GlobalComm
 from mindspore.communication import get_rank
 from mindspore.ops.auto_generate import (WeightQuantBatchMatmul, QuantBatchMatmul, DynamicQuantExt,
                                          GroupedMatmulV4, GroupedMatmulV4Transpose, GroupedMatmul)
-from mindspore_gs.common.utils import value_check
+from mindspore_gs.common.utils import value_check, is_310p
 from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQMode
