@@ -884,7 +884,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
             raise ValueError(f"Not support creating GptqDynamicQuantMatmul from {linear.matmul}.")
 
         rank = len(q_weight.shape)
-        ic_idx, oc_idx = (rank - 1, rank - 2) if transpose_b else (rank - 2, rank - 1)
+        ic_idx, oc_idx = (rank - 1, rank - 2) if transpose_b and not is_310p() else (rank - 2, rank - 1)
         ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
 
         if is_deploy:

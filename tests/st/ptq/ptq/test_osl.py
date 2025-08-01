@@ -190,7 +190,7 @@ def get_save_file_name(save_name):
 def quant_net(linear_type, is_expert):
     """Quantize: Saves quantized weight to ./osl-quant.ckpt, and returns the original float point output."""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
-    os.environ['ENFORCE_EAGER'] = 'true'
+    os.environ['FORCE_EAGER'] = 'true'
     os.environ["RUN_MODE"] = "predict"
     ascend_path = os.environ.get('ASCEND_HOME_PATH', '')
     if not ascend_path:
@@ -212,7 +212,7 @@ def infer_net(linear_type, is_expert):
     """Infer: Load quantized weight from ./osl-quant.ckpt, and returns inference output."""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = 'QbmmAllReduceAdd,QbmmAdd'
-    os.environ.pop('ENFORCE_EAGER', None)
+    os.environ.pop('FORCE_EAGER', None)
     ascend_path = os.environ.get('ASCEND_HOME_PATH', '')
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'
