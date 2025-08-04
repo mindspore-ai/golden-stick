@@ -21,6 +21,8 @@ from mindspore.ops import functional as F
 from mindspore.ops.auto_generate import GroupedMatmulV4
 from mindspore.nn import Cell
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
+                                                                          reduce_from_model_parallel_region)
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.hal import ParallelType, QuantWithSmooth, DynamicQuantCell
 
@@ -157,7 +159,7 @@ class LinearInferCell(Cell):
 
         if self._layer.sequence_parallel:
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
-            input_parallel = self._layer.gather_from_sp_region(input_parallel)
+            input_parallel = gather_from_model_parallel_region(input_parallel, self._layer.tp_group)
             input_parallel = input_parallel.swapaxes(0, 1).contiguous()
         if self.has_act_quant:
             input_parallel = self.quant_op(input_parallel)
@@ -184,7 +186,7 @@ class LinearInferCell(Cell):
         output_parallel = self._layer.reshape(output_parallel, output_shape)
 
         if self._layer.gather_output:
-            output = self._layer.gather_from_mp_region(output_parallel)
+            output = gather_from_model_parallel_region(input_parallel, self._layer.tp_group)
         else:
             output = output_parallel
         return output
@@ -228,7 +230,7 @@ class LinearInferCell(Cell):
             if self._layer.delay_allreduce:
                 output = output_parallel
             else:
-                output = self._layer.reduce_from_mp_region(output_parallel)
+                output = reduce_from_model_parallel_region(output_parallel, self._layer.tp_group)
 
         if self._layer.has_bias:
             output = self._layer.bias_add(output, self._layer.cast(self._layer.bias, self._layer.compute_dtype))
