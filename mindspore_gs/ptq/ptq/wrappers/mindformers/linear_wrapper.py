@@ -38,7 +38,18 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
         self.is_mcorelinear = isinstance(linear, (McoreColumnParallelLinear, McoreRowParallelLinear))
 
-    def add_hook(self):
+    def _get_matmul(self, linear):
+        if self.context.experimental:
+            return linear.quant_method.matmul
+        return linear.matmul
+
+    def _set_matmul(self, linear, new_matmul):
+        if self.context.experimental:
+            linear.quant_method.matmul = new_matmul
+            return
+        linear.matmul = new_matmul
+
+    def add_hook(self, experimental=False):
         class HookMatMul(msops.MatMul):
             def __call__(self, *args, **kwargs):
                 x = args[0]
@@ -56,36 +67,40 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
         # as such, if I want to override the __call__ method, I must override the __call__ of a class
         # but if I don't want to affect behaviour of other instances of the same class,
         # I need to create a new class with the overridden __call__ method.
-        if isinstance(self.layer.matmul, msops.MatMul):
-            self.layer.matmul.__class__ = HookMatMul
-            self.layer.matmul.layer_name = self.layer_name
-            self.layer.matmul.samples = self.samples
-        elif isinstance(self.layer.matmul, GroupedMatmulV4):
-            self.layer.matmul.__class__ = HookGroupedMatMul
-            self.layer.matmul.layer_name = self.layer_name
-            self.layer.matmul.samples = self.samples
-        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, msops.MatMul):
-            self.layer.matmul.mm.__class__ = HookMatMul
-            self.layer.matmul.mm.layer_name = self.layer_name
-            self.layer.matmul.mm.samples = self.samples
-        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, GroupedMatmulV4):
-            self.layer.matmul.mm.__class__ = HookGroupedMatMul
-            self.layer.matmul.mm.layer_name = self.layer_name
-            self.layer.matmul.mm.samples = self.samples
+        matmul = self.layer.quant_method.matmul if experimental else self.layer.matmul
+        if isinstance(matmul, msops.MatMul):
+            matmul.__class__ = HookMatMul
+            matmul.layer_name = self.layer_name
+            matmul.samples = self.samples
+        elif isinstance(matmul, GroupedMatmulV4):
+            matmul.__class__ = HookGroupedMatMul
+            matmul.layer_name = self.layer_name
+            matmul.samples = self.samples
+        elif hasattr(matmul, 'mm') and isinstance(matmul.mm, msops.MatMul):
+            matmul.mm.__class__ = HookMatMul
+            matmul.mm.layer_name = self.layer_name
+            matmul.mm.samples = self.samples
+        elif hasattr(matmul, 'mm') and isinstance(matmul.mm, GroupedMatmulV4):
+            matmul.mm.__class__ = HookGroupedMatMul
+            matmul.mm.layer_name = self.layer_name
+            matmul.mm.samples = self.samples
         else:
-            raise RuntimeError(f"Unsupported matmul type for hook: {type(self.layer.matmul)}")
+            raise RuntimeError(f"Unsupported matmul type for hook: {type(matmul)}")
 
-    def remove_hook(self):
-        if isinstance(self.layer.matmul, msops.MatMul):
-            self.layer.matmul.__class__ = msops.MatMul
-        elif isinstance(self.layer.matmul, GroupedMatmulV4):
-            self.layer.matmul.__class__ = GroupedMatmulV4
-        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, msops.MatMul):
-            self.layer.matmul.mm.__class__ = msops.MatMul
-        elif hasattr(self.layer.matmul, 'mm') and isinstance(self.layer.matmul.mm, GroupedMatmulV4):
-            self.layer.matmul.mm.__class__ = GroupedMatmulV4
+    def remove_hook(self, experimental=False):
+        matmul = self.layer.quant_method.matmul if experimental else self.layer.matmul
+        if isinstance(matmul, msops.MatMul):
+            matmul.__class__ = msops.MatMul
+        elif isinstance(matmul, GroupedMatmulV4):
+            matmul.__class__ = GroupedMatmulV4
+        elif hasattr(matmul, 'mm') and \
+             isinstance(matmul.mm, msops.MatMul):
+            matmul.mm.__class__ = msops.MatMul
+        elif hasattr(matmul, 'mm') and \
+             isinstance(matmul.mm, GroupedMatmulV4):
+            matmul.mm.__class__ = GroupedMatmulV4
         else:
-            raise RuntimeError(f"Unsupported matmul type for hook: {type(self.layer.matmul)}")
+            raise RuntimeError(f"Unsupported matmul type for hook: {type(matmul)}")
 
     @abc.abstractmethod
     def deploy(self):
@@ -179,12 +194,15 @@ class LinearInferCell(Cell):
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size))
         if self._layer.is_expert and self._layer.expert_num > 1:
             if self.has_act_dynamic_quant:
-                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, group_list, x_scale)
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight,
+                                                     group_list, x_scale)
             else:
-                output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
+                output_parallel = self._layer.matmul(input_parallel, self._layer.weight,
+                                                     group_list)
         else:
             if self.has_act_dynamic_quant:
-                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, None, x_scale)
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight,
+                                                     None, x_scale)
             else:
                 output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
         if self._layer.has_bias:
@@ -222,12 +240,14 @@ class LinearInferCell(Cell):
         input_parallel = self._layer.reshape(input_parallel, (-1, self._layer.input_size_per_partition))
         if self._layer.is_expert and self._layer.expert_num > 1:
             if self.has_act_dynamic_quant:
-                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, group_list, x_scale)
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, group_list,
+                                                     x_scale)
             else:
                 output_parallel = self._layer.matmul(input_parallel, self._layer.weight, group_list)
         else:
             if self.has_act_dynamic_quant:
-                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, None, x_scale)
+                output_parallel = self._layer.matmul(input_parallel, self.layer.weight, None,
+                                                     x_scale)
             else:
                 output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
 

@@ -18,6 +18,9 @@ import sys
 import time
 import pytest
 import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import mindspore as ms
 from mindspore import set_context, context, nn, Tensor, dtype, GRAPH_MODE, PYNATIVE_MODE
 from mindspore.dataset import GeneratorDataset

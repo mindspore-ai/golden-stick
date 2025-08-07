@@ -68,11 +68,11 @@ class WrapperCell(abc.ABC, Cell):
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)
         self.samples.clear()
 
-    def add_hook(self):
+    def add_hook(self, experimental=False):
         """add_hook"""
         raise NotImplementedError
 
-    def remove_hook(self):
+    def remove_hook(self, experimental=False):
         """remove_hook"""
         raise NotImplementedError
 

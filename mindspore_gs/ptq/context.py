@@ -121,6 +121,8 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     skip_offload_in_processing: bool = False
     save_gmm_bias_in_quant_phase: bool = False
 
+    experimental: bool = False
+
     dump_path: str = ""
     dumper: Dumper = Dumper()
 

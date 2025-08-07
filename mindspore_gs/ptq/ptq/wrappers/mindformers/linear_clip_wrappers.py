@@ -23,6 +23,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -48,6 +49,7 @@ class ClipLinearCell(WrapperLinearCell):
         LinearClipper.reg_layer_map(McoreColumnParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(McoreRowParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(QKVParallelLinear, ClipLinearCell, AutoClipChecker())
+        LinearClipper.reg_layer_map(MergedColumnParallelLinear, ClipLinearCell, AutoClipChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -72,7 +74,11 @@ class ClipLinearCell(WrapperLinearCell):
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
-        type_map = {Linear: ParallelType.NO_PARALLEL}
+        type_map = {Linear: ParallelType.NO_PARALLEL,
+                    McoreColumnParallelLinear: ParallelType.COL_PARALLEL,
+                    QKVParallelLinear: ParallelType.COL_PARALLEL,
+                    MergedColumnParallelLinear: ParallelType.COL_PARALLEL,
+                    McoreRowParallelLinear: ParallelType.ROW_PARALLEL}
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
