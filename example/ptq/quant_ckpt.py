@@ -27,7 +27,6 @@ from mindspore_gs.ptq.ptq_config import (PTQMode, PTQConfig, OutliersSuppression
                                          AWQConfig)
 from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import RoundToNearest as RTN
-from mindspore_gs.ptq.smooth_quant import SmoothQuant as SQ
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper, MFParallelLlama2Helper, \
@@ -141,9 +140,6 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
     if approach == 'rtn-c8':
         logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
         ptq = RTN(config=cfg)
-    elif approach == 'smooth_quant':
-        logger.info("Use SmoothQuant(W8A8) algo to quant network and weight.")
-        ptq = SQ(config=cfg)
     elif approach == 'rtn-a16w8':
         logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
         ptq = RTN(config=cfg)
