@@ -14,21 +14,31 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 
-from mindspore import nn, Parameter, dtype, Tensor
+
+from mindspore import nn, Parameter, dtype as msdtype, Tensor
 from mindspore.common.initializer import initializer
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
-from mindformers.parallel_core.inference.tensor_parallel.layers import LinearBase, RowParallelLinear, ColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (LinearBase,
+                                                                        RowParallelLinear,
+                                                                        ColumnParallelLinear,
+                                                                        QKVParallelLinear,
+                                                                        MergedColumnParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import LinearMethodBase
 from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
                                                                           scatter_to_model_parallel_region,
                                                                           reduce_from_model_parallel_region)
 from mindspore_gs.ptq.ptq.hal import ParallelType
+from mindspore_gs.ptq.ptq.wrapper_cell import Checker
+from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
+from mindspore_gs.ptq.context import InnerPTQConfig
+from mindspore_gs.ptq.ptq_config import QuantGranularity, OutliersSuppressionType
+from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 
 
 class Quant(nn.Cell):
     """Quant"""
-    def __init__(self, dst_type=dtype.int8):
+    def __init__(self, dst_type=msdtype.int8):
         super().__init__()
         self.dst_type = dst_type
 
@@ -41,7 +51,7 @@ class Quant(nn.Cell):
 
 class SmoothQuant(nn.Cell):
     """SmoothQuant"""
-    def __init__(self, dst_type=dtype.int8):
+    def __init__(self, dst_type=msdtype.int8):
         super().__init__()
         self.dst_type = dst_type
         self.quant = Quant(dst_type)
@@ -101,9 +111,9 @@ class FakeQuantLinearMethod(LinearMethodBase):
         self.is_act_quant = is_act_quant
         self.has_smooth = has_smooth
         if has_smooth:
-            self.fake_quant = SmoothFakeQuant(dtype.int8, output_dtype)
+            self.fake_quant = SmoothFakeQuant(msdtype.int8, output_dtype)
         else:
-            self.fake_quant = FakeQuant(dtype.int8, output_dtype)
+            self.fake_quant = FakeQuant(msdtype.int8, output_dtype)
         self.de_quant = DeQuant(output_dtype)
 
     def create_weights(self, layer: nn.Cell, input_size_per_partition: int,
@@ -128,12 +138,44 @@ class FakeQuantLinearMethod(LinearMethodBase):
         return self.quant_method.apply(layer, x, weight, bias)
 
 
+class FakeQuantWrapper(WrapperCell):
+    """FakeQuantWrapper"""
+    @staticmethod
+    def reg_self():
+        """reg_self"""
+        class FakeQuantChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.weight_quant_dtype == msdtype.int8 and config.act_quant_dtype == msdtype.int8 and \
+                       config.act_quant_granularity is QuantGranularity.PER_TENSOR
+
+        Quantizer.reg_fake_quant_layer_map(Linear, FakeQuantWrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(ColumnParallelLinear, FakeQuantWrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(RowParallelLinear, FakeQuantWrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(QKVParallelLinear, FakeQuantWrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(MergedColumnParallelLinear, FakeQuantWrapper, FakeQuantChecker())
+
+    def _quant_info(self) -> str:
+        return 'FakeQuant'
+
+    def add_hook(self, experimental=False):
+        pass
+
+    def remove_hook(self, experimental=False):
+        pass
+
+    def deploy(self):
+        return FakeQuantLinearCell(self.layer_name, self.layer, self.context, self.cfg)
+
+
 class FakeQuantLinearCell(LinearBase):
     """FakeQuantLinearCell"""
-
-    def __init__(self, layer_name, linear: LinearBase, is_act_quant=True, has_smooth=True):
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, linear: LinearBase, context, cfg: InnerPTQConfig):
         super().__init__(linear.input_size, linear.output_size)
         self.layer_name = layer_name
+        self.is_act_quant = cfg.act_quant_dtype is msdtype.int8
+        self.has_smooth = cfg.outliers_suppression in (OutliersSuppressionType.SMOOTH,
+                                                       OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
         if isinstance(linear, Linear):
             self.parallel_type = ParallelType.NO_PARALLEL
         elif isinstance(linear, ColumnParallelLinear):
@@ -157,12 +199,12 @@ class FakeQuantLinearCell(LinearBase):
 
         self.input_scale = Parameter(initializer("ones", (ic,), self.compute_dtype))
         self.smooth_scale = Parameter(initializer("ones", (ic,), self.compute_dtype))
-        self.input_offset = Parameter(initializer("zeros", (ic,), dtype.int32))
+        self.input_offset = Parameter(initializer("zeros", (ic,), msdtype.int32))
         self.weight_scale = Parameter(initializer("ones", (self.output_size_per_partition,), self.compute_dtype))
-        self.weight_offset = Parameter(initializer("zeros", (self.output_size_per_partition,), dtype.int32))
-        self.weight = Parameter(initializer("zeros", linear.weight.shape, dtype.int8))
-        self.quant_method = FakeQuantLinearMethod(layer_name, linear.quant_method, self.compute_dtype, is_act_quant,
-                                                  has_smooth)
+        self.weight_offset = Parameter(initializer("zeros", (self.output_size_per_partition,), msdtype.int32))
+        self.weight = Parameter(initializer("zeros", linear.weight.shape, msdtype.int8))
+        self.quant_method = FakeQuantLinearMethod(layer_name, linear.quant_method, self.compute_dtype,
+                                                  self.is_act_quant, self.has_smooth)
 
     # pylint: disable=unused-argument
     def construct(self, x, weight=None):

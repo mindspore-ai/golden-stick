@@ -375,6 +375,20 @@ class PTQ(CompAlgo):
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
+    def fake_quant(self, network):
+        """fake_quant"""
+        self._config.update_comm_info()
+        self._get_decoder_layers(network)
+        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
+            layer_name, layer = self.decoder_layers[i]
+            for processor in self.pipeline:
+                processor.set_fake_quant()
+                with no_init_parameters():
+                    processor.replace(layer_name, layer)
+                    processor.deploy(layer_name, layer)
+                network.update_parameters_name()
+        return network
+
     def _get_first_layer_input(self, network: Cell, ds=None, helper=None):
         """get first layer input"""
         catcher = InputCatcher()
