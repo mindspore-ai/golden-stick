@@ -28,6 +28,7 @@ class Quantizer(Algorithm):
     """quanter for linear and PageAttentionMgr"""
 
     layer_map = {}
+    fake_quant_layer_map = {}
 
     def target_layer_type(self) -> tuple:
         return tuple(self.layer_map.keys())
@@ -43,8 +44,15 @@ class Quantizer(Algorithm):
             Quantizer.layer_map[layer_type].append((checker, quant_layer_type))
 
     @staticmethod
-    def get_wrapper_layer(layer_type, config: InnerPTQConfig):
-        wrappers = Quantizer.layer_map.get(layer_type)
+    def reg_fake_quant_layer_map(layer_type, quant_layer_type, checker: Checker):
+        if not Quantizer.fake_quant_layer_map.get(layer_type):
+            Quantizer.fake_quant_layer_map[layer_type] = [(checker, quant_layer_type)]
+        else:
+            Quantizer.fake_quant_layer_map[layer_type].append((checker, quant_layer_type))
+
+    def get_wrapper_layer(self, layer_type, config: InnerPTQConfig):
+        wrappers = Quantizer.fake_quant_layer_map.get(layer_type) if self.is_fake_quant else \
+                   Quantizer.layer_map.get(layer_type)
         if not wrappers:
             return None
         for checker_wrapper in wrappers:
@@ -74,7 +82,9 @@ class Quantizer(Algorithm):
                         config.kvcache_quant_dtype in kvcache_support_dtype)
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                if not Quantizer.layer_map.get(type(cell)):
+                if not self.handler.is_fake_quant and not Quantizer.layer_map.get(type(cell)):
+                    return cell, False
+                if self.handler.is_fake_quant and not Quantizer.fake_quant_layer_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 if not layer_policy or not self._is_quant(layer_policy):
@@ -83,7 +93,7 @@ class Quantizer(Algorithm):
                     logger.info(f"{cell_name} is in blacklist, keep not being quant.")
                     return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
-                wrapper_cell_type = Quantizer.get_wrapper_layer(type(cell), layer_policy)
+                wrapper_cell_type = self.handler.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
