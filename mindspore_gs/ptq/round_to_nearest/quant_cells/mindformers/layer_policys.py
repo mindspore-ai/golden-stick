@@ -15,13 +15,10 @@
 """RTNLayerPolicy for mindformers layers."""
 
 from mindspore.nn import Cell
-from mindspore_gs.ptq.ptq_config import QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq import PTQMode
-from mindspore_gs.common import logger
 from mindspore_gs.ptq.round_to_nearest.rtn_layer_policy import RTNLayerPolicy
-from .quant_cells import LinearQuant, LinearDeploy, PagedAttentionDeploy, PagedAttentionQuant, \
-    PagedAttentionDeployFusion, DynamicQuantPagedAttentionDeploy
+from .quant_cells import LinearQuant, LinearDeploy
 
 
 class LinearLayerPolicy(RTNLayerPolicy):
@@ -42,27 +39,3 @@ class LinearLayerPolicy(RTNLayerPolicy):
         if self.is_deploy:
             return LinearDeploy(handler, self)
         return LinearQuant(handler, self)
-
-
-class PagedAttentionMgrPolicy(RTNLayerPolicy):
-    """
-    Derived class of SimulatedLayerPolicy. LayerPolicy used for nn.Dense.
-    """
-    def __init__(self, weight_names: [], act_names: [], config: InnerPTQConfig = InnerPTQConfig()):
-        super().__init__(weight_names, act_names, config)
-        self.set_input_number(3)
-        self.is_deploy = config.mode == PTQMode.DEPLOY
-        self.enable_deploy_fusion = config.enable_deploy_fusion
-        self.kvcache_dynamic_quant = config.kvcache_quant_granularity == QuantGranularity.PER_TOKEN
-        logger.info(f"PagedAttentionMgr Quant conifg: {config}.")
-
-    def wrap_cell(self, handler) -> Cell:
-        if self._config.kvcache_quant_dtype is None:
-            return None
-        if self.is_deploy:
-            if self.kvcache_dynamic_quant:
-                return DynamicQuantPagedAttentionDeploy(handler, self)
-            if self.enable_deploy_fusion:
-                return PagedAttentionDeployFusion(handler, self)
-            return PagedAttentionDeploy(handler, self)
-        return PagedAttentionQuant(handler, self)
