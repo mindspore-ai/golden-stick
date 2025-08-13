@@ -1051,8 +1051,10 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         """create"""
         # qbmm need transpose_b = False
         if linear.expert_num > 1:
+            q_weight.init_data()
             q_weight = msops.transpose(q_weight, (0, 2, 1)) if linear.transpose_b else q_weight
         else:
+            q_weight.init_data()
             q_weight = msops.transpose(q_weight, (1, 0)) if linear.transpose_b else q_weight
         linear.transpose_b = False
 
