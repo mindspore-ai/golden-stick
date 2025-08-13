@@ -97,6 +97,14 @@
 "golden-stick/example/ptq/round_to_nearest/networks/network.py"                                          "unused-argument"
 "golden-stick/tests/st/golden_stick/test_json_cache.py"                                                  "protected-access"
 "golden-stick/tests/st/golden_stick/test_transformer_inspect.py"                                         "len-as-condition"
+"golden-stick/tests/st/ptq/models/ptq_qwen3_runner.py"                                                   "wrong-import-position"
+"golden-stick/tests/st/ptq/ptq/ptq_deepseek_runner.py"                                                   "wrong-import-position"
+"golden-stick/tests/st/ptq/ptq/ptq_llama2_runner.py"                                                     "wrong-import-position"
+"golden-stick/tests/st/ptq/ptq/ptq_network_runner.py"                                                    "wrong-import-position"
+"golden-stick/tests/st/ptq/ptq/test_layer_configs.py"                                                    "wrong-import-position"
+"golden-stick/tests/st/ptq/ptq/test_osl.py"                                                              "wrong-import-position"
+"golden-stick/tests/st/ptq/ptq/test_ptq.py"                                                              "wrong-import-position"
+"golden-stick/tests/st/ptq/rtn/test_linear_a16w8.py"                                                     "wrong-import-position"
 
 # for version check
 "golden-stick/mindspore_gs/__init__.py"                           "wrong-import-position"

@@ -18,6 +18,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindspore import dtype, Parameter
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
@@ -45,6 +46,7 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(McoreRowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(QKVParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -100,8 +102,8 @@ class DynamicQuantLinearInferCell(LinearInferCell):
             logger.debug(f"DynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"DynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-        qmm, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy, False,
-                                                          self.layer.transpose_b, compute_type)
+        qmm, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy,
+                                                          False, self.layer.transpose_b, compute_type)
         self._set_act_dynamic_quant(dynamic_quant_op)
         self.layer.matmul = qmm
         self.layer.weight = q_weight
@@ -119,8 +121,8 @@ class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
             logger.debug(f"DynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"DynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-        qmm, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy, False,
-                                                          self.layer.transpose_b, compute_type)
+        qmm, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.quant_method.matmul, w_qparam, is_deploy,
+                                                          False, self.layer.transpose_b, compute_type)
         self._set_act_dynamic_quant(dynamic_quant_op)
-        self.layer.matmul = qmm
+        self.layer.quant_method.matmul = qmm
         self.layer.weight = q_weight

@@ -137,10 +137,7 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
                     weight_quant_granularity=weight_quant_granularity,
                     kvcache_quant_granularity=kvcache_quant_granularity,
                     group_size=uargs_.group_size)
-    if approach == 'rtn-c8':
-        logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
-        ptq = RTN(config=cfg)
-    elif approach == 'rtn-a16w8':
+    if approach == 'rtn-a16w8':
         logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
         ptq = RTN(config=cfg)
     elif approach == 'ptq':

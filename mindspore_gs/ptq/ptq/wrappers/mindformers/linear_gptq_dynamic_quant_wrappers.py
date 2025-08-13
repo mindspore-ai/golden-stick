@@ -18,6 +18,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindspore import dtype, ops
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
@@ -45,6 +46,7 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(McoreRowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(QKVParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -129,7 +131,8 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
         qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
                                                                         w_qparam, is_deploy, False,
-                                                                        self.layer.transpose_b, compute_type)
+                                                                        self.layer.transpose_b, compute_type,
+                                                                        experimental=True)
         self._set_act_dynamic_quant(dynamic_quant_op)
-        self.layer.matmul = qmm
+        self.layer.quant_method.matmul = qmm
         self.layer.weight = q_weight

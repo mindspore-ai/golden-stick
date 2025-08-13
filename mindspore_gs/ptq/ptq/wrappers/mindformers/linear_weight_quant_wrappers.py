@@ -22,6 +22,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
@@ -70,6 +71,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
             Quantizer.reg_layer_map(McoreColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(McoreRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(QKVParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(MergedColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
 
@@ -80,6 +82,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
         type_map[McoreColumnParallelLinear] = ParallelType.COL_PARALLEL
         type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
         type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[MergedColumnParallelLinear] = ParallelType.COL_PARALLEL
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -229,13 +232,13 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
         if w_qparam.quant_dtype == dtype.int8:
             qmm = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
-                                           self.layer.transpose_b, compute_type)
+                                           self.layer.transpose_b, compute_type, experimental=True)
         elif w_qparam.quant_dtype == dtype.qint4x2:
             qmm, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
-                                                         self.layer.transpose_b, compute_type)
+                                                         self.layer.transpose_b, compute_type, experimental=True)
             self.layer.transpose_b = False
         else:
             raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
-        self.layer.matmul = qmm
+        self.layer.quant_method.matmul = qmm
         del self.layer.weight
         self.layer.weight = q_weight

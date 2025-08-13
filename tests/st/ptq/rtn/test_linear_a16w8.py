@@ -21,6 +21,9 @@ from collections import OrderedDict
 
 import pytest
 import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import mindspore
 from mindspore import context, Parameter, dtype, GRAPH_MODE, PYNATIVE_MODE, Tensor, nn, ops
 from mindspore_gs.ptq import RoundToNearest as RTN

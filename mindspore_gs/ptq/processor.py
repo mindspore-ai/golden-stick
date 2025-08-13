@@ -16,8 +16,7 @@
 
 import abc
 import warnings
-from typing import Tuple
-
+from typing import Tuple, Union
 from mindspore.nn import Cell
 from mindspore_gs.common import logger
 
@@ -54,8 +53,8 @@ def transform_network_inplace(network: Cell, target_layer_type: type, transform_
     Transformer().process(network, network_root_name)
 
 
-def network_replace(network: Cell, src_layer: type, dst_layer: type, dst_layer_fn: callable, opname_blacklist: list,
-                    network_root_name="network"):
+def network_replace(network: Cell, src_layer: Union[type, tuple], dst_layer: type, dst_layer_fn: callable,
+                    opname_blacklist: list, network_root_name="network"):
     """network replace"""
     class Replacer(Processor):
         """A network iterator for one-to-one sub-cell replace."""

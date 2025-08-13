@@ -81,9 +81,9 @@ class McoreLinearInferCell(Cell):
             x_scale = mint.reshape(x_scale, (-1,))
 
         if self.has_act_dynamic_quant:
-            output_parallel = self._layer.matmul(input_, weight, None, x_scale)
+            output_parallel = self._layer.quant_method.matmul(input_, weight, None, x_scale)
         else:
-            output_parallel = self._layer.matmul(input_, weight)
+            output_parallel = self._layer.quant_method.matmul(input_, weight)
 
         if self._layer.has_bias and not self._layer.skip_bias_add:
             bias = self._layer.cast(self._layer.bias, self._layer.compute_dtype)
@@ -122,9 +122,9 @@ class McoreLinearInferCell(Cell):
         input_parallel = mint.reshape(input_parallel, (-1, self._layer.input_size_per_partition))
 
         if self.has_act_dynamic_quant:
-            output_parallel = self._layer.matmul(input_parallel, self._layer.weight, None, x_scale)
+            output_parallel = self._layer.quant_method.matmul(input_parallel, self._layer.weight, None, x_scale)
         else:
-            output_parallel = self._layer.matmul(input_parallel, self._layer.weight)
+            output_parallel = self._layer.quant_method.matmul(input_parallel, self._layer.weight)
         output = self._layer.reduce_from_mp_region(output_parallel)
 
         if self._layer.has_bias and not self._layer.skip_bias_add:
@@ -174,6 +174,6 @@ class McoreLinearInferCell(Cell):
             return {}
         if self.quant_op:
             state_dict.update(self.quant_op.param_shard_state(tensor_parallel_num, **kwargs))
-        if hasattr(self.layer.matmul, "param_shard_state"):
-            state_dict.update(self.layer.matmul.param_shard_state(tensor_parallel_num, self.parallel_type))
+        if hasattr(self.layer.quant_method.matmul, "param_shard_state"):
+            state_dict.update(self.layer.quant_method.matmul.param_shard_state(tensor_parallel_num, self.parallel_type))
         return state_dict

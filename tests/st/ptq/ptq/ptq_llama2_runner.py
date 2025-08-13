@@ -21,6 +21,8 @@ import sys
 import shutil
 import numpy as np
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import mindspore as ms
 from mindspore.communication import get_rank
 from mindspore import save_checkpoint
@@ -36,8 +38,6 @@ from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Help
 from mindspore_gs.common.utils import offload_network
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.datasets import create_boolq_dataset
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 
 def create_ds(network_helper, ds_path, ds_type, tokenizer_):
     """Create datasets."""

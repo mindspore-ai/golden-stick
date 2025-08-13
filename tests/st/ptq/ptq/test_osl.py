@@ -19,6 +19,9 @@ import argparse
 import json
 import pytest
 import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import mindspore as ms
 from mindspore import dtype as msdtype
 from mindspore import nn, Tensor

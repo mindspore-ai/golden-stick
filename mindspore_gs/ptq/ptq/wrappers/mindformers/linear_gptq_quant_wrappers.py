@@ -27,6 +27,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
@@ -54,6 +55,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(McoreRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(QKVParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
