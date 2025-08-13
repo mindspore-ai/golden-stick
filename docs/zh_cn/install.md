@@ -11,10 +11,9 @@
 | 软件名称 |  版本   |
 | :-----: | :-----: |
 | Ubuntu  |  18.04  |
-| Python  |  3.9-3.10 |
+| Python  |  3.9-3.11 |
 
 > 其他的三方依赖请参考[requirements文件](https://gitee.com/mindspore/golden-stick/blob/master/requirements.txt)。
-> 当前MindSpore Golden Stick仅能在Ubuntu18.04上运行。
 
 ## MindSpore版本依赖关系
 
@@ -22,6 +21,7 @@ MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表�
 
 | MindSpore Golden Stick版本 |                             分支                                  | MindSpore版本 |
 | :---------------------: | :-----------------------------------------------------------------: | :-------: |
+|          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0   |
 |          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0   |
 |          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0   |
 |          0.6.0          | [r0.6](https://gitee.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0   |
@@ -37,15 +37,9 @@ MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表�
 
 ## pip安装
 
-使用pip命令安装，请从[MindSpore Golden Stick下载页面](https://www.mindspore.cn/versions)下载并安装whl包。
-
- ```shell
-pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{ms_version}/GoldenStick/any/mindspore_gs-{mg_version}-py3-none-any.whl --trusted-host ms-release.obs.cn-north-4.myhuaweicloud.com -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
+使用pip命令安装，请从[MindSpore Golden Stick Releases](https://gitee.com/mindspore/golden-stick/releases)下载对应whl包并安装whl。
 
 > - 在联网状态下，安装whl包时会自动下载MindSpore Golden Stick安装包的依赖项（依赖项详情参见requirement.txt），其余情况需自行安装。
-> - `{ms_version}`表示与MindSpore Golden Stick匹配的MindSpore版本号，例如下载1.0.0版本MindSpore Golden Stick时，`{ms_version}`可写为2.5.0。
-> - `{mg_version}`表示MindSpore Golden Stick版本号，例如下载1.0.0版本MindSpore Golden Stick时，`{mg_version}`应写为1.0.0。
 
 ## 源码编译安装
 
