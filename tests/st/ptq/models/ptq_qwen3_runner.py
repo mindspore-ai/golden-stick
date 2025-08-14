@@ -110,7 +110,7 @@ def quant_qwen3(config_path_, output_dir_, quant_algo_, ds_path):
     model = AutoModel.from_pretrained(config_path_)
     cfg, layers_policy = create_ptq_config(quant_algo_)
     model.calibrate(cfg, layers_policy, datasets)
-    ckpt_path = model.save_pretrained(output_dir_)
+    ckpt_path = model.save_pretrained(output_dir_, quant_algo_, quant_algo_)
 
     os.environ.pop('ENFORCE_EAGER', None)
     return ckpt_path

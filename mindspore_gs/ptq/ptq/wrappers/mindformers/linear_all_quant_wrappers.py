@@ -30,6 +30,7 @@ from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq.hal import QuantParam, AllQuantMatmul, ParallelType, KernelType, OutlierSuppressionPlusSmoothMatmul
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
+from mindspore_gs.ptq.utils import QuantType
 from .parallel_minmax import get_min_max_op
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
@@ -186,3 +187,17 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
             self.layer.smooth_scale = Parameter(Tensor(quant.smooth_scale.asnumpy()))
             self.layer.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
             self.layer.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+
+    def quant_type_dict(self):
+        """quant_type_dict"""
+        quant_type = {
+            self.layer.smooth_scale.name: QuantType.W8A8.value,
+            self.layer.weight_scale.name: QuantType.W8A8.value,
+            self.layer.weight_offset.name: QuantType.W8A8.value,
+            self.layer.weight.name: QuantType.W8A8.value,
+            self.quant_op.input_scale.name: QuantType.W8A8.value,
+            self.quant_op.input_zp.name: QuantType.W8A8.value
+        }
+        if self.layer.has_bias:
+            quant_type.update({self.layer.bias.name, QuantType.W8A8.value})
+        return quant_type
