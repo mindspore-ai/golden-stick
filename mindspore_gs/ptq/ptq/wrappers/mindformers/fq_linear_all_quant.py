@@ -173,7 +173,7 @@ class FakeQuantLinearCell(LinearBase):
     def __init__(self, layer_name, linear: LinearBase, context, cfg: InnerPTQConfig):
         super().__init__(linear.input_size, linear.output_size)
         self.layer_name = layer_name
-        self.is_act_quant = cfg.act_quant_dtype is msdtype.int8
+        self.is_act_quant = cfg.act_quant_dtype == msdtype.int8
         self.has_smooth = cfg.outliers_suppression in (OutliersSuppressionType.SMOOTH,
                                                        OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
         if isinstance(linear, Linear):
