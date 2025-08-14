@@ -23,6 +23,10 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
@@ -49,6 +53,12 @@ class WeightQuantLinearCell(WrapperLinearCell):
                         and config.precision_recovery == PrecisionRecovery.NONE)
 
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(QKVParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, WeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -67,13 +77,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
             Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
-        try:
-            Quantizer.reg_layer_map(McoreColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(McoreRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(QKVParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(MergedColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
-        except ImportError:
-            pass
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
@@ -83,6 +86,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
         type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
         type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
         type_map[MergedColumnParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[ColumnParallelGroupedLinear] = ParallelType.COL_PARALLEL
+        type_map[RowParallelGroupedLinear] = ParallelType.ROW_PARALLEL
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -109,8 +114,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
             raise ValueError("only per-tensor activation quantization now.")
 
         rank = len(linear.weight.shape)
-        ic_axis = rank - 1 if linear.transpose_b else rank - 2
-        self.weight_quantizer_axis = rank - 2 if linear.transpose_b else rank - 1
+        ic_axis = rank - 1 if self._transpose_b() else rank - 2
+        self.weight_quantizer_axis = rank - 2 if self._transpose_b() else rank - 1
         self.ic = linear.weight.shape[ic_axis]
         self.oc = linear.weight.shape[self.weight_quantizer_axis]
 
@@ -160,7 +165,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
                                                self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                                self.cfg.group_size, self.cfg.weight_quant_dtype,
                                                self.weight_quantizer_axis,
-                                               is_transpose=self._layer.transpose_b)
+                                               is_transpose=self._transpose_b())
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_CHANNEL:
             w_scale = np.squeeze(w_scale)
             w_zp = np.squeeze(w_zp)
@@ -232,12 +237,12 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
         if w_qparam.quant_dtype == dtype.int8:
             qmm = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
-                                           self.layer.transpose_b, compute_type, experimental=True)
+                                           self._transpose_b(), compute_type, experimental=True)
         elif w_qparam.quant_dtype == dtype.qint4x2:
             qmm, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
-                                                         self.layer.transpose_b, compute_type, experimental=True,
+                                                         self._transpose_b(), compute_type, experimental=True,
                                                          use_fake_quant=self.cfg.use_fake_quant)
-            self.layer.transpose_b = False
+            self._set_transpose_b_to_false()
         else:
             raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
         self.layer.quant_method.matmul = qmm

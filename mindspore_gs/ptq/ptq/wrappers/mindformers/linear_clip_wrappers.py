@@ -24,6 +24,10 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -50,6 +54,8 @@ class ClipLinearCell(WrapperLinearCell):
         LinearClipper.reg_layer_map(McoreRowParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(QKVParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(MergedColumnParallelLinear, ClipLinearCell, AutoClipChecker())
+        LinearClipper.reg_layer_map(ColumnParallelGroupedLinear, ClipLinearCell, AutoClipChecker())
+        LinearClipper.reg_layer_map(RowParallelGroupedLinear, ClipLinearCell, AutoClipChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -78,7 +84,9 @@ class ClipLinearCell(WrapperLinearCell):
                     McoreColumnParallelLinear: ParallelType.COL_PARALLEL,
                     QKVParallelLinear: ParallelType.COL_PARALLEL,
                     MergedColumnParallelLinear: ParallelType.COL_PARALLEL,
-                    McoreRowParallelLinear: ParallelType.ROW_PARALLEL}
+                    McoreRowParallelLinear: ParallelType.ROW_PARALLEL,
+                    ColumnParallelGroupedLinear: ParallelType.COL_PARALLEL,
+                    RowParallelGroupedLinear: ParallelType.ROW_PARALLEL,}
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -228,7 +236,7 @@ class ClipLinearCell(WrapperLinearCell):
         super(ClipLinearCell, self).process()
         org_shape = self._layer.weight.shape
         if len(org_shape) == 3:
-            if self._layer.transpose_b:
+            if self._transpose_b():
                 # [num_experts, oc, ic] -> [num_experts * oc, ic]
                 weight = self._layer.weight.data.reshape((-1, org_shape[-1]))
             else:
@@ -251,7 +259,7 @@ class ClipLinearCell(WrapperLinearCell):
         self._apply_clip(clip_val)
 
         if len(org_shape) == 3:
-            if self.layer.transpose_b:
+            if self._transpose_b():
                 weight = self._layer.weight.reshape(org_shape)
             else:
                 weight = msops.transpose(self._layer.weight.data, (1, 0))
@@ -274,7 +282,7 @@ class ClipLinearCell(WrapperLinearCell):
     # pylint: disable=W0211
     def col_sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
-        w_shard = (self.tensor_parallel_group_size, 1) if self.transpose_b else (1, self.tensor_parallel_group_size)
+        w_shard = (self.tensor_parallel_group_size, 1) if self._transpose_b() else (1, self.tensor_parallel_group_size)
         state_dict = {self.weight.name: {'shape': self.weight.shape, 'shard': w_shard}}
         if self.has_bias:
             state_dict[self.bias.name] = {'shape': self.bias.shape, 'shard': (self.tensor_parallel_group_size,)}
@@ -284,7 +292,7 @@ class ClipLinearCell(WrapperLinearCell):
     #pylint: disable=W0211
     def row_sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
-        w_shard = (1, self.tensor_parallel_group_size) if self.transpose_b else (self.tensor_parallel_group_size, 1)
+        w_shard = (1, self.tensor_parallel_group_size) if self._transpose_b() else (self.tensor_parallel_group_size, 1)
         state_dict = {self.weight.name: {'shape': self.weight.shape, 'shard': w_shard}}
         if self.has_bias:
             state_dict[self.bias.name] = {'shape': self.bias.shape,

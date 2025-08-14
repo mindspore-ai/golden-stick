@@ -24,8 +24,8 @@ from .linear_dynamic_quant_wrappers import DynamicQuantLinearCell
 from .linear_gptq_dynamic_quant_wrappers import GptqDynamicQuantLinearCell
 from .kvcache_quant_wrappers import QuantPageAttentionMgrCell, DynamicQuantPageAttentionMgrCell
 
-from .fq_linear_all_quant import FakeQuantW8A8Wrapper
-from .fq_gptq_dynamic_quant import FakeQuantW4A8DynamicWrapper
+from .fake_quant_linear import FakeQuantW8A8Wrapper
+from .fake_quant_gptq_dynamic_quant import FakeQuantW4A8DynamicWrapper
 
 SearchOutlierSuppressionLiteLinearCell.reg_self()
 SmoothQuantLinearCell.reg_self()
