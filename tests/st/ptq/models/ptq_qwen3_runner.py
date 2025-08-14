@@ -151,8 +151,8 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, quant_ckpt_pat
         shutil.rmtree(quant_ckpt_path_)
     except (OSError, FileNotFoundError):
         pass
-    assert score >= score_mapping[quant_algo_], f"Score {quant_algo_} is {score:.4f}, \
-                                  which is lower than standard f{score_mapping[quant_algo_]}"
+    error_str = f"Score {quant_algo_} is {score:.4f}, which is lower than standard f{score_mapping[quant_algo_]}"
+    assert score >= score_mapping[quant_algo_], error_str
     print(f"Score of {quant_algo_} is {score}", flush=True)
 
 

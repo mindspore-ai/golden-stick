@@ -16,4 +16,4 @@
 
 
 from .mf_model import MFModel
-from .qwen3_model import QWen3
+from .qwen3 import QWen3

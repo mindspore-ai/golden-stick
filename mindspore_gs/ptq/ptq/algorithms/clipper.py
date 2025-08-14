@@ -27,6 +27,7 @@ class LinearClipper(Algorithm):
     """clip got lienar"""
 
     linear_map = {}
+    fake_quant_linear_map = {}
 
     def target_layer_type(self) -> tuple:
         return tuple(self.linear_map.keys())
@@ -41,9 +42,9 @@ class LinearClipper(Algorithm):
         else:
             LinearClipper.linear_map[layer_type].append((checker, quant_layer_type))
 
-    @staticmethod
-    def get_wrapper_layer(layer_type, config: InnerPTQConfig):
-        wrappers = LinearClipper.linear_map.get(layer_type)
+    def get_wrapper_layer(self, layer_type, config: InnerPTQConfig):
+        wrappers = LinearClipper.linear_map.get(layer_type) if not self.is_fake_quant else \
+            LinearClipper.fake_quant_linear_map.get(layer_type)
         if not wrappers:
             return None
         for checker_wrapper in wrappers:
@@ -63,7 +64,9 @@ class LinearClipper(Algorithm):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
-                if not LinearClipper.linear_map.get(type(cell)):
+                if not self.handler.is_fake_quant and not LinearClipper.linear_map.get(type(cell)):
+                    return cell, False
+                if self.handler.is_fake_quant and not LinearClipper.fake_quant_linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 is_inner_osp = layer_policy.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_PLUS \
@@ -80,7 +83,7 @@ class LinearClipper(Algorithm):
                     logger.info(f"{cell_name} is in blacklist, keep not being clip.")
                     return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
-                wrapper_cell_type = LinearClipper.get_wrapper_layer(type(cell), layer_policy)
+                wrapper_cell_type = self.handler.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):

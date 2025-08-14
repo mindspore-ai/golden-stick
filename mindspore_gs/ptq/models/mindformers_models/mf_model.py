@@ -22,6 +22,7 @@ from mindspore import load_param_into_net, load_checkpoint
 from mindformers import AutoModel, MindFormerConfig, build_context, build_parallel_config
 from mindspore_gs.ptq.models.base_model import BaseModel
 from mindspore_gs.common import logger
+from mindspore_gs.ptq import PTQ
 
 
 class MFModel(BaseModel):
@@ -130,4 +131,11 @@ class MFModel(BaseModel):
         return param_dict
 
     def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):
-        raise NotImplementedError
+        logger.info("Use ptq algo to fake-quant network and weight")
+        ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
+        # pylint: disable=protected-access
+        ptq._config.experimental = True
+        transformer_layers = self._transformer_layers()
+        _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
+        ptq.fake_quant(self.network)
+        self._load_tp_splited_safetensors(quant_safetensors_path)
