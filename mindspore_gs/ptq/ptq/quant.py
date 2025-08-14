@@ -373,7 +373,7 @@ class PTQ(CompAlgo):
         """fake_quant"""
         self._config.update_comm_info()
         self._get_decoder_layers(network)
-        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
+        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ FakeQuant..."):
             layer_name, layer = self.decoder_layers[i]
             for processor in self.pipeline:
                 processor.set_fake_quant()
