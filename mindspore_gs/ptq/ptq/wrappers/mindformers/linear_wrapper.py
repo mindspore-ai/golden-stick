@@ -26,7 +26,14 @@ from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather
                                                                           reduce_scatter_to_model_parallel_region,
                                                                           scatter_to_model_parallel_region)
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
-    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+    ColumnParallelLinear as McoreColumnParallelLinear,
+    RowParallelLinear as McoreRowParallelLinear,
+    QKVParallelLinear,
+    MergedColumnParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
                                                                           reduce_from_model_parallel_region,
                                                                           reduce_scatter_to_model_parallel_region,
@@ -40,18 +47,30 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
-        self.is_mcorelinear = isinstance(linear, (McoreColumnParallelLinear, McoreRowParallelLinear))
+        self.is_mcorelinear = isinstance(linear, (McoreColumnParallelLinear,
+                                                  McoreRowParallelLinear,
+                                                  QKVParallelLinear,
+                                                  MergedColumnParallelLinear,
+                                                  ColumnParallelGroupedLinear,
+                                                  RowParallelGroupedLinear))
+        self.is_gmm_mcore = isinstance(linear, (ColumnParallelGroupedLinear,
+                                                RowParallelGroupedLinear))
 
     def _get_matmul(self, linear):
-        if self.context.experimental:
+        if self.is_mcorelinear: # and not self.is_gmm_mcore:
             return linear.quant_method.matmul
         return linear.matmul
 
     def _set_matmul(self, linear, new_matmul):
-        if self.context.experimental:
+        if self.is_mcorelinear:# and not self.is_gmm_mcore:
             linear.quant_method.matmul = new_matmul
             return
         linear.matmul = new_matmul
+
+    def _transpose_b(self):
+        if self.is_gmm_mcore:
+            return False
+        return self.layer.transpose_b
 
     def add_hook(self, experimental=False):
         class HookMatMul(msops.MatMul):
@@ -71,7 +90,7 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
         # as such, if I want to override the __call__ method, I must override the __call__ of a class
         # but if I don't want to affect behaviour of other instances of the same class,
         # I need to create a new class with the overridden __call__ method.
-        matmul = self.layer.quant_method.matmul if experimental else self.layer.matmul
+        matmul = self._get_matmul(self.layer)
         if isinstance(matmul, msops.MatMul):
             matmul.__class__ = HookMatMul
             matmul.layer_name = self.layer_name
@@ -92,7 +111,7 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
             raise RuntimeError(f"Unsupported matmul type for hook: {type(matmul)}")
 
     def remove_hook(self, experimental=False):
-        matmul = self.layer.quant_method.matmul if experimental else self.layer.matmul
+        matmul = self._get_matmul(self.layer)
         if isinstance(matmul, msops.MatMul):
             matmul.__class__ = msops.MatMul
         elif isinstance(matmul, GroupedMatmulV4):

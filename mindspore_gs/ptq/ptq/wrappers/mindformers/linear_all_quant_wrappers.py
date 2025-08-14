@@ -22,6 +22,10 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -54,6 +58,8 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreRowParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(QKVParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(MergedColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, AllQuantLinearCell, A8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -133,13 +139,13 @@ class AllQuantLinearInferCell(LinearInferCell):
                 msops.expand_dims(-linear.matmul.beta_osp, 0),
                 (
                     origin_weight.astype("float32").transpose()
-                    if self._layer.transpose_b
+                    if self.layer.transpose_b
                     else self._layer.weight.astype("float32")
                 ),
             )
             bias_osp = bias_osp.squeeze()
-        quant, qmm = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam, is_deploy,
-                                           cfg.tp_size, compute_type,
+        quant, qmm = AllQuantMatmul.create(layer_name, linear, linear.transpose_b, parallel_type, q_weight, x_qparam,
+                                           w_qparam, is_deploy, cfg.tp_size, compute_type,
                                            KernelType.ACLNN if use_aclnn_quant else KernelType.INTERNAL, bias_osp)
         if not is_deploy:
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
@@ -167,13 +173,13 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
                 msops.expand_dims(-linear.quant_method.matmul.beta_osp, 0),
                 (
                     origin_weight.astype("float32").transpose()
-                    if self._layer.transpose_b
+                    if self._transpose_b()
                     else self._layer.weight.astype("float32")
                 ),
             )
             bias_osp = bias_osp.squeeze()
-        quant, qmm = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam, is_deploy,
-                                           cfg.tp_size, compute_type,
+        quant, qmm = AllQuantMatmul.create(layer_name, linear, self._transpose_b(), parallel_type, q_weight,
+                                           x_qparam, w_qparam, is_deploy, cfg.tp_size, compute_type,
                                            KernelType.ACLNN if use_aclnn_quant else KernelType.INTERNAL, bias_osp,
                                            context.experimental)
         if not is_deploy:

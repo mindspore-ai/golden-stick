@@ -32,6 +32,10 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
@@ -59,6 +63,8 @@ class SmoothLinearCell(WrapperLinearCell):
         type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
         type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
         type_map[MergedColumnParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[ColumnParallelGroupedLinear] = ParallelType.COL_PARALLEL
+        type_map[RowParallelGroupedLinear] = ParallelType.ROW_PARALLEL
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -97,11 +103,11 @@ class SmoothLinearCell(WrapperLinearCell):
         """_apply_weight_smooth"""
         # weight * scale
         weight_scale = msops.expand_dims(smooth_scale, 0)
-        if not self._layer.transpose_b:
+        if not self._transpose_b():
             weight_scale = msops.transpose(weight_scale, (1, 0))
         orin_dtype = self._layer.weight.dtype
         weight = msops.mul(self._layer.weight, weight_scale)
-        weight = self._layer.cast(weight, orin_dtype)
+        weight = msops.cast(weight, orin_dtype)
         msops.assign(self._layer.weight, weight)
         logger.debug(f"SmoothLinearCell: smoothed_weight of Layer({self._layer_name}) is {{{self._layer.weight.shape}, "
                      f"{self._layer.weight.dtype}}}")
@@ -111,7 +117,7 @@ class SmoothLinearCell(WrapperLinearCell):
         org_shape = self._layer.weight.shape
         # weight * scale
         weight_scale = msops.expand_dims(smooth_scale, 0)
-        if not self._layer.transpose_b:
+        if not self._transpose_b():
             weight_scale = msops.transpose(weight_scale, (1, 0))
             # [num_experts, ic, oc] -> [ic, num_experts * oc]
             weight = msops.transpose(self._layer.weight.data, (1, 0, 2)).reshape((org_shape[1], -1))
@@ -121,9 +127,9 @@ class SmoothLinearCell(WrapperLinearCell):
 
         orin_dtype = self._layer.weight.dtype
         weight = msops.mul(weight, weight_scale)
-        weight = self._layer.cast(weight, orin_dtype)
+        weight = msops.cast(weight, orin_dtype)
 
-        if not self._layer.transpose_b:
+        if not self._transpose_b():
             # [ic, num_experts * oc] -> [num_experts, ic, oc]
             weight = weight.reshape((org_shape[1], org_shape[0], org_shape[2]))
             weight = msops.transpose(weight, (1, 0, 2))
@@ -173,7 +179,7 @@ class SmoothLinearCell(WrapperLinearCell):
         """deploy"""
         if self.cfg.mode == PTQMode.QUANTIZE or self.cfg.outliers_suppression == OutliersSuppressionType.NONE:
             return self.layer
-        ic = self._layer.weight.shape[1] if self._layer.transpose_b else self._layer.weight.shape[1]
+        ic = self._layer.weight.shape[1] if self._transpose_b() else self._layer.weight.shape[1]
         self._apply_act_smooth_for_deploy(ic, self.compute_type)
         if self.is_colparallel:
             self.layer.sharded_state_dict = MethodType(SmoothLinearCell.col_sharded_state_dict, self.layer)
@@ -185,7 +191,7 @@ class SmoothLinearCell(WrapperLinearCell):
     # pylint: disable=W0211
     def col_sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
-        w_shard = (self.tensor_parallel_group_size, 1) if self.transpose_b else (1, self.tensor_parallel_group_size)
+        w_shard = (self.tensor_parallel_group_size, 1) if self._transpose_b() else (1, self.tensor_parallel_group_size)
         smooth_scale_shard = (1,)
         smooth_scale = self.matmul.smooth_scale if not self.context.experimental else \
             self.quant_method.matmul.smooth_scale
@@ -199,7 +205,7 @@ class SmoothLinearCell(WrapperLinearCell):
     # pylint: disable=W0211
     def row_sharded_state_dict(self):
         """provide the sharded state dict based on the config"""
-        w_shard = (1, self.tensor_parallel_group_size) if self.transpose_b else (self.tensor_parallel_group_size, 1)
+        w_shard = (1, self.tensor_parallel_group_size) if self._transpose_b() else (self.tensor_parallel_group_size, 1)
         smooth_scale_shard = (self.tensor_parallel_group_size,)
         smooth_scale = self.matmul.smooth_scale if not self.context.experimental else \
             self.quant_method.matmul.smooth_scale
@@ -225,6 +231,8 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(McoreRowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(QKVParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(MergedColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelGroupedLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelGroupedLinear, SmoothQuantLinearCell, SmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -262,7 +270,7 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         input_max_pow = msops.pow(act_max, alpha)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|activation_minmax|output0_activation_minmax_pow",
                                   input_max_pow)
-        weight_smooth_minmax_axis = -2 if self.layer.transpose_b else -1
+        weight_smooth_minmax_axis = -2 if self._transpose_b() else -1
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input0_alpha", Tensor(alpha))
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input1_weight", self.layer.weight)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale|weight_minmax|input2_weight_minmax_axis",
@@ -304,6 +312,8 @@ class AWQLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(McoreRowParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(QKVParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(MergedColumnParallelLinear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(ColumnParallelGroupedLinear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(RowParallelGroupedLinear, AWQLinearCell, AWQChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -408,6 +418,10 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                                          SearchOutlierSuppressionLiteChecker())
         LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelGroupedLinear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelGroupedLinear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -451,8 +465,8 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         self.scale_max, self.scale_min = get_min_max_op(cfg.tp_size, self.is_rowparallel)
 
         rank = len(linear.weight.shape)
-        self.ic_axis = rank - 1 if linear.transpose_b else rank - 2
-        self.oc_axis = rank - 2 if linear.transpose_b else rank - 1
+        self.ic_axis = rank - 1 if self._transpose_b() else rank - 2
+        self.oc_axis = rank - 2 if self._transpose_b() else rank - 1
         self.oc = linear.weight.shape[self.oc_axis]
         self.is_expert = (rank == 3)
         self.expert_num = linear.weight.shape[0] if self.is_expert else -1
@@ -577,7 +591,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                                                 False,
                                                 high_precision_params=False)
             t_w_scale = Tensor(w_scale)
-            if self._layer.transpose_b:
+            if self._transpose_b():
                 t_w_scale = msops.transpose(t_w_scale, (1, 0))
             self.x_scale_fast = Tensor(x_scale)
             self.deq_scale = msops.cast((self.x_scale_fast * t_w_scale), msdtype.float32)
@@ -666,6 +680,8 @@ class AWQSmoothLinearCell(AWQLinearCell):
         LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(QKVParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelGroupedLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelGroupedLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -696,8 +712,8 @@ class AWQSmoothLinearCell(AWQLinearCell):
         self.scale_max, self.scale_min = get_min_max_op(cfg.tp_size, self.is_rowparallel)
 
         rank = len(linear.weight.shape)
-        self.ic_axis = rank - 1 if linear.transpose_b else rank - 2
-        self.oc_axis = rank - 2 if linear.transpose_b else rank - 1
+        self.ic_axis = rank - 1 if self._transpose_b() else rank - 2
+        self.oc_axis = rank - 2 if self._transpose_b() else rank - 1
         self.oc = linear.weight.shape[self.oc_axis]
 
         self.fp16_weight = None
@@ -741,7 +757,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
         org_shape = self._layer.weight.shape
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
             # group in input channel
-            dst_shape = (-1, self.cfg.group_size) if self._layer.transpose_b else (self.cfg.group_size, -1)
+            dst_shape = (-1, self.cfg.group_size) if self._transpose_b() else (self.cfg.group_size, -1)
             weight = self._layer.weight.reshape(dst_shape)
         else:
             weight = self._layer.weight
@@ -815,11 +831,11 @@ class AWQSmoothLinearCell(AWQLinearCell):
                                                self.oc_axis,
                                                True,
                                                True,
-                                               self._layer.transpose_b)
+                                               self._transpose_b())
             logger.debug(f"AWQSmoothLinearCell: search scale alpha {ratio}, pesudo weight of Layer({self._layer_name}) "
                          f"is {{{pesudo_weight.shape}, {pesudo_weight.dtype}, {pesudo_weight.asnumpy()}}}")
             weight_scales = msops.expand_dims(scales, 0)
-            if not self._layer.transpose_b:
+            if not self._transpose_b():
                 weight_scales = msops.transpose(weight_scales, (1, 0))
             self._layer.weight.set_data(msops.div(pesudo_weight, weight_scales))
             pseudo_output = self._module_forward()
@@ -855,7 +871,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
         """smooth"""
         org_shape = self._layer.weight.shape
         if len(org_shape) == 3:
-            if self._layer.transpose_b:
+            if self._transpose_b():
                 # [num_experts, oc, ic] -> [num_experts * oc, ic]
                 weight = self._layer.weight.data.reshape((-1, org_shape[-1]))
                 self.ic_axis, self.oc_axis = 1, 0
@@ -868,7 +884,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
             self._layer.weight.set_data(weight)
         self._get_statistic_data()
         if len(org_shape) == 3:
-            if self._layer.transpose_b:
+            if self._transpose_b():
                 # [num_experts * oc, ic] -> [num_experts, oc, ic]
                 weight = self._layer.weight.reshape(org_shape)
                 self.ic_axis, self.oc_axis = 2, 1
@@ -923,6 +939,10 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
         LinearAutoSmoother.reg_layer_map(QKVParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
         LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelGroupedLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelGroupedLinear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
@@ -1031,7 +1051,7 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
             msops.expand_dims(self.shift_values, 0),
             (
                 self._layer.weight.astype("float32").transpose()
-                if self._layer.transpose_b
+                if self._transpose_b()
                 else self._layer.weight.astype("float32")
             ),
         )
@@ -1068,7 +1088,7 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
                                                 True,
                                                 False)
             t_w_scale = Tensor(w_scale)
-            if self._layer.transpose_b:
+            if self._transpose_b():
                 t_w_scale = msops.transpose(t_w_scale, (1, 0))
             self.x_scale_fast = Tensor(x_scale)
             self.deq_scale = msops.cast((self.x_scale_fast * t_w_scale), msdtype.float32)
@@ -1174,6 +1194,10 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
         LinearAutoSmoother.reg_layer_map(QKVParallelLinear, OutlierSuppressionPlusLinearCell,
                                          OutlierSuppressionPlusChecker())
         LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(ColumnParallelGroupedLinear, OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(RowParallelGroupedLinear, OutlierSuppressionPlusLinearCell,
                                          OutlierSuppressionPlusChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)

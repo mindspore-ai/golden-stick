@@ -19,6 +19,10 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 from mindspore import Parameter, dtype, ops
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
@@ -47,6 +51,8 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreRowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(QKVParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -131,7 +137,7 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
         qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
                                                                         w_qparam, is_deploy, False,
-                                                                        self.layer.transpose_b, compute_type,
+                                                                        self._transpose_b(), compute_type,
                                                                         experimental=True,
                                                                         use_fake_quant=self.cfg.use_fake_quant)
         self._set_act_dynamic_quant(dynamic_quant_op)

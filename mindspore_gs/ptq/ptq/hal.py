@@ -1086,14 +1086,13 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         # qbmm need transpose_b = False
         if hasattr(linear, "expert_num") and linear.expert_num > 1:
             q_weight.init_data()
-            q_weight = msops.transpose(q_weight, (0, 2, 1)) if linear.transpose_b else q_weight
+            q_weight = msops.transpose(q_weight, (0, 2, 1)) if transpose_b else q_weight
         else:
             q_weight.init_data()
-            q_weight = msops.transpose(q_weight, (1, 0)) if linear.transpose_b else q_weight
-        linear.transpose_b = False
+            q_weight = msops.transpose(q_weight, (1, 0)) if transpose_b else q_weight
 
         rank = len(q_weight.shape)
-        ic_idx, oc_idx = (rank - 1, rank - 2) if linear.transpose_b else (rank - 2, rank - 1)
+        ic_idx, oc_idx = (rank - 2, rank - 1)
         ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
 
         if is_deploy:
@@ -1117,17 +1116,17 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         matmul = linear.quant_method.matmul if experimental else linear.matmul
         if isinstance(matmul, msops.MatMul):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
-                                                            linear.transpose_b, dst_dtype, False)
+                                                            False, dst_dtype, False)
         elif isinstance(matmul, GroupedMatmulV4):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
-                                                            linear.transpose_b, dst_dtype, True)
+                                                            False, dst_dtype, True)
         elif isinstance(matmul, SmoothMatmul):
             wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, matmul, w_qparam,
-                                                              is_deploy, transpose_a, linear.transpose_b, dst_dtype)
+                                                              is_deploy, transpose_a, False, dst_dtype)
         elif isinstance(matmul, SmoothMatmulForDeploy):
             wqbmm = WeightQuantInt4Matmul._from_smooth_matmul_for_deploy(layer_name, matmul,
                                                                          w_qparam, is_deploy, transpose_a,
-                                                                         linear.transpose_b, dst_dtype)
+                                                                         False, dst_dtype)
         else:
             raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
         return wqbmm, q_weight
@@ -1349,6 +1348,7 @@ class AllQuantMatmul(QuantUnitCell):
     @staticmethod
     def _quant_bias(
         linear,
+        transpose_b,
         matmul,
         parallel_type: ParallelType,
         q_weight,
@@ -1363,7 +1363,7 @@ class AllQuantMatmul(QuantUnitCell):
         is_osp = isinstance(matmul, OutlierSuppressionPlusSmoothMatmul)
         if bias_osp is None and is_osp:
             raise ValueError("Use OSP but bias_osp is None.")
-        trans_b = linear.transpose_b
+        trans_b = transpose_b
         rank = len(q_weight.shape)
         oc_idx = rank - 2 if trans_b else rank - 1
         oc = q_weight.shape[oc_idx]
@@ -1405,6 +1405,7 @@ class AllQuantMatmul(QuantUnitCell):
     def create(
         layer_name,
         linear,
+        transpose_b,
         parallel_type: ParallelType,
         q_weight,
         x_qparam: QuantParam,
@@ -1422,15 +1423,15 @@ class AllQuantMatmul(QuantUnitCell):
         if bias_osp is None and is_osp:
             raise ValueError("Use OSP but bias_osp is None.")
         trans_a = False
-        trans_b = linear.transpose_b
+        trans_b = transpose_b
         rank = len(q_weight.shape)
         ic_idx = rank - 1 if trans_b else rank - 2
         ic = q_weight.shape[ic_idx]
 
         # dequant offset
-        quant_bias = AllQuantMatmul._quant_bias(linear, matmul, parallel_type, q_weight,
-                                                x_qparam, w_qparam, is_deploy, tp_size,
-                                                dst_dtype, bias_osp)
+        quant_bias = AllQuantMatmul._quant_bias(linear, transpose_b, matmul, parallel_type,
+                                                q_weight, x_qparam, w_qparam, is_deploy,
+                                                tp_size, dst_dtype, bias_osp)
 
         # create qmm
         if isinstance(matmul, (msops.MatMul, GroupedMatmulV4)):
