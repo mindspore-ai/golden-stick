@@ -103,8 +103,6 @@ class Algorithm:
 
     def deploy(self, decoder_layer_name, decoder_layer):
         """deploy"""
-        if self.is_fake_quant:
-            return
         class Deployer(Processor):
             """A network iterator for transform fq-network to quant-network."""
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
