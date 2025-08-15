@@ -29,7 +29,11 @@ from mindspore import dtype as msdtype
 from mindformers import MindFormerConfig
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq import (PTQConfig, PTQMode,
+                              OutliersSuppressionType,
+                              GPTQQuantConfig,
+                              PrecisionRecovery,
+                              QuantGranularity)
 from mindspore_gs.ptq.models import AutoModel
 from transformers import AutoTokenizer
 
@@ -56,6 +60,18 @@ def create_ptq_config(quant_type: str):
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
                         opname_blacklist=['output_layer', 'linear_fc2'])
         layer_policies = OrderedDict()
+    elif quant_type.lower() == 'a8w4':
+        gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+                        act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
+                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=64,
+                        algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ, weight_clip=True,
+                        opname_blacklist=['output_layer', 'linear_fc2'])
+        a8w8_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                             act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+                             opname_blacklist=['output_layer', 'linear_fc2'])
+        layer_policies = OrderedDict({r'.*\.linear_proj\.*': a8w8_cfg,
+                                      r'.*\.linear_fc1\.*': a8w8_cfg})
     else:
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
     return cfg, layer_policies
@@ -139,6 +155,7 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, quant_ckpt_pat
     """ptq_qwen3_predict_2stage"""
     score_mapping = {
         "A8W8": 0.41,
+        "A8W4": 0.29
     }
 
     real_quant_ckpt_path = quant_qwen3(calibrate_config_path_, quant_ckpt_path_, quant_algo_, ds_path)

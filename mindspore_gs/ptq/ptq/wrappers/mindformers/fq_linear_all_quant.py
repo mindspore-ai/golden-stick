@@ -17,7 +17,6 @@
 
 from mindspore import nn, Parameter, dtype as msdtype, Tensor
 from mindspore.common.initializer import initializer
-from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (LinearBase,
                                                                         RowParallelLinear,
@@ -25,84 +24,17 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (LinearBa
                                                                         QKVParallelLinear,
                                                                         MergedColumnParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import LinearMethodBase
-from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
-                                                                          scatter_to_model_parallel_region,
-                                                                          reduce_from_model_parallel_region)
-from mindspore_gs.ptq.ptq.hal import ParallelType
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq_config import QuantGranularity, OutliersSuppressionType
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
+from mindspore_gs.ptq.ptq.wrappers.mindformers.fq_base import (FakeQuantLinearCell,
+                                                               SmoothFakeQuant,
+                                                               FakeQuant,
+                                                               DeQuant)
 
-
-class Quant(nn.Cell):
-    """Quant"""
-    def __init__(self, dst_type=msdtype.int8):
-        super().__init__()
-        self.dst_type = dst_type
-
-    def construct(self, x, scale, offset):
-        x = x / scale
-        x = msops.round(x) + offset
-        x = msops.clip(x, -128., 127.)
-        return msops.cast(x, self.dst_type)
-
-
-class SmoothQuant(nn.Cell):
-    """SmoothQuant"""
-    def __init__(self, dst_type=msdtype.int8):
-        super().__init__()
-        self.dst_type = dst_type
-        self.quant = Quant(dst_type)
-
-    def construct(self, x, smooth_scale, scale, offset):
-        # FIXME hangangqiang2@huawei.com
-        # Theoretically, weights should be multiplied by scale, while activations should be divided by scale.
-        # However, during deployment, smooth_scale is inverted (reciprocal taken) after apply_scale_to_weight.
-        # Since weights have already been multiplied by scale, activations must still be multiplied by scale here.
-        x = x * smooth_scale
-        return self.quant(x, scale, offset)
-
-
-class DeQuant(nn.Cell):
-    """DeQuant"""
-    def __init__(self, dst_type):
-        super().__init__()
-        self.dst_type = dst_type
-
-    def construct(self, x, scale, offset):
-        x = (x - offset) * scale
-        return x.astype(self.dst_type)
-
-
-class FakeQuant(nn.Cell):
-    """FakeQuant"""
-    def __init__(self, quant_dtype, dst_dtype):
-        super().__init__()
-        self.quant = Quant(quant_dtype)
-        self.de_quant = DeQuant(dst_dtype)
-
-    def construct(self, x, scale, offset):
-        x = self.quant(x, scale, offset)
-        x = self.de_quant(x, scale, offset)
-        return x
-
-
-class SmoothFakeQuant(nn.Cell):
-    """SmoothFakeQuant"""
-    def __init__(self, quant_dtype, dst_dtype):
-        super().__init__()
-        self.quant = SmoothQuant(quant_dtype)
-        self.de_quant = DeQuant(dst_dtype)
-
-    def construct(self, x, smooth_scale, scale, offset):
-        x = self.quant(x, smooth_scale, scale, offset)
-        x = self.de_quant(x, scale, offset)
-        return x
-
-
-class FakeQuantLinearMethod(LinearMethodBase):
+class FakeQuantW8A8LinearMethod(LinearMethodBase):
     """Linear method without quantization."""
     def __init__(self, layer_name, quant_method: LinearMethodBase, output_dtype, is_act_quant=True, has_smooth=True):
         super().__init__()
@@ -138,7 +70,7 @@ class FakeQuantLinearMethod(LinearMethodBase):
         return self.quant_method.apply(layer, x, weight, bias)
 
 
-class FakeQuantWrapper(WrapperCell):
+class FakeQuantW8A8Wrapper(WrapperCell):
     """FakeQuantWrapper"""
     @staticmethod
     def reg_self():
@@ -148,11 +80,11 @@ class FakeQuantWrapper(WrapperCell):
                 return config.weight_quant_dtype == msdtype.int8 and config.act_quant_dtype == msdtype.int8 and \
                        config.act_quant_granularity is QuantGranularity.PER_TENSOR
 
-        Quantizer.reg_fake_quant_layer_map(Linear, FakeQuantWrapper, FakeQuantChecker())
-        Quantizer.reg_fake_quant_layer_map(ColumnParallelLinear, FakeQuantWrapper, FakeQuantChecker())
-        Quantizer.reg_fake_quant_layer_map(RowParallelLinear, FakeQuantWrapper, FakeQuantChecker())
-        Quantizer.reg_fake_quant_layer_map(QKVParallelLinear, FakeQuantWrapper, FakeQuantChecker())
-        Quantizer.reg_fake_quant_layer_map(MergedColumnParallelLinear, FakeQuantWrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(Linear, FakeQuantW8A8Wrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(ColumnParallelLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(RowParallelLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(QKVParallelLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(MergedColumnParallelLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
 
     def _quant_info(self) -> str:
         return 'FakeQuant'
@@ -164,82 +96,23 @@ class FakeQuantWrapper(WrapperCell):
         pass
 
     def deploy(self):
-        return FakeQuantLinearCell(self.layer_name, self.layer, self.context, self.cfg)
+        return FakeQuantW8A8LinearCell(self.layer_name, self.layer, self.context, self.cfg)
 
 
-class FakeQuantLinearCell(LinearBase):
-    """FakeQuantLinearCell"""
+class FakeQuantW8A8LinearCell(FakeQuantLinearCell):
+    """FakeQuantW8A8LinearCell"""
     # pylint: disable=unused-argument
     def __init__(self, layer_name, linear: LinearBase, context, cfg: InnerPTQConfig):
-        super().__init__(linear.input_size, linear.output_size)
-        self.layer_name = layer_name
-        self.is_act_quant = cfg.act_quant_dtype == msdtype.int8
-        self.has_smooth = cfg.outliers_suppression in (OutliersSuppressionType.SMOOTH,
-                                                       OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
-        if isinstance(linear, Linear):
-            self.parallel_type = ParallelType.NO_PARALLEL
-        elif isinstance(linear, ColumnParallelLinear):
-            self.input_size = linear.input_size
-            ic = linear.input_size
-            self.gather_output = linear.gather_output
-            self.tp_group = linear.tp_group
-            self.output_size_per_partition = sum(linear.output_partition_sizes)
-            self.bias = linear.bias if linear.has_bias else None
-            self.parallel_type = ParallelType.COL_PARALLEL
-        elif isinstance(linear, RowParallelLinear):
-            ic = linear.input_size_per_partition
-            self.output_size_per_partition = linear.output_size_per_partition
-            self.input_is_parallel = linear.input_is_parallel
-            self.tp_group = linear.tp_group
-            self.bias = None if self.tp_group.rank > 0 else linear.bias
-            self.parallel_type = ParallelType.ROW_PARALLEL
-        else:
-            raise ValueError(f"Not supported linear: {linear}")
-        self.compute_dtype = linear.compute_dtype
+        super().__init__(layer_name, linear, context, cfg)
+        self.is_act_quant = self.cfg.act_quant_dtype == msdtype.int8
+        self.has_smooth = self.cfg.outliers_suppression in (OutliersSuppressionType.SMOOTH,
+                                                            OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
 
-        self.input_scale = Parameter(initializer("ones", (ic,), self.compute_dtype))
-        self.smooth_scale = Parameter(initializer("ones", (ic,), self.compute_dtype))
-        self.input_offset = Parameter(initializer("zeros", (ic,), msdtype.int32))
+        self.input_scale = Parameter(initializer("ones", (self.ic,), self.compute_dtype))
+        self.smooth_scale = Parameter(initializer("ones", (self.ic,), self.compute_dtype))
+        self.input_offset = Parameter(initializer("zeros", (self.ic,), msdtype.int32))
         self.weight_scale = Parameter(initializer("ones", (self.output_size_per_partition,), self.compute_dtype))
         self.weight_offset = Parameter(initializer("zeros", (self.output_size_per_partition,), msdtype.int32))
         self.weight = Parameter(initializer("zeros", linear.weight.shape, msdtype.int8))
-        self.quant_method = FakeQuantLinearMethod(layer_name, linear.quant_method, self.compute_dtype,
-                                                  self.is_act_quant, self.has_smooth)
-
-    # pylint: disable=unused-argument
-    def construct(self, x, weight=None):
-        """linear deploy construct"""
-        if self.parallel_type == ParallelType.NO_PARALLEL:
-            raise RuntimeError(f"Normal Linear is not supplied by mcore")
-        if self.parallel_type == ParallelType.COL_PARALLEL:
-            x = self.col_linear_forward(x)
-        if self.parallel_type == ParallelType.ROW_PARALLEL:
-            x = self.row_linear_forward(x)
-        return x
-
-    def col_linear_forward(self, input_):
-        """
-        Forward of ColumnParallelLinear.
-        Performs a linear transformation considering various parallel modes and data type conversions.
-        """
-        output_parallel = self.quant_method.apply(self, input_, self.weight, self.bias)
-
-        if self.gather_output:
-            output = gather_from_model_parallel_region(output_parallel, self.tp_group)
-        else:
-            output = output_parallel
-        return output
-
-    def row_linear_forward(self, input_):
-        """
-        Forward of RowParallelLinear.
-        Performs a linear transformation considering various parallel modes and data type conversions.
-        """
-
-        if self.input_is_parallel:
-            input_parallel = input_
-        else:
-            input_parallel = scatter_to_model_parallel_region(input_, self.tp_group)
-        output_parallel = self.quant_method.apply(self, input_parallel, self.weight, self.bias)
-        output = reduce_from_model_parallel_region(output_parallel, self.tp_group)
-        return output
+        self.quant_method = FakeQuantW8A8LinearMethod(layer_name, linear.quant_method, self.compute_dtype,
+                                                      self.is_act_quant, self.has_smooth)

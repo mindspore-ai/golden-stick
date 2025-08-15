@@ -77,7 +77,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
-        if linear.expert_num and linear.expert_num > 1:
+        if hasattr(linear, "expert_num") and linear.expert_num > 1:
             self.is_moe = True
         else:
             self.is_moe = False
@@ -91,7 +91,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
         self.bits = 4 if self.cfg.weight_quant_dtype == dtype.qint4x2 else 8
         self.nsamples = 0
-        self.cfg.reflash_inputs_after_each_processor = True
+        if not context.experimental:
+            self.cfg.reflash_inputs_after_each_processor = True
         self.group_scale = []
         self.group_zero = []
         self.qweight = []

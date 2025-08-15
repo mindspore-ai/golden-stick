@@ -44,7 +44,7 @@ class BaseModel:
         dtype = param.dtype
         return shape, dtype
 
-    def save_pretrained(self, save_path, safetensor_name, json_name) -> tuple:
+    def save_pretrained(self, save_path, safetensor_name, json_name) -> str:
         """save_pretrained"""
         save_safetensor_path = self._save_safetenors(save_path, safetensor_name)
         _ = self._save_desc_json(save_path, safetensor_name, json_name)
@@ -111,6 +111,7 @@ class BaseModel:
         ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
         # pylint: disable=protected-access
         ptq._config.experimental = True
+        ptq._config.use_fake_quant = True
         transformer_layers = self._transformer_layers()
         _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
         quant_start = time.time()
