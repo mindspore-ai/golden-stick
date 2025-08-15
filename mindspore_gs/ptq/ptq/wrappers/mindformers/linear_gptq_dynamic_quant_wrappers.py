@@ -19,7 +19,7 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
-from mindspore import dtype, ops
+from mindspore import Parameter, dtype, ops
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -88,8 +88,8 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
     def deploy(self):
         w_qparam = QuantParam(self.w_scale, self.w_zp, self.cfg.group_size, self.cfg.weight_quant_dtype)
         if self.is_mcorelinear:
-            return GptqDynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
-                                                        w_qparam, self.compute_type, self.parallel_type)
+            return GptqDynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.context, self.cfg,
+                                                        self.q_weight, w_qparam, self.compute_type, self.parallel_type)
         return GptqDynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
                                                w_qparam, self.compute_type, self.parallel_type)
 
@@ -119,7 +119,7 @@ class GptqDynamicQuantLinearInferCell(LinearInferCell):
 class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
     """GptqDynamicQuantLinearInferCell"""
 
-    def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
+    def __init__(self, layer_name, linear: Linear, context, cfg, q_weight, w_qparam: QuantParam, compute_type,
                  parallel_type: ParallelType):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
@@ -132,7 +132,11 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
         qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
                                                                         w_qparam, is_deploy, False,
                                                                         self.layer.transpose_b, compute_type,
-                                                                        experimental=True)
+                                                                        experimental=True,
+                                                                        use_fake_quant=self.cfg.use_fake_quant)
         self._set_act_dynamic_quant(dynamic_quant_op)
         self.layer.quant_method.matmul = qmm
         self.layer.weight = q_weight
+        if context.experimental:
+            self.layer.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+            self.layer.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
