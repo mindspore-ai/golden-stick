@@ -43,6 +43,7 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
+        self.context = context
         self.is_mcorelinear = isinstance(linear, (McoreColumnParallelLinear,
                                                   McoreRowParallelLinear,
                                                   QKVParallelLinear,

@@ -84,9 +84,9 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         use_all_to_all = hasattr(self.layer, 'use_alltoall') and self.layer.use_alltoall
         if not use_all_to_all:
             if self.is_mcorelinear:
-                return DynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
-                                                        QuantParam(self.w_scale, self.w_zp), self.compute_type,
-                                                        self.parallel_type)
+                return DynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.context, self.cfg,
+                                                        self.q_weight, QuantParam(self.w_scale, self.w_zp),
+                                                        self.compute_type, self.parallel_type)
             return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
                                                QuantParam(self.w_scale, self.w_zp), self.compute_type,
                                                self.parallel_type)
@@ -119,7 +119,7 @@ class DynamicQuantLinearInferCell(LinearInferCell):
 class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
     """DynamicQuantLinearInferCell"""
 
-    def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
+    def __init__(self, layer_name, linear: Linear, context, cfg, q_weight, w_qparam: QuantParam, compute_type,
                  parallel_type: ParallelType):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
@@ -134,13 +134,17 @@ class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
         self.layer.quant_method.matmul = qmm
         self.layer.weight = q_weight
 
+        if context.experimental:
+            self.layer.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+            self.layer.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+
     def quant_type_dict(self):
         """quant_type_dict"""
         quant_type = {
-            self.layer.weight_scale.name: QuantType.W4A8_DYNAMIC.value,
-            self.layer.weight_offset.name: QuantType.W4A8_DYNAMIC.value,
-            self.layer.weight.name: QuantType.W4A8_DYNAMIC.value
+            self.layer.weight_scale.name: QuantType.W8A8_DYNAMIC.value,
+            self.layer.weight_offset.name: QuantType.W8A8_DYNAMIC.value,
+            self.layer.weight.name: QuantType.W8A8_DYNAMIC.value
         }
         if self.layer.has_bias:
-            quant_type.update({self.layer.bias.name, QuantType.W4A8_DYNAMIC.value})
+            quant_type.update({self.layer.bias.name, QuantType.W8A8_DYNAMIC.value})
         return quant_type
