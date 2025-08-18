@@ -30,6 +30,7 @@ from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.hal import QuantParam, GptqDynamicQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
+from mindspore_gs.ptq.utils import QuantType
 from .linear_gptq_quant_wrappers import GptqWeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
 from .mcore_linear_wrapper import McoreLinearInferCell
@@ -146,3 +147,14 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
         if context.experimental:
             self.layer.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
             self.layer.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+
+    def quant_type_dict(self):
+        """quant_type_dict"""
+        quant_type = {
+            self.layer.weight_scale.name: QuantType.W4A8_DYNAMIC.value,
+            self.layer.weight_offset.name: QuantType.W4A8_DYNAMIC.value,
+            self.layer.weight.name: QuantType.W4A8_DYNAMIC.value
+        }
+        if self.layer.has_bias:
+            quant_type.update({self.layer.bias.name: QuantType.W4A8_DYNAMIC.value})
+        return quant_type
