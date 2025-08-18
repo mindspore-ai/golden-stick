@@ -21,7 +21,7 @@ import sys
 import shutil
 import numpy as np
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 
 import mindspore as ms
 from mindspore import dataset
@@ -29,11 +29,7 @@ from mindspore import dtype as msdtype
 from mindformers import MindFormerConfig
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import (PTQConfig, PTQMode,
-                              OutliersSuppressionType,
-                              GPTQQuantConfig,
-                              PrecisionRecovery,
-                              QuantGranularity)
+from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
 from mindspore_gs.ptq.models import AutoModel
 from transformers import AutoTokenizer
 
@@ -58,20 +54,8 @@ def create_ptq_config(quant_type: str):
     if quant_type.lower() == 'a8w8':
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                        opname_blacklist=['output_layer', 'linear_fc2'])
+                        opname_blacklist=['output_layer', 'linear_fc2', 'kv_up_proj'])
         layer_policies = OrderedDict()
-    elif quant_type.lower() == 'a8w4':
-        gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
-        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
-                        act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
-                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=64,
-                        algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ, weight_clip=True,
-                        opname_blacklist=['output_layer', 'linear_fc2'])
-        a8w8_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                             act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                             opname_blacklist=['output_layer', 'linear_fc2'])
-        layer_policies = OrderedDict({r'.*\.linear_proj\.*': a8w8_cfg,
-                                      r'.*\.linear_fc1\.*': a8w8_cfg})
     else:
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
     return cfg, layer_policies
@@ -109,7 +93,7 @@ def evaluate(model, ds_path, tokenizer):
     return correct / data_count
 
 
-def quant_qwen3(config_path_, output_dir_, quant_algo_, ds_path):
+def quant_dsv3(config_path_, output_dir_, quant_algo_, ds_path):
     """PTQ quant to quant qwen3"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['ENFORCE_EAGER'] = "true"
@@ -126,13 +110,13 @@ def quant_qwen3(config_path_, output_dir_, quant_algo_, ds_path):
     model = AutoModel.from_pretrained(config_path_)
     cfg, layers_policy = create_ptq_config(quant_algo_)
     model.calibrate(cfg, layers_policy, datasets)
-    ckpt_path = model.save_pretrained(output_dir_, quant_algo_, quant_algo_)
+    ckpt_path = model.save_quantized(output_dir_)
 
     os.environ.pop('ENFORCE_EAGER', None)
     return ckpt_path
 
 
-def eval_qwen3(config_path_, ckpt_path_, ds_path, quant_algo_):
+def eval_dsv3(config_path_, ckpt_path_, ds_path, quant_algo_):
     """eval qwen3 by float ckpt and int ckpt"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
@@ -152,15 +136,14 @@ def eval_qwen3(config_path_, ckpt_path_, ds_path, quant_algo_):
 
 
 def datasets_accuracy(calibrate_config_path_, infer_config_path_, quant_ckpt_path_, quant_algo_, ds_path):
-    """ptq_qwen3_predict_2stage"""
+    """ptq_dsv3_predict_2stage"""
     score_mapping = {
         "A8W8": 0.41,
-        "A8W4": 0.29
     }
 
-    real_quant_ckpt_path = quant_qwen3(calibrate_config_path_, quant_ckpt_path_, quant_algo_, ds_path)
+    real_quant_ckpt_path = quant_dsv3(calibrate_config_path_, quant_ckpt_path_, quant_algo_, ds_path)
 
-    score = eval_qwen3(infer_config_path_, real_quant_ckpt_path, ds_path, quant_algo_)
+    score = eval_dsv3(infer_config_path_, real_quant_ckpt_path, ds_path, quant_algo_)
     print("="*50, flush=True)
     print(f"{quant_algo_} score {score}", flush=True)
     try:
@@ -180,8 +163,8 @@ if __name__ == "__main__":
     quant_algo = uargs.quant_algo
 
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    calibrate_config_path = os.path.join(cur_dir, "calibrate_qwen3.yaml")
-    infer_config_path = os.path.join(cur_dir, "predict_qwen3.yaml")
-    quant_ckpt_path = os.path.join(cur_dir, f"qwen3-quant-2p-{quant_algo}")
+    calibrate_config_path = os.path.join(cur_dir, "calibrate_deepseek3_671b.yaml")
+    infer_config_path = os.path.join(cur_dir, "predict_deepseek3_671b.yaml")
+    quant_ckpt_path = os.path.join(cur_dir, f"dsv3-quant-4p-{quant_algo}")
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     datasets_accuracy(calibrate_config_path, infer_config_path, quant_ckpt_path, quant_algo, dataset_path)

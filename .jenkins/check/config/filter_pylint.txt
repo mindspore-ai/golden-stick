@@ -105,6 +105,9 @@
 "golden-stick/tests/st/ptq/ptq/test_osl.py"                                                              "wrong-import-position"
 "golden-stick/tests/st/ptq/ptq/test_ptq.py"                                                              "wrong-import-position"
 "golden-stick/tests/st/ptq/rtn/test_linear_a16w8.py"                                                     "wrong-import-position"
+"golden-stick/tests/st/ptq/models/deepseekv3/ptq_dsv3_runner.py"                                         "wrong-import-position"
+"golden-stick/tests/st/ptq/models/qwen3/ptq_qwen3_runner.py"                                             "wrong-import-position"
+"golden-stick/tests/st/ptq/models/qwen3_moe/ptq_qwen3_moe_runner.py"                                     "wrong-import-position"
 
 # for version check
 "golden-stick/mindspore_gs/__init__.py"                           "wrong-import-position"

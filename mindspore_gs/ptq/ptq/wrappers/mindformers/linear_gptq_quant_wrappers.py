@@ -28,6 +28,10 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
@@ -56,6 +60,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(QKVParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, GptqWeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -277,7 +283,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                                     self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                     self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                     self.cfg.group_size, self.cfg.weight_quant_dtype,
-                                    self.weight_quantizer_axis, False, False, self.layer.transpose_b, False)
+                                    self.weight_quantizer_axis, False, False, self._transpose_b(), False)
         return weight, scale, zp
 
     def quant(self):

@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""mindformers quant models"""
+"""qwen3 quant model"""
 
-
-from .mf_model import MFModel
+from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
 from .qwen3 import QWen3
-from .qwen3_moe import QWen3MoE
-from .deepseekv3 import DeepSeekV3
+
+
+@MFModel.reg_model('qwen3_moe')
+class QWen3MoE(QWen3):
+    """QWen3"""

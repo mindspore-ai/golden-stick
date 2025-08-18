@@ -29,10 +29,10 @@ from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq_config import QuantGranularity, OutliersSuppressionType
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
-from mindspore_gs.ptq.ptq.wrappers.mindformers.fq_base import (FakeQuantLinearCell,
-                                                               SmoothFakeQuant,
-                                                               FakeQuant,
-                                                               DeQuant)
+from mindspore_gs.ptq.ptq.wrappers.mindformers.fake_quant_base import (FakeQuantLinearCell,
+                                                                       SmoothFakeQuant,
+                                                                       FakeQuant,
+                                                                       DeQuant)
 
 class FakeQuantW8A8LinearMethod(LinearMethodBase):
     """Linear method without quantization."""

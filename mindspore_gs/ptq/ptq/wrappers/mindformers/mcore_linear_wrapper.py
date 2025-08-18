@@ -15,12 +15,16 @@
 """mindformers mcore linear wrapper cell."""
 from typing import Optional
 
-from mindspore import mint
+from mindspore import mint, Parameter
 from mindspore.nn import Cell
 from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
                                                                           reduce_from_model_parallel_region,
                                                                           scatter_to_model_parallel_region)
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 from mindspore_gs.ptq.ptq.hal import ParallelType, QuantWithSmooth, DynamicQuantCell
 
 
@@ -37,6 +41,9 @@ class McoreLinearInferCell(Cell):
         self.has_act_dynamic_quant = False
         self.dyn_quant_op: Optional[DynamicQuantCell] = None
 
+        self.is_gmm_mcore = isinstance(linear, (ColumnParallelGroupedLinear,
+                                                RowParallelGroupedLinear))
+
     def _set_act_quant(self, quant_op: QuantWithSmooth):
         self.has_act_quant = True
         self.quant_op = quant_op
@@ -49,6 +56,16 @@ class McoreLinearInferCell(Cell):
     def layer(self):
         """layer"""
         return self._layer
+
+    def _transpose_b(self):
+        if self.is_gmm_mcore:
+            return False
+        return self.layer.transpose_b
+
+    def _set_transpose_b_to_false(self):
+        if self.is_gmm_mcore:
+            return
+        self.layer.transpose_b = False
 
     def col_linear_forward(self, input_, weight=None):
         """
@@ -156,7 +173,7 @@ class McoreLinearInferCell(Cell):
         tensor_parallel_num = self.layer.tensor_parallel_group_size
 
         if self.parallel_type == ParallelType.COL_PARALLEL:
-            w_shard = (tensor_parallel_num, 1) if self.layer.transpose_b else (1, tensor_parallel_num)
+            w_shard = (tensor_parallel_num, 1) if self._transpose_b() else (1, tensor_parallel_num)
             if not self.layer.skip_weight_param_allocation:
                 state_dict[self.layer.weight.name] = {'shape': self.layer.weight.shape,
                                                       'shard': w_shard}
@@ -164,9 +181,9 @@ class McoreLinearInferCell(Cell):
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape,
                                                     'shard': (tensor_parallel_num,)}
         elif self.parallel_type == ParallelType.ROW_PARALLEL:
-            w_shard = (1, tensor_parallel_num) if self.layer.transpose_b else (tensor_parallel_num, 1)
+            w_shard = (1, tensor_parallel_num) if self._transpose_b() else (tensor_parallel_num, 1)
             if self.layer.is_expert and self.layer.expert_num > 1:
-                w_shard = (1, 1, tensor_parallel_num) if self.layer.transpose_b \
+                w_shard = (1, 1, tensor_parallel_num) if self._transpose_b() \
                     else (1, tensor_parallel_num, 1)
             if self.layer.bias:
                 state_dict[self.layer.bias.name] = {'shape': self.layer.bias.shape,
@@ -180,3 +197,10 @@ class McoreLinearInferCell(Cell):
         if hasattr(self.layer.quant_method.matmul, "param_shard_state"):
             state_dict.update(self.layer.quant_method.matmul.param_shard_state(tensor_parallel_num, self.parallel_type))
         return state_dict
+
+
+class McoreGroupLinearDeployer(Cell):
+    """McoreGroupLinearDeployer"""
+
+    def append_param(self, name: str, param: Parameter):
+        setattr(self, name, param)

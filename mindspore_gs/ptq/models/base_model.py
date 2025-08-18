@@ -44,13 +44,12 @@ class BaseModel:
         dtype = param.dtype
         return shape, dtype
 
-    def save_pretrained(self, save_path, safetensor_name, json_name) -> str:
+    def save_quantized(self, save_path) -> tuple:
         """save_pretrained"""
-        save_safetensor_path = self._save_safetenors(save_path, safetensor_name)
-        _ = self._save_desc_json(save_path, safetensor_name, json_name)
-        return save_safetensor_path
+        self._save_safetenors(save_path)
+        _ = self._save_desc_json(save_path)
 
-    def _save_safetenors(self, save_path, safetensor_name) -> str:
+    def _save_safetenors(self, save_path) -> str:
         """_save_safetenors"""
         start = time.time()
         logger.info(f"Saving checkpoint...", flush=True)
@@ -59,25 +58,19 @@ class BaseModel:
             rank_id = get_rank()
         except RuntimeError:
             rank_id = 0
-        save_safetensor_path = os.path.join(save_path,
-                                            f"{safetensor_name}_quant_safetensors")
-        save_path = os.path.join(save_safetensor_path, f"rank_{rank_id}")
+        save_path = os.path.join(save_path, f"rank_{rank_id}")
         os.makedirs(save_path, exist_ok=True)
-        final_path = os.path.join(save_path, safetensor_name)
+        final_path = os.path.join(save_path, 'quant')
         ms.save_checkpoint(param_dict, final_path, format="safetensors")
         logger.info(f'Checkpoint saved to {final_path}', flush=True)
         logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-        return save_safetensor_path
 
-    def _save_desc_json(self, save_path, safetensor_name, json_name) -> str:
+    def _save_desc_json(self, save_path) -> str:
         """_save_desc_json"""
         start = time.time()
         logger.info(f"Saving describle json file...", flush=True)
         desc_info = self.get_description_file(self._network())
-        save_safetensor_path = os.path.join(save_path,
-                                            f"{safetensor_name}_quant_safetensors")
-        save_json_path = os.path.join(save_safetensor_path,
-                                      f"quant_model_description_{json_name}.json")
+        save_json_path = os.path.join(save_path, f"quantization_description.json")
         os.makedirs(save_path, exist_ok=True)
         with open(save_json_path, "w", encoding="utf-8") as f:
             json.dump(desc_info, f, ensure_ascii=False, indent=4)
