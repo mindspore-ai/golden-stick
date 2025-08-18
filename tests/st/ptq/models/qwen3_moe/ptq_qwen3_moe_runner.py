@@ -165,9 +165,9 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, quant_ckpt_pat
 def quant_type_description(quant_ckpt_path_, quant_algo_):
     "quant_type_description"
     desc_json_path = ""
-    for folder_name in os.listdir(quant_ckpt_path_):
-        if folder_name.endswith(".json"):
-            desc_json_path = os.path.join(quant_ckpt_path_, folder_name)
+    for file_name in os.listdir(quant_ckpt_path_):
+        if file_name.endswith(".json") and "quantization_description" in file_name:
+            desc_json_path = os.path.join(quant_ckpt_path_, file_name)
     assert desc_json_path is not None, "No quant description json file."
     with open(desc_json_path, "r") as fp:
         desc_map = json.load(fp)

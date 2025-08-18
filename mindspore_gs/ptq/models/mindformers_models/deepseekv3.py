@@ -15,20 +15,19 @@
 """qwen3 quant model"""
 
 
-from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
+from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel, MFModelNotEnableSafeTensors
 
 
 @MFModel.reg_model('deepseek_v3')
-class DeepSeekV3(MFModel):
+class DeepSeekV3(MFModelNotEnableSafeTensors):
     """DeepSeekV3"""
 
-    def _split_route_moe_weight(self, param_dict) -> dict:
-        return param_dict
+    def _split_route_moe_weight(self, param_dict) -> tuple[dict, dict]:
+        return param_dict, {}
 
-    def _process_params_dict_before_save(self, param_dict) -> dict:
+    def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
         new_param_dict = self._split_route_moe_weight(param_dict)
-        # merge weights by TP
-        return new_param_dict
+        return new_param_dict, {}
 
     def get_description_file(self, network):
         raise NotImplementedError

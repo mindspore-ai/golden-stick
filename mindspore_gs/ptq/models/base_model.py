@@ -15,107 +15,52 @@
 """base class of quant models"""
 
 
-import os
-import time
-import json
-import mindspore as ms
-from mindspore import Parameter
-from mindspore.communication import get_rank
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq import PTQ
-from mindspore_gs.common.utils import offload_network
 
 
 class BaseModel:
     """BaseModel"""
-    def forward(self, input_ids, max_new_tokens=1):
-        """forward"""
-        raise NotImplementedError
+    _model_hub_registry: dict[str, type] = {}
+
+    @staticmethod
+    def _reg_model_hub(name, model_clazz):
+        cur = BaseModel._model_hub_registry.get(name)
+        if cur:
+            raise RuntimeError(f"Duplicated model-hub reg, name: {name}, already reg class: {cur}, "
+                               f"current reg class:{model_clazz}")
+        logger.info(f"Register name {name} to model {model_clazz}")
+        BaseModel._model_hub_registry[name] = model_clazz
+
+    @staticmethod
+    def reg_model_hub(alias=None):
+        def decorator(cls):
+            """decorator"""
+            register_key = alias if alias is not None else cls.__name__
+            BaseModel._reg_model_hub(register_key, cls)
+            return cls
+
+        return decorator
+
+    @staticmethod
+    def get_model_hub_registry():
+        return BaseModel._model_hub_registry
 
     @classmethod
     def from_pretrained(cls, **kwargs):
         """from_pretrained"""
         raise NotImplementedError
 
-    @staticmethod
-    def _cal_size(param: Parameter):
-        """_cal_size"""
-        shape = param.shape
-        dtype = param.dtype
-        return shape, dtype
-
-    def save_quantized(self, save_path) -> tuple:
-        """save_pretrained"""
-        self._save_safetenors(save_path)
-        _ = self._save_desc_json(save_path)
-
-    def _save_safetenors(self, save_path) -> str:
-        """_save_safetenors"""
-        start = time.time()
-        logger.info(f"Saving checkpoint...", flush=True)
-        param_dict = self.parameters_dict()
-        try:
-            rank_id = get_rank()
-        except RuntimeError:
-            rank_id = 0
-        save_path = os.path.join(save_path, f"rank_{rank_id}")
-        os.makedirs(save_path, exist_ok=True)
-        final_path = os.path.join(save_path, 'quant')
-        ms.save_checkpoint(param_dict, final_path, format="safetensors")
-        logger.info(f'Checkpoint saved to {final_path}', flush=True)
-        logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
-
-    def _save_desc_json(self, save_path) -> str:
-        """_save_desc_json"""
-        start = time.time()
-        logger.info(f"Saving describle json file...", flush=True)
-        desc_info = self.get_description_file(self._network())
-        save_json_path = os.path.join(save_path, f"quantization_description.json")
-        os.makedirs(save_path, exist_ok=True)
-        with open(save_json_path, "w", encoding="utf-8") as f:
-            json.dump(desc_info, f, ensure_ascii=False, indent=4)
-        logger.info(f'Describle json file saved to {save_json_path}', flush=True)
-        logger.info(f'Save describle json cost time is {time.time() - start} s.')
-        return save_json_path
-
-    def get_description_file(self, network):
-        """
-        Obtain the description of quantization type for each parameter in each layer of the network.
-        Such as W8A8 or W4A8_DYNAMIC
-        """
-        raise NotImplementedError
-
-    def parameters_dict(self, scope="") -> dict:
-        """parameters_dict"""
-        raise NotImplementedError
-
-    def _network(self):
-        """_network"""
-        raise NotImplementedError
-
-    def _transformer_layers(self) -> tuple[type]:
-        """_transformer_layers"""
+    def forward(self, input_ids, max_new_tokens=1):
+        """forward"""
         raise NotImplementedError
 
     def calibrate(self, ptq_config, layers_policy, datasets):
         """calibrate"""
-        logger.info("Use ptq algo to quant network and weight.")
-        net = self._network()
-        ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
-        # pylint: disable=protected-access
-        ptq._config.experimental = True
-        ptq._config.use_fake_quant = True
-        transformer_layers = self._transformer_layers()
-        _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
-        quant_start = time.time()
-        logger.info('Quantize-ing network...')
-        start_time = time.time()
-        ptq.apply(net, datasets=datasets)
-        offload_network(net)
-        logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
-        start_time = time.time()
-        logger.info(f'Convert to real quantize cost time is {time.time() - start_time} s.')
-        logger.info(f'Quant Network cost total time is {time.time() - quant_start} s.')
+        raise NotImplementedError
+
+    def save_quantized(self, save_path):
+        """save_pretrained"""
+        raise NotImplementedError
 
     def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):
         raise NotImplementedError

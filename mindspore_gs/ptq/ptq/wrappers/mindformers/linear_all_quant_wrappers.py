@@ -196,7 +196,7 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
         self.deq_scale = qmm.dequant_scale
         self.quant_bias = qmm.quant_bias
         self.input_scale = self.quant_op.input_scale
-        self.input_offset = self.quant_op.input_zp
+        self.input_offset = Parameter(self.quant_op.input_zp.astype(dtype.int32))
         self.quant_op = None
         self.has_bias = self.layer.has_bias
         if self.has_bias:

@@ -20,6 +20,7 @@ import os
 import sys
 import shutil
 import json
+import time
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
@@ -115,6 +116,7 @@ def quant_qwen3(config_path_, output_dir_, quant_algo_, ds_path):
     """PTQ quant to quant qwen3"""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
     os.environ['ENFORCE_EAGER'] = "true"
+    os.environ['GSLOG'] = "1"
     ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -129,7 +131,7 @@ def quant_qwen3(config_path_, output_dir_, quant_algo_, ds_path):
     cfg, layers_policy = create_ptq_config(quant_algo_)
     model.calibrate(cfg, layers_policy, datasets)
     model.save_quantized(output_dir_)
-
+    time.sleep(5)
     os.environ.pop('ENFORCE_EAGER', None)
 
 
@@ -160,7 +162,7 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, quant_ckpt_pat
     }
 
     quant_qwen3(calibrate_config_path_, quant_ckpt_path_, quant_algo_, ds_path)
-    quant_type_description(quant_ckpt_path, quant_algo)
+    check_quant_description(quant_ckpt_path, quant_algo)
 
     score = eval_qwen3(infer_config_path_, quant_ckpt_path_, ds_path, quant_algo_)
     print("="*50, flush=True)
@@ -170,14 +172,14 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, quant_ckpt_pat
     print(f"Score of {quant_algo_} is {score}", flush=True)
 
 
-def quant_type_description(quant_ckpt_path_, quant_algo_):
+def check_quant_description(quant_ckpt_path_, quant_algo_):
     "quant_type_description"
     if not os.path.exists(quant_ckpt_path_):
         raise ValueError(f"{quant_ckpt_path_} dose not exist.")
     desc_json_path = ""
-    for folder_name in os.listdir(quant_ckpt_path_):
-        if folder_name.endswith(".json"):
-            desc_json_path = os.path.join(quant_ckpt_path_, folder_name)
+    for file_name in os.listdir(quant_ckpt_path_):
+        if file_name.endswith(".json") and "quantization_description" in file_name:
+            desc_json_path = os.path.join(quant_ckpt_path_, file_name)
     assert desc_json_path is not None, "No quant description json file."
     with open(desc_json_path, "r") as fp:
         desc_map = json.load(fp)
@@ -232,8 +234,12 @@ if __name__ == "__main__":
     quant_algo = uargs.quant_algo
 
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    calibrate_config_path = os.path.join(cur_dir, "calibrate_qwen3.yaml")
-    infer_config_path = os.path.join(cur_dir, "predict_qwen3.yaml")
+    if quant_algo == 'A8W4':
+        calibrate_config_path = os.path.join(cur_dir, "calibrate_qwen3_old.yaml")
+        infer_config_path = os.path.join(cur_dir, "predict_qwen3_old.yaml")
+    else:
+        calibrate_config_path = os.path.join(cur_dir, "calibrate_qwen3.yaml")
+        infer_config_path = os.path.join(cur_dir, "predict_qwen3.yaml")
     quant_ckpt_path = os.path.join(cur_dir, f"qwen3-quant-2p-{quant_algo}")
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     datasets_accuracy(calibrate_config_path, infer_config_path, quant_ckpt_path, quant_algo, dataset_path)
