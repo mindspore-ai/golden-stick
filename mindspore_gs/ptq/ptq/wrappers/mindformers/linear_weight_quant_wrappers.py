@@ -235,7 +235,8 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
                                            self.layer.transpose_b, compute_type, experimental=True)
         elif w_qparam.quant_dtype == dtype.qint4x2:
             qmm, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
-                                                         self.layer.transpose_b, compute_type, experimental=True)
+                                                         self.layer.transpose_b, compute_type, experimental=True,
+                                                         use_fake_quant=self.cfg.use_fake_quant)
             self.layer.transpose_b = False
         else:
             raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")

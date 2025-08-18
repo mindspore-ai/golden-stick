@@ -847,7 +847,8 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, q_weight, linear, w_qparam: QuantParam, is_deploy, transpose_a=False,
-               transpose_b=False, dst_dtype=dtype.float16, save_gmm_bias=False, experimental=False):
+               transpose_b=False, dst_dtype=dtype.float16, save_gmm_bias=False, experimental=False,
+               use_fake_quant=False):
         """create"""
         matmul = linear.quant_method.matmul if experimental else linear.matmul
         if isinstance(matmul, msops.MatMul):
@@ -874,20 +875,22 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
         ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
 
         if is_deploy:
-            if linear.expert_num > 1:
+            if hasattr(linear, "expert_num") and linear.expert_num > 1:
                 weight_shape = (linear.expert_num // linear.moe_ep_size, ic, oc // 2)
             else:
                 weight_shape = (ic, oc // 2)
             q_weight = Parameter(initializer("ones", weight_shape, w_qparam.quant_dtype), name=linear.weight.name)
         else:
-            if linear.expert_num > 1:
+            if hasattr(linear, "expert_num") and linear.expert_num > 1:
                 q_weight = q_weight.transpose(0, 2, 1) if transpose_b else q_weight
-                q_weight_pack = np_int4data_pack_to_int8_3d(q_weight.asnumpy())
+                if not use_fake_quant:
+                    q_weight = np_int4data_pack_to_int8_3d(q_weight.asnumpy())
             else:
                 q_weight = q_weight.transpose(1, 0) if transpose_b else q_weight
-                q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
+                if not use_fake_quant:
+                    q_weight = np_int4data_pack_to_int8(q_weight.asnumpy())
             logger.debug(f"GptqDynamicQuantMatmul: pack q_weight of Layer({layer_name}) is "
-                         f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
+                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight}}}")
             if gdqmm.is_group_mm and save_gmm_bias:
                 scale = msops.repeat_elements(w_qparam.scale, rep=w_qparam.group_size, axis=1)
                 gmm_bias = msops.mul(8,
@@ -895,7 +898,10 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                                         msops.mul(q_weight.astype(dtype.float32), scale), dim=1
                                     )).astype(dtype.float32)
                 gdqmm.gmm_bias = Parameter(gmm_bias, name="gmm_bias")
-            q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
+            if use_fake_quant:
+                q_weight = Parameter(q_weight.astype(dtype.int8), name=linear.weight.name)
+            else:
+                q_weight = Parameter(Tensor(q_weight, dtype=w_qparam.quant_dtype), name=linear.weight.name)
         return gdqmm, q_weight, quant_op
 
     def construct(self, qx, quant_weight, group_list=None, x_scale=None):
@@ -905,7 +911,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                               [x_scale], group_list, split_item=3, group_type=0, group_list_type=1)[0]
         else:
             qx = msops.cast(qx, self.dst_dtype)
-            weight_scale = msops.cast(self.weight_scale, dtype.float16)
+            weight_scale = msops.cast(self.weight_scale, self.dst_dtype)
             output = self.weight_qbmm(qx, quant_weight, weight_scale, None, None, None, None)
             output = msops.mul(output, x_scale.unsqueeze(1))
         return output.astype(self.dst_dtype)
@@ -1038,11 +1044,12 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
             self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
 
     @staticmethod
+    # pylint: disable=arguments-differ
     def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
-               dst_dtype=dtype.float16, experimental=False):
+               dst_dtype=dtype.float16, experimental=False, use_fake_quant=False):
         """create"""
         # qbmm need transpose_b = False
-        if linear.expert_num > 1:
+        if hasattr(linear, "expert_num") and linear.expert_num > 1:
             q_weight.init_data()
             q_weight = msops.transpose(q_weight, (0, 2, 1)) if linear.transpose_b else q_weight
         else:
@@ -1055,19 +1062,22 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
         ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
 
         if is_deploy:
-            if linear.expert_num > 1:
+            if hasattr(linear, "expert_num") and linear.expert_num > 1:
                 weight_shape = (linear.expert_num, ic, oc // 2)
             else:
                 weight_shape = (ic, oc // 2)
             q_weight = Parameter(initializer("ones", weight_shape, w_qparam.quant_dtype), name=linear.weight.name)
         else:
-            if linear.expert_num > 1:
-                q_weight_pack = np_int4data_pack_to_int8_3d(q_weight.asnumpy())
+            if use_fake_quant:
+                q_weight = Parameter(q_weight.astype(dtype.int8), name=linear.weight.name)
             else:
-                q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
-            logger.debug(f"WeightQuantInt4Matmul: pack q_weight of Layer({layer_name}) is "
-                         f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
-            q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
+                if hasattr(linear, "expert_num") and linear.expert_num > 1:
+                    q_weight_pack = np_int4data_pack_to_int8_3d(q_weight.asnumpy())
+                else:
+                    q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
+                logger.debug(f"WeightQuantInt4Matmul: pack q_weight of Layer({layer_name}) is "
+                            f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
+                q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
 
         matmul = linear.quant_method.matmul if experimental else linear.matmul
         if isinstance(matmul, msops.MatMul):

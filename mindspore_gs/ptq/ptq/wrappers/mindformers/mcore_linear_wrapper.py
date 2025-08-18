@@ -18,6 +18,9 @@ from typing import Optional
 from mindspore import mint
 from mindspore.nn import Cell
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
+                                                                          reduce_from_model_parallel_region,
+                                                                          scatter_to_model_parallel_region)
 from mindspore_gs.ptq.ptq.hal import ParallelType, QuantWithSmooth, DynamicQuantCell
 
 
@@ -69,7 +72,7 @@ class McoreLinearInferCell(Cell):
                 )
 
         origin_dtype = input_.dtype
-        output_shape = input_.shape[:-1] + (self._layer.output_size_per_partition,)
+        output_shape = input_.shape[:-1] + (sum(self._layer.output_size_per_partition),)
 
         input_ = mint.reshape(input_, (-1, self._layer.input_size))
         input_ = self._layer.cast(input_, self._layer.compute_dtype)
@@ -93,7 +96,7 @@ class McoreLinearInferCell(Cell):
         output_parallel = self._layer.cast(output_parallel, origin_dtype)
 
         if self._layer.gather_output:
-            output = self._layer.gather_from_mp_region(output_parallel)
+            output = gather_from_model_parallel_region(output_parallel, self._layer.tp_group)
         else:
             output = output_parallel
         return output
@@ -107,7 +110,7 @@ class McoreLinearInferCell(Cell):
         if self._layer.input_is_parallel:
             input_parallel = input_
         else:
-            input_parallel = self._layer.scatter_to_mp_region(input_)
+            input_parallel = scatter_to_model_parallel_region(input_, self._layer.tp_group)
 
         origin_dtype = input_parallel.dtype
         input_parallel = self._layer.cast(input_parallel, self._layer.compute_dtype)
@@ -125,7 +128,7 @@ class McoreLinearInferCell(Cell):
             output_parallel = self._layer.quant_method.matmul(input_parallel, self._layer.weight, None, x_scale)
         else:
             output_parallel = self._layer.quant_method.matmul(input_parallel, self._layer.weight)
-        output = self._layer.reduce_from_mp_region(output_parallel)
+        output = reduce_from_model_parallel_region(output_parallel, self._layer.tp_group)
 
         if self._layer.has_bias and not self._layer.skip_bias_add:
             bias = self._layer.cast(self._layer.bias, self._layer.compute_dtype)
