@@ -206,5 +206,5 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
             self.quant_op.input_zp.name: QuantType.W8A8.value
         }
         if self.layer.has_bias:
-            quant_type.update({self.layer.bias.name, QuantType.W8A8.value})
+            quant_type.update({self.layer.bias.name: QuantType.W8A8.value})
         return quant_type

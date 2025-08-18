@@ -74,7 +74,7 @@ def test_ptq_qwen3_a8w8_accuracy():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_llama2_a8w4_accuracy():
+def test_ptq_qwen3_a8w4_accuracy():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply A8W4 on llama2 and check score.

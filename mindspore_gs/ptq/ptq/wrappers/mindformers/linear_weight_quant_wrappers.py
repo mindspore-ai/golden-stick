@@ -34,6 +34,7 @@ from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.ptq.ptq.hal import QuantParam, WeightQuantMatmul, WeightQuantInt4Matmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
+from mindspore_gs.ptq.utils import QuantType
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
 from .linear_wrapper import WrapperLinearCell, LinearInferCell
@@ -248,3 +249,18 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
         self.layer.quant_method.matmul = qmm
         del self.layer.weight
         self.layer.weight = q_weight
+
+    def quant_type_dict(self):
+        """quant_type_dict"""
+        if self.cfg.weight_quant_dtype == dtype.int8:
+            type_ = QuantType.W8A8_DYNAMIC.value
+        elif self.cfg.weight_quant_dtype == dtype.qint4x2:
+            type_ = QuantType.W4A8_DYNAMIC.value
+        quant_type = {
+            self.layer.weight_scale.name: type_,
+            self.layer.weight_offset.name: type_,
+            self.layer.weight.name: type_
+        }
+        if self.layer.has_bias:
+            quant_type.update({self.layer.bias.name: type_})
+        return quant_type

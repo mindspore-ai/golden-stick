@@ -72,7 +72,6 @@ class QWen3(MFModel):
                 for key, value in info.items():
                     new_key = self._convert_name(key)
                     results[new_key] = value
-                results.update(info)
         process(network, 'network')
         return results
 
