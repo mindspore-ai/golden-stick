@@ -29,7 +29,9 @@ from mindspore import dtype as msdtype
 from mindformers import MindFormerConfig
 from mindspore_gs.datasets import get_datasets
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQConfig, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq import (PTQConfig, PTQMode,
+                              OutliersSuppressionType,
+                              QuantGranularity)
 from mindspore_gs.ptq.models import AutoModel
 from transformers import AutoTokenizer
 
@@ -55,7 +57,11 @@ def create_ptq_config(quant_type: str):
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
                         opname_blacklist=['output_layer', 'linear_fc2'])
-        layer_policies = OrderedDict()
+        a8w8_dynamic_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                     weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                                     act_quant_granularity=QuantGranularity.PER_TOKEN,
+                                     opname_blacklist=['output_layer', 'linear_fc2'])
+        layer_policies = OrderedDict({".*mlp.experts.*": a8w8_dynamic_cfg})
     else:
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
     return cfg, layer_policies

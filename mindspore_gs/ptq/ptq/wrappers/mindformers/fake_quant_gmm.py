@@ -17,7 +17,6 @@
 
 from mindspore import nn, Parameter, dtype as msdtype, Tensor
 from mindspore.common.initializer import initializer
-from mindspore import ops as msops
 from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import LinearBase
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
@@ -33,21 +32,7 @@ from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq_config import QuantGranularity, OutliersSuppressionType
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
-
-
-class GMMQuant(nn.Cell):
-    """Quant"""
-    def __init__(self, dst_type=msdtype.int8):
-        super().__init__()
-        self.dst_type = dst_type
-
-    def construct(self, x, scale, offset):
-        scale = scale.expand_dims(1)
-        offset = offset.expand_dims(1)
-        x = x / scale
-        x = msops.round(x) + offset
-        x = msops.clip(x, -128., 127.)
-        return msops.cast(x, self.dst_type)
+from mindspore_gs.ptq.ptq.wrappers.mindformers.fake_quant_base import DynamicFakeQuant
 
 
 class GMMDeQuant(nn.Cell):
@@ -63,18 +48,6 @@ class GMMDeQuant(nn.Cell):
         return x.astype(self.dst_type)
 
 
-class GMMFakeQuant(nn.Cell):
-    """FakeQuant"""
-    def __init__(self, quant_dtype, dst_dtype):
-        super().__init__()
-        self.quant = GMMQuant(quant_dtype)
-        self.de_quant = GMMDeQuant(dst_dtype)
-
-    def construct(self, x, scale, offset):
-        x = self.quant(x, scale, offset)
-        x = self.de_quant(x, scale, offset)
-        return x
-
 class FakeQuantLinearMethod(LinearMethodBase):
     """Linear method without quantization."""
     def __init__(self, layer_name, quant_method: LinearMethodBase, output_dtype, is_act_quant=True):
@@ -82,7 +55,7 @@ class FakeQuantLinearMethod(LinearMethodBase):
         self.layer_name = layer_name
         self.quant_method = quant_method
         self.is_act_quant = is_act_quant
-        self.fake_quant = GMMFakeQuant(msdtype.int8, output_dtype)
+        self.fake_quant = DynamicFakeQuant(msdtype.int8, output_dtype)
         self.de_quant = GMMDeQuant(output_dtype)
 
     def create_weights(self, layer: nn.Cell, input_size_per_partition: int,
@@ -92,7 +65,7 @@ class FakeQuantLinearMethod(LinearMethodBase):
     def apply(self, layer: nn.Cell, x: Tensor, weight: Tensor, bias: Parameter = None, group_list=None):
         """apply"""
         if self.is_act_quant:
-            x = self.fake_quant(x, layer.input_scale, layer.input_offset)
+            x = self.fake_quant(x)
         weight = self.de_quant(weight, layer.weight_scale, layer.weight_offset)
         return self.quant_method.apply(layer, x, weight, bias, group_list)
 
@@ -105,7 +78,7 @@ class FakeQuantGroupWrapper(WrapperCell):
         class FakeQuantChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.weight_quant_dtype == msdtype.int8 and config.act_quant_dtype == msdtype.int8 and \
-                       config.act_quant_granularity is QuantGranularity.PER_TENSOR
+                       config.act_quant_granularity is QuantGranularity.PER_TOKEN
 
         Quantizer.reg_fake_quant_layer_map(ColumnParallelGroupedLinear, FakeQuantGroupWrapper, FakeQuantChecker())
         Quantizer.reg_fake_quant_layer_map(RowParallelGroupedLinear, FakeQuantGroupWrapper, FakeQuantChecker())
@@ -136,28 +109,29 @@ class FakeQuantGroupLinearCell(LinearBase):
             self.parallel_type = ParallelType.NO_PARALLEL
         elif isinstance(linear, ColumnParallelGroupedLinear):
             self.input_size = linear.input_size
-            ic = linear.input_size
+            self.ic = linear.input_size
             self.gather_output = linear.gather_output
             self.tp_group = linear.tp_group
-            self.output_size_per_partition = sum(linear.output_partition_sizes)
+            self.output_size_per_partition = linear.output_size_per_partition
             self.bias = linear.bias if linear.has_bias else None
             self.parallel_type = ParallelType.COL_PARALLEL
+            self.num_local_experts = linear.num_local_experts
         elif isinstance(linear, RowParallelGroupedLinear):
-            ic = linear.input_size_per_partition
-            self.output_size_per_partition = linear.output_size_per_partition
+            self.ic = linear.input_size_per_partition
+            self.output_size_per_partition = linear.output_size
             self.input_is_parallel = linear.input_is_parallel
             self.tp_group = linear.tp_group
             self.bias = None if self.tp_group.rank > 0 else linear.bias
             self.parallel_type = ParallelType.ROW_PARALLEL
+            self.num_local_experts = linear.num_local_experts
         else:
             raise ValueError(f"Not supported linear: {linear}")
         self.compute_dtype = linear.compute_dtype
 
-        self.input_scale = Parameter(initializer("ones", (ic,), self.compute_dtype))
-        self.smooth_scale = Parameter(initializer("ones", (ic,), self.compute_dtype))
-        self.input_offset = Parameter(initializer("zeros", (ic,), msdtype.int32))
-        self.weight_scale = Parameter(initializer("ones", (self.output_size_per_partition,), self.compute_dtype))
-        self.weight_offset = Parameter(initializer("zeros", (self.output_size_per_partition,), msdtype.int32))
+        self.weight_scale = Parameter(initializer(
+            "ones", (self.num_local_experts, self.output_size_per_partition), self.compute_dtype))
+        self.weight_offset = Parameter(initializer(
+            "zeros", (self.num_local_experts, self.output_size_per_partition), msdtype.int32))
         self.weight = Parameter(initializer("zeros", linear.weight.shape, msdtype.int8))
         self.quant_method = FakeQuantLinearMethod(layer_name, linear.quant_method, self.compute_dtype,
                                                   self.is_act_quant)

@@ -16,6 +16,7 @@
 
 from mindspore.nn.cell import Cell
 from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
+from mindspore_gs.ptq.utils import QuantType
 
 
 @MFModel.reg_model('qwen3')
@@ -53,12 +54,8 @@ class QWen3(MFModel):
         # merge weights by TP
         return new_param_dict
 
-    def get_description_file(self, network):
-        """
-        Obtain the description of quantization type for each parameter in each layer of the network.
-        Such as W8A8 or W4A8_DYNAMIC
-        """
-        from mindspore_gs.ptq.utils import QuantType
+    def _get_quant_type(self, network):
+        """_get_quant_type"""
         if not isinstance(network, Cell):
             raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")
         results = {}
@@ -77,7 +74,14 @@ class QWen3(MFModel):
                     results[new_key] = value
                 results.update(info)
         process(network, 'network')
+        return results
 
+    def get_description_file(self, network):
+        """
+        Obtain the description of quantization type for each parameter in each layer of the network.
+        Such as W8A8 or W4A8_DYNAMIC
+        """
+        results = self._get_quant_type(network)
         desc_info = {}
         param_dict = self.parameters_dict()
         for key, _ in param_dict.items():
