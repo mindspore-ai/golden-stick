@@ -101,7 +101,7 @@ class PTQModelTester:
         config_path_ = os.path.join(cur_dir_, config_path_)
 
         mfconfig = MindFormerConfig(config_path_)
-        tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir)
+        tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir, trust_remote_code=True)
 
         datasets = PTQModelTester.create_ds(ds_path, 'ceval', tokenizer, 'train', 50)
         model = AutoQuantForCausalLM.from_pretrained(config_path_)
@@ -121,7 +121,7 @@ class PTQModelTester:
             os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
 
         mfconfig = MindFormerConfig(config_path_)
-        tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir)
+        tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir, trust_remote_code=True)
         model = AutoQuantForCausalLM.from_pretrained(config_path_)
         cfg, layers_policy = self.create_ptq_config(quant_algo_)
         model.fake_quant(cfg, layers_policy, ckpt_path_)
