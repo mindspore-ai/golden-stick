@@ -19,6 +19,7 @@ import argparse
 import os
 import sys
 import shutil
+import json
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
@@ -35,6 +36,7 @@ from mindspore_gs.ptq import (PTQConfig, PTQMode,
                               PrecisionRecovery,
                               QuantGranularity)
 from mindspore_gs.ptq.models import AutoModel
+from mindspore_gs.ptq.utils import QuantType
 from transformers import AutoTokenizer
 
 
@@ -158,18 +160,69 @@ def datasets_accuracy(calibrate_config_path_, infer_config_path_, quant_ckpt_pat
     }
 
     quant_qwen3(calibrate_config_path_, quant_ckpt_path_, quant_algo_, ds_path)
+    quant_type_description(quant_ckpt_path, quant_algo)
 
     score = eval_qwen3(infer_config_path_, quant_ckpt_path_, ds_path, quant_algo_)
     print("="*50, flush=True)
     print(f"{quant_algo_} score {score}", flush=True)
-    try:
-        print(f"to rm dir: {quant_ckpt_path_}", flush=True)
-        shutil.rmtree(quant_ckpt_path_)
-    except (OSError, FileNotFoundError):
-        pass
     error_str = f"Score {quant_algo_} is {score:.4f}, which is lower than standard f{score_mapping[quant_algo_]}"
     assert score >= score_mapping[quant_algo_], error_str
     print(f"Score of {quant_algo_} is {score}", flush=True)
+
+
+def quant_type_description(quant_ckpt_path_, quant_algo_):
+    "quant_type_description"
+    if not os.path.exists(quant_ckpt_path_):
+        raise ValueError(f"{quant_ckpt_path_} dose not exist.")
+    desc_json_path = ""
+    for folder_name in os.listdir(quant_ckpt_path_):
+        if folder_name.endswith(".json"):
+            desc_json_path = os.path.join(quant_ckpt_path_, folder_name)
+    assert desc_json_path is not None, "No quant description json file."
+    with open(desc_json_path, "r") as fp:
+        desc_map = json.load(fp)
+
+    if quant_algo_.lower() == "a8w8":
+        assert desc_map['model.decoder.layers.0.self_attention.linear_qkv.weight'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.1.self_attention.linear_proj.smooth_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.2.self_attention.linear_qkv.weight_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.3.self_attention.linear_proj.weight_offset'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.4.self_attention.linear_proj.input_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.5.self_attention.linear_proj.input_offset'] == QuantType.W8A8.value
+
+        assert desc_map['model.decoder.layers.7.mlp.linear_fc1.weight'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.8.mlp.linear_fc1.smooth_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.9.mlp.linear_fc1.weight_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.10.mlp.linear_fc1.weight_offset'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.11.mlp.linear_fc1.input_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.12.mlp.linear_fc1.input_offset'] == QuantType.W8A8.value
+
+        assert desc_map['model.decoder.layers.13.mlp.linear_fc2.weight'] == QuantType.FLOAT.value
+        print(f"{quant_algo_} description test done.")
+    elif quant_algo_.lower() == "a8w4":
+        assert desc_map['model.decoder.layers.0.self_attention.linear_qkv.weight'] == QuantType.W4A8_DYNAMIC.value
+        assert desc_map['model.decoder.layers.1.self_attention.linear_qkv.weight_scale'] == QuantType.W4A8_DYNAMIC.value
+        assert desc_map['model.decoder.layers.2.self_attention.linear_qkv.weight_offset'] == \
+            QuantType.W4A8_DYNAMIC.value
+
+        assert desc_map['model.decoder.layers.3.self_attention.linear_proj.weight'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.3.self_attention.linear_proj.smooth_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.4.self_attention.linear_proj.weight_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.5.self_attention.linear_proj.weight_offset'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.6.self_attention.linear_proj.input_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.7.self_attention.linear_proj.input_offset'] == QuantType.W8A8.value
+
+        assert desc_map['model.decoder.layers.8.mlp.linear_fc1.weight'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.9.mlp.linear_fc1.smooth_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.10.mlp.linear_fc1.weight_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.11.mlp.linear_fc1.weight_offset'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.12.mlp.linear_fc1.input_scale'] == QuantType.W8A8.value
+        assert desc_map['model.decoder.layers.13.mlp.linear_fc1.input_offset'] == QuantType.W8A8.value
+
+        assert desc_map['model.decoder.layers.14.mlp.linear_fc2.weight'] == QuantType.FLOAT.value
+        print(f"{quant_algo_} description test done.")
+    else:
+        raise RuntimeError(f'Input unsupported quant type: {quant_algo_}.')
 
 
 if __name__ == "__main__":
@@ -184,3 +237,8 @@ if __name__ == "__main__":
     quant_ckpt_path = os.path.join(cur_dir, f"qwen3-quant-2p-{quant_algo}")
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     datasets_accuracy(calibrate_config_path, infer_config_path, quant_ckpt_path, quant_algo, dataset_path)
+    try:
+        print(f"to rm dir: {quant_ckpt_path}", flush=True)
+        shutil.rmtree(quant_ckpt_path)
+    except (OSError, FileNotFoundError):
+        pass

@@ -146,5 +146,5 @@ class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
             self.layer.weight.name: QuantType.W8A8_DYNAMIC.value
         }
         if self.layer.has_bias:
-            quant_type.update({self.layer.bias.name, QuantType.W8A8_DYNAMIC.value})
+            quant_type.update({self.layer.bias.name: QuantType.W4A8_DYNAMIC.value})
         return quant_type
