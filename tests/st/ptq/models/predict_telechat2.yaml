@@ -1,0 +1,35 @@
+seed: 0
+output_dir: './output' # path to save checkpoint/strategy
+load_checkpoint: ''
+auto_trans_ckpt: False
+use_parallel: True
+run_mode: 'predict'
+use_legacy: False
+load_ckpt_format: 'safetensors'
+
+trainer:
+  type: CausalLanguageModelingTrainer
+  model_name: 'telechat2'
+
+# default parallel of device num = 8 for Atlas 800T A2
+parallel_config:
+  data_parallel: 1
+  model_parallel: 4
+# HuggingFace file directory
+pretrained_model_dir: '/home/workspace/mindspore_ckpt/safetensors/telechat2'
+model:
+  model_config:
+    compute_dtype: "bfloat16"
+    layernorm_compute_dtype: "float32"
+    rotary_dtype: "float32"
+    params_dtype: "bfloat16"
+
+# mindspore context init config
+context:
+  mode: 0 #0--Graph Mode; 1--Pynative Mode
+  max_device_memory: "58GB"
+
+# parallel context config
+parallel:
+  parallel_mode: "MANUAL_PARALLEL"
+  enable_alltoall: False
