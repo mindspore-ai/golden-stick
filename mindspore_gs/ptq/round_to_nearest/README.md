@@ -149,8 +149,8 @@ The running results are as follows:
 ```text
 Archive:  wikitext-2-v1.zip
    creating: wikitext-2/
-  inflating: wikitext-2/wiki.test.tokens  
-  inflating: wikitext-2/wiki.valid.tokens  
+  inflating: wikitext-2/wiki.test.tokens
+  inflating: wikitext-2/wiki.valid.tokens
   inflating: wikitext-2/wiki.train.tokens
 ```
 
@@ -169,7 +169,7 @@ The running results are as follows:
 Length: 13476850247 (13G) [binary/octet-stream]
 Saving to: ‘llama2_7b.ckpt’
 
-llama2_7b.ckpt      100%[===================>]  12.55G  27.5MB/s    in 7m 39s  
+llama2_7b.ckpt      100%[===================>]  12.55G  27.5MB/s    in 7m 39s
 
 2024-03-19 17:36:57 (28.0 MB/s) - ‘llama2_7b.ckpt’ saved [13476850247/13476850247]
 
