@@ -1,6 +1,6 @@
 seed: 0
 output_dir: './output' # path to save checkpoint/strategy
-load_checkpoint: '/home/workspace/mindspore_ckpt/safetensors/Qwen3-0.6B'
+load_checkpoint: ''
 auto_trans_ckpt: False
 use_parallel: True
 run_mode: 'predict'
