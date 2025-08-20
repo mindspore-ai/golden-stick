@@ -122,7 +122,7 @@ def quant_qwen3(config_path_, output_dir_, quant_algo_, ds_path):
     config_path_ = os.path.join(cur_dir_, config_path_)
 
     mfconfig = MindFormerConfig(config_path_)
-    tokenizer = AutoTokenizer.from_pretrained(mfconfig.load_checkpoint)
+    tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir)
 
     datasets = create_ds(ds_path, 'ceval', tokenizer, 'train', 50)
     model = AutoModel.from_pretrained(config_path_)
@@ -143,7 +143,7 @@ def eval_qwen3(config_path_, ckpt_path_, ds_path, quant_algo_):
         os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
 
     mfconfig = MindFormerConfig(config_path_)
-    tokenizer = AutoTokenizer.from_pretrained(mfconfig.load_checkpoint)
+    tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir)
     model = AutoModel.from_pretrained(config_path_)
     cfg, layers_policy = create_ptq_config(quant_algo_)
     model.fake_quant(cfg, layers_policy, ckpt_path_)
