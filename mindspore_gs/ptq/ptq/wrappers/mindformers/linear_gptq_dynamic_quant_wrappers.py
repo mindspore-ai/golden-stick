@@ -125,7 +125,7 @@ class GptqDynamicQuantLinearInferCell(LinearInferCell):
 
 class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
     """GptqDynamicQuantLinearInferCell"""
-
+    # pylint: disable=unused-argument
     def __init__(self, layer_name, linear: Linear, context, cfg, q_weight, w_qparam: QuantParam, compute_type,
                  parallel_type: ParallelType):
         super().__init__(linear, parallel_type)
@@ -136,25 +136,29 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
                          f"{w_qparam}")
             logger.debug(f"GptqDynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-        qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
-                                                                        w_qparam, is_deploy, False,
-                                                                        self._transpose_b(), compute_type,
-                                                                        experimental=True,
-                                                                        use_fake_quant=self.cfg.use_fake_quant)
+        _, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
+                                                                      w_qparam, is_deploy, False,
+                                                                      self._transpose_b(), compute_type,
+                                                                      experimental=True,
+                                                                      use_fake_quant=self.cfg.use_fake_quant)
         self._set_act_dynamic_quant(dynamic_quant_op)
-        self.layer.quant_method.matmul = qmm
-        self.layer.weight = q_weight
-        if context.experimental:
-            self.layer.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
-            self.layer.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+        del self.layer.weight
+        self.layer.weight = None
+        self.weight = q_weight
+        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+        self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+        self.has_bias = self.layer.has_bias
+        if self.has_bias:
+            self.bias = self.layer.bias
+            self.layer.bias = None
 
     def quant_type_dict(self):
         """quant_type_dict"""
         quant_type = {
-            self.layer.weight_scale.name: QuantType.W4A8_DYNAMIC.value,
-            self.layer.weight_offset.name: QuantType.W4A8_DYNAMIC.value,
-            self.layer.weight.name: QuantType.W4A8_DYNAMIC.value
+            self.weight_scale.name: QuantType.W4A8_DYNAMIC.value,
+            self.weight_offset.name: QuantType.W4A8_DYNAMIC.value,
+            self.weight.name: QuantType.W4A8_DYNAMIC.value
         }
-        if self.layer.has_bias:
-            quant_type.update({self.layer.bias.name: QuantType.W4A8_DYNAMIC.value})
+        if self.has_bias:
+            quant_type.update({self.bias.name: QuantType.W4A8_DYNAMIC.value})
         return quant_type
