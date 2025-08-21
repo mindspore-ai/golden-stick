@@ -26,30 +26,13 @@ class QWen3(MFModel):
     def _split_route_moe_weight(self, param_dict) -> dict:
         return param_dict
 
-    def _convert_name(self, key):
-        """_convert_name"""
-        def replacer(string, src, dst):
-            if src in string:
-                string = string.replace(src, dst)
-            return string
-        new_key = key
-        new_key = replacer(new_key, "._layer.matmul.", ".")
-        new_key = replacer(new_key, "._layer.", ".")
-        new_key = replacer(new_key, ".matmul.", ".")
-        new_key = replacer(new_key, ".quant_op.", ".")
-        new_key = replacer(new_key, ".input_zp", ".input_offset")
-        new_key = replacer(new_key, ".weight_zp", ".weight_offset")
-        new_key = replacer(new_key, ".dequant_scale", ".deq_scale")
-        return new_key
-
     def _process_params_dict_before_save(self, param_dict) -> dict:
         """_process_params_dict_before_save"""
         new_param_dict = {}
         for key, param in param_dict.items():
             if "key_cache" in key or "value_cache" in key or "float_weight" in key:
                 continue
-            new_key = self._convert_name(key)
-            new_param_dict[new_key] = param
+            new_param_dict[key] = param
         new_param_dict = self._split_route_moe_weight(new_param_dict)
         # merge weights by TP
         return new_param_dict
@@ -69,9 +52,7 @@ class QWen3(MFModel):
                     process(cell, full_cell_name)
                     continue
                 info = cell.quant_type_dict()
-                for key, value in info.items():
-                    new_key = self._convert_name(key)
-                    results[new_key] = value
+                results.update(info)
         process(network, 'network')
         return results
 
