@@ -26,25 +26,7 @@ class DeepSeekV3(MFModel):
         return param_dict
 
     def _process_params_dict_before_save(self, param_dict) -> dict:
-        new_param_dict = {}
-        def replacer(string, src, dst):
-            if src in string:
-                string = string.replace(src, dst)
-            return string
-
-        for key, param in param_dict.items():
-            if "key_cache" in key or "value_cache" in key or "float_weight" in key:
-                continue
-            new_key = key
-            new_key = replacer(new_key, "._layer.matmul.", ".")
-            new_key = replacer(new_key, "._layer.", ".")
-            new_key = replacer(new_key, ".matmul.", ".")
-            new_key = replacer(new_key, ".quant_op.", ".")
-            new_key = replacer(new_key, ".input_zp", ".input_offset")
-            new_key = replacer(new_key, ".weight_zp", ".weight_offset")
-            new_key = replacer(new_key, ".dequant_scale", ".deq_scale")
-            new_param_dict[new_key] = param
-        new_param_dict = self._split_route_moe_weight(new_param_dict)
+        new_param_dict = self._split_route_moe_weight(param_dict)
         # merge weights by TP
         return new_param_dict
 

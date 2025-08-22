@@ -237,18 +237,22 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
             logger.debug(f"WeightQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
         if w_qparam.quant_dtype == dtype.int8:
-            qmm = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
-                                           self._transpose_b(), compute_type, experimental=True)
+            _ = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                         self._transpose_b(), compute_type, experimental=True)
         elif w_qparam.quant_dtype == dtype.qint4x2:
-            qmm, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
-                                                         self._transpose_b(), compute_type, experimental=True,
-                                                         use_fake_quant=self.cfg.use_fake_quant)
+            _, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                                       self._transpose_b(), compute_type, experimental=True,
+                                                       use_fake_quant=self.cfg.use_fake_quant)
             self._set_transpose_b_to_false()
         else:
             raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
-        self.layer.quant_method.matmul = qmm
         del self.layer.weight
-        self.layer.weight = q_weight
+        self.layer.weight = None
+        self.weight = q_weight
+        self.has_bias = self.layer.has_bias
+        if self.has_bias:
+            self.bias = self.layer.bias
+            self.layer.bias = None
 
     def quant_type_dict(self):
         """quant_type_dict"""
@@ -257,10 +261,10 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
         elif self.cfg.weight_quant_dtype == dtype.qint4x2:
             type_ = QuantType.W4A8_DYNAMIC.value
         quant_type = {
-            self.layer.weight_scale.name: type_,
-            self.layer.weight_offset.name: type_,
-            self.layer.weight.name: type_
+            self.weight_scale.name: type_,
+            self.weight_offset.name: type_,
+            self.weight.name: type_
         }
-        if self.layer.has_bias:
-            quant_type.update({self.layer.bias.name: type_})
+        if self.has_bias:
+            quant_type.update({self.bias.name: type_})
         return quant_type

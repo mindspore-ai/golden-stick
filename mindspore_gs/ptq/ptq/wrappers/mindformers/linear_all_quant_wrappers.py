@@ -187,23 +187,32 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
             logger.debug(f"AllQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}}}")
         self._set_act_quant(quant)
-        self.layer.quant_method.matmul = qmm
-        self.layer.weight = q_weight
-        if context.experimental:
-            self.layer.smooth_scale = Parameter(Tensor(quant.smooth_scale.asnumpy()))
-            self.layer.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
-            self.layer.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+        del self.layer.weight
+        self.layer.weight = None
+        self.weight = q_weight
+        self.smooth_scale = Parameter(Tensor(quant.smooth_scale.asnumpy()))
+        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+        self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+        self.deq_scale = qmm.dequant_scale
+        self.quant_bias = qmm.quant_bias
+        self.input_scale = self.quant_op.input_scale
+        self.input_offset = self.quant_op.input_zp
+        self.quant_op = None
+        self.has_bias = self.layer.has_bias
+        if self.has_bias:
+            self.bias = self.layer.bias
+            self.layer.bias = None
 
     def quant_type_dict(self):
         """quant_type_dict"""
         quant_type = {
-            self.layer.smooth_scale.name: QuantType.W8A8.value,
-            self.layer.weight_scale.name: QuantType.W8A8.value,
-            self.layer.weight_offset.name: QuantType.W8A8.value,
-            self.layer.weight.name: QuantType.W8A8.value,
-            self.quant_op.input_scale.name: QuantType.W8A8.value,
-            self.quant_op.input_zp.name: QuantType.W8A8.value
+            self.smooth_scale.name: QuantType.W8A8.value,
+            self.weight_scale.name: QuantType.W8A8.value,
+            self.weight_offset.name: QuantType.W8A8.value,
+            self.weight.name: QuantType.W8A8.value,
+            self.input_scale.name: QuantType.W8A8.value,
+            self.input_offset.name: QuantType.W8A8.value
         }
-        if self.layer.has_bias:
-            quant_type.update({self.layer.bias.name: QuantType.W8A8.value})
+        if self.has_bias:
+            quant_type.update({self.bias.name: QuantType.W8A8.value})
         return quant_type
