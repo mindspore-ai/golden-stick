@@ -18,32 +18,32 @@
 from mindspore_gs.common import logger
 
 
-class BaseModel:
-    """BaseModel"""
+class BaseQuantForCausalLM:
+    """BaseQuantForCausalLM"""
     _model_hub_registry: dict[str, type] = {}
 
     @staticmethod
     def _reg_model_hub(name, model_clazz):
-        cur = BaseModel._model_hub_registry.get(name)
+        cur = BaseQuantForCausalLM._model_hub_registry.get(name)
         if cur:
             raise RuntimeError(f"Duplicated model-hub reg, name: {name}, already reg class: {cur}, "
                                f"current reg class:{model_clazz}")
         logger.info(f"Register name {name} to model {model_clazz}")
-        BaseModel._model_hub_registry[name] = model_clazz
+        BaseQuantForCausalLM._model_hub_registry[name] = model_clazz
 
     @staticmethod
     def reg_model_hub(alias=None):
         def decorator(cls):
             """decorator"""
             register_key = alias if alias is not None else cls.__name__
-            BaseModel._reg_model_hub(register_key, cls)
+            BaseQuantForCausalLM._reg_model_hub(register_key, cls)
             return cls
 
         return decorator
 
     @staticmethod
     def get_model_hub_registry():
-        return BaseModel._model_hub_registry
+        return BaseQuantForCausalLM._model_hub_registry
 
     @classmethod
     def from_pretrained(cls, **kwargs):

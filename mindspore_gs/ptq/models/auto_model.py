@@ -16,14 +16,14 @@
 
 
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.models.base_model import BaseModel
+from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 
 
-class AutoModel:
+class AutoQuantForCausalLM:
     """AutoModel"""
     @staticmethod
-    def from_pretrained(pretained) -> BaseModel:
-        model_hubs = BaseModel.get_model_hub_registry()
+    def from_pretrained(pretained) -> BaseQuantForCausalLM:
+        model_hubs = BaseQuantForCausalLM.get_model_hub_registry()
         for name, model_hub in model_hubs.items():
             try:
                 model = model_hub.from_pretrained(pretained)
