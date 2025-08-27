@@ -29,8 +29,8 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (RowParal
                                                                         QKVParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (ColumnParallelGroupedLinear,
                                                                              RowParallelGroupedLinear)
-from mindspore_gs.ptq.models.base_model_impl import BaseModelImpl
-from mindspore_gs.ptq.models.base_model import BaseModel
+from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
+from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQ
 from mindspore_gs.ptq.models.distributed_parameter import DistributedParameter
@@ -39,8 +39,8 @@ from mindspore_gs.ptq.ptq.wrappers.mindformers.mcore_linear_wrapper import Mcore
 from mindspore_gs.ptq.models.safetensors_mgr import SafeTensorsMgr
 
 
-@BaseModel.reg_model_hub("mindformers")
-class MFModel(BaseModelImpl):
+@BaseQuantForCausalLM.reg_model_hub("mindformers")
+class MFModel(BaseQuantForCausalLMImpl):
     """MFModel"""
     _model_registry: dict[str, type] = {}
 

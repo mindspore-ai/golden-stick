@@ -19,12 +19,12 @@ import time
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common.utils import offload_network
-from .base_model import BaseModel
+from .base_model import BaseQuantForCausalLM
 from .distributed_parameter import DistributedParameter
 
 
-class BaseModelImpl(BaseModel):
-    """BaseModel"""
+class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
+    """BaseQuantForCausalLMImpl"""
     def forward(self, input_ids, max_new_tokens=1):
         """forward"""
         raise NotImplementedError

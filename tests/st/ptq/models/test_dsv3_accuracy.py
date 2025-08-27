@@ -13,11 +13,60 @@
 # limitations under the License.
 # ============================================================================
 """test interfaces of ptq."""
+
+
+from collections import OrderedDict
+from typing import Optional
 import os
 import time
-import shutil
+import argparse
 import pytest
+from mindspore import dtype as msdtype
+from mindspore_gs.common import BackendTarget
+from mindspore_gs.ptq import (PTQConfig, PTQMode,
+                              OutliersSuppressionType)
 from tests.st.test_utils import get_available_port
+from ptq_model_tester import PTQModelTester
+
+
+class DeepSeekV3Tester(PTQModelTester):
+    """PTQModelTester"""
+    def create_ptq_config(self, quant_type: str):
+        """create_ptq"""
+        if quant_type.lower() == 'a8w8':
+            cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                            act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+                            opname_blacklist=['output_layer', 'linear_fc2', 'kv_up_proj'])
+            layer_policies = OrderedDict()
+        else:
+            raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
+        return cfg, layer_policies
+
+    # pylint: disable=unused-argument
+    def check_quant_description(self, quant_ckpt_path, quant_type) -> bool:
+        "quant_type_description"
+        return True
+
+    def get_ds_acc_threshold(self, quant_type) -> Optional[float]:
+        score_mapping = {
+            "A8W8": 0.41,
+        }
+        return score_mapping.get(quant_type)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--quant_algo', '-a', type=str, required=True)
+    uargs = parser.parse_args()
+    input_quant_algo = uargs.quant_algo
+
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    calibrate_config_path = os.path.join(cur_dir, "calibrate_deepseek3_671b.yaml")
+    infer_config_path = os.path.join(cur_dir, "predict_deepseek3_671b.yaml")
+    q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant-4p-{input_quant_algo}")
+    dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
+    tester = DeepSeekV3Tester()
+    tester.test_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, input_quant_algo, dataset_path)
 
 
 def ptq_predict_2stage_4p_run(quant_algo):
@@ -36,25 +85,8 @@ def ptq_predict_2stage_4p_run(quant_algo):
         f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_dsv3_4p_logs "
         f"python {run_file} -a {quant_algo}"
     )
-    if return_code != 0:
-        log_file = open(f"./test_ptq_{quant_algo}_predictdsv3_4p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
     os.system("ps -u | grep 'ptq_dsv3_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    try:
-        log_file = f"./test_ptq_{quant_algo}_predict_dsv3_4p_logs/worker_0.log"
-        print(f"to rm dir: {log_file}", flush=True)
-        shutil.rmtree(log_file)
-    except (OSError, FileNotFoundError):
-        pass
-    try:
-        log_dir = f"./test_ptq_{quant_algo}_predict_dsv3_4p_logs"
-        print(f"to rm dir: {log_dir}", flush=True)
-        shutil.rmtree(log_dir)
-    except (OSError, FileNotFoundError):
-        pass
     time.sleep(1.0)
     assert return_code == 0
 
