@@ -59,7 +59,7 @@ def ptq_predict_2stage_2p_run(quant_algo):
     assert return_code == 0
 
 
-@pytest.mark.level0
+@pytest.mark.level2
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_ptq_qwen3_a8w8_accuracy():
@@ -71,7 +71,7 @@ def test_ptq_qwen3_a8w8_accuracy():
     ptq_predict_2stage_2p_run("A8W8")
 
 
-@pytest.mark.level0
+@pytest.mark.level2
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_ptq_qwen3_a8w4_accuracy():
@@ -81,3 +81,15 @@ def test_ptq_qwen3_a8w4_accuracy():
     Expectation: score is good.
     """
     ptq_predict_2stage_2p_run("A8W4")
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_ptq_qwen3_mix_accuracy():
+    """
+    Feature: test omni quant adjust parameter in two stages with two cards.
+    Description: apply mix quant policy on llama2 and check score.
+    Expectation: score is good.
+    """
+    ptq_predict_2stage_2p_run("mix")
