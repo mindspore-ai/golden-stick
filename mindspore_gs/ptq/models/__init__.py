@@ -15,5 +15,6 @@
 """quant models"""
 
 
-from .mindformers_models import QWen3
 from .auto_model import AutoModel
+from .base_model import BaseModel
+from .mindformers_models import QWen3, QWen3MoE, DeepSeekV3

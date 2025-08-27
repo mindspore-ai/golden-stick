@@ -182,7 +182,7 @@ class McoreLinearInferCell(Cell):
                                                     'shard': (tensor_parallel_num,)}
         elif self.parallel_type == ParallelType.ROW_PARALLEL:
             w_shard = (1, tensor_parallel_num) if self._transpose_b() else (tensor_parallel_num, 1)
-            if self.layer.is_expert and self.layer.expert_num > 1:
+            if self.is_gmm_mcore:
                 w_shard = (1, 1, tensor_parallel_num) if self._transpose_b() \
                     else (1, tensor_parallel_num, 1)
             if self.layer.bias:

@@ -15,11 +15,19 @@
 """auto model"""
 
 
+from mindspore_gs.common import logger
 from mindspore_gs.ptq.models.base_model import BaseModel
-from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
 
 
 class AutoModel:
+    """AutoModel"""
     @staticmethod
     def from_pretrained(pretained) -> BaseModel:
-        return MFModel.from_pretrained(pretained)
+        model_hubs = BaseModel.get_model_hub_registry()
+        for name, model_hub in model_hubs.items():
+            try:
+                model = model_hub.from_pretrained(pretained)
+                logger.info(f"Create model from {name}")
+                return model
+            except ValueError:
+                pass
