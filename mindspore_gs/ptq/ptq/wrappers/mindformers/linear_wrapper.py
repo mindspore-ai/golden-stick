@@ -29,7 +29,8 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear,
     RowParallelLinear as McoreRowParallelLinear,
     QKVParallelLinear,
-    MergedColumnParallelLinear)
+    MergedColumnParallelLinear,
+    ReplicatedLinear)
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     ColumnParallelGroupedLinear,
     RowParallelGroupedLinear
@@ -49,7 +50,8 @@ class WrapperLinearCell(WrapperCell, abc.ABC):
                                                   QKVParallelLinear,
                                                   MergedColumnParallelLinear,
                                                   ColumnParallelGroupedLinear,
-                                                  RowParallelGroupedLinear))
+                                                  RowParallelGroupedLinear,
+                                                  ReplicatedLinear))
         self.is_gmm_mcore = isinstance(linear, (ColumnParallelGroupedLinear,
                                                 RowParallelGroupedLinear))
 

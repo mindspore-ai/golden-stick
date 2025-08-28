@@ -1,0 +1,256 @@
+"""Unify safetensors."""
+
+import argparse
+import json
+import os
+import re
+from copy import copy
+from safetensors import safe_open
+from safetensors.numpy import save_file
+from tqdm import tqdm
+import numpy as np
+
+import mindspore
+
+
+def get_args():
+    """Get args."""
+    parser = argparse.ArgumentParser(description="Unify safetensors for DeepSeekV3 OSL quantization.")
+    parser.add_argument(
+        "--input_dir",
+        type=str,
+        required=True,
+        help="Path to the quantized distributed model.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Path to save the unified quantized model.",
+    )
+    parser.add_argument(
+        "--output_file_prefix",
+        type=str,
+        required=True,
+        help="Filename prefix to save the unified quantized model.",
+    )
+    parser.add_argument(
+        "--rank_num",
+        type=int,
+        required=True,
+        help="Number of ranks (partitions) in the distributed model.",
+    )
+    parser.add_argument(
+        "--quant_type",
+        type=str,
+        required=False,
+        help="The quantization algorithm of deepseek model.",
+    )
+    return parser.parse_args()
+
+
+def sort_param_names(param_names):
+    """Sort parameter names."""
+    return sorted(param_names, key=lambda x: [int(i) if i.isdigit() else i for i in re.split(r"(\d+)", x)])
+
+
+def open_files(distributed_safetensors, rank_num):
+    """Open files."""
+    files = []
+    for file in (f"{distributed_safetensors}/rank_{i}/quant.safetensors" for i in range(rank_num)):
+        files.append(safe_open(file, framework="np"))
+    files = tuple(files)
+    param_names = sort_param_names(files[0].keys())
+    return files, param_names
+
+
+def get_parallel_type(param_name):
+    """Get parallel type."""
+    type_map = {
+        ".down_proj.": "row",
+        ".embed_tokens.": "column",
+        ".gate.": "no_parallel",
+        ".gate_proj.": "column",
+        ".input_layernorm.": "no_parallel",
+        ".kv_a_layernorm.": "no_parallel",
+        ".kv_a_proj_with_mqa.": "no_parallel",
+        ".kv_b_proj.": "column",
+        "lm_head.": "column",
+        ".norm.": "no_parallel",
+        ".o_proj.": "row",
+        ".post_attention_layernorm.": "no_parallel",
+        ".q_a_layernorm.": "no_parallel",
+        ".q_a_proj.": "no_parallel",
+        ".q_b_proj.": "column",
+        ".up_proj.": "column",
+    }
+    for k, v in type_map.items():
+        if k in param_name:
+            return v
+    raise ValueError(f"Unsupported param name: {param_name}")
+
+
+def get_param_axis(param_name, axis_name):
+    """Get parameter axis."""
+    axis_map = {
+        "deq_scale": ("oc",),
+        "input_offset": ("ic",),
+        "input_scale": ("ic",),
+        "quant_bias": ("oc",),
+        "smooth_scale": ("ic",),
+        "weight": ("oc", "ic"),
+        "weight_offset": ("oc",),
+        "weight_scale": ("oc",),
+    }
+    axis = axis_map[param_name.split(".")[-1]]
+    if axis_name not in axis:
+        return -1
+    return axis.index(axis_name)
+
+
+def get_a8w4_moe_param_axis(param_name, axis_name):
+    """Get parameter axis."""
+    axis_map = {
+        "weight": ("oc", "ic"),
+        "weight_offset": ("oc", "ic"),
+        "weight_scale": ("oc", "ic"),
+    }
+    axis = axis_map[param_name.split(".")[-1]]
+    if axis_name not in axis:
+        return -1
+    return axis.index(axis_name)
+
+
+def load_parallel_param(shard_slices, shard_axis, quant_type, is_experts):
+    """Load parallel parameter from shard slices.
+    Step 1. Get full param shape by multiplying shard shape by rank_num along shard_axis.
+    Step 2. Create an empty array of full param shape.
+    Step 3. For each rank, load the shard and place it in the correct position in the full param array.
+    """
+    rank_num = len(shard_slices)
+    shard_shape = shard_slices[0].get_shape()
+    full_shape = copy(shard_shape)
+    if quant_type.lower() == "a8w4" and is_experts \
+        and len(full_shape) == 1:
+        full_shape = (full_shape[0], 1)
+    full_shape[shard_axis] *= rank_num
+    dtype = shard_slices[0][0].dtype
+    full_param = np.empty(full_shape, dtype=dtype)
+    for i, shard in enumerate(shard_slices):
+        if shard.get_shape() != shard_shape:
+            raise ValueError(
+                f"Shard shape mismatch on rank {i} (shard axis is {shard_axis}): "
+                f"expected {shard_shape}, got {shard.get_shape()}"
+            )
+        shard_size = shard.get_shape()[shard_axis]
+        if shard_axis == 0:
+            full_param[i * shard_size : (i + 1) * shard_size] = shard[:]
+        elif shard_axis == 1:
+            full_param[:, i * shard_size : (i + 1) * shard_size] = shard[:]
+        else:
+            raise ValueError(f"Unsupported shard axis: {shard_axis}")
+    return full_param
+
+
+def load_one_param(files, param_name, quant_type):
+    """Load one parameter."""
+    shard_axis = -1
+
+    is_experts = ".mlp.experts." in param_name
+    parallel_type = get_parallel_type(param_name)
+
+    if parallel_type == "row":
+        if quant_type.lower() == "a8w4" and is_experts:
+            shard_axis = get_a8w4_moe_param_axis(param_name, "ic")
+        else:
+            shard_axis = get_param_axis(param_name, "ic")
+    elif parallel_type == "column":
+        if quant_type.lower() == "a8w4" and is_experts:
+            shard_axis = get_a8w4_moe_param_axis(param_name, "oc")
+        else:
+            shard_axis = get_param_axis(param_name, "oc")
+
+    if shard_axis != -1:
+        shard_slices = [f.get_slice(param_name) for f in files]
+        return load_parallel_param(shard_slices, shard_axis,
+                                   quant_type, is_experts)
+
+    return files[0].get_tensor(param_name)
+
+
+def unify_and_save_safetensors(files, param_names, quant_type,
+                               output_dir, output_file_prefix):
+    """Unify safetensors."""
+    param_dict = {}
+
+    unified_state_dict = {}
+    max_file_size = 4 * 1024**3  # 4GB
+    current_size = 0
+    file_idx = 1
+
+    def save_to_file():
+        filename = f"{output_file_prefix}_{file_idx:03d}.safetensors"
+        filepath = f"{output_dir}/{filename}"
+        save_file(unified_state_dict, filepath)
+        param_dict.update((k, filename) for k in unified_state_dict)
+
+    for param_name in tqdm(param_names):
+        print(f"Processing parameter: {param_name}")
+        param = load_one_param(files, param_name, quant_type)
+        param_bytes = param.nbytes
+        if current_size + param_bytes > max_file_size and unified_state_dict:
+            save_to_file()
+            unified_state_dict = {}
+            current_size = 0
+            file_idx += 1
+        unified_state_dict[param_name] = param
+        current_size += param_bytes
+    if unified_state_dict:
+        save_to_file()
+
+    return param_dict
+
+
+def save_param_dict(param_dict, output_dir, output_file_prefix):
+    """Save parameter dictionary."""
+    filename = f"{output_file_prefix}.safetensors.index.json"
+    filepath = f"{output_dir}/{filename}"
+    save_obj = {
+        "metadata": {},
+        "weight_map": param_dict,
+    }
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(save_obj, f, indent=2)
+
+
+def trans_int8_to_int4(ckpt_path):
+    '''trans_int8_to_int4'''
+    for folder_name in os.listdir(ckpt_path):
+        if folder_name.endswith(".safetensors"):
+            folder_path = os.path.join(ckpt_path, folder_name)
+            ori_param = mindspore.load_checkpoint(folder_path, format="safetensors")
+            for name in sorted(ori_param.keys()):
+                value = ori_param[name]
+                if "mlp.experts" in name:
+                    print(f"convert {name} to int4.")
+                    ori_param[name] = mindspore.Parameter(
+                        mindspore.Tensor(value.asnumpy(), mindspore.qint4x2),
+                        name=name, requires_grad=False)
+            mindspore.save_checkpoint(ori_param, folder_path, format="safetensors")
+            print(f"save {folder_path} int4 safetensors success.")
+
+
+def main():
+    """Main function."""
+    args = get_args()
+    os.makedirs(args.output_dir, exist_ok=True)
+    files, param_names = open_files(args.input_dir, args.rank_num)
+    param_dict = unify_and_save_safetensors(files, param_names, args.quant_type,
+                                            args.output_dir, args.output_file_prefix)
+    save_param_dict(param_dict, args.output_dir, args.output_file_prefix)
+    if args.quant_type.lower() == "a8w4":
+        trans_int8_to_int4(args.output_dir)
+
+
+if __name__ == "__main__":
+    main()

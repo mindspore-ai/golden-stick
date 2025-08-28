@@ -93,6 +93,7 @@ class PTQModelTester:
         """quant by PTQ"""
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
         os.environ['ENFORCE_EAGER'] = "true"
+        os.environ['MS_ALLOC_CONF'] = "enable_vmm:True"
         ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
         if not ascend_path:
             os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -114,6 +115,7 @@ class PTQModelTester:
         """eval model by float ckpt and int ckpt"""
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
         os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+        os.environ['MS_ALLOC_CONF'] = "enable_vmm:True"
         os.environ.pop('ENFORCE_EAGER', None)
         ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
         if not ascend_path:
@@ -147,6 +149,10 @@ class PTQModelTester:
                 print(line, flush=True)
             log_file.close()
             time.sleep(10)
+        return 0 if result else -1
+
+    def del_files(self, quant_algo_, quant_ckpt_path_):
+        """del_files"""
         try:
             print(f"to rm dir: {quant_ckpt_path_}", flush=True)
             shutil.rmtree(quant_ckpt_path_)
@@ -158,4 +164,3 @@ class PTQModelTester:
             shutil.rmtree(log_dir)
         except (OSError, FileNotFoundError):
             pass
-        return 0 if result else -1

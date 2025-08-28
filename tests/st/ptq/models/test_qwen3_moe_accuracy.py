@@ -130,6 +130,7 @@ if __name__ == "__main__":
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = QWen3MoETester()
     tester.test_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, input_quant_algo, dataset_path)
+    tester.del_files(uargs.quant_algo, q_ckpt_path)
 
 
 def ptq_predict_2stage_4p_run(quant_algo):
