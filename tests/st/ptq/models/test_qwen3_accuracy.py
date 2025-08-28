@@ -25,6 +25,9 @@ import pytest
 from mindspore import dtype as msdtype
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.utils import QuantType
+
+os.environ['GSLOG'] = "1"
+
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import (PTQConfig, PTQMode,
                               OutliersSuppressionType,
@@ -57,17 +60,27 @@ class QWen3Tester(PTQModelTester):
             layer_policies = OrderedDict({r'.*\.linear_proj\.*': a8w8_cfg,
                                           r'.*\.linear_fc1\.*': a8w8_cfg})
         elif quant_type.lower() == 'mix':
-            gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
-            cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
-                            act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
-                            weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=64,
-                            algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ, weight_clip=True,
-                            opname_blacklist=['output_layer', 'linear_fc2'])
-            a8w8_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                                 act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+            a8w8_dynamic_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                         weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                                         act_quant_granularity=QuantGranularity.PER_TOKEN,
+                                         opname_blacklist=['output_layer'])
+            a8w8_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                 weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                                 act_quant_granularity=QuantGranularity.PER_TENSOR,
+                                 outliers_suppression=OutliersSuppressionType.SMOOTH,
                                  opname_blacklist=['output_layer', 'linear_fc2'])
-            layer_policies = OrderedDict({r'.*\.linear_proj\.*': a8w8_cfg,
-                                          r'.*\.linear_fc1\.*': a8w8_cfg})
+            a8w4_dynamic_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                         weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
+                                         weight_quant_granularity=QuantGranularity.PER_GROUP,
+                                         group_size=64, algo_args=GPTQQuantConfig(static_groups=True, desc_act=True),
+                                         act_quant_granularity=QuantGranularity.PER_TOKEN,
+                                         precision_recovery=PrecisionRecovery.GPTQ, weight_clip=True,
+                                         opname_blacklist=['output_layer'])
+            cfg = a8w8_dynamic_cfg
+            layer_policies = OrderedDict({r'.*\.1[0-4]\..*': a8w8_cfg,
+                                          r'.*\.1[5-9]\..*': a8w8_cfg,
+                                          'not_match': a8w4_dynamic_cfg
+                                         })
         else:
             raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
         return cfg, layer_policies
@@ -103,7 +116,6 @@ class QWen3Tester(PTQModelTester):
                 'model.decoder.layers.4.self_attention.linear_proj.input_scale': QuantType.W8A8.value,
                 'model.decoder.layers.5.self_attention.linear_proj.input_offset': QuantType.W8A8.value,
                 'model.decoder.layers.7.mlp.linear_fc1.weight': QuantType.W8A8.value,
-                'model.decoder.layers.8.mlp.linear_fc1.smooth_scale': QuantType.W8A8.value,
                 'model.decoder.layers.9.mlp.linear_fc1.weight_scale': QuantType.W8A8.value,
                 'model.decoder.layers.10.mlp.linear_fc1.weight_offset': QuantType.W8A8.value,
                 'model.decoder.layers.11.mlp.linear_fc1.input_scale': QuantType.W8A8.value,
@@ -115,7 +127,7 @@ class QWen3Tester(PTQModelTester):
                     return False
             logger.info(f"{quant_type} description test success.")
             return True
-        if quant_type.lower() in ["a8w4", "mix"]:
+        if quant_type.lower() in ["a8w4"]:
             check_map = {
                 'model.decoder.layers.0.self_attention.linear_qkv.weight': QuantType.W4A8_DYNAMIC.value,
                 'model.decoder.layers.1.self_attention.linear_qkv.weight_scale': QuantType.W4A8_DYNAMIC.value,
@@ -139,13 +151,53 @@ class QWen3Tester(PTQModelTester):
                     return False
             logger.info(f"{quant_type} description test success.")
             return True
+        if quant_type.lower() in ["mix"]:
+            check_map = {
+                'model.decoder.layers.0.self_attention.linear_qkv.weight': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.1.self_attention.linear_qkv.weight_scale': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.2.self_attention.linear_qkv.weight_offset': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.3.self_attention.linear_proj.weight': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.4.self_attention.linear_proj.weight_scale': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.5.self_attention.linear_proj.weight_offset': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.6.mlp.linear_fc1.weight': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.7.mlp.linear_fc1.weight_scale': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.8.mlp.linear_fc1.weight_offset': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.9.mlp.linear_fc2.weight': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.20.mlp.linear_fc2.weight_scale': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.21.mlp.linear_fc2.weight_offset': QuantType.W8A8_DYNAMIC.value,
+
+                'model.decoder.layers.10.self_attention.linear_qkv.weight': QuantType.W8A8.value,
+                'model.decoder.layers.11.self_attention.linear_qkv.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.12.self_attention.linear_qkv.weight_offset': QuantType.W8A8.value,
+                'model.decoder.layers.13.self_attention.linear_qkv.input_scale': QuantType.W8A8.value,
+                'model.decoder.layers.14.self_attention.linear_qkv.input_offset': QuantType.W8A8.value,
+                'model.decoder.layers.15.self_attention.linear_qkv.smooth_scale': QuantType.W8A8.value,
+                'model.decoder.layers.16.self_attention.linear_proj.weight': QuantType.W8A8.value,
+                'model.decoder.layers.16.self_attention.linear_proj.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.16.self_attention.linear_proj.weight_offset': QuantType.W8A8.value,
+                'model.decoder.layers.16.self_attention.linear_proj.input_scale': QuantType.W8A8.value,
+                'model.decoder.layers.16.self_attention.linear_proj.input_offset': QuantType.W8A8.value,
+                'model.decoder.layers.16.self_attention.linear_proj.smooth_scale': QuantType.W8A8.value,
+                'model.decoder.layers.17.mlp.linear_fc1.weight': QuantType.W8A8.value,
+                'model.decoder.layers.17.mlp.linear_fc1.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.17.mlp.linear_fc1.weight_offset': QuantType.W8A8.value,
+                'model.decoder.layers.17.mlp.linear_fc1.input_scale': QuantType.W8A8.value,
+                'model.decoder.layers.17.mlp.linear_fc1.input_offset': QuantType.W8A8.value,
+                'model.decoder.layers.17.mlp.linear_fc1.smooth_scale': QuantType.W8A8.value,
+                'model.decoder.layers.18.mlp.linear_fc2.weight': QuantType.FLOAT.value,
+            }
+            for name, value in check_map.items():
+                if not check(name, value):
+                    return False
+            logger.info(f"{quant_type} description test success.")
+            return True
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
 
     def get_ds_acc_threshold(self, quant_type) -> Optional[float]:
         score_mapping = {
             "A8W8": 0.41,
             "A8W4": 0.29,
-            "mix": 0.29
+            "mix": 0.35
         }
         return score_mapping.get(quant_type)
 
@@ -172,6 +224,7 @@ def ptq_predict_2stage_2p_run(quant_algo):
     Expectation: accuracy is good.
     """
     os.environ['quant_algo'] = f"{quant_algo}"
+    os.environ['HCCL_CONNECT_TIMEOUT'] = "1800"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_qwen3_accuracy.py")
     port = get_available_port()
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")

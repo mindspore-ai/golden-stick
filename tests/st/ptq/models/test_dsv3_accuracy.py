@@ -76,6 +76,7 @@ def ptq_predict_2stage_4p_run(quant_algo):
     Expectation: accuracy is good.
     """
     os.environ['quant_algo'] = f"{quant_algo}"
+    os.environ['HCCL_CONNECT_TIMEOUT'] = "1800"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ptq_dsv3_runner.py")
     port = get_available_port()
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")

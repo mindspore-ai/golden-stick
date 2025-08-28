@@ -18,12 +18,17 @@
 from mindspore import nn, dtype as msdtype
 from mindspore import ops as msops
 from mindformers.modules.layers import Linear
-from mindformers.parallel_core.inference.tensor_parallel.layers import (LinearBase,
-                                                                        RowParallelLinear,
-                                                                        ColumnParallelLinear)
-from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
-                                                                          scatter_to_model_parallel_region,
-                                                                          reduce_from_model_parallel_region)
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    LinearBase,
+    RowParallelLinear,
+    ColumnParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear)
+from mindformers.parallel_core.inference.tensor_parallel.mappings import (
+    gather_from_model_parallel_region,
+    scatter_to_model_parallel_region,
+    reduce_from_model_parallel_region)
 from mindspore_gs.ptq.ptq.hal import ParallelType
 from mindspore_gs.ptq.context import InnerPTQConfig
 
@@ -91,6 +96,7 @@ class SmoothFakeQuant(nn.Cell):
     def construct(self, x, smooth_scale, scale, offset):
         x = self.quant(x, smooth_scale, scale, offset)
         x = self.de_quant(x, scale, offset)
+        x = x / smooth_scale
         return x
 
 
@@ -133,6 +139,19 @@ class DynamicFakeQuant(nn.Cell):
         x, scale = self.quant(x)
         x = self.de_quant(x, scale)
         return x
+
+
+class GMMDeQuant(nn.Cell):
+    """DeQuant"""
+    def __init__(self, dst_type):
+        super().__init__()
+        self.dst_type = dst_type
+
+    def construct(self, x, scale, offset):
+        scale = scale.expand_dims(1)
+        offset = offset.expand_dims(1)
+        x = (x - offset) * scale
+        return x.astype(self.dst_type)
 
 
 class FakeQuantLinearCell(LinearBase):
@@ -200,4 +219,73 @@ class FakeQuantLinearCell(LinearBase):
             input_parallel = scatter_to_model_parallel_region(input_, self.tp_group)
         output_parallel = self.quant_method.apply(self, input_parallel, self.weight, self.bias)
         output = reduce_from_model_parallel_region(output_parallel, self.tp_group)
+        return output
+
+
+class FakeQuantGroupLinearCell(LinearBase):
+    """FakeQuantLinearCell"""
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, linear: LinearBase, context, cfg: InnerPTQConfig):
+        super().__init__(linear.input_size, linear.output_size)
+        self.context = context
+        self.cfg = cfg
+        self.layer_name = layer_name
+        if isinstance(linear, Linear):
+            self.parallel_type = ParallelType.NO_PARALLEL
+        elif isinstance(linear, ColumnParallelGroupedLinear):
+            self.input_size = linear.input_size
+            self.ic = linear.input_size
+            self.gather_output = linear.gather_output
+            self.tp_group = linear.tp_group
+            self.output_size_per_partition = linear.output_size_per_partition
+            self.bias = linear.bias if linear.has_bias else None
+            self.parallel_type = ParallelType.COL_PARALLEL
+            self.num_local_experts = linear.num_local_experts
+        elif isinstance(linear, RowParallelGroupedLinear):
+            self.ic = linear.input_size_per_partition
+            self.output_size_per_partition = linear.output_size
+            self.input_is_parallel = linear.input_is_parallel
+            self.tp_group = linear.tp_group
+            self.bias = None if self.tp_group.rank > 0 else linear.bias
+            self.parallel_type = ParallelType.ROW_PARALLEL
+            self.num_local_experts = linear.num_local_experts
+        else:
+            raise ValueError(f"Not supported linear: {linear}")
+        self.compute_dtype = linear.compute_dtype
+
+    # pylint: disable=unused-argument
+    def construct(self, x, weight=None, group_list=None):
+        """linear deploy construct"""
+        if self.parallel_type == ParallelType.NO_PARALLEL:
+            raise RuntimeError(f"Normal Linear is not supplied by mcore")
+        if self.parallel_type == ParallelType.COL_PARALLEL:
+            x = self.col_group_linear_forward(x, self.weight, group_list)
+        if self.parallel_type == ParallelType.ROW_PARALLEL:
+            x = self.row_linear_forward(x, self.weight, group_list)
+        return x
+
+    def col_group_linear_forward(self, input_parallel, weight=None, group_list=None):
+        """
+        Forward of ColumnParallelLinear.
+        Performs a linear transformation considering various parallel modes and data type conversions.
+        """
+        output_parallel = self.quant_method.apply(self, input_parallel, weight, self.bias, group_list)
+        if self.gather_output:
+            output = gather_from_model_parallel_region(output_parallel, self.tp_group)
+        else:
+            output = output_parallel
+        return output
+
+    def row_linear_forward(self, input_, weight=None, group_list=None):
+        """
+        Forward of RowParallelLinear.
+        Performs a linear transformation considering various parallel modes and data type conversions.
+        """
+
+        if self.input_is_parallel:
+            input_parallel = input_
+        else:
+            input_parallel = scatter_to_model_parallel_region(input_, self.tp_group)
+
+        output = self.quant_method.apply(self, input_parallel, weight, self.bias, group_list)
         return output

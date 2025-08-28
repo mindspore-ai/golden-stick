@@ -17,6 +17,7 @@
 from typing import Optional
 import os
 import sys
+import re
 import time
 import shutil
 import numpy as np
@@ -26,7 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 import mindspore as ms
 from mindspore import dataset
 from mindformers import MindFormerConfig
-from mindspore_gs.datasets import get_datasets
+from mindspore_gs.datasets import create_ceval_dataset
 from mindspore_gs.ptq.models import AutoQuantForCausalLM
 from transformers import AutoTokenizer
 
@@ -43,24 +44,21 @@ class PTQModelTester:
         raise NotImplementedError
 
     @staticmethod
-    def create_ds(ds_path, ds_type, tokenizer_, mode, n_samples=-1):
+    def create_ds(ds_path, tokenizer_, mode, n_samples=-1):
         """Create datasets."""
         dataset.config.set_numa_enable(False)
         if not ds_path:
             raise ValueError(f"Please provide dataset_path.")
-        if not ds_type:
-            raise ValueError(f"Please provide dataset_type.")
         seq_ = 200
-        max_decode_length = 100
         ignore_token_id = tokenizer_.pad_token_id
-        ds = get_datasets(ds_type, ds_path, mode, 1, seq_, max_decode_length, tokenizer_, ignore_token_id,
-                          1, False, n_samples=n_samples)
+        ds = create_ceval_dataset(ds_path, mode, 1, seq_, tokenizer_, ignore_token_id,
+                                  1, False, n_samples=n_samples, use_box=True)
         return ds
 
     @staticmethod
     def evaluate(model, ds_path, tokenizer):
         """evaluate 'network' with dataset from 'dataset_path'."""
-        ds = PTQModelTester.create_ds(ds_path, 'ceval', tokenizer, 'eval')
+        ds = PTQModelTester.create_ds(ds_path, tokenizer, 'eval')
         pad_token_id = tokenizer.pad_token_id
         correct = 0
         data_count = 0
@@ -71,7 +69,7 @@ class PTQModelTester:
             for j in range(input_ids.shape[0]):
                 batch_valid_length.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
             batch_valid_length = np.array(batch_valid_length)
-            outputs = model.forward(input_ids, max_new_tokens=5)
+            outputs = model.forward(input_ids, max_new_tokens=20)
             output_ids = []
             for j in range(input_ids.shape[0]):
                 data_count += 1
@@ -79,7 +77,9 @@ class PTQModelTester:
                 pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
                 labels_str = tokenizer.decode(labels[j], skip_special_tokens=True)
                 question = tokenizer.decode(input_ids[j], skip_special_tokens=True)
-                if labels_str.lower() in pres_str.lower():
+                match = re.search(r'\{(.*?)\}', pres_str)
+                pres_answer = match.group(1) if match else ''
+                if labels_str.lower() == pres_answer.lower():
                     correct += 1
                     print(f"question {data_count}: {question}\n predict: {pres_str} answer: {labels_str}. correct!",
                           flush=True)
@@ -93,7 +93,6 @@ class PTQModelTester:
         """quant by PTQ"""
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
         os.environ['ENFORCE_EAGER'] = "true"
-        os.environ['GSLOG'] = "1"
         ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
         if not ascend_path:
             os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
@@ -103,10 +102,10 @@ class PTQModelTester:
         mfconfig = MindFormerConfig(config_path_)
         tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir)
 
-        datasets = PTQModelTester.create_ds(ds_path, 'ceval', tokenizer, 'train', 50)
+        datasets = PTQModelTester.create_ds(ds_path, tokenizer, 'train', 50)
         model = AutoQuantForCausalLM.from_pretrained(config_path_)
         cfg, layers_policy = self.create_ptq_config(quant_algo_)
-        model.calibrate(cfg, layers_policy, datasets)
+        model.calibrate(cfg, layers_policy, datasets, fake_quant=True)
         model.save_quantized(output_dir_)
         time.sleep(5)
         os.environ.pop('ENFORCE_EAGER', None)
@@ -147,6 +146,7 @@ class PTQModelTester:
             for line in log_file:
                 print(line, flush=True)
             log_file.close()
+            time.sleep(10)
         try:
             print(f"to rm dir: {quant_ckpt_path_}", flush=True)
             shutil.rmtree(quant_ckpt_path_)

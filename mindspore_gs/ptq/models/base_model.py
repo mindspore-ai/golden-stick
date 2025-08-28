@@ -54,7 +54,7 @@ class BaseQuantForCausalLM:
         """forward"""
         raise NotImplementedError
 
-    def calibrate(self, ptq_config, layers_policy, datasets):
+    def calibrate(self, ptq_config, layers_policy, datasets, **kwargs):
         """calibrate"""
         raise NotImplementedError
 
