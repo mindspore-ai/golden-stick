@@ -15,19 +15,143 @@
 """qwen3 quant model"""
 
 
-from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel, MFModelNotEnableSafeTensors
+import os
+import time
+import json
+
+from mindspore.nn.cell import Cell
+from mindspore.communication import get_rank
+
+import mindspore as ms
+from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel, MFModelEnableSafeTensors
+from mindspore_gs.ptq.models.mindformers_models.param_processor import (
+    MLAParamProcessor, MoeParamProcessor, FFNParamProcessor)
+from mindspore_gs.ptq.utils import QuantType
+from mindspore_gs.common import logger
 
 
 @MFModel.reg_model('deepseek_v3')
-class DeepSeekV3(MFModelNotEnableSafeTensors):
+class DeepSeekV3(MFModelEnableSafeTensors):
     """DeepSeekV3"""
 
-    def _split_route_moe_weight(self, param_dict) -> tuple[dict, dict]:
-        return param_dict, {}
+    def _convert_name(self, param_dict):
+        """Convert mcore name to huggingface name.
+        One parameter may correspond to multiple parameters in huggingface,
+        so return a list of names."""
+        new_param_dict = {}
+        for key, value in param_dict.items():
+            key = key.replace('model.', '')
+            key = key.replace('decoder.layers.', 'model.layers.')
+            key = key.replace('.self_attention.', '.self_attn.')
+            key = key.replace('embedding.word_embeddings.', 'model.embed_tokens.')
+            key = key.replace('decoder.final_layernorm.', 'model.norm.')
+            key = key.replace('output_layer.', 'lm_head.')
+            key = key.replace('.pre_mlp_layernorm.', '.post_attention_layernorm.')
+            key = key.replace('.linear_q_down_proj.', '.q_a_proj.')
+            key = key.replace('.linear_kv_down_proj.', '.kv_a_proj_with_mqa.')
+            key = key.replace('.q_layernorm.', '.q_a_layernorm.')
+            key = key.replace('.linear_q_up_proj.', '.q_b_proj.')
+            key = key.replace('.kv_layernorm.', '.kv_a_layernorm.')
+            key = key.replace('.linear_kv_up_proj.', '.kv_b_proj.')
+            key = key.replace('.linear_proj.', '.o_proj.')
+            key = key.replace('.gating.', '.gate_proj.')
+            key = key.replace('.hidden.', '.up_proj.')
+            key = key.replace('.linear_fc2.', '.down_proj.')
+            key = key.replace('.router.weight.', '.gate.')
+            key = key.replace('.router.expert_bias', '.gate.e_score_correction_bias')
+            new_param_dict[key] = value
+        return new_param_dict
 
     def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
-        new_param_dict = self._split_route_moe_weight(param_dict)
-        return new_param_dict, {}
+        param_dict, param_name_trace = super()._process_params_dict_before_save(param_dict)
+
+        # Apply QKV split
+        qkv_processor = MLAParamProcessor(self.network)
+        param_dict, qkv_trace = qkv_processor.split_param(param_dict)
+        param_name_trace.update(qkv_trace)
+
+        # Apply MoE split
+        moe_processor = MoeParamProcessor(self.network)
+        param_dict, moe_trace = moe_processor.split_param(param_dict)
+        param_name_trace.update(moe_trace)
+
+        # Apply FFN split
+        ffn_processor = FFNParamProcessor(self.network)
+        param_dict, ffn_trace = ffn_processor.split_param(param_dict)
+        param_name_trace.update(ffn_trace)
+
+        return param_dict, param_name_trace
+
+    def parameters_dict(self, scope="") -> dict:
+        """parameters_dict"""
+        param_dict = self.network.parameters_dict()
+        param_dict, _ = self._process_params_dict_before_save(param_dict)
+        param_dict = self._convert_name(param_dict)
+        return param_dict
+
+    def _get_quant_type(self, network):
+        """_get_quant_type"""
+        if not isinstance(network, Cell):
+            raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")
+        results = {}
+        def process(root: Cell, name_prefix):
+            """Iterate the whole network and call callback function `process_cell`."""
+            if root is None:
+                return
+            for name, cell in root.name_cells().items():
+                full_cell_name = f"{name_prefix}.{name}"
+                if not hasattr(cell, "quant_type_dict"):
+                    process(cell, full_cell_name)
+                    continue
+                info = cell.quant_type_dict()
+                results.update(info)
+        process(network, 'network')
+        return results
 
     def get_description_file(self, network):
-        raise NotImplementedError
+        """
+        Obtain the description of quantization type for each parameter in each layer of the network.
+        Such as W8A8 or W8A8_DYNAMIC.
+        """
+        quant_types = self._get_quant_type(network)
+        quant_types = MLAParamProcessor(self.network).split_name(quant_types)
+        quant_types = MoeParamProcessor(self.network).split_name(quant_types)
+        quant_types = FFNParamProcessor(self.network).split_name(quant_types)
+        quant_types = self._convert_name(quant_types)
+        param_dict = self.parameters_dict()
+        desc_info = dict((key, quant_types.get(key, QuantType.FLOAT.value)) for key in param_dict)
+        return desc_info
+
+    def save_quantized(self, save_path):
+        """save_pretrained"""
+        self._save_safetenors(save_path)
+        _ = self._save_desc_json(save_path)
+
+    def _save_safetenors(self, save_path) -> str:
+        """_save_safetenors"""
+        start = time.time()
+        logger.info(f"Saving checkpoint...", flush=True)
+        param_dict = self.parameters_dict()
+        try:
+            rank_id = get_rank()
+        except RuntimeError:
+            rank_id = 0
+        save_path = os.path.join(save_path, f"rank_{rank_id}")
+        os.makedirs(save_path, exist_ok=True)
+        final_path = os.path.join(save_path, 'quant')
+        ms.save_checkpoint(param_dict, final_path, format="safetensors")
+        logger.info(f'Checkpoint saved to {final_path}', flush=True)
+        logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
+
+    def _save_desc_json(self, save_path) -> str:
+        """_save_desc_json"""
+        start = time.time()
+        logger.info(f"Saving describle json file...", flush=True)
+        desc_info = self.get_description_file(self._network())
+        save_json_path = os.path.join(save_path, f"quantization_description.json")
+        os.makedirs(save_path, exist_ok=True)
+        with open(save_json_path, "w", encoding="utf-8") as f:
+            json.dump(desc_info, f, ensure_ascii=False, indent=4)
+        logger.info(f'Describle json file saved to {save_json_path}', flush=True)
+        logger.info(f'Save describle json cost time is {time.time() - start} s.')
+        return save_json_path

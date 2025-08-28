@@ -154,7 +154,15 @@ class MFModelEnableSafeTensors(MFModel):
                     cell.weight2 = None
                 process(cell, full_cell_name)
         process(self.network, 'network')
-        return param_dict, param_name_trace
+
+        new_param_dict = {}
+        for key, value in param_dict.items():
+            if (is_fc1_quant and "weight1" in key) or \
+                (is_fc2_quant and "weight2" in key):
+                continue
+            else:
+                new_param_dict[key] = value
+        return new_param_dict, param_name_trace
 
     def _shard_dict(self):
         """_shard_dict"""

@@ -21,6 +21,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import ReplicatedLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     ColumnParallelGroupedLinear,
@@ -56,6 +57,7 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(McoreRowParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(QKVParallelLinear, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(ReplicatedLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(MergedColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelGroupedLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(RowParallelGroupedLinear, AllQuantLinearCell, A8W8Checker())
@@ -196,7 +198,7 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
         self.deq_scale = qmm.dequant_scale
         self.quant_bias = qmm.quant_bias
         self.input_scale = self.quant_op.input_scale
-        self.input_offset = Parameter(self.quant_op.input_zp.astype(dtype.int32))
+        self.input_offset = Parameter(self.quant_op.input_zp)
         self.quant_op = None
         self.has_bias = self.layer.has_bias
         if self.has_bias:
@@ -211,7 +213,9 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
             self.weight_offset.name: QuantType.W8A8.value,
             self.weight.name: QuantType.W8A8.value,
             self.input_scale.name: QuantType.W8A8.value,
-            self.input_offset.name: QuantType.W8A8.value
+            self.input_offset.name: QuantType.W8A8.value,
+            self.deq_scale.name: QuantType.W8A8.value,
+            self.quant_bias.name: QuantType.W8A8.value,
         }
         if self.has_bias:
             quant_type.update({self.bias.name: QuantType.W8A8.value})
