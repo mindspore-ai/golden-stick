@@ -118,6 +118,7 @@ class MFModel(BaseQuantForCausalLMImpl):
         ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
         # pylint: disable=protected-access
         ptq._config.experimental = True
+        ptq._config.use_fake_quant = True
         transformer_layers = self._transformer_layers()
         _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
         ptq.fake_quant(self.network)

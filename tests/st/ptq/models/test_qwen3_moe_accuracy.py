@@ -25,10 +25,15 @@ import pytest
 from mindspore import dtype as msdtype
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.utils import QuantType
+
+os.environ['GSLOG'] = "1"
+
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import (PTQConfig, PTQMode,
                               OutliersSuppressionType,
-                              QuantGranularity)
+                              QuantGranularity,
+                              GPTQQuantConfig,
+                              PrecisionRecovery)
 from tests.st.test_utils import get_available_port
 from ptq_model_tester import PTQModelTester
 
@@ -37,18 +42,30 @@ class QWen3MoETester(PTQModelTester):
     """QWen3MoETester"""
     def create_ptq_config(self, quant_type: str):
         """create_ptq"""
-        if quant_type.lower() == 'a8w8':
-            cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                            act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                            opname_blacklist=['output_layer', 'linear_fc2'])
+        if quant_type.lower() == 'mix':
             a8w8_dynamic_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
                                          weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
                                          act_quant_granularity=QuantGranularity.PER_TOKEN,
-                                         opname_blacklist=['output_layer', 'linear_fc2'])
-            layer_policies = OrderedDict({".*mlp.experts.*": a8w8_dynamic_cfg})
+                                         opname_blacklist=['output_layer'])
+            a8w8_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                 weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                                 act_quant_granularity=QuantGranularity.PER_TENSOR,
+                                 outliers_suppression=OutliersSuppressionType.SMOOTH,
+                                 opname_blacklist=['output_layer', 'linear_fc2'])
+            gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
+            a8w4_dynamic_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                         weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
+                                         weight_quant_granularity=QuantGranularity.PER_GROUP,
+                                         group_size=64, algo_args=gptq_config,
+                                         act_quant_granularity=QuantGranularity.PER_TOKEN,
+                                         precision_recovery=PrecisionRecovery.GPTQ, weight_clip=True,
+                                         opname_blacklist=['output_layer'])
+            layer_policies = OrderedDict({r".*mlp.experts.*": a8w8_dynamic_cfg,
+                                          r"not_match": a8w4_dynamic_cfg,
+                                         })
         else:
             raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
-        return cfg, layer_policies
+        return a8w8_cfg, layer_policies
 
     def check_quant_description(self, quant_ckpt_path, quant_type) -> bool:
         "quant_type_description"
@@ -72,17 +89,21 @@ class QWen3MoETester(PTQModelTester):
                 logger.error(f"quant info of {name} should be {expect}, but got: {cur}.")
             return ret
 
-        if quant_type.lower() == "a8w8":
+        if quant_type.lower() == "mix":
             check_map = {
-                'model.decoder.layers.0.self_attention.linear_qkv.weight': QuantType.W8A8.value,
-                'model.decoder.layers.1.self_attention.linear_qkv.weight_scale': QuantType.W8A8.value,
-                'model.decoder.layers.2.self_attention.linear_qkv.weight_offset': QuantType.W8A8.value,
-                'model.decoder.layers.3.self_attention.linear_proj.input_scale': QuantType.W8A8.value,
-                'model.decoder.layers.4.self_attention.linear_proj.input_offset': QuantType.W8A8.value,
+                'model.decoder.layers.0.self_attention.linear_qkv.weight': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.1.self_attention.linear_qkv.weight_scale': QuantType.W8A8_DYNAMIC.value,
                 'model.decoder.layers.5.mlp.experts.0.linear_fc1.weight': QuantType.W8A8_DYNAMIC.value,
                 'model.decoder.layers.6.mlp.experts.1.linear_fc1.weight_scale': QuantType.W8A8_DYNAMIC.value,
-                'model.decoder.layers.7.mlp.experts.2.linear_fc1.weight_offset': QuantType.W8A8_DYNAMIC.value,
-                'model.decoder.layers.8.mlp.experts.0.linear_fc2.weight': QuantType.FLOAT.value,
+                'model.decoder.layers.8.mlp.experts.0.linear_fc2.weight': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.10.self_attention.linear_qkv.weight': QuantType.W8A8.value,
+                'model.decoder.layers.11.self_attention.linear_qkv.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.12.self_attention.linear_qkv.weight_offset': QuantType.W8A8.value,
+                'model.decoder.layers.13.self_attention.linear_proj.input_scale': QuantType.W8A8.value,
+                'model.decoder.layers.14.self_attention.linear_proj.input_offset': QuantType.W8A8.value,
+                'model.decoder.layers.15.mlp.experts.0.linear_fc1.weight': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.16.mlp.experts.1.linear_fc1.weight_scale': QuantType.W8A8_DYNAMIC.value,
+                'model.decoder.layers.17.mlp.experts.0.linear_fc2.weight': QuantType.W8A8_DYNAMIC.value,
             }
             for name, value in check_map.items():
                 if not check(name, value):
@@ -92,7 +113,7 @@ class QWen3MoETester(PTQModelTester):
         raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
 
     def get_ds_acc_threshold(self, quant_type) -> Optional[float]:
-        score_mapping = {"A8W8": 0.76,}
+        score_mapping = {"mix": 0.76,}
         return score_mapping.get(quant_type)
 
 
@@ -118,6 +139,7 @@ def ptq_predict_2stage_4p_run(quant_algo):
     Expectation: accuracy is good.
     """
     os.environ['quant_algo'] = f"{quant_algo}"
+    os.environ['HCCL_CONNECT_TIMEOUT'] = "1800"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_qwen3_moe_accuracy.py")
     port = get_available_port()
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
@@ -133,13 +155,13 @@ def ptq_predict_2stage_4p_run(quant_algo):
     assert return_code == 0
 
 
-@pytest.mark.level2
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-def test_ptq_qwen3_moe_a8w8_accuracy():
+def test_ptq_qwen3_moe_mix_accuracy():
     """
     Feature: test omni quant adjust parameter in two stages with two cards.
     Description: apply A8W8 on qwen3_moe and check score.
     Expectation: score is good.
     """
-    ptq_predict_2stage_4p_run("A8W8")
+    ptq_predict_2stage_4p_run("mix")

@@ -87,9 +87,13 @@ TASK2DESC = {
 choices = ["A", "B", "C", "D"]
 
 
-def format_example(subject, line, include_answer=True):
+def format_example(subject, line, include_answer=True, use_box=False):
     """format_example"""
-    example = f"以下是中国关于{TASK2DESC.get(subject, '')}考试的单项选择题，请不要分析过程，直接在A、B、C、D四个选项中选出正确答案。\n\n"
+    if use_box:
+        example = f"以下是中国关于{TASK2DESC.get(subject, '')}考试的单项选择题，请直接从A、B、C、D四个选项中选择一个作为答案，" \
+                  "并且一定要把最终答案用{}包起来，如：正确答案是{A}\n\n"
+    else:
+        example = f"以下是中国关于{TASK2DESC.get(subject, '')}考试的单项选择题，请不要分析过程，直接在A、B、C、D四个选项中选出正确答案。\n\n"
     example = example + line["question"]
     for choice in choices:
         example += f'\n{choice}. {line[f"{choice}"]}'
@@ -104,11 +108,12 @@ def format_example(subject, line, include_answer=True):
 class CEvalDataset(BaseDataset):
     """boolQ dataset."""
     def __init__(self, path: str, mode: str, seq_length: int, tokenizer: callable, ignore_token_id=-100,
-                 need_pad=False, n_samples=-1, add_special_tokens=True):
+                 need_pad=False, n_samples=-1, add_special_tokens=True, use_box=False):
         super().__init__(path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
                          add_special_tokens)
         self.subjects = []
         self.iter_subjects = None
+        self.use_box = use_box
         self._load()
 
     def _load(self):
@@ -124,7 +129,7 @@ class CEvalDataset(BaseDataset):
             df = pd.read_csv(file_path)
 
             for idx, row in df.iterrows():
-                input_str = format_example(subject_name, row, include_answer=False)
+                input_str = format_example(subject_name, row, include_answer=False, use_box=self.use_box)
                 subjects.append(TASK2DESC.get(subject_name, ""))
                 sources.append(input_str)
                 targets.append(row["answer"])
@@ -201,9 +206,11 @@ class CEvalDataset(BaseDataset):
 
 
 def create_ceval_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
-                         ignore_token_id=-100, repeat=1, need_pad=False, n_samples=-1, add_special_tokens=True):
+                         ignore_token_id=-100, repeat=1, need_pad=False, n_samples=-1, add_special_tokens=True,
+                         use_box=False):
     """create squad dataset"""
-    ds = CEvalDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples, add_special_tokens)
+    ds = CEvalDataset(ds_path, mode, seq_length, tokenizer, ignore_token_id, need_pad, n_samples,
+                      add_special_tokens, use_box)
     ds = GeneratorDataset(source=ds, column_names=["subjects", "input_ids", "labels"])
     type_cast_op = C.TypeCast(dtype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")

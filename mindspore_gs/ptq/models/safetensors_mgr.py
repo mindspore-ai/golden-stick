@@ -73,6 +73,7 @@ class SafeTensorsMgr:
         for name in tqdm(sorted_params, desc="Merge TP weights", disable=not enable_tqdm):
             param = dis_params_dict[name]
             param.comm()
+            self.barrier()
 
     @staticmethod
     def _get_num_str(index, length=5):

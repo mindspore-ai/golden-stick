@@ -105,9 +105,9 @@
 "golden-stick/tests/st/ptq/ptq/test_osl.py"                                                              "wrong-import-position"
 "golden-stick/tests/st/ptq/ptq/test_ptq.py"                                                              "wrong-import-position"
 "golden-stick/tests/st/ptq/rtn/test_linear_a16w8.py"                                                     "wrong-import-position"
-"golden-stick/tests/st/ptq/models/ptq_dsv3_runner.py"                                                    "wrong-import-position"
-"golden-stick/tests/st/ptq/models/ptq_qwen3_runner.py"                                                   "wrong-import-position"
-"golden-stick/tests/st/ptq/models/ptq_qwen3_moe_runner.py"                                               "wrong-import-position"
+"golden-stick/tests/st/ptq/models/test_dsv3_accuracy.py"                                                 "wrong-import-position"
+"golden-stick/tests/st/ptq/models/test_qwen3_accuracy.py"                                                "wrong-import-position"
+"golden-stick/tests/st/ptq/models/test_qwen3_moe_accuracy.py"                                            "wrong-import-position"
 "golden-stick/tests/st/ptq/models/ptq_model_tester.py"                                                   "wrong-import-position"
 
 # for version check
