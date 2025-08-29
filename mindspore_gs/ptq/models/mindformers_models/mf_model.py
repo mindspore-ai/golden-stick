@@ -12,13 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""base class of mindformers quant model"""
 
+"""
+MindFormers Quantization Model Base Class
+
+This module provides the base implementation for quantizing models
+using the MindFormers framework. It extends the generic quantization
+base classes to provide specific functionality for MindFormers models.
+
+The MFModel class serves as the foundation for all MindFormers-specific
+quantized model implementations. It handles:
+- Model loading and initialization from MindFormers configurations
+- Integration with MindFormers' distributed computing capabilities
+- Parameter management compatible with MindFormers' tensor parallelism
+- SafeTensors format support for efficient model saving and loading
+
+This implementation is designed to work seamlessly with MindFormers'
+model zoo and supports various large language models including Qwen3,
+DeepSeekV3, and other transformer-based architectures.
+
+Example:
+    >>> from mindspore_gs.ptq.models.mindformers_models import MFModel
+    >>>
+    >>> # The class is typically used through specific implementations
+    >>> # like QWen3, DeepSeekV3, etc.
+    >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/model.yaml")
+"""
 
 import os
 import time
 import json
 import mindspore as ms
+from mindspore import Parameter, ops as msops
 from mindspore.communication import get_rank
 from mindspore.nn.utils import no_init_parameters
 from mindspore import load_param_into_net, load_checkpoint
@@ -41,11 +66,47 @@ from mindspore_gs.ptq.models.safetensors_mgr import SafeTensorsMgr
 
 @BaseQuantForCausalLM.reg_model_hub("mindformers")
 class MFModel(BaseQuantForCausalLMImpl):
-    """MFModel"""
+    """MindFormers Model Base Class for Quantization
+
+    This class provides the base implementation for quantizing models
+    using the MindFormers framework. It extends BaseQuantForCausalLMImpl
+    to provide specific functionality for MindFormers models.
+
+    Key features of this implementation include:
+    - Seamless integration with MindFormers model configurations
+    - Support for distributed computing and tensor parallelism
+    - Efficient parameter management for large-scale models
+    - SafeTensors format support for model persistence
+    - Compatibility with MindFormers' model zoo
+
+    The class uses a registry pattern to allow specific model implementations
+    (like Qwen3, DeepSeekV3) to register themselves and be automatically
+    discovered by the AutoQuantForCausalLM interface.
+
+    Examples:
+        >>> # Typically used through specific implementations like QWen3
+        >>> from mindspore_gs.ptq.models import AutoQuantForCausalLM
+        >>>
+        >>> # Automatically selects the appropriate MindFormers implementation
+        >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/qwen3_config.yaml")
+    """
+
     _model_registry: dict[str, type] = {}
 
     @staticmethod
     def _reg_model(name, model_clazz):
+        """Internal method to register a model implementation.
+
+        This method registers a specific model implementation in the
+        internal registry, preventing duplicate registrations.
+
+        Args:
+            name (str): Name/identifier for the model implementation.
+            model_clazz (type): The class implementing the model.
+
+        Raises:
+            RuntimeError: If a model with the same name is already registered.
+        """
         cur = MFModel._model_registry.get(name)
         if cur:
             raise RuntimeError(f"Duplicated model reg, name: {name}, already reg class: {cur}, "
@@ -55,6 +116,23 @@ class MFModel(BaseQuantForCausalLMImpl):
 
     @staticmethod
     def reg_model(alias=None):
+        """Decorator for registering specific model implementations.
+
+        This decorator registers a class as a specific model implementation
+        that can be automatically discovered and instantiated.
+
+        Args:
+            alias (str, optional): Alternative name for the model.
+                If not provided, the class name will be used. Defaults to None.
+
+        Returns:
+            function. Decorator function that registers the class.
+
+        Examples:
+            >>> @MFModel.reg_model('qwen3')
+            >>> class QWen3(MFModel):
+            >>>     pass
+        """
         def decorator(cls):
             """decorator"""
             register_key = alias if alias is not None else cls.__name__
@@ -64,6 +142,15 @@ class MFModel(BaseQuantForCausalLMImpl):
         return decorator
 
     def __init__(self, yaml_path):
+        """Initialize the MindFormers quantized model.
+
+        This method initializes the model by loading the MindFormers
+        configuration, building the execution context, and creating
+        the underlying network instance.
+
+        Args:
+            yaml_path (str): Path to the MindFormers model configuration YAML file.
+        """
         config = MindFormerConfig(yaml_path)
         build_context(config)
         build_parallel_config(config)
@@ -77,6 +164,21 @@ class MFModel(BaseQuantForCausalLMImpl):
     # pylint: disable=arguments-differ
     @classmethod
     def from_pretrained(cls, yaml_path):
+        """Create a model instance from a pretrained configuration.
+
+        This method creates a model instance by loading the MindFormers
+        configuration and selecting the appropriate specific model
+        implementation based on the configuration.
+
+        Args:
+            yaml_path (str): Path to the MindFormers model configuration YAML file.
+
+        Returns:
+            MFModel. An instance of the appropriate model implementation.
+
+        Raises:
+            ValueError: If the model name in the configuration is not supported.
+        """
         if not os.path.isfile(yaml_path):
             raise ValueError(f"The {yaml_path} is not exists, "
                              "please check the yaml path.")
@@ -94,20 +196,62 @@ class MFModel(BaseQuantForCausalLMImpl):
         return model_cls(yaml_path)
 
     def _original_safetensors_path(self):
+        """Get the original SafeTensors file path.
+
+        Returns:
+            str. Path to the original SafeTensors file.
+        """
         return self._original_sf_path
 
     def forward(self, input_ids, max_new_tokens=1):
+        """Perform forward pass through the model.
+
+        This method delegates to the underlying MindFormers network's
+        generate method for inference.
+
+        Args:
+            input_ids (Tensor): Input token IDs for the model.
+            max_new_tokens (int, optional): Maximum number of tokens to generate.
+                Defaults to 1.
+
+        Returns:
+            Generated output from the model.
+        """
         return self.network.generate(input_ids, do_sample=False, max_new_tokens=max_new_tokens)
 
     def _network(self):
+        """Get the underlying network instance.
+
+        Returns:
+            The underlying MindFormers network instance.
+        """
         return self.network
 
     def _transformer_layers(self) -> tuple[type]:
-        """_transformer_layers"""
+        """Get the transformer layer types for quantization.
+
+        This method returns the transformer layer types that should
+        be targeted for quantization in MindFormers models.
+
+        Returns:
+            tuple[type]. Tuple containing TransformerLayer type.
+        """
         from mindformers.parallel_core.inference.transformer.transformer_layer import TransformerLayer
         return [TransformerLayer]
 
     def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
+        """Process parameter dictionary before saving.
+
+        This method filters out certain parameters that should not be
+        saved, such as cache and float weight parameters.
+
+        Args:
+            param_dict (dict): Dictionary of model parameters.
+
+        Returns:
+            tuple[dict, dict]. Tuple containing the filtered parameter
+                dictionary and parameter name trace.
+        """
         new_param_dict = {}
         for key, param in param_dict.items():
             if "key_cache" in key or "value_cache" in key or "float_weight" in key:
@@ -116,9 +260,31 @@ class MFModel(BaseQuantForCausalLMImpl):
         return new_param_dict, {}
 
     def _load_weights_to_fake_quant(self, quant_safetensors_path):
+        """Load weights for fake quantization.
+
+        This is an abstract method that must be implemented by derived classes.
+
+        Args:
+            quant_safetensors_path (str): Path to quantized SafeTensors file.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
         raise NotImplementedError
 
     def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):
+        """Apply fake quantization to the model.
+
+        This method applies fake quantization to the model, inserting
+        quantization and dequantization operations in the computation
+        graph while keeping the underlying operations in floating point.
+
+        Args:
+            ptq_config (PTQConfig): Configuration for post-training quantization.
+            layers_policy (dict): Policy for different layer quantization strategies.
+            quant_safetensors_path (str, optional): Path to quantized SafeTensors file.
+                Defaults to "".
+        """
         logger.info("Use ptq algo to fake-quant network and weight")
         ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
         # pylint: disable=protected-access
@@ -131,14 +297,40 @@ class MFModel(BaseQuantForCausalLMImpl):
 
 
 class MFModelEnableSafeTensors(MFModel):
-    """MFModelEnableSafeTensors"""
+    """MindFormers Model with SafeTensors Support
+
+    This class extends MFModel to provide support for SafeTensors
+    format for efficient model saving and loading. SafeTensors is
+    a format that provides faster loading times and better security
+    compared to traditional checkpoint formats.
+    """
+
     def _load_weights_to_fake_quant(self, quant_safetensors_path):
+        """Load weights for fake quantization from SafeTensors.
+
+        This method loads quantized weights from SafeTensors files
+        for fake quantization.
+
+        Args:
+            quant_safetensors_path (str): Path to quantized SafeTensors file.
+        """
         from .weight_loader import WeightProcessor
         processor = WeightProcessor()
         processor.load_safetensors_shard(quant_safetensors_path, self.network)
 
     def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
-        """_process_params_dict_before_save"""
+        """Process parameter dictionary before saving to SafeTensors.
+
+        This method filters parameters and handles expert weights
+        specifically for SafeTensors format.
+
+        Args:
+            param_dict (dict): Dictionary of model parameters.
+
+        Returns:
+            tuple[dict, dict]. Tuple containing the processed parameter
+                dictionary and parameter name trace.
+        """
         param_dict, param_name_trace = super()._process_params_dict_before_save(param_dict)
         # _del_experts_weight
         experts_dict = {k: v for k, v in param_dict.items()
@@ -170,9 +362,16 @@ class MFModelEnableSafeTensors(MFModel):
         return new_param_dict, param_name_trace
 
     def _shard_dict(self):
-        """_shard_dict"""
+        """Generate sharding dictionary for distributed parameters.
+
+        This method creates a dictionary that maps parameter names
+        to their sharding axes, which is used for distributed computing.
+
+        Returns:
+            dict. Dictionary mapping parameter names to sharding axes.
+        """
         class Collector(Processor):
-            """Collector"""
+            """Collector for parameter sharding information."""
             def __init__(self):
                 self.shard_axis = {}
                 self.row_linears = ('linear_proj', 'linear_fc2')
@@ -181,6 +380,7 @@ class MFModelEnableSafeTensors(MFModel):
 
             @staticmethod
             def _transpose_b(linear):
+                """Check if linear layer transposes the weight matrix."""
                 if isinstance(linear, (RowParallelLinear, ColumnParallelLinear,
                                        QKVParallelLinear, MergedColumnParallelLinear)):
                     return linear.transpose_b
@@ -189,11 +389,13 @@ class MFModelEnableSafeTensors(MFModel):
                 raise ValueError(f"Not supported linear: {type(linear)}")
 
             def _try_append_shard_axis(self, linear, param_name, axis):
+                """Append sharding axis information for a parameter."""
                 if not hasattr(linear, param_name):
                     return
                 self.shard_axis[getattr(linear, param_name).name] = axis
 
             def process_cell(self, cell_name, cell):
+                """Process a network cell to collect sharding information."""
                 if 'linear_proj' in cell_name:
                     # pylint: disable=protected-access
                     transpose_b = cell._transpose_b()
@@ -211,9 +413,6 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'weight_offset', None)
                     self._try_append_shard_axis(cell, 'input_scale', 0)
                     self._try_append_shard_axis(cell, 'input_offset', 0)
-                    self._try_append_shard_axis(cell, 'smooth_scale', 0)
-                    self._try_append_shard_axis(cell, 'dequant_scale', None)
-                    self._try_append_shard_axis(cell, 'quant_bias', None)
                 elif any(seg in cell_name for seg in ('linear_q', 'linear_k',
                                                       'linear_v', 'linear_qkv')):
                     # pylint: disable=protected-access
@@ -251,7 +450,18 @@ class MFModelEnableSafeTensors(MFModel):
         return collector.shard_axis
 
     def parameters_dict(self, scope="") -> dict[str, DistributedParameter]:
-        """parameters_dict"""
+        """Get the dictionary of model parameters with distributed information.
+
+        This method returns a dictionary mapping parameter names to
+        DistributedParameter objects that include sharding information.
+
+        Args:
+            scope (str, optional): Scope for parameter retrieval. Defaults to "".
+
+        Returns:
+            dict[str, DistributedParameter]. Dictionary mapping parameter names
+            to DistributedParameter objects with sharding information.
+        """
         param_dict = self.network.parameters_dict()
         param_dict, param_name_trace = self._process_params_dict_before_save(param_dict)
         shard_info = self._shard_dict()
@@ -272,7 +482,14 @@ class MFModelEnableSafeTensors(MFModel):
         return dis_param_dict
 
     def save_quantized(self, save_path):
-        """save_pretrained"""
+        """Save the quantized model in SafeTensors format.
+
+        This method saves the quantized model parameters and metadata
+        in SafeTensors format for efficient loading and better security.
+
+        Args:
+            save_path (str): Path where the quantized model should be saved.
+        """
         super().save_quantized(save_path)
         sf_mgr = SafeTensorsMgr()
         sf_mgr.save(self._original_sf_path,
@@ -281,13 +498,42 @@ class MFModelEnableSafeTensors(MFModel):
                     self.get_description_file(self._network()))
 
     def get_description_file(self, network):
+        """Get the description file for quantization information.
+
+        This is an abstract method that must be implemented by derived classes.
+
+        Args:
+            network: The network to analyze for quantization descriptions.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
         raise NotImplementedError
 
+
 class MFModelNotEnableSafeTensors(MFModel):
-    """MFModelNotEnableSafeTensors"""
+    """MindFormers Model without SafeTensors Support
+
+    This class provides the same functionality as MFModelEnableSafeTensors
+    but without SafeTensors format support, using traditional checkpoint
+    formats instead.
+    """
+
     @staticmethod
     def _find_unique_file(directory, suffix):
-        """_find_unique_file"""
+        """Find a unique file with the specified suffix in a directory.
+
+        Args:
+            directory (str): Directory to search in.
+            suffix (str): File suffix to look for.
+
+        Returns:
+            str. Path to the unique file found.
+
+        Raises:
+            FileNotFoundError: If the directory doesn't exist.
+            ValueError: If no file or multiple files with the suffix are found.
+        """
         if not os.path.isdir(directory):
             raise FileNotFoundError(f"directory not exist: {directory}")
 
@@ -306,13 +552,22 @@ class MFModelNotEnableSafeTensors(MFModel):
         return matching_files[0]
 
     def _concat_route_moe_weight(self, param_dict) -> dict:
-        """_concat_route_moe_weight"""
+        """Concatenate routed MoE weights.
+
+        This method handles the concatenation of weights for Mixture of
+        Experts models with routing mechanisms.
+
+        Args:
+            param_dict (dict): Dictionary of model parameters.
+
+        Returns:
+            dict. Dictionary with concatenated MoE weights.
+        """
         new_param_dict = {}
         experts_dict = {k: v for k, v in param_dict.items()
                         if ".mlp.experts." in k}
         other_dict = dict(param_dict.items() - experts_dict.items())
         new_param_dict.update(other_dict)
-
         is_fc1_quant = any([".linear_fc1.weight_scale" in k for k in experts_dict.keys()])
         is_fc2_quant = any([".linear_fc2.weight_scale" in k for k in experts_dict.keys()])
 
@@ -329,7 +584,16 @@ class MFModelNotEnableSafeTensors(MFModel):
         return new_param_dict, is_fc1_quant, is_fc2_quant
 
     def _concat_experts(self, param_dict, is_quant, weight_name):
-        """_concat_experts"""
+        """Concatenate expert weights for MoE models.
+
+        Args:
+            param_dict (dict): Dictionary of expert parameters.
+            is_quant (bool): Whether quantization is applied.
+            weight_name (str): Name of the weight parameter.
+
+        Returns:
+            dict. Dictionary with concatenated expert weights.
+        """
         new_param_dict = {}
         for key, _ in param_dict.items():
             key_split = key.split('.')
@@ -357,7 +621,13 @@ class MFModelNotEnableSafeTensors(MFModel):
         return new_param_dict
 
     def _del_experts_weight(self, network, is_fc1_quant, is_fc2_quant):
-        """_del_experts_weight"""
+        """Delete expert weights after processing.
+
+        Args:
+            network: The network instance.
+            is_fc1_quant (bool): Whether FC1 is quantized.
+            is_fc2_quant (bool): Whether FC2 is quantized.
+        """
         def process(root, name_prefix):
             """Iterate the whole network and call callback function `process_cell`."""
             if root is None:
@@ -372,13 +642,24 @@ class MFModelNotEnableSafeTensors(MFModel):
         process(network, 'network')
 
     def _process_params_dict_before_load(self, param_dict) -> dict:
-        """_process_params_dict_before_load"""
+        """Process parameter dictionary before loading.
+
+        Args:
+            param_dict (dict): Dictionary of model parameters.
+
+        Returns:
+            dict. Processed parameter dictionary.
+        """
         param_dict, is_fc1_quant, is_fc2_quant = self._concat_route_moe_weight(param_dict)
         self._del_experts_weight(self.network, is_fc1_quant, is_fc2_quant)
         return param_dict
 
     def _load_weights_to_fake_quant(self, quant_safetensors_path):
-        """_load_tp_splited_safetensors"""
+        """Load weights for fake quantization from checkpoint files.
+
+        Args:
+            quant_safetensors_path (str): Path to quantized checkpoint files.
+        """
         if not quant_safetensors_path:
             return
         try:
@@ -394,18 +675,37 @@ class MFModelNotEnableSafeTensors(MFModel):
         logger.info(f"CKPT has but not in network: {ckpt_not_load}", flush=True)
 
     def parameters_dict(self, scope=""):
+        """Get the dictionary of model parameters.
+
+        Args:
+            scope (str, optional): Scope for parameter retrieval. Defaults to "".
+
+        Returns:
+            dict. Dictionary of model parameters.
+        """
         param_dict = self.network.parameters_dict()
         param_dict, _ = self._process_params_dict_before_save(param_dict)
         return param_dict
 
     def save_quantized(self, save_path):
-        """save_pretrained"""
+        """Save the quantized model to checkpoint files.
+
+        Args:
+            save_path (str): Path where the quantized model should be saved.
+        """
         super().save_quantized(save_path)
         self._save_safetenors(save_path)
         _ = self._save_desc_json(save_path)
 
     def _save_safetenors(self, save_path) -> str:
-        """_save_safetenors"""
+        """Save model parameters in SafeTensors format.
+
+        Args:
+            save_path (str): Path where parameters should be saved.
+
+        Returns:
+            str. Path to the saved SafeTensors file.
+        """
         start = time.time()
         logger.info(f"Saving checkpoint...", flush=True)
         param_dict = self.parameters_dict()
@@ -421,7 +721,14 @@ class MFModelNotEnableSafeTensors(MFModel):
         logger.info(f'Save checkpoint cost time is {time.time() - start} s.')
 
     def _save_desc_json(self, save_path) -> str:
-        """_save_desc_json"""
+        """Save quantization description JSON file.
+
+        Args:
+            save_path (str): Path where the description file should be saved.
+
+        Returns:
+            str. Path to the saved description JSON file.
+        """
         start = time.time()
         logger.info(f"Saving describle json file...", flush=True)
         desc_info = self.get_description_file(self._network())
@@ -434,4 +741,14 @@ class MFModelNotEnableSafeTensors(MFModel):
         return save_json_path
 
     def get_description_file(self, network):
+        """Get the description file for quantization information.
+
+        This is an abstract method that must be implemented by derived classes.
+
+        Args:
+            network: The network to analyze for quantization descriptions.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
         raise NotImplementedError
