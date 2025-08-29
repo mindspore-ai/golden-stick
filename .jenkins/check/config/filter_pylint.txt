@@ -109,6 +109,8 @@
 "golden-stick/tests/st/ptq/models/test_qwen3_accuracy.py"                                                "wrong-import-position"
 "golden-stick/tests/st/ptq/models/test_qwen3_moe_accuracy.py"                                            "wrong-import-position"
 "golden-stick/tests/st/ptq/models/ptq_model_tester.py"                                                   "wrong-import-position"
+"golden-stick/tests/st/ptq/models/test_auto_model.py"                                                    "wrong-import-position"
+"golden-stick/tests/st/ptq/models/test_base_model.py"                                                    "wrong-import-position"
 
 # for version check
 "golden-stick/mindspore_gs/__init__.py"                           "wrong-import-position"

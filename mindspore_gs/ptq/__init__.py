@@ -22,3 +22,4 @@ from .ptq_config import (PTQConfig, PTQMode, OutliersSuppressionType, PrecisionR
 from .round_to_nearest import RoundToNearest
 from .ptq import PTQ
 from .network_helpers import NetworkHelper
+from .models import AutoQuantForCausalLM, BaseQuantForCausalLM

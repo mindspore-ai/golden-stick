@@ -12,9 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""quant models"""
 
+"""
+PTQ Models Package
+
+This package provides high-level interfaces and implementations for
+post-training quantization of large language models. It includes:
+
+1. Auto Model Interface: Automatic model detection and selection
+2. Base Model Classes: Standardized interfaces for quantized models
+3. Framework-Specific Implementations: Support for different model frameworks
+4. Utility Functions: Helper functions for model management and quantization
+
+The package is organized to provide a simple and consistent API for
+users while supporting multiple model frameworks and quantization
+algorithms through a plugin-based architecture.
+
+Key Components:
+    - AutoQuantForCausalLM: Main entry point for automatic model quantization
+    - BaseQuantForCausalLM: Base class defining standard quantization interfaces
+    - Framework-specific implementations (MindFormers, etc.)
+
+Example:
+    >>> from mindspore_gs.ptq.models import AutoQuantForCausalLM
+    >>>
+    >>> # Automatically detect and load the appropriate model
+    >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/model.yaml")
+    >>>
+    >>> # Calibrate and quantize the model
+    >>> model.calibrate(ptq_config, layers_policy, calibration_dataset)
+    >>>
+    >>> # Save the quantized model
+    >>> model.save_quantized("/path/to/save/location")
+"""
 
 from .auto_model import AutoQuantForCausalLM
 from .base_model import BaseQuantForCausalLM
-from .mindformers_models import QWen3, QWen3MoE, DeepSeekV3
