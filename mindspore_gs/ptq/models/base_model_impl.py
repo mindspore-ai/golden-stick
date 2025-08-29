@@ -67,20 +67,21 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         """_transformer_layers"""
         raise NotImplementedError
 
-    def calibrate(self, ptq_config, layers_policy, datasets):
+    def calibrate(self, ptq_config, layers_policy, datasets, **kwargs):
         """calibrate"""
         logger.info("Use ptq algo to quant network and weight.")
         net = self._network()
         ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
         # pylint: disable=protected-access
         ptq._config.experimental = True
-        ptq._config.use_fake_quant = True
+        ptq._config.use_fake_quant = kwargs.get('fake_quant', False)
         transformer_layers = self._transformer_layers()
         _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
         quant_start = time.time()
         logger.info('Quantize-ing network...')
         start_time = time.time()
         ptq.apply(net, datasets=datasets)
+        ptq.summary(net)
         offload_network(net)
         logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
         start_time = time.time()

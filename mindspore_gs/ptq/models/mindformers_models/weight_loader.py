@@ -144,6 +144,8 @@ class WeightProcessor:
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.smooth_scale", -1)
         # fc2
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight", 0)
+        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_scale", -1)
+        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_offset", -1)
         mlpnorm_key = f"model.decoder.layers.{layer_id}.pre_mlp_layernorm.weight"
         self._get_split_set(mlpnorm_key, -1)
 
