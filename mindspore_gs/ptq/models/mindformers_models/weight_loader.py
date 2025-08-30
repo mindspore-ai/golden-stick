@@ -135,13 +135,22 @@ class WeightProcessor:
 
     def _split_mlp_weight(self, layer_id):
         """_split_dense_ffn_weight"""
-        # fc1
-        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.weight", 1)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.weight_scale", 0)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.weight_offset", 0)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.input_scale", -1)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.input_offset", -1)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.smooth_scale", -1)
+        # Load split FFN parameters (gating, hidden) instead of linear_fc1
+        param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
+                          'input_scale', 'input_offset', 'smooth_scale']
+
+        for suffix in param_suffixes:
+            # Determine split_axis based on parameter type
+            if suffix in ['weight']:
+                split_axis = 1  # FFN weight split axis
+            elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                split_axis = 0  # FFN quantization parameters split axis
+            else:
+                split_axis = -1  # No split needed
+
+            # Load split gating and hidden parameters
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.gating.{suffix}", split_axis)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.hidden.{suffix}", split_axis)
         # fc2
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight", 0)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_scale", -1)
@@ -151,13 +160,21 @@ class WeightProcessor:
 
     def _split_attention_weight(self, layer_id):
         """_split_attention_weight"""
-        # wqkv
-        self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.weight", 0)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.input_scale", -1)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.input_offset", -1)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.weight_scale", 0)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.weight_offset", 0)
-        self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.smooth_scale", -1)
+        # Load split QKV parameters (linear_q, linear_k, linear_v) instead of linear_qkv
+        param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
+                          'input_scale', 'input_offset', 'smooth_scale']
+
+        for suffix in param_suffixes:
+            # Determine split_axis based on parameter type
+            if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                split_axis = 0  # QKV split axis
+            else:
+                split_axis = -1  # No split needed
+
+            # Load split Q, K, V parameters
+            self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_q.{suffix}", split_axis)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_k.{suffix}", split_axis)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_v.{suffix}", split_axis)
         # wo
         self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_proj.weight", 1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_proj.input_scale", 0)
@@ -189,49 +206,132 @@ class WeightProcessor:
         for layer_id in tqdm(range(num_layers), desc="Load weights", disable=not enable_tqdm):
             self._split_weight_of_each_layer(layer_id)
 
-    def _qkv_concat_of_each_layer(self, layer_id):
-        """_qkv_concat_of_each_layer"""
-        wq_key = f"model.layers.{layer_id}.attention.wq._layer.weight"
-        wk_key = f"model.layers.{layer_id}.attention.wk._layer.weight"
-        wv_key = f"model.layers.{layer_id}.attention.wv._layer.weight"
-        w_qkv_key = f"model.layers.{layer_id}.attention.w_qkv._layer.weight"
-        wq = self._np_dict.pop(wq_key)
-        wk = self._np_dict.pop(wk_key)
-        wv = self._np_dict.pop(wv_key)
-        self._np_dict[w_qkv_key] = np.concatenate((wq, wk, wv), axis=0)
+    def _qkv_merge_of_each_layer(self, layer_id):
+        """Merge split QKV parameters back to linear_qkv for each layer"""
+        # Define parameter suffixes that need to be merged
+        # Note: input_scale, input_offset, smooth_scale are input-related parameters
+        # that should NOT be merged because they correspond to input channels
+        # and are fully replicated across all devices
+        merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']
+        input_param_suffixes = ['input_scale', 'input_offset', 'smooth_scale']
 
-    def _qkv_concat(self):
-        """_qkv_concat"""
+        for suffix in input_param_suffixes:
+            q_key = f"model.decoder.layers.{layer_id}.self_attention.linear_q.{suffix}"
+            k_key = f"model.decoder.layers.{layer_id}.self_attention.linear_k.{suffix}"
+            v_key = f"model.decoder.layers.{layer_id}.self_attention.linear_v.{suffix}"
+            qkv_key = f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.{suffix}"
+            # Check if all three components exist with detailed logging
+            missing_keys = []
+            if q_key not in self._np_dict:
+                missing_keys.append(q_key)
+            if k_key not in self._np_dict:
+                missing_keys.append(k_key)
+            if v_key not in self._np_dict:
+                missing_keys.append(v_key)
+
+            if missing_keys:
+                logger.debug(f"Layer {layer_id}, suffix {suffix}: Missing keys {missing_keys}")
+                continue
+            # Execute merge operation
+            q_param = self._np_dict.pop(q_key)
+            _ = self._np_dict.pop(k_key)
+            _ = self._np_dict.pop(v_key)
+            self._np_dict[qkv_key] = q_param
+
+        for suffix in merge_param_suffixes:
+            q_key = f"model.decoder.layers.{layer_id}.self_attention.linear_q.{suffix}"
+            k_key = f"model.decoder.layers.{layer_id}.self_attention.linear_k.{suffix}"
+            v_key = f"model.decoder.layers.{layer_id}.self_attention.linear_v.{suffix}"
+            qkv_key = f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.{suffix}"
+            # Check if all three components exist with detailed logging
+            missing_keys = []
+            if q_key not in self._np_dict:
+                missing_keys.append(q_key)
+            if k_key not in self._np_dict:
+                missing_keys.append(k_key)
+            if v_key not in self._np_dict:
+                missing_keys.append(v_key)
+            if missing_keys:
+                logger.debug(f"Layer {layer_id}, suffix {suffix}: Missing keys {missing_keys}")
+                continue
+            # Execute merge operation
+            q_param = self._np_dict.pop(q_key)
+            k_param = self._np_dict.pop(k_key)
+            v_param = self._np_dict.pop(v_key)
+            # Log parameter shapes for debugging
+            logger.debug(f"Layer {layer_id}, {suffix}: Q shape {q_param.shape}, "
+                         f"K shape {k_param.shape}, V shape {v_param.shape}")
+
+            # Concatenate along axis 0 (QKV split axis)
+            merged_param = np.concatenate((q_param, k_param, v_param), axis=0)
+            self._np_dict[qkv_key] = merged_param
+            logger.debug(f"Successfully merged {suffix} for layer {layer_id}, final shape: {merged_param.shape}")
+
+    def _qkv_merge(self):
+        """Merge split QKV parameters back to linear_qkv"""
         num_layers = self.num_layers
         enable_tqdm = self.rank_id == 0
-        for layer_id in tqdm(range(num_layers), desc="Concat QKV weights", disable=not enable_tqdm):
-            self._qkv_concat_of_each_layer(layer_id)
+        for layer_id in tqdm(range(num_layers), desc="Merge QKV weights", disable=not enable_tqdm):
+            self._qkv_merge_of_each_layer(layer_id)
 
-    def _ffn_concat_of_each_layer(self, layer_id):
-        """_ffn_concat_of_each_layer"""
-        w_gate_hidden_key = f"model.layers.{layer_id}.feed_forward.w_gate_hidden._layer.weight"
-        w1 = self._np_dict.pop(f"model.layers.{layer_id}.feed_forward.w1._layer.weight")
-        w3 = self._np_dict.pop(f"model.layers.{layer_id}.feed_forward.w3._layer.weight")
-        self._np_dict[w_gate_hidden_key] = np.concatenate((w1, w3), axis=0)
+    def _ffn_merge_of_each_layer(self, layer_id):
+        """Merge split FFN parameters back to linear_fc1 for each layer"""
+        # Define parameter suffixes that need to be merged
+        # Note: input_scale, input_offset, smooth_scale are input-related parameters
+        # that should NOT be merged because they correspond to input channels
+        # and are fully replicated across all devices
+        merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']
+        input_param_suffixes = ['input_scale', 'input_offset', 'smooth_scale']
 
-        new_key = f"model.layers.{layer_id}.feed_forward.w_gate_hidden._layer.matmul.dequant_scale"
-        w1 = self._np_dict.pop(f"model.layers.{layer_id}.feed_forward.w1._layer.matmul.dequant_scale")
-        w3 = self._np_dict.pop(f"model.layers.{layer_id}.feed_forward.w3._layer.matmul.dequant_scale")
-        self._np_dict[new_key] = np.concatenate((w1, w3), axis=0)
+        for suffix in input_param_suffixes:
+            gating_key = f"model.decoder.layers.{layer_id}.mlp.gating.{suffix}"
+            hidden_key = f"model.decoder.layers.{layer_id}.mlp.hidden.{suffix}"
+            fc1_key = f"model.decoder.layers.{layer_id}.mlp.linear_fc1.{suffix}"
+            # Check if all three components exist with detailed logging
+            missing_keys = []
+            if gating_key not in self._np_dict:
+                missing_keys.append(gating_key)
+            if hidden_key not in self._np_dict:
+                missing_keys.append(hidden_key)
+            if missing_keys:
+                logger.debug(f"Layer {layer_id}, suffix {suffix}: Missing keys {missing_keys}")
+                continue
+            # Execute merge operation
+            gate_param = self._np_dict.pop(gating_key)
+            _ = self._np_dict.pop(hidden_key)
+            self._np_dict[fc1_key] = gate_param
 
-        new_key = f"model.layers.{layer_id}.feed_forward.w_gate_hidden._layer.weight"
-        w1 = self._np_dict.pop(f"model.layers.{layer_id}.feed_forward.w1._layer.matmul.quant_bias")
-        w3 = self._np_dict.pop(f"model.layers.{layer_id}.feed_forward.w3._layer.matmul.quant_bias")
-        self._np_dict[new_key] = np.concatenate((w1, w3), axis=0)
+        for suffix in merge_param_suffixes:
+            gating_key = f"model.decoder.layers.{layer_id}.mlp.gating.{suffix}"
+            hidden_key = f"model.decoder.layers.{layer_id}.mlp.hidden.{suffix}"
+            fc1_key = f"model.decoder.layers.{layer_id}.mlp.linear_fc1.{suffix}"
+            missing_keys = []
+            if gating_key not in self._np_dict:
+                missing_keys.append(gating_key)
+            if hidden_key not in self._np_dict:
+                missing_keys.append(hidden_key)
+            if missing_keys:
+                logger.debug(f"Layer {layer_id}, suffix {suffix}: Missing keys {missing_keys}")
+                continue
+            # Execute merge operation
+            gating_param = self._np_dict.pop(gating_key)
+            hidden_param = self._np_dict.pop(hidden_key)
 
-    def _ffn_concat(self):
-        """_ffn_concat"""
-        if not self.config.model.model_config.qkv_concat:
-            return
-        num_layers = self.config.model.model_config.num_layers
+            # Log parameter shapes for debugging
+            logger.debug(f"Layer {layer_id}, {suffix}: Gating shape {gating_param.shape}, "
+                         f"Hidden shape {hidden_param.shape}")
+
+            # Concatenate along axis 0 (FFN split axis)
+            merged_param = np.concatenate((gating_param, hidden_param), axis=0)
+            self._np_dict[fc1_key] = merged_param
+            logger.debug(f"Successfully merged FFN {suffix} for layer {layer_id}, final shape: {merged_param.shape}")
+
+    def _ffn_merge(self):
+        """Merge split FFN parameters back to linear_fc1"""
+        num_layers = self.num_layers
         enable_tqdm = self.rank_id == 0
-        for layer_id in tqdm(range(num_layers), desc="Concat FFN weights", disable=not enable_tqdm):
-            self._ffn_concat_of_each_layer(layer_id)
+        for layer_id in tqdm(range(num_layers), desc="Merge FFN weights", disable=not enable_tqdm):
+            self._ffn_merge_of_each_layer(layer_id)
 
     def _moe_merge_of_each_layer(self, layer_id):
         """_qkv_concat_of_each_layer"""
@@ -341,6 +441,8 @@ class WeightProcessor:
         self.tie_word_embeddings = self.config.get('tie_word_embeddings', False)
 
         self._split_weight()
+        self._qkv_merge()
+        self._ffn_merge()
         self._moe_merge()
         self._del_experts_weight(network)
         self._load_param(network)
