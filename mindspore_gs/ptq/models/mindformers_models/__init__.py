@@ -19,3 +19,4 @@ from .mf_model import MFModel
 from .qwen3 import QWen3
 from .qwen3_moe import QWen3MoE
 from .deepseekv3 import DeepSeekV3
+from .telechat2 import Telechat2
