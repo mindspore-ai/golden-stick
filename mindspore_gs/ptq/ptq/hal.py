@@ -273,7 +273,7 @@ class QuantWithOutlierSuppressionPlus(QuantUnitCell):
                                                                   is_deploy, parallel_type, beta, dtype.int8)
         if kernel_type is KernelType.ACLNN:
             return QuantWithOutlierSuppressionPlusHighPerformance(layer_name, x_qparam, ic, dst_dtype,
-                                                                  is_deploy, parallel_type, beta, dtype.float16)
+                                                                  is_deploy, parallel_type, beta, dst_dtype)
         if kernel_type is KernelType.HIGH_PRECISION:
             return QuantWithOutlierSuppressionPlusHighPrecision(layer_name, x_qparam, ic, dst_dtype,
                                                                 is_deploy, parallel_type, beta)
@@ -1307,6 +1307,35 @@ class AllQuantMatmul(QuantUnitCell):
         raise RuntimeError(f"Not supported kernel type: {kernel_type}")
 
     @staticmethod
+    def _get_deploy_quant_bias(parallel_type, is_osp, q_weight, x_qparam, w_qparam, trans_b, tp_size, dst_dtype,
+                               linear, bias_osp, bias_name):
+        """_get_deploy_quant_bias"""
+        # fuse bias
+        if parallel_type is ParallelType.ROW_PARALLEL:
+            if not is_osp:
+                t_bias = AllQuantMatmul._correction_into_bias(
+                    q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
+                )
+                # set quant_bias=0 on other card when doing pynative eval
+                if RANK_ID != 0:
+                    t_bias = msops.zeros_like(t_bias)
+            else:
+                t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                    linear.matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, bias_osp
+                )
+        else:
+            if not is_osp:
+                t_bias = AllQuantMatmul._correction_into_bias(
+                    q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype
+                )
+            else:
+                t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                    linear.matmul, q_weight, x_qparam, w_qparam, trans_b, False, bias_osp
+                )
+        quant_bias = Parameter(t_bias, name=bias_name)
+        return quant_bias
+
+    @staticmethod
     def create(
         layer_name,
         linear,
@@ -1337,29 +1366,9 @@ class AllQuantMatmul(QuantUnitCell):
             bias_shape = (export_num, oc) if export_num else (oc,)
             quant_bias = Parameter(initializer("zeros", bias_shape, dtype.int32), name=bias_name)
         else:
-            # fuse bias
-            if parallel_type is ParallelType.ROW_PARALLEL:
-                if not is_osp:
-                    t_bias = AllQuantMatmul._correction_into_bias(
-                        q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
-                    )
-                    # set quant_bias=0 on other card when doing pynative eval
-                    if RANK_ID != 0:
-                        t_bias = msops.zeros_like(t_bias)
-                else:
-                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
-                        linear.matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, bias_osp
-                    )
-            else:
-                if not is_osp:
-                    t_bias = AllQuantMatmul._correction_into_bias(
-                        q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype
-                    )
-                else:
-                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
-                        linear.matmul, q_weight, x_qparam, w_qparam, trans_b, False, bias_osp
-                    )
-            quant_bias = Parameter(t_bias, name=bias_name)
+            quant_bias = AllQuantMatmul._get_deploy_quant_bias(parallel_type, is_osp, q_weight, x_qparam, w_qparam,
+                                                               trans_b, tp_size, dst_dtype, linear, bias_osp,
+                                                               bias_name)
 
         # create qmm
         if isinstance(linear.matmul, (msops.MatMul, GroupedMatmulV4)):
@@ -1385,8 +1394,9 @@ class AllQuantMatmul(QuantUnitCell):
                                                                                         x_qparam, w_qparam, is_deploy,
                                                                                         trans_a, trans_b, quant_bias,
                                                                                         dst_dtype, kernel_type)
+            # quant ops use aclnn because of asd quant ops not support per-tensor
             quant = QuantWithOutlierSuppressionPlus.create(layer_name, x_qparam, ic, dst_dtype, is_deploy,
-                                                           parallel_type, beta, kernel_type)
+                                                           parallel_type, beta, KernelType.ACLNN)
         # for osp of omniquant
         elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul):
             qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul(
