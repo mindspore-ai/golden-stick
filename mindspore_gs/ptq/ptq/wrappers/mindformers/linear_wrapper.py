@@ -188,7 +188,7 @@ class LinearInferCell(Cell):
         output_parallel = self._layer.reshape(output_parallel, output_shape)
 
         if self._layer.gather_output:
-            output = gather_from_model_parallel_region(input_parallel, self._layer.tp_group)
+            output = gather_from_model_parallel_region(output_parallel, self._layer.tp_group)
         else:
             output = output_parallel
         return output
