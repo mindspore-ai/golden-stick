@@ -29,6 +29,7 @@ from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
 )
 
 from mindspore_gs.common import logger
+from mindspore_gs.common.utils import offload_param
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
@@ -185,8 +186,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
             # FIXME: Experiments show that offloading weight here may lead to memory leak. Set the temporary flag
             # 'skip_offload_in_processing' to skip this call, the weight param will be offloaded in PTQ.apply procedure.
             # The switch should be removed after the issue is fixed. -- @tongl2
-            # pylint: disable=protected-access
-            self.layer.weight._offload()
+            offload_param(self.layer.weight)
         self.cat_samples = None
 
     def deploy(self):

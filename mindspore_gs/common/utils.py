@@ -21,7 +21,7 @@ import warnings
 from functools import wraps
 import psutil
 import numpy as np
-from mindspore import nn
+from mindspore import nn, Parameter
 
 
 def value_check(name, src, supported_type, value_choices=None):
@@ -55,10 +55,16 @@ def list_value_check(name, src, item_supported_type, value_choices=None):
             raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
 
 
+def offload_param(param: Parameter):
+    if param.device == "CPU":
+        return
+    # pylint: disable=protected-access
+    param._offload()
+
+
 def offload_network(network: nn.Cell):
     for _, param in network.parameters_dict().items():
-        # pylint: disable=protected-access
-        param._offload()
+        offload_param(param)
 
 
 def deprecated(version, substitute=None):

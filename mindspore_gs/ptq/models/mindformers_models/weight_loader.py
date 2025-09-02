@@ -135,24 +135,53 @@ class WeightProcessor:
 
     def _split_mlp_weight(self, layer_id):
         """_split_dense_ffn_weight"""
-        # Load split FFN parameters (gating, hidden) instead of linear_fc1
-        param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
-                          'input_scale', 'input_offset', 'smooth_scale']
+        # Check if split FFN parameters exist in safetensors
+        ffn_split_exists = any([
+            f"model.decoder.layers.{layer_id}.mlp.gating.weight" in self._param_map,
+            f"model.decoder.layers.{layer_id}.mlp.hidden.weight" in self._param_map
+        ])
 
-        for suffix in param_suffixes:
-            # Determine split_axis based on parameter type
-            if suffix in ['weight']:
-                split_axis = 1  # FFN weight split axis
-            elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
-                split_axis = 0  # FFN quantization parameters split axis
-            else:
-                split_axis = -1  # No split needed
+        if ffn_split_exists:
+            # Load split FFN parameters (gating, hidden)
+            logger.debug(f"Loading split FFN parameters for layer {layer_id}")
+            param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
+                              'input_scale', 'input_offset', 'smooth_scale', 'bias']
 
-            # Load split gating and hidden parameters
-            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.gating.{suffix}", split_axis)
-            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.hidden.{suffix}", split_axis)
+            for suffix in param_suffixes:
+                # Determine split_axis based on parameter type
+                if suffix in ['weight']:
+                    split_axis = 1  # FFN weight split axis
+                elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                    split_axis = 0  # FFN quantization parameters split axis
+                elif suffix == 'bias':
+                    split_axis = 0  # FFN bias also needs to be split
+                else:
+                    split_axis = -1  # No split needed
+
+                # Load split gating and hidden parameters
+                self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.gating.{suffix}", split_axis)
+                self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.hidden.{suffix}", split_axis)
+        else:
+            # Load original FFN parameters (linear_fc1) for models without FFN split
+            logger.debug(f"Loading original FFN parameters for layer {layer_id}")
+            param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
+                              'input_scale', 'input_offset', 'smooth_scale', 'bias']
+
+            for suffix in param_suffixes:
+                # Determine split_axis based on parameter type
+                if suffix in ['weight']:
+                    split_axis = 1  # FFN weight split axis
+                elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                    split_axis = 0  # FFN quantization parameters split axis
+                elif suffix == 'bias':
+                    split_axis = 0  # FFN bias also needs to be split
+                else:
+                    split_axis = -1  # No split needed
+
+                self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.{suffix}", split_axis)
         # fc2
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight", 0)
+        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.bias", -1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_scale", -1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_offset", -1)
         mlpnorm_key = f"model.decoder.layers.{layer_id}.pre_mlp_layernorm.weight"
@@ -160,23 +189,51 @@ class WeightProcessor:
 
     def _split_attention_weight(self, layer_id):
         """_split_attention_weight"""
-        # Load split QKV parameters (linear_q, linear_k, linear_v) instead of linear_qkv
-        param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
-                          'input_scale', 'input_offset', 'smooth_scale']
+        # Check if split QKV parameters exist in safetensors
+        qkv_split_exists = any([
+            f"model.decoder.layers.{layer_id}.self_attention.linear_q.weight" in self._param_map,
+            f"model.decoder.layers.{layer_id}.self_attention.linear_k.weight" in self._param_map,
+            f"model.decoder.layers.{layer_id}.self_attention.linear_v.weight" in self._param_map
+        ])
 
-        for suffix in param_suffixes:
-            # Determine split_axis based on parameter type
-            if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
-                split_axis = 0  # QKV split axis
-            else:
-                split_axis = -1  # No split needed
+        if qkv_split_exists:
+            # Load split QKV parameters (linear_q, linear_k, linear_v)
+            logger.debug(f"Loading split QKV parameters for layer {layer_id}")
+            param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
+                              'input_scale', 'input_offset', 'smooth_scale', 'bias']
 
-            # Load split Q, K, V parameters
-            self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_q.{suffix}", split_axis)
-            self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_k.{suffix}", split_axis)
-            self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_v.{suffix}", split_axis)
+            for suffix in param_suffixes:
+                # Determine split_axis based on parameter type
+                if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                    split_axis = 0  # QKV split axis
+                elif suffix == 'bias':
+                    split_axis = 0  # QKV bias also needs to be split
+                else:
+                    split_axis = -1  # No split needed
+
+                # Load split Q, K, V parameters
+                self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_q.{suffix}", split_axis)
+                self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_k.{suffix}", split_axis)
+                self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_v.{suffix}", split_axis)
+        else:
+            # Load original QKV parameters (linear_qkv) for models without QKV split
+            logger.debug(f"Loading original QKV parameters for layer {layer_id}")
+            param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias',
+                              'input_scale', 'input_offset', 'smooth_scale', 'bias']
+
+            for suffix in param_suffixes:
+                # Determine split_axis based on parameter type
+                if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                    split_axis = 0  # QKV split axis
+                elif suffix == 'bias':
+                    split_axis = 0  # QKV bias also needs to be split
+                else:
+                    split_axis = -1  # No split needed
+
+                self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_qkv.{suffix}", split_axis)
         # wo
         self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_proj.weight", 1)
+        self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_proj.bias", -1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_proj.input_scale", 0)
         self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_proj.input_offset", 0)
         self._get_split_set(f"model.decoder.layers.{layer_id}.self_attention.linear_proj.weight_scale", -1)
@@ -212,7 +269,7 @@ class WeightProcessor:
         # Note: input_scale, input_offset, smooth_scale are input-related parameters
         # that should NOT be merged because they correspond to input channels
         # and are fully replicated across all devices
-        merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']
+        merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']
         input_param_suffixes = ['input_scale', 'input_offset', 'smooth_scale']
 
         for suffix in input_param_suffixes:
@@ -269,6 +326,17 @@ class WeightProcessor:
 
     def _qkv_merge(self):
         """Merge split QKV parameters back to linear_qkv"""
+        # Check if any split QKV parameters exist in the loaded data
+        qkv_split_exists = any(
+            key for key in self._np_dict
+            if 'linear_q.' in key or 'linear_k.' in key or 'linear_v.' in key
+        )
+
+        if not qkv_split_exists:
+            logger.debug("No split QKV parameters found, skipping QKV merge")
+            return
+
+        logger.debug("Split QKV parameters detected, performing merge")
         num_layers = self.num_layers
         enable_tqdm = self.rank_id == 0
         for layer_id in tqdm(range(num_layers), desc="Merge QKV weights", disable=not enable_tqdm):
@@ -280,7 +348,7 @@ class WeightProcessor:
         # Note: input_scale, input_offset, smooth_scale are input-related parameters
         # that should NOT be merged because they correspond to input channels
         # and are fully replicated across all devices
-        merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']
+        merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']
         input_param_suffixes = ['input_scale', 'input_offset', 'smooth_scale']
 
         for suffix in input_param_suffixes:
@@ -328,6 +396,17 @@ class WeightProcessor:
 
     def _ffn_merge(self):
         """Merge split FFN parameters back to linear_fc1"""
+        # Check if any split FFN parameters exist in the loaded data
+        ffn_split_exists = any(
+            key for key in self._np_dict
+            if 'gating.' in key or 'hidden.' in key
+        )
+
+        if not ffn_split_exists:
+            logger.debug("No split FFN parameters found, skipping FFN merge")
+            return
+
+        logger.debug("Split FFN parameters detected, performing merge")
         num_layers = self.num_layers
         enable_tqdm = self.rank_id == 0
         for layer_id in tqdm(range(num_layers), desc="Merge FFN weights", disable=not enable_tqdm):
