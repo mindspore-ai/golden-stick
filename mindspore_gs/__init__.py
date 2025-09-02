@@ -17,10 +17,6 @@ MindSpore golden stick module.
 """
 
 
-__all__ = ["SimulatedQuantizationAwareTraining", "SlbQuantAwareTraining", "PrunerKfCompressAlgo",
-           "PrunerFtCompressAlgo", "UniPruner", "CompAlgo", "GhostAlgo", 'PTQConfig', 'PTQMode', 'BackendTarget',
-           "RoundToNearest"]
-
 from .comp_algo import CompAlgo
 from .common import BackendTarget
 from .quantization import SimulatedQuantizationAwareTraining, SlbQuantAwareTraining
