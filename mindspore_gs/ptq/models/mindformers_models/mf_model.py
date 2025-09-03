@@ -77,7 +77,12 @@ class MFModel(BaseQuantForCausalLMImpl):
     # pylint: disable=arguments-differ
     @classmethod
     def from_pretrained(cls, yaml_path):
-        # todo check
+        if not os.path.isfile(yaml_path):
+            raise ValueError(f"The {yaml_path} is not exists, "
+                             "please check the yaml path.")
+        if not yaml_path.endswith('.yaml'):
+            raise ValueError(f"The {yaml_path} is not a yaml file, "
+                             "please check the yaml path.")
         logger.info('Creating mindformers network...', flush=True)
         config = MindFormerConfig(yaml_path)
         if not hasattr(config, 'trainer') or not hasattr(config.trainer, 'model_name'):
@@ -267,6 +272,7 @@ class MFModelEnableSafeTensors(MFModel):
 
     def save_quantized(self, save_path):
         """save_pretrained"""
+        super().save_quantized(save_path)
         sf_mgr = SafeTensorsMgr()
         sf_mgr.save(self._original_sf_path,
                     save_path,
@@ -393,6 +399,7 @@ class MFModelNotEnableSafeTensors(MFModel):
 
     def save_quantized(self, save_path):
         """save_pretrained"""
+        super().save_quantized(save_path)
         self._save_safetenors(save_path)
         _ = self._save_desc_json(save_path)
 

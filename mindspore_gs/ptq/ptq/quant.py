@@ -24,6 +24,7 @@ import tqdm
 from mindspore import dtype, get_context, PYNATIVE_MODE
 from mindspore.nn import Cell
 from mindspore.nn.utils import no_init_parameters
+from mindspore.dataset import GeneratorDataset, RepeatDataset
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import offload_network, value_check
@@ -267,12 +268,16 @@ class PTQ(CompAlgo):
             raise TypeError('The regular string of layer_policies not correct, please check and try again.')
 
     def _check_apply_inputs(self, datasets):
+        """_check_apply_inputs"""
         os.environ['ENFORCE_EAGER'] = 'true'
         logger.info("set environ ENFORCE_EAGER=true and MS_JIT=0 because of PTQMode.QUANTIZE mode")
         if get_context("mode") != PYNATIVE_MODE:
             raise ValueError("In QUANTIZE phase, please set mode=PYNATIVE_MODE.")
         if not datasets:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
+        if not isinstance(datasets, (GeneratorDataset, RepeatDataset)):
+            raise TypeError("The type of dataset is not correct, suppose to <RepeatDataset>, "
+                            f"but got {type(datasets)}")
         logger.info(f"Visible decoder layer types: {self.decoder_layer_types}. If decoder layer type of target network "
                     "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
         logger.info("Analysis network structure.")
