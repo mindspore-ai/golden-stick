@@ -27,6 +27,8 @@ from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather
                                                                           scatter_to_model_parallel_region)
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
+                                                                          reduce_from_model_parallel_region)
 from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell
 from mindspore_gs.ptq.ptq.hal import ParallelType, QuantWithSmooth, DynamicQuantCell
 
