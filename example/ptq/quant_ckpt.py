@@ -66,7 +66,7 @@ def get_args():
                         help="Available: per_channel/per_group")
     parser.add_argument('--kvcache_quant_granularity', '-kvg', type=str, default="per_channel",
                         help="Available: per_channel/per_token")
-    parser.add_argument('--group_size', '-g', type=int, default=0, help="Available: 64/128")
+    parser.add_argument('--group_size', '-g', type=int, default=0, help="Available: 64/128/256")
 
     parser.add_argument('--opname_blacklist', '-b', type=str, nargs='*',
                         help="A list of model layers not to convert, set blacklist when use PTQ algo. "
@@ -137,10 +137,7 @@ def create_ptq(uargs_, backend=BackendTarget.ASCEND):
                     weight_quant_granularity=weight_quant_granularity,
                     kvcache_quant_granularity=kvcache_quant_granularity,
                     group_size=uargs_.group_size)
-    if approach == 'rtn-c8':
-        logger.info("Use RoundToNearest(KVCacheInt8) algo to quant network and weight.")
-        ptq = RTN(config=cfg)
-    elif approach == 'rtn-a16w8':
+    if approach == 'rtn-a16w8':
         logger.info("Use RoundToNearest(W8A16) algo to quant network and weight.")
         ptq = RTN(config=cfg)
     elif approach == 'ptq':

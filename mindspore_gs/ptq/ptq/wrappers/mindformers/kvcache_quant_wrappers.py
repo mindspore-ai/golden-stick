@@ -105,10 +105,10 @@ class QuantPageAttentionMgrCell(WrapperCell):
                                           QuantParam(self.key_t_scale, self.key_t_zp),
                                           QuantParam(self.value_t_scale, self.value_t_zp))
 
-    def add_hook(self):
+    def add_hook(self, experimental=False):
         pass
 
-    def remove_hook(self):
+    def remove_hook(self, experimental=False):
         pass
 
     def construct(self, x, *args, **kwargs):
@@ -203,10 +203,10 @@ class DynamicQuantPageAttentionMgrCell(WrapperCell):
     def deploy(self):
         return DynamicQuantPagedAttentionDeploy(self.layer)
 
-    def add_hook(self):
+    def add_hook(self, experimental=False):
         pass
 
-    def remove_hook(self):
+    def remove_hook(self, experimental=False):
         pass
 
     def process(self):

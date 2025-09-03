@@ -24,7 +24,16 @@ from mindspore.communication import get_rank
 from mindspore.communication.management import GlobalComm
 from mindspore.ops import sub as aclnn_sub, add as aclnn_add
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 from mindspore_gs.common import logger
+from mindspore_gs.common.utils import offload_param
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -40,6 +49,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
 
     @staticmethod
     def reg_self():
+        """reg_self"""
         class A16WxChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 support_dtype = [dtype.int8, dtype.qint4x2]
@@ -47,6 +57,12 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                         and config.precision_recovery == PrecisionRecovery.GPTQ)
 
         Quantizer.reg_layer_map(Linear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(QKVParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, GptqWeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -68,21 +84,22 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
-        if linear.expert_num and linear.expert_num > 1:
+        if hasattr(linear, "expert_num") and linear.expert_num > 1:
             self.is_moe = True
         else:
             self.is_moe = False
         self.linear_name = linear_name.split('.')[-1] if not self.is_moe else 'moe|' + linear_name.split('.')[-1]
-        if context.algorithm_cache_path:
+        if "gptq" in context.algorithm_cache_path:
             self.enable_cache = True
-            cache_file_path = os.path.join(context.algorithm_cache_path, f'rank_{context.rank_id}', 'gptq.json')
+            cache_file_path = os.path.join(context.algorithm_cache_path["gptq"], f'rank_{context.rank_id}', 'gptq.json')
         else:
             self.enable_cache = False
             cache_file_path = ''
         self.cache: Optional[JSONCache] = JSONCache(cache_file_path)
         self.bits = 4 if self.cfg.weight_quant_dtype == dtype.qint4x2 else 8
         self.nsamples = 0
-        self.cfg.reflash_inputs_after_each_processor = True
+        if not context.experimental:
+            self.cfg.reflash_inputs_after_each_processor = True
         self.group_scale = []
         self.group_zero = []
         self.qweight = []
@@ -228,13 +245,13 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 scale, zero, _ = quant_tensor(weight[:, i : i + self.cfg.group_size], self.w_quant_min,
                                               self.w_quant_max, self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                               False, 0, self.cfg.weight_quant_dtype,
-                                              self.weight_quantizer_axis, False)
+                                              0, False)
                 self.group_scale.append(Tensor(scale, dtype.float32).T)
                 self.group_zero.append(Tensor(zero, dtype.float32).T)
         quant_tick = time.time()
         self._gptq_precision_recovery(weight, hinv, scale, zero, perm)
         logger.info(f'[TIME]quant layers with time {time.time() - quant_tick}s')
-        if self.cfg.algo_args["desc_act"] and self.weight_need_allgather:
+        if self.cfg.algo_args["desc_act"]:
             self.qweight = self.qweight[:, invperm]
         if self.weight_need_allgather:
             self.qweight = self.qweight[:, self.rank_id * self.ic : self.rank_id * self.ic + self.ic]
@@ -267,7 +284,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                                     self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                     self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                     self.cfg.group_size, self.cfg.weight_quant_dtype,
-                                    self.weight_quantizer_axis, False, False, self.layer.transpose_b, False)
+                                    self.weight_quantizer_axis, False, False, self._transpose_b(), False)
         return weight, scale, zp
 
     def quant(self):
@@ -335,6 +352,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         return qweight_name, scale_name, zero_name
 
     def process(self):
+        """quant"""
         qweight_name, scale_name, zero_name = self._cache_key()
         scale = self.cache.get(scale_name)
         zero = self.cache.get(zero_name)
@@ -350,5 +368,4 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 self.cache.put(qweight_name, self.q_weight.asnumpy())
                 self.cache.put(scale_name, self.w_scale.asnumpy())
                 self.cache.put(zero_name, self.w_zp.asnumpy())
-        # pylint: disable=protected-access
-        self.layer.weight._offload()
+        offload_param(self.layer.weight)

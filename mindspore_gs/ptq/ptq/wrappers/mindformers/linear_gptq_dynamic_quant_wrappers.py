@@ -15,15 +15,25 @@
 """ptq wrapper cells for mindformers."""
 
 from mindformers.modules.layers import Linear
-from mindspore import dtype, ops
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
+from mindspore import Parameter, dtype, ops
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.hal import QuantParam, GptqDynamicQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
+from mindspore_gs.ptq.utils import QuantType
 from .linear_gptq_quant_wrappers import GptqWeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
+from .mcore_linear_wrapper import McoreLinearInferCell
 
 
 class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
@@ -38,6 +48,12 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
                        config.precision_recovery is PrecisionRecovery.GPTQ
 
         Quantizer.reg_layer_map(Linear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(McoreColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(McoreRowParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(QKVParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -78,14 +94,17 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
 
     def deploy(self):
         w_qparam = QuantParam(self.w_scale, self.w_zp, self.cfg.group_size, self.cfg.weight_quant_dtype)
-        return GptqDynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight, self.perm,
+        if self.is_mcorelinear:
+            return GptqDynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.context, self.cfg,
+                                                        self.q_weight, w_qparam, self.compute_type, self.parallel_type)
+        return GptqDynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
                                                w_qparam, self.compute_type, self.parallel_type)
 
 
 class GptqDynamicQuantLinearInferCell(LinearInferCell):
     """GptqDynamicQuantLinearInferCell"""
 
-    def __init__(self, layer_name, linear: Linear, cfg, q_weight, perm, w_qparam: QuantParam, compute_type,
+    def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
                  parallel_type: ParallelType):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
@@ -95,9 +114,51 @@ class GptqDynamicQuantLinearInferCell(LinearInferCell):
                          f"{w_qparam}")
             logger.debug(f"GptqDynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-        qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear, perm,
+        qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
                                                                         w_qparam, is_deploy, False,
-                                                                        self.layer.transpose_b, compute_type)
+                                                                        self.layer.transpose_b, compute_type,
+                                                                        self.cfg.save_gmm_bias_in_quant_phase)
         self._set_act_dynamic_quant(dynamic_quant_op)
         self.layer.matmul = qmm
         self.layer.weight = q_weight
+
+
+class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
+    """GptqDynamicQuantLinearInferCell"""
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, linear: Linear, context, cfg, q_weight, w_qparam: QuantParam, compute_type,
+                 parallel_type: ParallelType):
+        super().__init__(linear, parallel_type)
+        self.cfg = cfg
+        is_deploy = cfg.mode == PTQMode.DEPLOY
+        if not is_deploy:
+            logger.debug(f"GptqDynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is "
+                         f"{w_qparam}")
+            logger.debug(f"GptqDynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+        _, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
+                                                                      w_qparam, is_deploy, False,
+                                                                      self._transpose_b(), compute_type,
+                                                                      experimental=True,
+                                                                      use_fake_quant=self.cfg.use_fake_quant)
+        self._set_act_dynamic_quant(dynamic_quant_op)
+        del self.layer.weight
+        self.layer.weight = None
+        self.weight = q_weight
+        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+        self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+        self.has_bias = self.layer.has_bias
+        if self.has_bias:
+            self.bias = self.layer.bias
+            self.layer.bias = None
+
+    def quant_type_dict(self):
+        """quant_type_dict"""
+        quant_type = {
+            self.weight_scale.name: QuantType.W4A8_DYNAMIC.value,
+            self.weight_offset.name: QuantType.W4A8_DYNAMIC.value,
+            self.weight.name: QuantType.W4A8_DYNAMIC.value
+        }
+        if self.has_bias:
+            quant_type.update({self.bias.name: QuantType.W4A8_DYNAMIC.value})
+        return quant_type

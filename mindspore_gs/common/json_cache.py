@@ -26,33 +26,25 @@ from .logger import logger
 
 class JSONCache:
     """JSONCache"""
-
-    _instance = None
-    _filepath = None
+    _instances = {}
     _empty_path_warned = False
 
-    def __new__(cls, filepath=''):
-        if cls._instance is not None:
-            if filepath != cls._filepath:
-                raise ValueError(
-                    f"Singleton already initialized with path: {cls._filepath!r}, "
-                    f"attempted to reuse with: {filepath!r}"
-                )
-            return cls._instance
-
-        instance = super().__new__(cls)
+    def __new__(cls, filepath: str):
+        if filepath not in cls._instances:
+            cls._instances[filepath] = super(JSONCache, cls).__new__(cls)
+            cls._instances[filepath]._filepath = filepath
+            cls._instances[filepath]._load_data()
 
         if filepath == "":
             if not cls._empty_path_warned:
                 logger.warning("Initialized with empty filepath - data will not persist")
                 cls._empty_path_warned = True
 
-        cls._filepath = filepath
-        cls._instance = instance
-        return instance
+        return cls._instances[filepath]
 
     def __init__(self, filepath=''):
         if not hasattr(self, '_initialized'):
+            self._filepath = filepath
             self._initialized = True
             self._data = {}
             self._load_data()

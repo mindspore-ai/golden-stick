@@ -41,6 +41,10 @@ class Algorithm:
         for config in self.layer_policies:
             if not config and not isinstance(config, InnerPTQConfig):
                 raise TypeError(f'layer_policies should be InnerPTQConfig, bug got {type(config)}')
+        self.is_fake_quant = False
+
+    def set_fake_quant(self):
+        self.is_fake_quant = True
 
     @staticmethod
     def _get_fallback_config(fallback_algo, origin_config):

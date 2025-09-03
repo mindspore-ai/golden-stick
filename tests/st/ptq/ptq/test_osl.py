@@ -19,6 +19,9 @@ import argparse
 import json
 import pytest
 import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import mindspore as ms
 from mindspore import dtype as msdtype
 from mindspore import nn, Tensor
@@ -174,7 +177,7 @@ def create_ptq(mode):
     # pylint: disable=protected-access
     ptq._config.always_use_fp_input_in_processer = True
     ptq._config.skip_offload_in_processing = True
-    ptq._config.algorithm_cache_path = '' # Disable cache for testing
+    ptq._config.algorithm_cache_path = {} # Disable cache for testing
     ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
     return ptq
 

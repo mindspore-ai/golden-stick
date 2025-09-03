@@ -19,6 +19,8 @@ import os
 import sys
 import numpy as np
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import mindspore as ms
 from mindspore.communication import get_rank
 from mindspore import save_checkpoint
@@ -35,8 +37,6 @@ from mindspore_gs.ptq.context import LayerQuantizeAlgo
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
 from mindspore_gs.common.utils import offload_network
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 
 
 def create_hello_ds(tokenizer, repeat=1):
@@ -99,7 +99,9 @@ def create_cfg(quant_algo_, mode):
                         group_size=128,
                         algo_args=algorithm_config)
     elif quant_algo_ == 'A8W4_GPTQ':
-        algorithm_config = GPTQQuantConfig(block_size=32, desc_act=True)
+        algorithm_config = GPTQQuantConfig(static_groups=True,
+                                           block_size=32,
+                                           desc_act=True)
         cfg = PTQConfig(mode=mode,
                         backend=BackendTarget.ASCEND,
                         opname_blacklist=["w2", "lm_head"],

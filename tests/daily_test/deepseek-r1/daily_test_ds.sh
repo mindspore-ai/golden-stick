@@ -23,7 +23,7 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_deepseek_r1_671b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250709/master_20250709010019_0737648dbea2303d71168f5f5e5b235e4ff204a6_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
+MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250725/master_20250725105343_13363c7a080a83c620fc4e16ad5222cb819fc35d_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
 
 export GSLOG=1
 export MS_ENABLE_LCCL=off

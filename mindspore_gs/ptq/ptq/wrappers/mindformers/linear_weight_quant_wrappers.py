@@ -19,16 +19,27 @@ from mindspore import Parameter, Tensor, dtype
 from mindspore.common.initializer import initializer
 
 from mindformers.modules.layers import Linear
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
 
 from mindspore_gs.common import logger
+from mindspore_gs.common.utils import offload_param
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity, PrecisionRecovery
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.ptq.ptq.hal import QuantParam, WeightQuantMatmul, WeightQuantInt4Matmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
+from mindspore_gs.ptq.utils import QuantType
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from .parallel_minmax import get_min_max_op
 from .linear_wrapper import WrapperLinearCell, LinearInferCell
+from .mcore_linear_wrapper import McoreLinearInferCell
 
 
 class WeightQuantLinearCell(WrapperLinearCell):
@@ -44,6 +55,12 @@ class WeightQuantLinearCell(WrapperLinearCell):
                         and config.precision_recovery == PrecisionRecovery.NONE)
 
         Quantizer.reg_layer_map(Linear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(McoreRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(QKVParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, WeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -67,6 +84,12 @@ class WeightQuantLinearCell(WrapperLinearCell):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
 
         type_map = {Linear: ParallelType.NO_PARALLEL}
+        type_map[McoreColumnParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
+        type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[MergedColumnParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[ColumnParallelGroupedLinear] = ParallelType.COL_PARALLEL
+        type_map[RowParallelGroupedLinear] = ParallelType.ROW_PARALLEL
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -93,8 +116,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
             raise ValueError("only per-tensor activation quantization now.")
 
         rank = len(linear.weight.shape)
-        ic_axis = rank - 1 if linear.transpose_b else rank - 2
-        self.weight_quantizer_axis = rank - 2 if linear.transpose_b else rank - 1
+        ic_axis = rank - 1 if self._transpose_b() else rank - 2
+        self.weight_quantizer_axis = rank - 2 if self._transpose_b() else rank - 1
         self.ic = linear.weight.shape[ic_axis]
         self.oc = linear.weight.shape[self.weight_quantizer_axis]
 
@@ -111,8 +134,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP:
             if self.ic % self.cfg.group_size != 0:
                 raise ValueError(f"input channel {self.ic} can not divide group_size {self.cfg.group_size}.")
-            if self.ic == self.cfg.group_size:
-                raise ValueError(f"input channel {self.ic} can not equal to group_size {self.cfg.group_size}.")
             if rank == 2:
                 scale_zp_shape = (self.ic // self.cfg.group_size, self.oc)
             elif rank == 3:
@@ -146,7 +167,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
                                                self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                                self.cfg.group_size, self.cfg.weight_quant_dtype,
                                                self.weight_quantizer_axis,
-                                               is_transpose=self._layer.transpose_b)
+                                               is_transpose=self._transpose_b())
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_CHANNEL:
             w_scale = np.squeeze(w_scale)
             w_zp = np.squeeze(w_zp)
@@ -165,12 +186,14 @@ class WeightQuantLinearCell(WrapperLinearCell):
             # FIXME: Experiments show that offloading weight here may lead to memory leak. Set the temporary flag
             # 'skip_offload_in_processing' to skip this call, the weight param will be offloaded in PTQ.apply procedure.
             # The switch should be removed after the issue is fixed. -- @tongl2
-            # pylint: disable=protected-access
-            self.layer.weight._offload()
+            offload_param(self.layer.weight)
         self.cat_samples = None
 
     def deploy(self):
         w_qparam = QuantParam(self.w_scale, self.w_zp, self.cfg.group_size, self.cfg.weight_quant_dtype)
+        if self.is_mcorelinear:
+            return WeightQuantMcoreLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight, w_qparam,
+                                                   self.compute_type, self.parallel_type)
         return WeightQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight, w_qparam,
                                           self.compute_type, self.parallel_type)
 
@@ -199,3 +222,49 @@ class WeightQuantLinearInferCell(LinearInferCell):
         self.layer.matmul = qmm
         del self.layer.weight
         self.layer.weight = q_weight
+
+
+class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
+    """WeightQuantLinearInferCell"""
+
+    def __init__(self, layer_name, linear: Linear, cfg, q_weight, w_qparam: QuantParam, compute_type,
+                 parallel_type: ParallelType):
+        super().__init__(linear, parallel_type)
+        self.cfg = cfg
+        is_deploy = cfg.mode == PTQMode.DEPLOY
+        if not is_deploy:
+            logger.debug(f"WeightQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
+            logger.debug(f"WeightQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+        if w_qparam.quant_dtype == dtype.int8:
+            _ = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                         self._transpose_b(), compute_type, experimental=True)
+        elif w_qparam.quant_dtype == dtype.qint4x2:
+            _, q_weight = WeightQuantInt4Matmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
+                                                       self._transpose_b(), compute_type, experimental=True,
+                                                       use_fake_quant=self.cfg.use_fake_quant)
+            self._set_transpose_b_to_false()
+        else:
+            raise ValueError("Only support int8 and int4 quantization of weight, please check config info.")
+        del self.layer.weight
+        self.layer.weight = None
+        self.weight = q_weight
+        self.has_bias = self.layer.has_bias
+        if self.has_bias:
+            self.bias = self.layer.bias
+            self.layer.bias = None
+
+    def quant_type_dict(self):
+        """quant_type_dict"""
+        if self.cfg.weight_quant_dtype == dtype.int8:
+            type_ = QuantType.W8A8_DYNAMIC.value
+        elif self.cfg.weight_quant_dtype == dtype.qint4x2:
+            type_ = QuantType.W4A8_DYNAMIC.value
+        quant_type = {
+            self.weight_scale.name: type_,
+            self.weight_offset.name: type_,
+            self.weight.name: type_
+        }
+        if self.has_bias:
+            quant_type.update({self.bias.name: type_})
+        return quant_type

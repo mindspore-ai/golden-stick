@@ -17,6 +17,7 @@
 
 import unittest
 import os
+import shutil
 import pytest
 from mindspore_gs.common.name_prefix_tree import NameTree
 
@@ -270,10 +271,7 @@ class TestNameTree(unittest.TestCase):
         self.tree.generate_dot("output/subdirectory/another_tree.dot")
         self.assertTrue(os.path.exists("output/subdirectory/another_tree.dot"))
 
-        os.remove("output/tree.dot")
-        os.remove("output/subdirectory/another_tree.dot")
-        os.rmdir("output/subdirectory")
-        os.rmdir("output")
+        shutil.rmtree("output")
 
     @pytest.mark.level0
     @pytest.mark.platform_x86_cpu

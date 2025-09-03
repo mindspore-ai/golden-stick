@@ -41,6 +41,7 @@ class WrapperCell(abc.ABC, Cell):
     def __init__(self, layer_name: str, layer, context: InnerPTQConfig, cfg: InnerPTQConfig,
                  **kwargs):
         super().__init__()
+        self.context = context
         self.cfg = cfg
         self._layer_name = layer_name
         self._layer = layer
@@ -69,11 +70,11 @@ class WrapperCell(abc.ABC, Cell):
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)
         self.samples.clear()
 
-    def add_hook(self):
+    def add_hook(self, experimental=False):
         """add_hook"""
         raise NotImplementedError
 
-    def remove_hook(self):
+    def remove_hook(self, experimental=False):
         """remove_hook"""
         raise NotImplementedError
 

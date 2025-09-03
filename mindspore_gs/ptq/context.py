@@ -115,10 +115,14 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     tp_size: int = 1
     rank_id: int = 0
     layer_quant_info_collect: dict = field(default_factory=dict)
-    algorithm_cache_path: str = ''
+    algorithm_cache_path: dict = field(default_factory=dict)
     always_use_fp_input_in_processer: bool = False
     use_inner_osp: bool = False
     skip_offload_in_processing: bool = False
+    save_gmm_bias_in_quant_phase: bool = False
+
+    experimental: bool = False
+    use_fake_quant: bool = False
 
     dump_path: str = ""
     dumper: Dumper = Dumper()

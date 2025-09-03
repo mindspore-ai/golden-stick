@@ -18,7 +18,6 @@ import numpy as np
 from mindspore.ops import functional as F
 from mindspore.ops import operations as P
 from mindspore import Parameter, Tensor, dtype
-from mindspore.common.initializer import initializer
 from mindformers.modules.layers import Linear
 
 from mindspore_gs.common.gs_enum import BackendTarget

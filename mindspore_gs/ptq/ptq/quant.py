@@ -24,7 +24,6 @@ import tqdm
 from mindspore import dtype, get_context, PYNATIVE_MODE
 from mindspore.nn import Cell
 from mindspore.nn.utils import no_init_parameters
-from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import offload_network, value_check
@@ -273,6 +272,17 @@ class PTQ(CompAlgo):
             raise TypeError('The regular string of layer_policies not correct, please check and try again.') \
                 from re.error
 
+    def _check_apply_inputs(self, datasets):
+        os.environ['ENFORCE_EAGER'] = 'true'
+        logger.info("set environ ENFORCE_EAGER=true and MS_JIT=0 because of PTQMode.QUANTIZE mode")
+        if get_context("mode") != PYNATIVE_MODE:
+            raise ValueError("In QUANTIZE phase, please set mode=PYNATIVE_MODE.")
+        if not datasets:
+            raise ValueError("please provide dataset when use PTQ quant to quantize network.")
+        logger.info(f"Visible decoder layer types: {self.decoder_layer_types}. If decoder layer type of target network "
+                    "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
+        logger.info("Analysis network structure.")
+
     # pylint: disable=arguments-differ
     # pylint: disable=unused-argument
     def apply(self, network: Cell,
@@ -297,7 +307,6 @@ class PTQ(CompAlgo):
         self._config.update_comm_info()
         self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
-            logger.info("unset environ ENFORCE_EAGER and MS_JIT because of PTQMode.DEPLOY mode")
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = self.decoder_layers[i]
                 for processor in self.pipeline:
@@ -306,15 +315,7 @@ class PTQ(CompAlgo):
                         processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
-        os.environ['ENFORCE_EAGER'] = 'true'
-        logger.info("set environ ENFORCE_EAGER=true and MS_JIT=0 because of PTQMode.QUANTIZE mode")
-        if get_context("mode") != PYNATIVE_MODE:
-            raise ValueError("In QUANTIZE phase, please set mode=PYNATIVE_MODE.")
-        if not datasets:
-            raise ValueError("please provide dataset when use PTQ quant to quantize network.")
-        logger.info(f"Visible decoder layer types: {self.decoder_layer_types}. If decoder layer type of target network "
-                    "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
-        logger.info("Analysis network structure.")
+        self._check_apply_inputs(datasets)
         start_time = time.time()
         logger.info(f"Catching inputs for first decoder layer with {datasets.get_dataset_size()} datasets samples.")
         catcher, network = self._get_first_layer_input(network, datasets, network_helper)
@@ -338,7 +339,7 @@ class PTQ(CompAlgo):
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()
 
-                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook())
+                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook(self._config.experimental))
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):
                     output = layer(*args, **kwargs)
@@ -347,10 +348,13 @@ class PTQ(CompAlgo):
                         # layers. This branch may introduces error to the next layer, because previous processors in the
                         # pipeline changes the layer, and thus, gives a inaccurate output. Set the switch to True to
                         # avoid this issue. The switch should be removed after the issue is fixed. -- @tongl2
-                        all_args[index][0] = output[0] if isinstance(output, tuple) else output
+                        if "hidden_states" in all_kwargs[index]:
+                            all_kwargs[index]["hidden_states"] = output[0] if isinstance(output, tuple) else output
+                        else:
+                            all_args[index][0] = output[0] if isinstance(output, tuple) else output
                     index += 1
 
-                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook())
+                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook(self._config.experimental))
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
                 processor.process(layer_name, layer)
@@ -360,12 +364,29 @@ class PTQ(CompAlgo):
             if self._config.reflash_inputs_after_each_processor:
                 index = 0
                 for args, kwargs in zip(cur_args, cur_kwargs):
-                    all_args[index][0] = layer(*args, **kwargs)
+                    if "hidden_states" in all_kwargs[index]:
+                        all_kwargs[index]["hidden_states"] = layer(*args, **kwargs)
+                    else:
+                        all_args[index][0] = layer(*args, **kwargs)
                     index += 1
             start_time = time.time()
             offload_network(layer)
             gc.collect()
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
+        return network
+
+    def fake_quant(self, network):
+        """fake_quant"""
+        self._config.update_comm_info()
+        self._get_decoder_layers(network)
+        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ FakeQuant..."):
+            layer_name, layer = self.decoder_layers[i]
+            for processor in self.pipeline:
+                processor.set_fake_quant()
+                with no_init_parameters():
+                    processor.replace(layer_name, layer)
+                    processor.deploy(layer_name, layer)
+                network.update_parameters_name()
         return network
 
     def _get_first_layer_input(self, network: Cell, ds=None, helper=None):
@@ -400,27 +421,8 @@ class PTQ(CompAlgo):
 
         Returns:
             An instance of Cell represents quantized network.
-
-        Raises:
-            TypeError: If `net_opt` is not Cell.
-            TypeError: If `ckpt_path` is not string.
-            ValueError: If `ckpt_path` is not empty and invalid.
         """
-        if not isinstance(net_opt, Cell):
-            raise TypeError(
-                f'The parameter `net_opt` must be isinstance of Cell, but got {type(net_opt)}.')
-        if not isinstance(ckpt_path, str):
-            raise TypeError(
-                f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
-        real_path = os.path.realpath(ckpt_path)
-        if ckpt_path != "":
-            if os.path.isfile(real_path):
-                param_dict = load_checkpoint(ckpt_path)
-                load_param_into_net(net_opt, param_dict)
-            else:
-                raise ValueError(
-                    f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
-        self.summary(net_opt)
+        logger.info("PTQ.convert take no effect now, no need to invoke.")
         return net_opt
 
     def _summary_target_layer_type(self) -> tuple:

@@ -15,15 +15,25 @@
 """ptq wrapper cells for mindformers."""
 
 from mindformers.modules.layers import Linear
-from mindspore import dtype
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
+from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+    ColumnParallelGroupedLinear,
+    RowParallelGroupedLinear
+)
+from mindspore import dtype, Parameter
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.hal import QuantParam, DynamicQuantMatmul, ParallelType
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
+from mindspore_gs.ptq.utils import QuantType
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_wrapper import LinearInferCell
+from .mcore_linear_wrapper import McoreLinearInferCell
 
 
 class DynamicQuantLinearCell(WeightQuantLinearCell):
@@ -31,12 +41,19 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
 
     @staticmethod
     def reg_self():
+        """reg_self"""
         class DynamicA8W8Checker(Checker):
             def check(self, config: InnerPTQConfig):
                 return config.weight_quant_dtype == dtype.int8 and config.act_quant_dtype == dtype.int8 and \
                        config.act_quant_granularity is QuantGranularity.PER_TOKEN
 
         Quantizer.reg_layer_map(Linear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(McoreColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(McoreRowParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(QKVParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(ColumnParallelGroupedLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(RowParallelGroupedLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -63,8 +80,21 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         raise RuntimeError(f"Unexpected act_quant_dtype: {self.cfg.act_quant_dtype}.")
 
     def deploy(self):
-        return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
-                                           QuantParam(self.w_scale, self.w_zp), self.compute_type, self.parallel_type)
+        """deploy"""
+        use_all_to_all = hasattr(self.layer, 'use_alltoall') and self.layer.use_alltoall
+        if not use_all_to_all:
+            if self.is_mcorelinear:
+                return DynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.context, self.cfg,
+                                                        self.q_weight, QuantParam(self.w_scale, self.w_zp),
+                                                        self.compute_type, self.parallel_type)
+            return DynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
+                                               QuantParam(self.w_scale, self.w_zp), self.compute_type,
+                                               self.parallel_type)
+        # for all_to_all, quant is absorbed into dispatch-op
+        self.layer.weight = self.q_weight
+        weight_scale_dtype = self.compute_type if self.parallel_type == ParallelType.ROW_PARALLEL else dtype.float32
+        self.layer.weight_scale = Parameter(self.w_scale.astype(weight_scale_dtype))
+        return self.layer
 
 
 class DynamicQuantLinearInferCell(LinearInferCell):
@@ -79,8 +109,46 @@ class DynamicQuantLinearInferCell(LinearInferCell):
             logger.debug(f"DynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"DynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-        qmm, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy, False,
-                                                          self.layer.transpose_b, compute_type)
+        qmm, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.matmul, w_qparam, is_deploy,
+                                                          False, self.layer.transpose_b, compute_type)
         self._set_act_dynamic_quant(dynamic_quant_op)
         self.layer.matmul = qmm
         self.layer.weight = q_weight
+
+
+class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
+    """DynamicQuantLinearInferCell"""
+
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, linear: Linear, context, cfg, q_weight, w_qparam: QuantParam, compute_type,
+                 parallel_type: ParallelType):
+        super().__init__(linear, parallel_type)
+        self.cfg = cfg
+        is_deploy = cfg.mode == PTQMode.DEPLOY
+        if not is_deploy:
+            logger.debug(f"DynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
+            logger.debug(f"DynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
+                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+        _, dynamic_quant_op = DynamicQuantMatmul.create(layer_name, linear.quant_method.matmul, w_qparam, is_deploy,
+                                                        False, self._transpose_b(), compute_type)
+        self._set_act_dynamic_quant(dynamic_quant_op)
+        del self.layer.weight
+        self.layer.weight = None
+        self.weight = q_weight
+        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+        self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
+        self.has_bias = self.layer.has_bias
+        if self.has_bias:
+            self.bias = self.layer.bias
+            self.layer.bias = None
+
+    def quant_type_dict(self):
+        """quant_type_dict"""
+        quant_type = {
+            self.weight_scale.name: QuantType.W8A8_DYNAMIC.value,
+            self.weight_offset.name: QuantType.W8A8_DYNAMIC.value,
+            self.weight.name: QuantType.W8A8_DYNAMIC.value
+        }
+        if self.has_bias:
+            quant_type.update({self.bias.name: QuantType.W4A8_DYNAMIC.value})
+        return quant_type
