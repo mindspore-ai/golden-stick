@@ -366,12 +366,17 @@ class QKVParamProcessor:
             # Get dimensions from network config
             num_heads = self.network.config.num_attention_heads
             num_key_value_heads = getattr(self.network.config, 'num_key_value_heads', num_heads)
-            head_dim = self.network.config.hidden_size // num_heads
+            head_dim = getattr(self.network.config, 'head_dim', self.network.config.hidden_size // num_heads)
 
-            # Calculate split sizes
-            q_size = num_heads * head_dim
-            k_size = num_key_value_heads * head_dim
-            v_size = num_key_value_heads * head_dim
+            # Get tensor parallel world size for proper dimension calculation
+            tensor_parallel_world_size = get_tensor_model_parallel_world_size()
+            if tensor_parallel_world_size is None or tensor_parallel_world_size <= 0:
+                tensor_parallel_world_size = 1
+
+            # Calculate split sizes considering tensor parallelism
+            q_size = (num_heads * head_dim) // tensor_parallel_world_size
+            k_size = (num_key_value_heads * head_dim) // tensor_parallel_world_size
+            v_size = (num_key_value_heads * head_dim) // tensor_parallel_world_size
 
             # Split tensor on axis 0
             if value.dtype == ms.qint4x2:

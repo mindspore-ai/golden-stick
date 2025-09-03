@@ -206,7 +206,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'dequant_scale', None)
                     self._try_append_shard_axis(cell, 'quant_bias', None)
                 elif 'linear_fc2' in cell_name:
-                    self._try_append_shard_axis(cell, 'weight', 0)
+                    self._try_append_shard_axis(cell, 'weight', 1)
                     self._try_append_shard_axis(cell, 'weight_scale', None)
                     self._try_append_shard_axis(cell, 'weight_offset', None)
                     self._try_append_shard_axis(cell, 'input_scale', 0)
@@ -226,8 +226,9 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'smooth_scale', None)
                     self._try_append_shard_axis(cell, 'dequant_scale', 0)
                     self._try_append_shard_axis(cell, 'quant_bias', 0)
-                elif 'linear_fc1' in cell_name:
-                    self._try_append_shard_axis(cell, 'weight', 1)
+                elif any(seg in cell_name for seg in ('hidden', 'gating',
+                                                      'linear_fc1')):
+                    self._try_append_shard_axis(cell, 'weight', 0)
                     self._try_append_shard_axis(cell, 'weight_scale', 0)
                     self._try_append_shard_axis(cell, 'weight_offset', 0)
                     self._try_append_shard_axis(cell, 'input_scale', None)
