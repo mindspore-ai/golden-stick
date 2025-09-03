@@ -408,8 +408,6 @@ unzip squad1.1.zip -d ./squad
 
 [Llama2分词器文件](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model)
 
-[llama2模型配置文件](https://gitee.com/mindspore/mindformers/blob/dev/configs/llama2/predict_llama2_7b.yaml)
-
 下载好上述3个文件后，将其拷贝至workspace目录下。
 
 准备完上述文件后，目录结构为：
