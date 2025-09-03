@@ -580,6 +580,43 @@ def test_ptq_config_error():
 @pytest.mark.level0
 @pytest.mark.platform_x86_cpu
 @pytest.mark.env_onecard
+def test_a8w4_config_error():
+    """
+    Feature: A8W4 PTQConfig test.
+    Description: Test invalid configuration of A8W4 quantization.
+    Expectation: Raise error for invalid configuration
+    """
+    algo_args = GPTQQuantConfig(desc_act=True, static_groups=True)
+    with pytest.raises(ValueError):
+        config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.qint4x2,
+                           act_quant_granularity=QuantGranularity.PER_TENSOR,
+                           weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           precision_recovery=PrecisionRecovery.GPTQ,
+                           algo_args=algo_args,
+                           group_size=256)
+        _ = PTQ(config)
+
+    with pytest.raises(ValueError):
+        config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.qint4x2,
+                           act_quant_granularity=QuantGranularity.PER_TENSOR,
+                           weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           precision_recovery=PrecisionRecovery.GPTQ,
+                           algo_args=algo_args,
+                           group_size=256)
+        _ = PTQ(config)
+
+    with pytest.raises(ValueError):
+        config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.qint4x2,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
+                           weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           precision_recovery=PrecisionRecovery.GPTQ,
+                           group_size=256)
+        _ = PTQ(config)
+
+
+@pytest.mark.level0
+@pytest.mark.platform_x86_cpu
+@pytest.mark.env_onecard
 def test_gptq_config_error():
     """
     Feature: simulated GPTQQuantConfig __post_init__ function.
