@@ -407,8 +407,6 @@ Download address:
 
 [Llama2 tokenizer file](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model)
 
-[llama2 model configuration file](https://gitee.com/mindspore/mindformers/blob/dev/configs/llama2/predict_llama2_7b.yaml)
-
 After downloading the above 3 files, copy them to the workspace directory.
 
 After preparing the above files, the directory structure is:
