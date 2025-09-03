@@ -33,6 +33,7 @@ from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     RowParallelGroupedLinear
 )
 from mindspore_gs.common import logger
+from mindspore_gs.common.utils import offload_param
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -367,5 +368,4 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
                 self.cache.put(qweight_name, self.q_weight.asnumpy())
                 self.cache.put(scale_name, self.w_scale.asnumpy())
                 self.cache.put(zero_name, self.w_zp.asnumpy())
-        # pylint: disable=protected-access
-        self.layer.weight._offload()
+        offload_param(self.layer.weight)

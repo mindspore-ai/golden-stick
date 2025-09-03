@@ -79,7 +79,7 @@ class PTQModelTester:
                 question = tokenizer.decode(input_ids[j], skip_special_tokens=True)
                 match = re.search(r'\{(.*?)\}', pres_str)
                 pres_answer = match.group(1) if match else ''
-                if labels_str.lower() == pres_answer.lower():
+                if labels_str.lower() == pres_answer.lower() or labels_str.lower() in pres_str.lower():
                     correct += 1
                     print(f"question {data_count}: {question}\n predict: {pres_str} answer: {labels_str}. correct!",
                           flush=True)

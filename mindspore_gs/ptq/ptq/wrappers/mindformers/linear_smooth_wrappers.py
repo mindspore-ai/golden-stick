@@ -37,6 +37,7 @@ from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     RowParallelGroupedLinear
 )
 from mindspore_gs.common import logger
+from mindspore_gs.common.utils import offload_param
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -908,8 +909,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)
         self.fp16_weight = copy.deepcopy(self._layer.weight.asnumpy())
         self.smooth()
-        # pylint: disable=protected-access
-        self.layer.weight._offload()
+        offload_param(self.layer.weight)
         self.cat_samples = None
         self.samples.clear()
         del self.decoder
