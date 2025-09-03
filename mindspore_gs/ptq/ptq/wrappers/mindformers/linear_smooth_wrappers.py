@@ -31,6 +31,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.json_cache import JSONCache
 from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantGranularity
@@ -57,6 +58,7 @@ class SmoothLinearCell(WrapperLinearCell):
         type_map[McoreColumnParallelLinear] = ParallelType.COL_PARALLEL
         type_map[McoreRowParallelLinear] = ParallelType.ROW_PARALLEL
         type_map[QKVParallelLinear] = ParallelType.COL_PARALLEL
+        type_map[MergedColumnParallelLinear] = ParallelType.COL_PARALLEL
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -135,10 +137,18 @@ class SmoothLinearCell(WrapperLinearCell):
 
     def _apply_act_smooth(self, smooth_scale: Tensor):
         """_apply_act_smooth"""
-        if isinstance(self._layer.matmul, SmoothMatmul):
-            self._layer.matmul.update(self._layer_name, self._layer.matmul.mm, smooth_scale)
+        if isinstance(self._get_matmul(self._layer), SmoothMatmul):
+            self._get_matmul(self._layer).update(self._layer_name,
+                                                 self._get_matmul(self._layer).mm,
+                                                 smooth_scale)
         else:
-            self._layer.matmul = SmoothMatmul.create(self._layer_name, self._layer.matmul, smooth_scale=smooth_scale)
+            self._set_matmul(
+                self._layer,
+                SmoothMatmul.create(
+                    self._layer_name,
+                    self._get_matmul(self._layer), smooth_scale=smooth_scale
+                    )
+                )
 
     def _apply_smooth(self, smooth_scale):
         """_apply_smooth"""
@@ -154,9 +164,10 @@ class SmoothLinearCell(WrapperLinearCell):
 
     def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
         """_apply_act_smooth_by_insert_op_for_deploy"""
-        self._layer.matmul = SmoothMatmulForDeploy.create(self._layer_name, self._layer.matmul, ic=ic,
-                                                          compute_dtype=compute_dtype)
-        logger.info(f"apply smooth scale by infer mul op in {self._layer.matmul}.")
+        self._set_matmul(self._layer, SmoothMatmulForDeploy.create(self._layer_name,
+                                                                   self._get_matmul(self._layer),
+                                                                   ic=ic, compute_dtype=compute_dtype))
+        logger.info(f"apply smooth scale by infer mul op in {self._get_matmul(self._layer)}.")
 
     def deploy(self):
         """deploy"""
@@ -176,9 +187,10 @@ class SmoothLinearCell(WrapperLinearCell):
         """provide the sharded state dict based on the config"""
         w_shard = (self.tensor_parallel_group_size, 1) if self.transpose_b else (1, self.tensor_parallel_group_size)
         smooth_scale_shard = (1,)
+        smooth_scale = self.matmul.smooth_scale if not self.context.experimental else \
+            self.quant_method.matmul.smooth_scale
         state_dict = {self.weight.name: {'shape': self.weight.shape, 'shard': w_shard},
-                      self.matmul.smooth_scale.name: {'shape': self.matmul.smooth_scale.shape,
-                                                      'shard': smooth_scale_shard}}
+                      smooth_scale.name: {'shape': smooth_scale.shape, 'shard': smooth_scale_shard}}
         if self.has_bias:
             state_dict[self.bias.name] = {'shape': self.bias.shape, 'shard': (self.tensor_parallel_group_size,)}
         return state_dict
@@ -189,9 +201,10 @@ class SmoothLinearCell(WrapperLinearCell):
         """provide the sharded state dict based on the config"""
         w_shard = (1, self.tensor_parallel_group_size) if self.transpose_b else (self.tensor_parallel_group_size, 1)
         smooth_scale_shard = (self.tensor_parallel_group_size,)
+        smooth_scale = self.matmul.smooth_scale if not self.context.experimental else \
+            self.quant_method.matmul.smooth_scale
         state_dict = {self.weight.name: {'shape': self.weight.shape, 'shard': w_shard},
-                      self.matmul.smooth_scale.name: {'shape': self.matmul.smooth_scale.shape,
-                                                      'shard': smooth_scale_shard}}
+                      smooth_scale.name: {'shape': smooth_scale.shape, 'shard': smooth_scale_shard}}
         if self.has_bias:
             state_dict[self.bias.name] = {'shape': self.bias.shape,
                                           'shard': (1,)}
@@ -211,6 +224,7 @@ class SmoothQuantLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(McoreColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(McoreRowParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         LinearSmoothQuant.reg_layer_map(QKVParallelLinear, SmoothQuantLinearCell, SmoothChecker())
+        LinearSmoothQuant.reg_layer_map(MergedColumnParallelLinear, SmoothQuantLinearCell, SmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -289,6 +303,7 @@ class AWQLinearCell(SmoothLinearCell):
         LinearSmoothQuant.reg_layer_map(McoreColumnParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(McoreRowParallelLinear, AWQLinearCell, AWQChecker())
         LinearSmoothQuant.reg_layer_map(QKVParallelLinear, AWQLinearCell, AWQChecker())
+        LinearSmoothQuant.reg_layer_map(MergedColumnParallelLinear, AWQLinearCell, AWQChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -390,6 +405,8 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
         LinearAutoSmoother.reg_layer_map(QKVParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                         SearchOutlierSuppressionLiteChecker())
+        LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                          SearchOutlierSuppressionLiteChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
@@ -648,6 +665,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
         LinearAutoSmoother.reg_layer_map(McoreColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         LinearAutoSmoother.reg_layer_map(QKVParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -904,6 +922,8 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
                                          OutlierSuppressionPlusSmoothChecker())
         LinearAutoSmoother.reg_layer_map(QKVParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
                                          OutlierSuppressionPlusSmoothChecker())
+        LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                         OutlierSuppressionPlusSmoothChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -1102,18 +1122,29 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
 
     def _apply_act_smooth(self, smooth_scale: Tensor):
         """_apply_act_smooth"""
-        if isinstance(self._layer.matmul, OutlierSuppressionPlusSmoothMatmul):
-            self._layer.matmul.update(self._layer_name, self._layer.matmul.mm, smooth_scale, -self.shift_values)
+        if isinstance(self._get_matmul(self._layer), OutlierSuppressionPlusSmoothMatmul):
+            self._get_matmul(self._layer).update(self._layer_name, self._get_matmul(self._layer).mm,
+                                                 smooth_scale, -self.shift_values)
         else:
-            self._layer.matmul = OutlierSuppressionPlusSmoothMatmul.create(
-                self._layer_name, self._layer.matmul, smooth_scale=smooth_scale, beta_osp=-self.shift_values
-            )
+            self._set_matmul(
+                self._layer,
+                OutlierSuppressionPlusSmoothMatmul.create(
+                    self._layer_name,
+                    self._get_matmul(self._layer),
+                    smooth_scale=smooth_scale,
+                    beta_osp=-self.shift_values))
         self.is_replaced = True
 
     def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
         """_apply_act_smooth_by_insert_op_for_deploy"""
-        self._layer.matmul = OutlierSuppressionPlusSmoothMatmulForDeploy.create(
-            self._layer_name, self._layer.matmul, ic=ic, compute_dtype=compute_dtype
+        self._set_matmul(
+            self._layer,
+            OutlierSuppressionPlusSmoothMatmulForDeploy.create(
+                self._layer_name,
+                self._get_matmul(self._layer),
+                ic=ic,
+                compute_dtype=compute_dtype
+            )
         )
 
     def smooth(self):
@@ -1141,6 +1172,8 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
         LinearAutoSmoother.reg_layer_map(McoreRowParallelLinear, OutlierSuppressionPlusLinearCell,
                                          OutlierSuppressionPlusChecker())
         LinearAutoSmoother.reg_layer_map(QKVParallelLinear, OutlierSuppressionPlusLinearCell,
+                                         OutlierSuppressionPlusChecker())
+        LinearAutoSmoother.reg_layer_map(MergedColumnParallelLinear, OutlierSuppressionPlusLinearCell,
                                          OutlierSuppressionPlusChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
@@ -1174,5 +1207,11 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
 
     def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
         """_apply_act_smooth_by_insert_op_for_deploy"""
-        self._layer.matmul = OutlierSuppressionPlusMatmulForDeploy.create(self._layer_name, self._layer.matmul, ic=ic,
-                                                                          compute_dtype=compute_dtype)
+        self._set_matmul(
+            self._layer,
+            OutlierSuppressionPlusMatmulForDeploy.create(
+                self._layer_name,
+                self._get_matmul(self._layer),
+                ic=ic,
+                compute_dtype=compute_dtype)
+        )

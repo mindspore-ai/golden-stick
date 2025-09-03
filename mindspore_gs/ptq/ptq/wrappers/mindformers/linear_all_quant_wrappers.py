@@ -21,6 +21,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -51,6 +52,7 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(McoreColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(McoreRowParallelLinear, AllQuantLinearCell, A8W8Checker())
         Quantizer.reg_layer_map(QKVParallelLinear, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(MergedColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -103,12 +105,12 @@ class AllQuantLinearCell(WeightQuantLinearCell):
 
     def deploy(self):
         if self.is_mcorelinear:
-            return AllQuantMcoreLinearInferCell(self._layer_name, self.layer, self.cfg,
+            return AllQuantMcoreLinearInferCell(self._layer_name, self.layer, self.context, self.cfg,
                                                 self.q_weight, QuantParam(self.x_scale, self.x_zp),
                                                 QuantParam(self.w_scale, self.w_zp), self.compute_type,
                                                 self.parallel_type)
 
-        return AllQuantLinearInferCell(self._layer_name, self.layer, self.cfg,
+        return AllQuantLinearInferCell(self._layer_name, self.layer, self.context, self.cfg,
                                        self.q_weight, QuantParam(self.x_scale, self.x_zp),
                                        QuantParam(self.w_scale, self.w_zp), self.compute_type,
                                        self.parallel_type)
@@ -116,9 +118,9 @@ class AllQuantLinearCell(WeightQuantLinearCell):
 
 class AllQuantLinearInferCell(LinearInferCell):
     """AllQuantLinearInferCell"""
-
-    def __init__(self, layer_name, linear: Linear, cfg: InnerPTQConfig, q_weight, x_qparam: QuantParam,
-                 w_qparam: QuantParam, compute_type, parallel_type: ParallelType):
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, linear: Linear, context: InnerPTQConfig, cfg: InnerPTQConfig, q_weight,
+                 x_qparam: QuantParam, w_qparam: QuantParam, compute_type, parallel_type: ParallelType):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
@@ -151,17 +153,17 @@ class AllQuantLinearInferCell(LinearInferCell):
 class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
     """AllQuantLinearInferCell"""
 
-    def __init__(self, layer_name, linear: Linear, cfg: InnerPTQConfig, q_weight, x_qparam: QuantParam,
-                 w_qparam: QuantParam, compute_type, parallel_type: ParallelType):
+    def __init__(self, layer_name, linear: Linear, context: InnerPTQConfig, cfg: InnerPTQConfig, q_weight,
+                 x_qparam: QuantParam, w_qparam: QuantParam, compute_type, parallel_type: ParallelType):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
         use_aclnn_quant = any(opname in layer_name for opname in cfg.aclnn_quant_list)
         bias_osp = None
-        if isinstance(self.layer.matmul, OutlierSuppressionPlusSmoothMatmul):
-            origin_weight = msops.mul(self._layer.weight, linear.matmul.smooth_scale)
+        if isinstance(self.layer.quant_method.matmul, OutlierSuppressionPlusSmoothMatmul):
+            origin_weight = msops.mul(self._layer.weight, linear.quant_method.matmul.smooth_scale)
             bias_osp = msops.matmul(
-                msops.expand_dims(-linear.matmul.beta_osp, 0),
+                msops.expand_dims(-linear.quant_method.matmul.beta_osp, 0),
                 (
                     origin_weight.astype("float32").transpose()
                     if self._layer.transpose_b
@@ -171,12 +173,17 @@ class AllQuantMcoreLinearInferCell(McoreLinearInferCell):
             bias_osp = bias_osp.squeeze()
         quant, qmm = AllQuantMatmul.create(layer_name, linear, parallel_type, q_weight, x_qparam, w_qparam, is_deploy,
                                            cfg.tp_size, compute_type,
-                                           KernelType.ACLNN if use_aclnn_quant else KernelType.INTERNAL, bias_osp)
+                                           KernelType.ACLNN if use_aclnn_quant else KernelType.INTERNAL, bias_osp,
+                                           context.experimental)
         if not is_deploy:
             logger.debug(f"AllQuantLinearInferCell: x_qparam of Layer({parallel_type}:{layer_name}) is {x_qparam}")
             logger.debug(f"AllQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"AllQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}}}")
         self._set_act_quant(quant)
-        self.layer.matmul = qmm
+        self.layer.quant_method.matmul = qmm
         self.layer.weight = q_weight
+        if context.experimental:
+            self.layer.smooth_scale = Parameter(Tensor(quant.smooth_scale.asnumpy()))
+            self.layer.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+            self.layer.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))

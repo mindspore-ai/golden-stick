@@ -98,14 +98,15 @@ class QuantWithSmooth(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
-               smooth_scale: Optional[np.ndarray] = None, kernel_type: KernelType = KernelType.ASD):
+               smooth_scale: Optional[np.ndarray] = None, kernel_type: KernelType = KernelType.ASD,
+               use_experimental=False):
         """create"""
         if kernel_type in (KernelType.ASD, KernelType.INTERNAL):
             return QuantWithSmoothHighPerformance(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
-                                                  smooth_scale, dtype.int8)
+                                                  smooth_scale, dtype.int8, use_experimental)
         if kernel_type is KernelType.ACLNN:
             return QuantWithSmoothHighPerformance(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
-                                                  smooth_scale, dst_dtype)
+                                                  smooth_scale, dst_dtype, use_experimental)
         if kernel_type is KernelType.HIGH_PRECISION:
             return QuantWithSmoothHighPrecision(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
                                                 smooth_scale)
@@ -213,7 +214,7 @@ class QuantWithSmoothHighPrecision(QuantWithSmooth):
 class QuantWithSmoothHighPerformance(QuantWithSmooth):
     """QuantWithSmoothHighPerformance"""
     def __init__(self, layer_name, x_qparam: QuantParam, ic, dst_dtype, is_deploy, parallel_type: ParallelType,
-                 smooth_scale: Optional[np.ndarray] = None, zp_dtype=dtype.int8):
+                 smooth_scale: Optional[np.ndarray] = None, zp_dtype=dtype.int8, use_experimental=False):
         super().__init__(layer_name, parallel_type)
         self.quant = QuantV2()
         self.is_perchannel = smooth_scale is not None
@@ -226,6 +227,8 @@ class QuantWithSmoothHighPerformance(QuantWithSmooth):
                 self.input_zp = Parameter(initializer('zeros', (ic,), zp_dtype))
             return
         # fuse smooth.mul and quant
+        if use_experimental: # FIXME: hangangqiang, remove after refactor
+            self.smooth_scale = Tensor(smooth_scale)
         input_scale_np = x_qparam.scale.asnumpy().astype(np.float16)
         if self.is_perchannel:
             final_scale_np = input_scale_np / smooth_scale.astype(np.float16)
@@ -851,7 +854,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
     def _from_matmul_prim(layer_name, is_deploy, w_qparam: QuantParam, transpose_a=False, transpose_b=False,
                           dst_dtype=dtype.float16, is_group_mm=False):
         qbmm = GptqDynamicQuantMatmul(layer_name, is_deploy, w_qparam, transpose_a, transpose_b, dst_dtype,
-                                  is_group_mm)
+                                      is_group_mm)
         quant_op = DynamicQuantCell.create(layer_name, is_deploy, None)
         return qbmm, quant_op
 
@@ -877,23 +880,27 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, q_weight, linear, w_qparam: QuantParam, is_deploy, transpose_a=False,
-               transpose_b=False, dst_dtype=dtype.float16, save_gmm_bias=False):
+               transpose_b=False, dst_dtype=dtype.float16, save_gmm_bias=False, experimental=False):
         """create"""
-        if isinstance(linear.matmul, msops.MatMul):
+        matmul = linear.quant_method.matmul if experimental else linear.matmul
+        if isinstance(matmul, msops.MatMul):
             gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam,
                                                                        transpose_a, transpose_b, dst_dtype)
-        elif isinstance(linear.matmul, GroupedMatmulV4):
+        elif isinstance(matmul, GroupedMatmulV4):
             gdqmm, quant_op = GptqDynamicQuantMatmul._from_matmul_prim(layer_name, is_deploy, w_qparam,
                                                                        transpose_a, transpose_b, dst_dtype, True)
-        elif isinstance(linear.matmul, SmoothMatmul):
-            gdqmm, quant_op = GptqDynamicQuantMatmul._from_smooth_matmul(layer_name, is_deploy, linear.matmul,
-                                                                         w_qparam, transpose_a, transpose_b, dst_dtype)
-        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
-            gdqmm, quant_op = GptqDynamicQuantMatmul._from_smooth_matmul_for_deploy(layer_name, is_deploy, linear.matmul
-                                                                                    , w_qparam, transpose_a,
+        elif isinstance(matmul, SmoothMatmul):
+            gdqmm, quant_op = GptqDynamicQuantMatmul._from_smooth_matmul(layer_name, is_deploy,
+                                                                         matmul,
+                                                                         w_qparam, transpose_a,
+                                                                         transpose_b, dst_dtype)
+        elif isinstance(matmul, SmoothMatmulForDeploy):
+            gdqmm, quant_op = GptqDynamicQuantMatmul._from_smooth_matmul_for_deploy(layer_name, is_deploy,
+                                                                                    matmul,
+                                                                                    w_qparam, transpose_a,
                                                                                     transpose_b, dst_dtype)
         else:
-            raise ValueError(f"Not support creating GptqDynamicQuantMatmul from {linear.matmul}.")
+            raise ValueError(f"Not support creating GptqDynamicQuantMatmul from {matmul}.")
 
         rank = len(q_weight.shape)
         ic_idx, oc_idx = (rank - 1, rank - 2) if transpose_b else (rank - 2, rank - 1)
@@ -1004,20 +1011,21 @@ class WeightQuantMatmul(QuantUnitCell):
 
     @staticmethod
     def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
-               dst_dtype=dtype.float16):
+               dst_dtype=dtype.float16, experimental=False):
         """create"""
-        if isinstance(linear.matmul, msops.MatMul):
+        matmul = linear.quant_method.matmul if experimental else linear.matmul
+        if isinstance(matmul, msops.MatMul):
             return WeightQuantMatmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
                                                        dst_dtype, False)
-        if isinstance(linear.matmul, GroupedMatmulV4):
+        if isinstance(matmul, GroupedMatmulV4):
             return WeightQuantMatmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a, transpose_b,
                                                        dst_dtype, True)
-        if isinstance(linear.matmul, SmoothMatmul):
-            return WeightQuantMatmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy, transpose_a,
-                                                         transpose_b, dst_dtype)
-        if isinstance(linear.matmul, SmoothMatmulForDeploy):
-            return WeightQuantMatmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, w_qparam, is_deploy,
-                                                                    transpose_a, transpose_b, dst_dtype)
+        if isinstance(matmul, SmoothMatmul):
+            return WeightQuantMatmul._from_smooth_matmul(layer_name, matmul, w_qparam, is_deploy,
+                                                         transpose_a, transpose_b, dst_dtype)
+        if isinstance(matmul, SmoothMatmulForDeploy):
+            return WeightQuantMatmul._from_smooth_matmul_for_deploy(layer_name, matmul, w_qparam,
+                                                                    is_deploy, transpose_a, transpose_b, dst_dtype)
         raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
 
     def construct(self, x, weight, group_list=None):
@@ -1066,7 +1074,7 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
 
     @staticmethod
     def create(layer_name, linear, q_weight, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
-               dst_dtype=dtype.float16):
+               dst_dtype=dtype.float16, experimental=False):
         """create"""
         # qbmm need transpose_b = False
         if linear.expert_num > 1:
@@ -1096,18 +1104,20 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
                          f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
             q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
 
-        if isinstance(linear.matmul, msops.MatMul):
+        matmul = linear.quant_method.matmul if experimental else linear.matmul
+        if isinstance(matmul, msops.MatMul):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
                                                             linear.transpose_b, dst_dtype, False)
-        elif isinstance(linear.matmul, GroupedMatmulV4):
+        elif isinstance(matmul, GroupedMatmulV4):
             wqbmm = WeightQuantInt4Matmul._from_matmul_prim(layer_name, w_qparam, is_deploy, transpose_a,
                                                             linear.transpose_b, dst_dtype, True)
-        elif isinstance(linear.matmul, SmoothMatmul):
-            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, linear.matmul, w_qparam, is_deploy,
-                                                              transpose_a, linear.transpose_b, dst_dtype)
-        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
-            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, w_qparam, is_deploy,
-                                                                         transpose_a, linear.transpose_b, dst_dtype)
+        elif isinstance(matmul, SmoothMatmul):
+            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul(layer_name, matmul, w_qparam,
+                                                              is_deploy, transpose_a, linear.transpose_b, dst_dtype)
+        elif isinstance(matmul, SmoothMatmulForDeploy):
+            wqbmm = WeightQuantInt4Matmul._from_smooth_matmul_for_deploy(layer_name, matmul,
+                                                                         w_qparam, is_deploy, transpose_a,
+                                                                         linear.transpose_b, dst_dtype)
         else:
             raise ValueError(f"Not support creating WeightQuantMatmul from {linear}.")
         return wqbmm, q_weight
@@ -1327,32 +1337,58 @@ class AllQuantMatmul(QuantUnitCell):
         raise RuntimeError(f"Not supported kernel type: {kernel_type}")
 
     @staticmethod
-    def _get_deploy_quant_bias(parallel_type, is_osp, q_weight, x_qparam, w_qparam, trans_b, tp_size, dst_dtype,
-                               linear, bias_osp, bias_name):
-        """_get_deploy_quant_bias"""
-        # fuse bias
-        if parallel_type is ParallelType.ROW_PARALLEL:
-            if not is_osp:
-                t_bias = AllQuantMatmul._correction_into_bias(
-                    q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
-                )
-                # set quant_bias=0 on other card when doing pynative eval
-                if RANK_ID != 0:
-                    t_bias = msops.zeros_like(t_bias)
-            else:
-                t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
-                    linear.matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, bias_osp
-                )
+    def _quant_bias(
+        linear,
+        matmul,
+        parallel_type: ParallelType,
+        q_weight,
+        x_qparam: QuantParam,
+        w_qparam: QuantParam,
+        is_deploy,
+        tp_size,
+        dst_dtype=dtype.float16,
+        bias_osp=None,
+    ):
+        """_quant_bias"""
+        is_osp = isinstance(matmul, OutlierSuppressionPlusSmoothMatmul)
+        if bias_osp is None and is_osp:
+            raise ValueError("Use OSP but bias_osp is None.")
+        trans_b = linear.transpose_b
+        rank = len(q_weight.shape)
+        oc_idx = rank - 2 if trans_b else rank - 1
+        oc = q_weight.shape[oc_idx]
+         # dequant offset
+        bias_name = linear.bias.name if linear.has_bias else q_weight.name + "_bias"
+        if is_deploy:
+            export_num = q_weight.shape[0] if len(q_weight.shape) == 3 else None
+            bias_shape = (export_num, oc) if export_num else (oc,)
+            quant_bias = Parameter(initializer("zeros", bias_shape, dtype.int32), name=bias_name)
         else:
-            if not is_osp:
-                t_bias = AllQuantMatmul._correction_into_bias(
-                    q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype
-                )
+            # fuse bias
+            if parallel_type is ParallelType.ROW_PARALLEL:
+                if not is_osp:
+                    t_bias = AllQuantMatmul._correction_into_bias(
+                        q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
+                    )
+                    # set quant_bias=0 on other card when doing pynative eval
+                    if RANK_ID != 0:
+                        t_bias = msops.zeros_like(t_bias)
+                else:
+                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                        matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1,
+                        bias_osp
+                    )
             else:
-                t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
-                    linear.matmul, q_weight, x_qparam, w_qparam, trans_b, False, bias_osp
-                )
-        quant_bias = Parameter(t_bias, name=bias_name)
+                if not is_osp:
+                    t_bias = AllQuantMatmul._correction_into_bias(
+                        q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype
+                    )
+                else:
+                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                        matmul, q_weight, x_qparam, w_qparam, trans_b,
+                        False, bias_osp
+                    )
+            quant_bias = Parameter(t_bias, name=bias_name)
         return quant_bias
 
     @staticmethod
@@ -1368,49 +1404,47 @@ class AllQuantMatmul(QuantUnitCell):
         dst_dtype=dtype.float16,
         kernel_type: KernelType = KernelType.ASD,
         bias_osp=None,
-    ) -> (QuantWithSmooth, "AllQuantMatmul", Parameter):
+        use_experimental=False,
+    ) -> tuple[QuantWithSmooth, "AllQuantMatmul", Parameter]:
         "AllQuantMatmul create"
-        is_osp = isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul)
+        matmul = linear.quant_method.matmul if use_experimental else linear.matmul
+        is_osp = isinstance(matmul, OutlierSuppressionPlusSmoothMatmul)
         if bias_osp is None and is_osp:
             raise ValueError("Use OSP but bias_osp is None.")
         trans_a = False
         trans_b = linear.transpose_b
         rank = len(q_weight.shape)
-        ic_idx, oc_idx = (rank - 1, rank - 2) if trans_b else (rank - 2, rank - 1)
-        ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
+        ic_idx = rank - 1 if trans_b else rank - 2
+        ic = q_weight.shape[ic_idx]
 
         # dequant offset
-        bias_name = linear.bias.name if linear.has_bias else q_weight.name + "_bias"
-        if is_deploy:
-            export_num = q_weight.shape[0] if len(q_weight.shape) == 3 else None
-            bias_shape = (export_num, oc) if export_num else (oc,)
-            quant_bias = Parameter(initializer("zeros", bias_shape, dtype.int32), name=bias_name)
-        else:
-            quant_bias = AllQuantMatmul._get_deploy_quant_bias(parallel_type, is_osp, q_weight, x_qparam, w_qparam,
-                                                               trans_b, tp_size, dst_dtype, linear, bias_osp,
-                                                               bias_name)
+        quant_bias = AllQuantMatmul._quant_bias(linear, matmul, parallel_type, q_weight,
+                                                x_qparam, w_qparam, is_deploy, tp_size,
+                                                dst_dtype, bias_osp)
 
         # create qmm
-        if isinstance(linear.matmul, (msops.MatMul, GroupedMatmulV4)):
-            qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(layer_name, linear.matmul, x_qparam, w_qparam,
-                                                                 is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
-                                                                 kernel_type)
+        if isinstance(matmul, (msops.MatMul, GroupedMatmulV4)):
+            qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(layer_name, matmul, x_qparam,
+                                                                 w_qparam, is_deploy, trans_a, trans_b, quant_bias,
+                                                                 dst_dtype, kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type)
-        elif isinstance(linear.matmul, SmoothMatmul):
-            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul(layer_name, linear.matmul, x_qparam, w_qparam,
-                                                                   is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
-                                                                   kernel_type)
+                                           kernel_type, use_experimental)
+        elif isinstance(matmul, SmoothMatmul):
+            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul(layer_name, matmul, x_qparam,
+                                                                   w_qparam, is_deploy, trans_a, trans_b, quant_bias,
+                                                                   dst_dtype, kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type)
-        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
-            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, x_qparam,
-                                                                              w_qparam, is_deploy, trans_a, trans_b,
-                                                                              quant_bias, dst_dtype, kernel_type)
+                                           kernel_type, use_experimental)
+        elif isinstance(matmul, SmoothMatmulForDeploy):
+            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul_for_deploy(layer_name, matmul,
+                                                                              x_qparam, w_qparam, is_deploy, trans_a,
+                                                                              trans_b, quant_bias, dst_dtype,
+                                                                              kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type)
-        elif isinstance(linear.matmul, OutlierSuppressionPlusMatmulForDeploy):
-            qmm, beta = AllQuantMatmul._from_outlier_suppression_plus_matmul_for_deploy(layer_name, linear.matmul,
+                                           kernel_type, use_experimental)
+        elif isinstance(matmul, OutlierSuppressionPlusMatmulForDeploy):
+            qmm, beta = AllQuantMatmul._from_outlier_suppression_plus_matmul_for_deploy(layer_name,
+                                                                                        matmul,
                                                                                         x_qparam, w_qparam, is_deploy,
                                                                                         trans_a, trans_b, quant_bias,
                                                                                         dst_dtype, kernel_type)
@@ -1418,10 +1452,10 @@ class AllQuantMatmul(QuantUnitCell):
             quant = QuantWithOutlierSuppressionPlus.create(layer_name, x_qparam, ic, dst_dtype, is_deploy,
                                                            parallel_type, beta, KernelType.ACLNN)
         # for osp of omniquant
-        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul):
+        elif isinstance(matmul, OutlierSuppressionPlusSmoothMatmul):
             qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul(
                 layer_name,
-                linear.matmul,
+                matmul,
                 x_qparam,
                 w_qparam,
                 is_deploy,
@@ -1434,10 +1468,10 @@ class AllQuantMatmul(QuantUnitCell):
             quant = QuantWithOutlierSuppressionPlusSmooth.create(
                 layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, kernel_type
             )
-        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmulForDeploy):
+        elif isinstance(matmul, OutlierSuppressionPlusSmoothMatmulForDeploy):
             qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul_for_deploy(
                 layer_name,
-                linear.matmul,
+                matmul,
                 x_qparam,
                 w_qparam,
                 is_deploy,
@@ -1451,7 +1485,7 @@ class AllQuantMatmul(QuantUnitCell):
                 layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, kernel_type
             )
         else:
-            raise ValueError(f"Not support creating AllQuantMatmul from {linear.matmul}.")
+            raise ValueError(f"Not support creating AllQuantMatmul from {matmul}.")
         return quant, qmm
 
     # pylint: disable=arguments-differ

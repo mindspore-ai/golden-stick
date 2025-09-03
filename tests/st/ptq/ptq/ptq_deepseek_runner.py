@@ -20,6 +20,8 @@ import shutil
 from collections import OrderedDict
 import numpy as np
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import mindspore as ms
 from mindspore.communication import get_rank
 from mindspore import dtype as msdtype
@@ -106,7 +108,6 @@ def create_ptq(quant_type: str, quant_mode: PTQMode):
 
 def create_deepseek_network(config, quant_type=None):
     """create deepseek network"""
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from research.deepseek3.deepseek3_config import DeepseekV3Config
     from research.deepseek3.deepseek3 import DeepseekV3ForCausalLM
