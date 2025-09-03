@@ -27,6 +27,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import ReplicatedLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     ColumnParallelGroupedLinear,
@@ -63,6 +64,7 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(ColumnParallelGroupedLinear, GptqWeightQuantLinearCell, A16WxChecker())
         Quantizer.reg_layer_map(RowParallelGroupedLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(ReplicatedLinear, GptqWeightQuantLinearCell, A16WxChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -85,6 +87,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
         if hasattr(linear, "expert_num") and linear.expert_num > 1:
+            self.is_moe = True
+        elif self.is_gmm_mcore:
             self.is_moe = True
         else:
             self.is_moe = False

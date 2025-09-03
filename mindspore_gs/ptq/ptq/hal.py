@@ -846,9 +846,27 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
             f'matmul of SmoothMatmul should be an instance of {msops.MatMul}, but got {src.mm}.')
 
     @staticmethod
+    def create_qweight(linear, q_weight, transpose_b, experimental, is_gmm_mcore,
+                       use_fake_quant):
+        """create_qweight"""
+        if experimental:
+            if is_gmm_mcore:
+                q_weight = q_weight if use_fake_quant else np_int4data_pack_to_int8_3d(q_weight.asnumpy())
+            else:
+                q_weight = q_weight.transpose(1, 0) if transpose_b else q_weight
+                q_weight = q_weight if use_fake_quant else np_int4data_pack_to_int8(q_weight.asnumpy())
+        else:
+            if hasattr(linear, "expert_num") and linear.expert_num > 1:
+                q_weight = q_weight if use_fake_quant else np_int4data_pack_to_int8_3d(q_weight.asnumpy())
+            else:
+                q_weight = q_weight.transpose(1, 0) if transpose_b else q_weight
+                q_weight = q_weight if use_fake_quant else np_int4data_pack_to_int8(q_weight.asnumpy())
+        return q_weight
+
+    @staticmethod
     def create(layer_name, q_weight, linear, w_qparam: QuantParam, is_deploy, transpose_a=False,
-               transpose_b=False, dst_dtype=dtype.float16, save_gmm_bias=False, experimental=False,
-               use_fake_quant=False):
+               transpose_b=False, dst_dtype=dtype.float16, is_gmm_mcore=False, save_gmm_bias=False,
+               experimental=False, use_fake_quant=False):
         """create"""
         matmul = linear.quant_method.matmul if experimental else linear.matmul
         if isinstance(matmul, msops.MatMul):
@@ -881,16 +899,8 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                 weight_shape = (ic, oc // 2)
             q_weight = Parameter(initializer("ones", weight_shape, w_qparam.quant_dtype), name=linear.weight.name)
         else:
-            if hasattr(linear, "expert_num") and linear.expert_num > 1:
-                q_weight = q_weight.transpose(0, 2, 1) if transpose_b else q_weight
-                if not use_fake_quant:
-                    q_weight = np_int4data_pack_to_int8_3d(q_weight.asnumpy())
-            else:
-                q_weight = q_weight.transpose(1, 0) if transpose_b else q_weight
-                if not use_fake_quant:
-                    q_weight = np_int4data_pack_to_int8(q_weight.asnumpy())
-            logger.debug(f"GptqDynamicQuantMatmul: pack q_weight of Layer({layer_name}) is "
-                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight}}}")
+            q_weight = GptqDynamicQuantMatmul.create_qweight(linear, q_weight, transpose_b, experimental,
+                                                             is_gmm_mcore, use_fake_quant)
             if gdqmm.is_group_mm and save_gmm_bias:
                 scale = msops.repeat_elements(w_qparam.scale, rep=w_qparam.group_size, axis=1)
                 gmm_bias = msops.mul(8,
