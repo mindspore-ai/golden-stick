@@ -16,19 +16,23 @@
 
 from mindspore import ops as msops
 from mindspore import nn
-from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_group
+from mindformers.parallel_core.inference.parallel_state import (get_tensor_model_parallel_group,
+                                                                get_tensor_model_parallel_world_size)
 
 
 class MinFromTensorParallelRegion(nn.Cell):
     "Get argmin from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group().group)
+        self.tp_world_size = get_tensor_model_parallel_world_size()
+        if self.tp_world_size > 1:
+            self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MIN, group=get_tensor_model_parallel_group().group)
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         """construct"""
-        output_parallel, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
-        output = self.all_reduce(output_parallel)
+        output, _ = msops.min(input_, axis, keepdims, initial=initial, where=where)
+        if self.tp_world_size > 1:
+            output = self.all_reduce(output)
         return output, _
 
 
@@ -36,12 +40,15 @@ class MaxFromTensorParallelRegion(nn.Cell):
     "Get argmax from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group().group)
+        self.tp_world_size = get_tensor_model_parallel_world_size()
+        if self.tp_world_size > 1:
+            self.all_reduce = msops.AllReduce(op=msops.ReduceOp.MAX, group=get_tensor_model_parallel_group().group)
 
     def construct(self, input_, axis=None, keepdims=False, *, initial=None, where=None):
         """construct"""
-        output_parallel, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
-        output = self.all_reduce(output_parallel)
+        output, _ = msops.max(input_, axis, keepdims, initial=initial, where=where)
+        if self.tp_world_size > 1:
+            output = self.all_reduce(output)
         return output, _
 
 
@@ -49,12 +56,15 @@ class SumFromTensorParallelRegion(nn.Cell):
     "Get sum from tensor-parallel region"
     def __init__(self):
         super().__init__()
-        self.all_reduce = msops.AllReduce(op=msops.ReduceOp.SUM, group=get_tensor_model_parallel_group().group)
+        self.tp_world_size = get_tensor_model_parallel_world_size()
+        if self.tp_world_size > 1:
+            self.all_reduce = msops.AllReduce(op=msops.ReduceOp.SUM, group=get_tensor_model_parallel_group().group)
 
     def construct(self, input_, axis=None, keepdims=False, *, dtype=None):
         """construct"""
-        output_parallel = msops.sum(input_, axis, keepdims, dtype=dtype)
-        output = self.all_reduce(output_parallel)
+        output = msops.sum(input_, axis, keepdims, dtype=dtype)
+        if self.tp_world_size > 1:
+            output = self.all_reduce(output)
         return output
 
 
