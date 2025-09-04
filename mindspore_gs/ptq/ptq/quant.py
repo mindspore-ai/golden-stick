@@ -375,7 +375,17 @@ class PTQ(CompAlgo):
         return network
 
     def fake_quant(self, network):
-        """fake_quant"""
+        """Apply fake quantization to the model.
+
+        This method applies fake quantization to the model, which is useful
+        for validating quantization effects without actually converting to
+        integer operations.
+
+        Raises:
+            TypeError: If `network` type is not Cell.
+        """
+        if not isinstance(network, Cell):
+            raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")
         self._config.update_comm_info()
         self._get_decoder_layers(network)
         for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ FakeQuant..."):
