@@ -63,6 +63,9 @@ class MFModel(BaseQuantForCausalLMImpl):
 
         return decorator
 
+    def _after_network_load_weights(self):
+        return
+
     def __init__(self, yaml_path):
         config = MindFormerConfig(yaml_path)
         build_context(config)
@@ -73,6 +76,7 @@ class MFModel(BaseQuantForCausalLMImpl):
         self._original_sf_path = config.load_checkpoint
         if config.load_checkpoint:
             self.network.load_weights(config.load_checkpoint)
+            self._after_network_load_weights()
 
     # pylint: disable=arguments-differ
     @classmethod

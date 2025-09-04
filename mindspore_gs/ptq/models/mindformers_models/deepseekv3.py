@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""qwen3 quant model"""
-
+"""deepseek v3 quant model"""
 
 import os
 import time
@@ -33,6 +32,24 @@ from mindspore_gs.common import logger
 @MFModel.reg_model('deepseek_v3')
 class DeepSeekV3(MFModelEnableSafeTensors):
     """DeepSeekV3"""
+
+    def __init__(self, yaml_path):
+        super().__init__(yaml_path)
+        self.__parameter_dict = None
+
+    def _after_network_load_weights(self):
+        def process(root, name_prefix):
+            """Iterate the whole network and call callback function `process_cell`."""
+            if root is None:
+                return
+            for name, cell in root.name_cells().items():
+                full_cell_name = f"{name_prefix}.{name}"
+                if hasattr(cell, "weight1"):
+                    del cell.weight1
+                if hasattr(cell, "weight2"):
+                    del cell.weight2
+                process(cell, full_cell_name)
+        process(self.network, 'network')
 
     def _convert_name(self, param_dict):
         """Convert mcore name to huggingface name.
@@ -84,9 +101,14 @@ class DeepSeekV3(MFModelEnableSafeTensors):
 
     def parameters_dict(self, scope="") -> dict:
         """parameters_dict"""
+        # FIXME: Currently, calling this method will release the original network to save memory.
+        if self.__parameter_dict is not None:
+            return self.__parameter_dict
         param_dict = self.network.parameters_dict()
+        del self.network.model
         param_dict, _ = self._process_params_dict_before_save(param_dict)
         param_dict = self._convert_name(param_dict)
+        self.__parameter_dict = param_dict
         return param_dict
 
     def _get_quant_type(self, network):
@@ -124,8 +146,8 @@ class DeepSeekV3(MFModelEnableSafeTensors):
 
     def save_quantized(self, save_path):
         """save_pretrained"""
-        self._save_safetenors(save_path)
         _ = self._save_desc_json(save_path)
+        self._save_safetenors(save_path)
 
     def _save_safetenors(self, save_path) -> str:
         """_save_safetenors"""
