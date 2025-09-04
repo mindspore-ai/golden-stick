@@ -31,7 +31,7 @@ This implementation is designed to work seamlessly with MindFormers'
 model zoo and supports various large language models including Qwen3,
 DeepSeekV3, and other transformer-based architectures.
 
-Example:
+Examples:
     >>> from mindspore_gs.ptq.models.mindformers_models import MFModel
     >>>
     >>> # The class is typically used through specific implementations
@@ -123,7 +123,7 @@ class MFModel(BaseQuantForCausalLMImpl):
 
         Args:
             alias (str, optional): Alternative name for the model.
-                If not provided, the class name will be used. Defaults to None.
+                If not provided, the class name will be used. Defaults to ``None``.
 
         Returns:
             function. Decorator function that registers the class.
@@ -212,7 +212,7 @@ class MFModel(BaseQuantForCausalLMImpl):
         Args:
             input_ids (Tensor): Input token IDs for the model.
             max_new_tokens (int, optional): Maximum number of tokens to generate.
-                Defaults to 1.
+                Defaults to ``1``.
 
         Returns:
             Generated output from the model.
@@ -283,7 +283,7 @@ class MFModel(BaseQuantForCausalLMImpl):
             ptq_config (PTQConfig): Configuration for post-training quantization.
             layers_policy (dict): Policy for different layer quantization strategies.
             quant_safetensors_path (str, optional): Path to quantized SafeTensors file.
-                Defaults to "".
+                Defaults to ``""``.
         """
         logger.info("Use ptq algo to fake-quant network and weight")
         ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
@@ -405,7 +405,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'input_scale', 0)
                     self._try_append_shard_axis(cell, 'input_offset', 0)
                     self._try_append_shard_axis(cell, 'smooth_scale', 0)
-                    self._try_append_shard_axis(cell, 'dequant_scale', None)
+                    self._try_append_shard_axis(cell, 'dep_scale', None)
                     self._try_append_shard_axis(cell, 'quant_bias', None)
                 elif 'linear_fc2' in cell_name:
                     self._try_append_shard_axis(cell, 'weight', 1)
@@ -413,6 +413,9 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'weight_offset', None)
                     self._try_append_shard_axis(cell, 'input_scale', 0)
                     self._try_append_shard_axis(cell, 'input_offset', 0)
+                    self._try_append_shard_axis(cell, 'smooth_scale', 0)
+                    self._try_append_shard_axis(cell, 'dep_scale', None)
+                    self._try_append_shard_axis(cell, 'quant_bias', None)
                 elif any(seg in cell_name for seg in ('linear_q', 'linear_k',
                                                       'linear_v', 'linear_qkv')):
                     # pylint: disable=protected-access
@@ -423,7 +426,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'input_scale', None)
                     self._try_append_shard_axis(cell, 'input_offset', None)
                     self._try_append_shard_axis(cell, 'smooth_scale', None)
-                    self._try_append_shard_axis(cell, 'dequant_scale', 0)
+                    self._try_append_shard_axis(cell, 'dep_scale', 0)
                     self._try_append_shard_axis(cell, 'quant_bias', 0)
                 elif any(seg in cell_name for seg in ('hidden', 'gating',
                                                       'linear_fc1')):
@@ -433,7 +436,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'input_scale', None)
                     self._try_append_shard_axis(cell, 'input_offset', None)
                     self._try_append_shard_axis(cell, 'smooth_scale', None)
-                    self._try_append_shard_axis(cell, 'dequant_scale', 0)
+                    self._try_append_shard_axis(cell, 'dep_scale', 0)
                     self._try_append_shard_axis(cell, 'quant_bias', 0)
                 elif 'output_layer' in cell_name:
                     self._try_append_shard_axis(cell, 'weight', 0)
@@ -456,7 +459,7 @@ class MFModelEnableSafeTensors(MFModel):
         DistributedParameter objects that include sharding information.
 
         Args:
-            scope (str, optional): Scope for parameter retrieval. Defaults to "".
+            scope (str, optional): Scope for parameter retrieval. Defaults to ``""``.
 
         Returns:
             dict[str, DistributedParameter]. Dictionary mapping parameter names
@@ -678,7 +681,7 @@ class MFModelNotEnableSafeTensors(MFModel):
         """Get the dictionary of model parameters.
 
         Args:
-            scope (str, optional): Scope for parameter retrieval. Defaults to "".
+            scope (str, optional): Scope for parameter retrieval. Defaults to ``""``.
 
         Returns:
             dict. Dictionary of model parameters.
