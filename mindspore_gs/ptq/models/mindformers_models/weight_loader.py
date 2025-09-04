@@ -150,7 +150,7 @@ class WeightProcessor:
             for suffix in param_suffixes:
                 # Determine split_axis based on parameter type
                 if suffix in ['weight']:
-                    split_axis = 1  # FFN weight split axis
+                    split_axis = 0  # FFN weight split axis
                 elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
                     split_axis = 0  # FFN quantization parameters split axis
                 elif suffix == 'bias':
@@ -170,7 +170,7 @@ class WeightProcessor:
             for suffix in param_suffixes:
                 # Determine split_axis based on parameter type
                 if suffix in ['weight']:
-                    split_axis = 1  # FFN weight split axis
+                    split_axis = 0  # FFN weight split axis
                 elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
                     split_axis = 0  # FFN quantization parameters split axis
                 elif suffix == 'bias':
@@ -180,7 +180,7 @@ class WeightProcessor:
 
                 self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc1.{suffix}", split_axis)
         # fc2
-        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight", 0)
+        self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight", 1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.bias", -1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_scale", -1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_offset", -1)

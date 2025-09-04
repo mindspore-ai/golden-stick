@@ -16,12 +16,30 @@
 
 from mindspore.nn.cell import Cell
 from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel, MFModelEnableSafeTensors
+from mindspore_gs.ptq.models.mindformers_models.param_processor import (QKVParamProcessor,
+                                                                        FFNParamProcessor)
 from mindspore_gs.ptq.utils import QuantType
 
 
 @MFModel.reg_model('telechat2')
 class Telechat2(MFModelEnableSafeTensors):
     """Telechat2"""
+
+    def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
+        """_process_params_dict_before_save"""
+        param_dict, param_name_trace = super()._process_params_dict_before_save(param_dict)
+
+        # Apply QKV split
+        qkv_processor = QKVParamProcessor(self.network)
+        param_dict, qkv_trace = qkv_processor.split_param(param_dict)
+        param_name_trace.update(qkv_trace)
+
+        # Apply FFN split
+        ffn_processor = FFNParamProcessor(self.network)
+        param_dict, ffn_trace = ffn_processor.split_param(param_dict)
+        param_name_trace.update(ffn_trace)
+
+        return param_dict, param_name_trace
 
     def _get_quant_type(self, network):
         """_get_quant_type"""
@@ -47,12 +65,11 @@ class Telechat2(MFModelEnableSafeTensors):
         Obtain the description of quantization type for each parameter in each layer of the network.
         Such as W8A8 or W4A8_DYNAMIC
         """
-        results = self._get_quant_type(network)
-        desc_info = {}
+        quant_types = self._get_quant_type(network)
+        # Apply QKV parameter name splitting to match quantization types
+        quant_types = QKVParamProcessor(self.network).split_name(quant_types)
+        # Apply FFN parameter name splitting to match quantization types
+        quant_types = FFNParamProcessor(self.network).split_name(quant_types)
         param_dict = self.parameters_dict()
-        for key, _ in param_dict.items():
-            if key in results.keys():
-                desc_info[key] = results[key]
-            else:
-                desc_info[key] = QuantType.FLOAT.value
+        desc_info = dict((key, quant_types.get(key, QuantType.FLOAT.value)) for key in param_dict)
         return desc_info
