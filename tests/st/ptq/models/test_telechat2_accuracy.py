@@ -69,18 +69,28 @@ class Telechat2Tester(PTQModelTester):
 
         if quant_type.lower() == "a8w8":
             check_map = {
-                'model.decoder.layers.0.self_attention.linear_qkv.weight': QuantType.W8A8.value,
+                'model.decoder.layers.0.self_attention.linear_q.weight': QuantType.W8A8.value,
+                'model.decoder.layers.0.self_attention.linear_k.weight': QuantType.W8A8.value,
+                'model.decoder.layers.0.self_attention.linear_v.weight': QuantType.W8A8.value,
                 'model.decoder.layers.1.self_attention.linear_proj.smooth_scale': QuantType.W8A8.value,
-                'model.decoder.layers.2.self_attention.linear_qkv.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.2.self_attention.linear_q.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.2.self_attention.linear_k.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.2.self_attention.linear_v.weight_scale': QuantType.W8A8.value,
                 'model.decoder.layers.3.self_attention.linear_proj.weight_offset': QuantType.W8A8.value,
                 'model.decoder.layers.4.self_attention.linear_proj.input_scale': QuantType.W8A8.value,
                 'model.decoder.layers.5.self_attention.linear_proj.input_offset': QuantType.W8A8.value,
-                'model.decoder.layers.7.mlp.linear_fc1.weight': QuantType.W8A8.value,
-                'model.decoder.layers.8.mlp.linear_fc1.smooth_scale': QuantType.W8A8.value,
-                'model.decoder.layers.9.mlp.linear_fc1.weight_scale': QuantType.W8A8.value,
-                'model.decoder.layers.10.mlp.linear_fc1.weight_offset': QuantType.W8A8.value,
-                'model.decoder.layers.11.mlp.linear_fc1.input_scale': QuantType.W8A8.value,
-                'model.decoder.layers.12.mlp.linear_fc1.input_offset': QuantType.W8A8.value,
+                'model.decoder.layers.7.mlp.gating.weight': QuantType.W8A8.value,
+                'model.decoder.layers.7.mlp.hidden.weight': QuantType.W8A8.value,
+                'model.decoder.layers.8.mlp.gating.smooth_scale': QuantType.W8A8.value,
+                'model.decoder.layers.8.mlp.hidden.smooth_scale': QuantType.W8A8.value,
+                'model.decoder.layers.9.mlp.gating.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.9.mlp.hidden.weight_scale': QuantType.W8A8.value,
+                'model.decoder.layers.10.mlp.gating.weight_offset': QuantType.W8A8.value,
+                'model.decoder.layers.10.mlp.hidden.weight_offset': QuantType.W8A8.value,
+                'model.decoder.layers.11.mlp.gating.input_scale': QuantType.W8A8.value,
+                'model.decoder.layers.11.mlp.hidden.input_scale': QuantType.W8A8.value,
+                'model.decoder.layers.12.mlp.gating.input_offset': QuantType.W8A8.value,
+                'model.decoder.layers.12.mlp.hidden.input_offset': QuantType.W8A8.value,
                 'model.decoder.layers.13.mlp.linear_fc2.weight': QuantType.FLOAT.value,
             }
             for name, value in check_map.items():
@@ -108,6 +118,7 @@ if __name__ == "__main__":
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = Telechat2Tester()
     tester.test_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, input_quant_algo, dataset_path)
+    tester.del_files(uargs.quant_algo, q_ckpt_path)
 
 
 def ptq_predict_2stage_4p_run(quant_algo):

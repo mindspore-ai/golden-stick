@@ -12,7 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""qwen3 quant model"""
+
+"""
+Qwen3 Quantized Model Implementation
+
+This module provides the quantized implementation for Qwen3 models
+using the MindFormers framework. It extends the MFModel base class
+to provide specific functionality for Qwen3 model quantization.
+
+Qwen3 is a series of large language models developed by Tongyi Lab,
+featuring strong performance in various natural language processing tasks.
+This quantized implementation enables efficient deployment of Qwen3
+models while maintaining high accuracy.
+
+The implementation supports various quantization techniques including:
+- Weight quantization (INT8, INT4)
+- Activation quantization
+- KVCache quantization
+- Mixed precision quantization
+
+Example:
+    >>> from mindspore_gs.ptq.models import AutoQuantForCausalLM
+    >>>
+    >>> # Automatically select and load Qwen3 model
+    >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/qwen3_config.yaml")
+    >>>
+    >>> # Calibrate and quantize the model
+    >>> model.calibrate(ptq_config, layers_policy, calibration_dataset)
+    >>>
+    >>> # Save the quantized model
+    >>> model.save_quantized("/path/to/save/qwen3_quant")
+"""
 
 from mindspore.nn.cell import Cell
 from mindspore_gs.ptq.models.mindformers_models.mf_model import (MFModel,
@@ -24,13 +54,65 @@ from mindspore_gs.ptq.utils import QuantType
 
 @MFModel.reg_model('qwen3')
 class QWen3(MFModelEnableSafeTensors):
-    """QWen3"""
+    """Qwen3 Quantized Model Implementation
+
+    This class provides the quantized implementation for Qwen3 models
+    using the MindFormers framework. It extends MFModelEnableSafeTensors
+    to provide specific functionality for Qwen3 model quantization.
+
+    Key features of this implementation include:
+    - Support for Qwen3-specific model architectures
+    - Integration with MindFormers' distributed computing capabilities
+    - Efficient parameter management for large-scale Qwen3 models
+    - SafeTensors format support for model persistence
+    - Quantization type description generation
+
+    The class is automatically registered with the 'qwen3' alias, making
+    it discoverable by the AutoQuantForCausalLM interface when a Qwen3
+    model configuration is detected.
+
+    Attributes:
+        Inherits all attributes from MFModelEnableSafeTensors.
+
+    Examples:
+        >>> from mindspore_gs.ptq.models import AutoQuantForCausalLM
+        >>>
+        >>> # Automatically detect and load Qwen3 model
+        >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/qwen3_config.yaml")
+        >>>
+        >>> # The model will be an instance of QWen3 class
+        >>> assert isinstance(model, QWen3)
+    """
 
     def _split_route_moe_weight(self, param_dict) -> tuple[dict, dict]:
+        """Split routed MoE weights.
+
+        This method handles the splitting of weights for Mixture of
+        Experts models with routing mechanisms in Qwen3 architecture.
+
+        Args:
+            param_dict (dict): Dictionary of model parameters.
+
+        Returns:
+            tuple[dict, dict]: Tuple containing the split parameter
+                dictionary and parameter name trace.
+        """
         return param_dict, {}
 
     def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
-        """_process_params_dict_before_save"""
+        """Process parameter dictionary before saving.
+
+        This method processes the parameter dictionary to handle
+        Qwen3-specific parameter management requirements before
+        saving the model.
+
+        Args:
+            param_dict (dict): Dictionary of model parameters.
+
+        Returns:
+            tuple[dict, dict]: Tuple containing the processed parameter
+                dictionary and parameter name trace.
+        """
         param_dict, param_name_trace = super()._process_params_dict_before_save(param_dict)
 
         # Apply QKV split
@@ -50,7 +132,20 @@ class QWen3(MFModelEnableSafeTensors):
         return param_dict, param_name_trace
 
     def _get_quant_type(self, network):
-        """_get_quant_type"""
+        """Get quantization type information for network parameters.
+
+        This method analyzes the network to determine the quantization
+        type for each parameter, such as W8A8 or W4A8_DYNAMIC.
+
+        Args:
+            network (Cell): The network to analyze for quantization types.
+
+        Returns:
+            dict. Dictionary mapping parameter names to their quantization types.
+
+        Raises:
+            TypeError: If the input network is not a Cell instance.
+        """
         if not isinstance(network, Cell):
             raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")
         results = {}
@@ -69,9 +164,19 @@ class QWen3(MFModelEnableSafeTensors):
         return results
 
     def get_description_file(self, network):
-        """
-        Obtain the description of quantization type for each parameter in each layer of the network.
-        Such as W8A8 or W4A8_DYNAMIC
+        """Obtain the description of quantization type for network parameters.
+
+        This method generates a comprehensive description of the
+        quantization type for each parameter in each layer of the network.
+        The description includes information such as W8A8 or W4A8_DYNAMIC
+        for each parameter.
+
+        Args:
+            network (Cell): The network to analyze for quantization descriptions.
+
+        Returns:
+            dict. Dictionary mapping parameter names to their quantization
+                type descriptions.
         """
         results = self._get_quant_type(network)
 

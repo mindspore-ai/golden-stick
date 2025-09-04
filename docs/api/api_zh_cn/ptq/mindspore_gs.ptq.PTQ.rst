@@ -44,10 +44,18 @@ mindspore_gs.ptq.PTQ
         返回：
             转换后的网络。
 
+    .. py:method:: fake_quant(network)
+
+        将网络应用伪量化操作。该方法对模型应用伪量化，这对于验证量化效果而不实际转换为整数操作非常有用。
+
+        参数：
+            - **network** (Cell) - 待伪量化的网络。
+
+        返回：
+            伪量化后的网络。
+
         异常：
-            - **TypeError** - `net_opt` 数据类型不是Cell。
-            - **TypeError** - `ckpt_path` 数据类型不是str。
-            - **ValueError** - `ckpt_path` 非空但不是有效路径。
+            - **TypeError** - `network` 数据类型不是Cell。
 
     .. py:method:: summary(network)
 

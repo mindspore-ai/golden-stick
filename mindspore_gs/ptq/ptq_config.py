@@ -270,7 +270,7 @@ class PTQConfig:
             granularity of weight.
             Currently only QuantGranularity.PER_CHANNEL and QuantGranularity.PER_GROUP are supported.
         group_size (int, optional): group_size of per_group quantization, suggest using 64, 128 or 256. Default value: ``0``.
-        weight_clip (bool, optional): Used to configure whether to use the clip policy, which will be forced to be true when using AWQ and OSL quantisation algorithms. Default value: ``False`.
+        weight_clip (bool, optional): Used to configure whether to use the clip policy, which will be forced to be true when using AWQ and OSL quantisation algorithms. Default value: ``False``.
 
     Raises:
         ValueError: If `mode` is not PTQMode.QUANTIZE or PTQMode.DEPLOY.
