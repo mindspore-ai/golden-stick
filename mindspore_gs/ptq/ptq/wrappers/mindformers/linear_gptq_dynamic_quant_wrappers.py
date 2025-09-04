@@ -18,6 +18,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import ReplicatedLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     ColumnParallelGroupedLinear,
@@ -54,6 +55,7 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         Quantizer.reg_layer_map(MergedColumnParallelLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelGroupedLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         Quantizer.reg_layer_map(RowParallelGroupedLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
+        Quantizer.reg_layer_map(ReplicatedLinear, GptqDynamicQuantLinearCell, GptqDynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -96,7 +98,8 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         w_qparam = QuantParam(self.w_scale, self.w_zp, self.cfg.group_size, self.cfg.weight_quant_dtype)
         if self.is_mcorelinear:
             return GptqDynamicQuantMcoreLinearInferCell(self._layer_name, self.layer, self.context, self.cfg,
-                                                        self.q_weight, w_qparam, self.compute_type, self.parallel_type)
+                                                        self.q_weight, w_qparam, self.compute_type, self.parallel_type,
+                                                        self.is_gmm_mcore)
         return GptqDynamicQuantLinearInferCell(self._layer_name, self.layer, self.cfg, self.q_weight,
                                                w_qparam, self.compute_type, self.parallel_type)
 
@@ -127,7 +130,7 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
     """GptqDynamicQuantLinearInferCell"""
     # pylint: disable=unused-argument
     def __init__(self, layer_name, linear: Linear, context, cfg, q_weight, w_qparam: QuantParam, compute_type,
-                 parallel_type: ParallelType):
+                 parallel_type: ParallelType, is_gmm_mcore=False):
         super().__init__(linear, parallel_type)
         self.cfg = cfg
         is_deploy = cfg.mode == PTQMode.DEPLOY
@@ -136,16 +139,18 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
                          f"{w_qparam}")
             logger.debug(f"GptqDynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
                          f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
-        _, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
-                                                                      w_qparam, is_deploy, False,
-                                                                      self._transpose_b(), compute_type,
-                                                                      experimental=True,
-                                                                      use_fake_quant=self.cfg.use_fake_quant)
+        qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
+                                                                        w_qparam, is_deploy, False,
+                                                                        self._transpose_b(), compute_type,
+                                                                        is_gmm_mcore=is_gmm_mcore,
+                                                                        experimental=True,
+                                                                        use_fake_quant=context.use_fake_quant)
         self._set_act_dynamic_quant(dynamic_quant_op)
         del self.layer.weight
         self.layer.weight = None
         self.weight = q_weight
-        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type)) if context.use_fake_quant \
+            else qmm.weight_scale
         self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
         self.has_bias = self.layer.has_bias
         if self.has_bias:

@@ -29,7 +29,7 @@ class MLAParamProcessor:
     def __init__(self, network):
         self.network = network
         self.qkv_split_rules = (r'\.linear_qkv_down_proj\.',
-                                '.q_down_proj.', '.kv_down_proj.')
+                                '.linear_q_down_proj.', '.linear_kv_down_proj.')
 
     def _split_qkv_name(self, param_dict):
         """_split_qkv_name"""
@@ -57,6 +57,8 @@ class MLAParamProcessor:
         }
 
         new_param_dict = {}
+        param_name_trace = {}
+
         for key, value in tqdm(param_dict.items(), desc="split mla qkv weights"):
             match = re.search(self.qkv_split_rules[0], key)
             if not match:
@@ -72,10 +74,10 @@ class MLAParamProcessor:
             split_axis = split_axis_map.get(param_name, -1)
             if split_axis < 0:
                 # No need to split, just clone the param to both gating and hidden
-                new_param_dict[gating_name] = value
-                new_param_dict[hidden_name] = value
-                param_name_trace[gating_name] = key
-                param_name_trace[hidden_name] = key
+                new_param_dict[q_down_name] = value
+                new_param_dict[kv_down_name] = value
+                param_name_trace[q_down_name] = key
+                param_name_trace[kv_down_name] = key
                 continue
             # Split tensor
             q_lora_rank = self.network.config.q_lora_rank
@@ -91,13 +93,16 @@ class MLAParamProcessor:
             shard_size = kv_lora_rank + qk_rope_head_dim
             new_param_dict[kv_down_name] = Parameter(
                 value.narrow(split_axis, shard_offset, shard_size))
-        return new_param_dict
+
+            param_name_trace[q_down_name] = key
+            param_name_trace[kv_down_name] = key
+        return new_param_dict, param_name_trace
 
     def _invert_trans_lkv2kv_weight(self, param_dict):
         """Permutate the kv_up_proj weight.
         Mutate in place. Change from kkkvvv to kvkvkv."""
         for key, value in param_dict.items():
-            match = re.search(r'\.kv_up_proj\.weight$', key)
+            match = re.search(r'\.linear_kv_up_proj\.weight$', key)
             if not match:
                 continue
 
@@ -128,10 +133,10 @@ class MLAParamProcessor:
 
     def split_param(self, param_dict):
         """The split process of MLA parameters"""
-        param_dict = self._split_qkv_weight(param_dict)
+        param_dict, param_name_trace = self._split_qkv_weight(param_dict)
         param_dict = self._invert_trans_rope_weight(param_dict)
         param_dict = self._invert_trans_lkv2kv_weight(param_dict)
-        return param_dict
+        return param_dict, param_name_trace
 
     def split_name(self, param_dict):
         """The split process of MLA parameters"""
@@ -143,22 +148,9 @@ class FFNParamProcessor:
     """Split parameters of FFN block."""
     def __init__(self, network):
         self.network = network
-        self.mlp_split_rules = (r'\.mlp\.linear_fc1\.',
-                                '.mlp.gating.', '.mlp.hidden.')
-        self.mlp_split_axis_map = {
-            # {param_name: axis}
-            'weight': 0,
-            'weight_offset': 0,
-            'weight_scale': 0,
-            'deq_scale': 0,
-            'quant_bias': 0,
-            'input_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-            'input_offset': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-            'smooth_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-        }
-        self.shared_experts_split_rules = (r'\.shared_experts\.linear_fc1\.',
-                                           '.shared_experts.gating.', '.shared_experts.hidden.')
-        self.shared_experts_split_axis_map = {
+        self.split_rules = (r'\.linear_fc1\.',
+                            '.gating.', '.hidden.')
+        self.split_axis_map = {
             # {param_name: axis}
             'weight': 0,
             'weight_offset': 0,
@@ -221,22 +213,12 @@ class FFNParamProcessor:
             if value.dtype == ms.qint4x2:
                 gating_start, gating_shared_size = gating_shard_range
                 hidden_start, hidden_shared_size = hidden_shard_range
-                if len(value.shape) == 2:
-                    new_param_dict[gating_name] = Parameter(ms.Tensor(
-                        value.asnumpy()[gating_start:gating_start+gating_shared_size, :],
-                        dtype=ms.qint4x2))
-                    new_param_dict[hidden_name] = Parameter(ms.Tensor(
-                        value.asnumpy()[hidden_start:hidden_start+hidden_shared_size, :],
-                        dtype=ms.qint4x2))
-                elif len(value.shape) == 3:
-                    new_param_dict[gating_name] = Parameter(ms.Tensor(
-                        value.asnumpy()[:, gating_start:gating_start+gating_shared_size, :],
-                        dtype=ms.qint4x2))
-                    new_param_dict[hidden_name] = Parameter(ms.Tensor(
-                        value.asnumpy()[:, hidden_start:hidden_start+hidden_shared_size, :],
-                        dtype=ms.qint4x2))
-                else:
-                    raise ValueError(f"Unexpected value shape: {value.shape} of key {key}")
+                new_param_dict[gating_name] = Parameter(ms.Tensor(
+                    value.asnumpy()[gating_start:gating_start+gating_shared_size, :],
+                    dtype=ms.qint4x2))
+                new_param_dict[hidden_name] = Parameter(ms.Tensor(
+                    value.asnumpy()[hidden_start:hidden_start+hidden_shared_size, :],
+                    dtype=ms.qint4x2))
             else:
                 new_param_dict[gating_name] = Parameter(value.narrow(split_axis, *gating_shard_range))
                 new_param_dict[hidden_name] = Parameter(value.narrow(split_axis, *hidden_shard_range))
@@ -251,19 +233,14 @@ class FFNParamProcessor:
         """split_param"""
         param_name_trace = {}
         param_dict, cur_trace = self._split_ffn_weight(param_dict,
-                                                       self.mlp_split_rules,
-                                                       self.mlp_split_axis_map)
-        param_name_trace.update(cur_trace)
-        param_dict, cur_trace = self._split_ffn_weight(param_dict,
-                                                       self.shared_experts_split_rules,
-                                                       self.shared_experts_split_axis_map)
+                                                       self.split_rules,
+                                                       self.split_axis_map)
         param_name_trace.update(cur_trace)
         return param_dict, param_name_trace
 
     def split_name(self, param_dict):
         """The split process of FFN parameters"""
-        param_dict = self._split_ffn_name(param_dict, self.mlp_split_rules)
-        param_dict = self._split_ffn_name(param_dict, self.shared_experts_split_rules)
+        param_dict = self._split_ffn_name(param_dict, self.split_rules)
         return param_dict
 
 
@@ -274,20 +251,6 @@ class MoeParamProcessor(FFNParamProcessor):
         self.num_experts = self.network.config.n_routed_experts
         self.moe_split_rules = (r'\.mlp\.experts\.',
                                 *(f'.mlp.experts.{i}.' for i in range(self.num_experts)))
-
-        self.route_experts_ffn_split_rules = (r'\.mlp\.experts\.linear_fc1\.',
-                                              '.mlp.experts.gating.', '.mlp.experts.hidden.')
-        self.route_experts_ffn_split_axis_map = {
-            # {param_name: axis}
-            'weight': 1,
-            'weight_offset': 1,
-            'weight_scale': 1,
-            'deq_scale': 1,
-            'quant_bias': 1,
-            'input_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-            'input_offset': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-            'smooth_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-        }
 
     def _split_moe_name(self, param_dict):
         """_split_moe_name"""
@@ -327,18 +290,16 @@ class MoeParamProcessor(FFNParamProcessor):
 
     def split_param(self, param_dict):
         """split_param"""
-        param_dict, param_name_trace = super().split_param(dict)
-        param_dict, cur_trace = self._split_ffn_weight(param_dict,
-                                                       self.route_experts_ffn_split_rules,
-                                                       self.route_experts_ffn_split_axis_map)
-        param_name_trace.update(cur_trace)
+        param_name_trace = {}
         param_dict = self._split_route_moe_weight(param_dict)
+        param_dict, cur_trace = super().split_param(param_dict)
+        param_name_trace.update(cur_trace)
         return param_dict, param_name_trace
 
     def split_name(self, param_dict):
         """split_name"""
-        param_dict = super().split_name(param_dict)
         param_dict = self._split_moe_name(param_dict)
+        param_dict = super().split_name(param_dict)
         return param_dict
 
 

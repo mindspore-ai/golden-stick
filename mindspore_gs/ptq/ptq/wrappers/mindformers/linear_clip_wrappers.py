@@ -23,6 +23,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import ReplicatedLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     ColumnParallelGroupedLinear,
@@ -56,6 +57,7 @@ class ClipLinearCell(WrapperLinearCell):
         LinearClipper.reg_layer_map(MergedColumnParallelLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(ColumnParallelGroupedLinear, ClipLinearCell, AutoClipChecker())
         LinearClipper.reg_layer_map(RowParallelGroupedLinear, ClipLinearCell, AutoClipChecker())
+        LinearClipper.reg_layer_map(ReplicatedLinear, ClipLinearCell, AutoClipChecker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -86,7 +88,8 @@ class ClipLinearCell(WrapperLinearCell):
                     MergedColumnParallelLinear: ParallelType.COL_PARALLEL,
                     McoreRowParallelLinear: ParallelType.ROW_PARALLEL,
                     ColumnParallelGroupedLinear: ParallelType.COL_PARALLEL,
-                    RowParallelGroupedLinear: ParallelType.ROW_PARALLEL,}
+                    RowParallelGroupedLinear: ParallelType.ROW_PARALLEL,
+                    ReplicatedLinear: ParallelType.NO_PARALLEL}
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
@@ -108,8 +111,9 @@ class ClipLinearCell(WrapperLinearCell):
         parallel_type = type_map.get(type(self.layer), None)
         self.is_rowparallel = parallel_type == ParallelType.ROW_PARALLEL
         self.is_colparallel = parallel_type == ParallelType.COL_PARALLEL
-        self.is_linear = parallel_type == ParallelType.NO_PARALLEL
-        if not self.is_rowparallel and not self.is_colparallel and not self.is_linear:
+        self.is_linear = parallel_type == ParallelType.NO_PARALLEL and isinstance(linear, Linear)
+        self.is_replicate = parallel_type == ParallelType.NO_PARALLEL and isinstance(linear, ReplicatedLinear)
+        if not any([self.is_colparallel, self.is_rowparallel, self.is_linear, self.is_replicate]):
             raise ValueError("only Linear、ColumnParallelLinear、RowParallelLinear cell is supported,"
                              f"but {linear_name} type is {type(linear)}.")
         self.compute_type = self.layer.dtype if self.is_linear else self.layer.compute_dtype
@@ -209,7 +213,8 @@ class ClipLinearCell(WrapperLinearCell):
                 cur_out = msops.sum(msops.mul(input_feat, q_w), dim=-1)
 
                 err = msops.mean(msops.pow(cur_out - org_out, 2), axis=1).reshape(min_errs.shape).astype(w.dtype)
-                logger.info(f"Layer {self._layer_name}, weight clip search iter {i_b}, ratio {i_s}")
+                if i_b % 100 == 0:
+                    logger.info(f"Layer {self._layer_name}, weight clip search iter {i_b}, ratio {i_s}")
                 logger.debug(f"clip err of Layer({self._layer_name}) is {{{err.shape}, {err.dtype}}}")
                 del cur_w
                 del cur_out
@@ -233,6 +238,7 @@ class ClipLinearCell(WrapperLinearCell):
         logger.debug(f"ClipLinearCell: clip weight of Layer({self._layer_name}) is {{{weight.shape}, {weight.dtype}}}")
 
     def process(self):
+        """process"""
         super(ClipLinearCell, self).process()
         org_shape = self._layer.weight.shape
         if len(org_shape) == 3:

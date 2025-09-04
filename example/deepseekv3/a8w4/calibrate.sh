@@ -23,25 +23,29 @@ export MS_ALLOC_CONF="enable_vmm:True"
 export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
+export MS_ENABLE_INTERNAL_KERNELS=on
+export ENFORCE_EAGER=true
+
 mf_path=$1
 worker_num=${2:-8}
+output_dir=${3:-quantized_model}
 base_path=$(cd "$(dirname $0)"; pwd)
-yaml=${base_path}/predict_deepseek_r1_671b_calibrate.yaml
-ceval_path=${base_path}/../../../tests/data/calibrate-dataset/calibrate.jsonl
-calibrate_path=${base_path}/../calibrate.py
+yaml_path=${base_path}/calibrate_deepseek3_671b.yaml
+dataset_path=${base_path}/../../../tests/data/calibrate-dataset/calibrate.jsonl
+calibrate_path=${base_path}/calibrate.py
 
 export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
-export MS_JIT="0"
-export ENFORCE_EAGER="true"
-msrun --worker_num=${worker_num} \
-      --local_worker_num=${worker_num} \
-      --master_port=8188 \
-      --cluster_time_out=300 \
-      --join=False \
-      --log_dir=calibrate_a8w4_log \
-      python ${calibrate_path} \
-            --config ${yaml} \
-            --approach a8w4 \
-            -t calibrate \
-            -s ${ceval_path} > log_calibrate_a8w4 2>&1 &
+msrun \
+    --worker_num=${worker_num} \
+    --local_worker_num=${worker_num} \
+    --master_port=8188 \
+    --cluster_time_out=300 \
+    --join=True \
+    --log_dir=log_calibrate \
+    python $calibrate_path \
+        --config_path $yaml_path \
+        --output_dir $output_dir \
+        --quant_type "a8w4" \
+        --ds_type "calibrate" \
+        --ds_path $dataset_path 2>&1 | tee calibrate.log

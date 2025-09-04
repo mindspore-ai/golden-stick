@@ -18,6 +18,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear as McoreColumnParallelLinear, RowParallelLinear as McoreRowParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
+from mindformers.parallel_core.inference.tensor_parallel.layers import ReplicatedLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     ColumnParallelGroupedLinear,
@@ -54,6 +55,7 @@ class DynamicQuantLinearCell(WeightQuantLinearCell):
         Quantizer.reg_layer_map(MergedColumnParallelLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(ColumnParallelGroupedLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         Quantizer.reg_layer_map(RowParallelGroupedLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
+        Quantizer.reg_layer_map(ReplicatedLinear, DynamicQuantLinearCell, DynamicA8W8Checker())
         try:
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
