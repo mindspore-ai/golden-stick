@@ -31,7 +31,7 @@ and adds concrete functionality for:
 This class serves as a foundation that specific model framework
 implementations can inherit from to avoid duplicating common logic.
 
-Example:
+Examples:
     >>> from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
     >>>
     >>> class MyModelImpl(BaseQuantForCausalLMImpl):
@@ -71,10 +71,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
     framework implementations that can override the abstract methods
     while reusing the common functionality provided here.
 
-    Attributes:
-        None
-
-    Example:
+    Examples:
         >>> from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
         >>>
         >>> class CustomModelImpl(BaseQuantForCausalLMImpl):
@@ -96,7 +93,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         Args:
             input_ids (Tensor): Input token IDs for the model.
             max_new_tokens (int, optional): Maximum number of tokens to generate.
-                Defaults to 1.
+                Defaults to ``1``.
 
         Returns:
             Forward pass results.
@@ -117,7 +114,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
             **kwargs: Arbitrary keyword arguments for model creation.
 
         Returns:
-            BaseQuantForCausalLMImpl: An instance of the quantized model.
+            BaseQuantForCausalLMImpl. An instance of the quantized model.
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.
@@ -150,10 +147,10 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         Args:
             index (int): The number to format.
             length (int, optional): The desired length of the output string.
-                Defaults to 5.
+                Defaults to ``5``.
 
         Returns:
-            str: Zero-padded string representation of the number.
+            str. Zero-padded string representation of the number.
 
         Raises:
             RuntimeError: If index is negative or exceeds the maximum allowed value.
@@ -193,10 +190,10 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         parameter management and distribution across different computing nodes.
 
         Args:
-            scope (str, optional): Scope for parameter retrieval. Defaults to "".
+            scope (str, optional): Scope for parameter retrieval. Defaults to ``""``.
 
         Returns:
-            dict[str, DistributedParameter]: Dictionary mapping parameter names
+            dict[str, DistributedParameter]. Dictionary mapping parameter names
             to DistributedParameter objects.
 
         Raises:
@@ -227,7 +224,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         to identify which layers in the network should be processed.
 
         Returns:
-            tuple[type]: Tuple of transformer layer types.
+            tuple[type]. Tuple of transformer layer types.
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.
@@ -250,7 +247,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
             datasets (Dataset): Calibration dataset for quantization.
             **kwargs: Additional keyword arguments.
                 fake_quant (bool, optional): Whether to use fake quantization.
-                    Defaults to False.
+                    Defaults to ``False``.
 
         Example:
             >>> # Typical usage pattern
@@ -293,7 +290,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
             ptq_config (PTQConfig): Configuration for post-training quantization.
             layers_policy (dict): Policy for different layer quantization strategies.
             quant_safetensors_path (str, optional): Path to quantized safetensors.
-                Defaults to "".
+                Defaults to ``""``.
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.
