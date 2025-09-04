@@ -346,12 +346,14 @@ class PTQConfig:
             logger.warning('GPTQQuantConfig is not configured, it will apply the default parameters.')
         if self.precision_recovery != PrecisionRecovery.GPTQ and isinstance(self.algo_args, GPTQQuantConfig):
             logger.warning(f'GPTQQuantConfig is configured, but the precision recovery is {self.precision_recovery}.')
-        use_a8w4 = self.act_quant_dtype == msdtype.int8 and self.weight_quant_dtype == msdtype.qint4x2
-        use_gptq_per_token = (self.act_quant_granularity == QuantGranularity.PER_TOKEN and
-                              self.precision_recovery == PrecisionRecovery.GPTQ)
-        if use_a8w4 and not use_gptq_per_token:
-            raise ValueError('PTQ algorithm only support act_quant_granularity with per_token and precision_recovery "'
-                             'with GPTQ for a8w4 quantization.')
+        if self.weight_quant_dtype == msdtype.qint4x2 and self.act_quant_dtype == msdtype.int8:
+            if not self.algo_args.desc_act or not self.algo_args.static_groups:
+                raise ValueError('PTQ algorithm only support desc_act=True and static_groups=True '
+                                 'with GPTQ for a8w4 quantization')
+            if self.act_quant_granularity != QuantGranularity.PER_TOKEN or \
+             self.precision_recovery != PrecisionRecovery.GPTQ:
+                raise ValueError('PTQ algorithm only support act_quant_granularity with per_token and precision_recovery '
+                                 'with GPTQ for a8w4 quantization.')
         value_check('precision_recovery', self.precision_recovery, PrecisionRecovery)
 
     def _check_quant_granularity(self):

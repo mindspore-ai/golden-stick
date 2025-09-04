@@ -15,6 +15,7 @@
 """base class of quant models"""
 
 
+import os
 import time
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq import PTQ
@@ -36,7 +37,9 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
 
     def save_quantized(self, save_path):
         """save_pretrained"""
-        raise NotImplementedError
+        if os.path.exists(save_path):
+            logger.warning(f"The {save_path} already exists, "
+                           "the save path will be overwritten.")
 
     @staticmethod
     def _get_num_str(index, length=5):
