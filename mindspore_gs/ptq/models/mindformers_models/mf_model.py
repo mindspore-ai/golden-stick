@@ -405,7 +405,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'input_scale', 0)
                     self._try_append_shard_axis(cell, 'input_offset', 0)
                     self._try_append_shard_axis(cell, 'smooth_scale', 0)
-                    self._try_append_shard_axis(cell, 'dep_scale', None)
+                    self._try_append_shard_axis(cell, 'deq_scale', None)
                     self._try_append_shard_axis(cell, 'quant_bias', None)
                 elif 'linear_fc2' in cell_name:
                     self._try_append_shard_axis(cell, 'weight', 1)
@@ -414,7 +414,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'input_scale', 0)
                     self._try_append_shard_axis(cell, 'input_offset', 0)
                     self._try_append_shard_axis(cell, 'smooth_scale', 0)
-                    self._try_append_shard_axis(cell, 'dep_scale', None)
+                    self._try_append_shard_axis(cell, 'deq_scale', None)
                     self._try_append_shard_axis(cell, 'quant_bias', None)
                 elif any(seg in cell_name for seg in ('linear_q', 'linear_k',
                                                       'linear_v', 'linear_qkv')):
@@ -426,7 +426,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'input_scale', None)
                     self._try_append_shard_axis(cell, 'input_offset', None)
                     self._try_append_shard_axis(cell, 'smooth_scale', None)
-                    self._try_append_shard_axis(cell, 'dep_scale', 0)
+                    self._try_append_shard_axis(cell, 'deq_scale', 0)
                     self._try_append_shard_axis(cell, 'quant_bias', 0)
                 elif any(seg in cell_name for seg in ('hidden', 'gating',
                                                       'linear_fc1')):
@@ -436,7 +436,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'input_scale', None)
                     self._try_append_shard_axis(cell, 'input_offset', None)
                     self._try_append_shard_axis(cell, 'smooth_scale', None)
-                    self._try_append_shard_axis(cell, 'dep_scale', 0)
+                    self._try_append_shard_axis(cell, 'deq_scale', 0)
                     self._try_append_shard_axis(cell, 'quant_bias', 0)
                 elif 'output_layer' in cell_name:
                     self._try_append_shard_axis(cell, 'weight', 0)
