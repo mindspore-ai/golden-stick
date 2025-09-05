@@ -3,6 +3,12 @@ import argparse
 import os
 from collections import OrderedDict
 
+import mindspore as ms
+from mindspore import dataset
+from mindspore import dtype as msdtype
+from mindformers import MindFormerConfig
+from transformers import AutoTokenizer
+
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
@@ -10,10 +16,6 @@ from mindspore_gs.ptq import (OutliersSuppressionType, PrecisionRecovery,
                               PTQConfig, PTQMode, QuantGranularity,
                               GPTQQuantConfig)
 from mindspore_gs.ptq.models import AutoQuantForCausalLM
-from transformers import AutoTokenizer
-from mindformers import MindFormerConfig
-from mindspore import dataset
-from mindspore import dtype as msdtype
 
 
 def get_args():
@@ -47,7 +49,7 @@ def create_ptq_config(quant_type: str):
     if quant_type.lower() == "a8w4":
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                         act_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
                         opname_blacklist=['output_layer', 'kv_up_proj'], weight_clip=True)
         mlp_config = PTQConfig(backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
                                act_quant_dtype=msdtype.int8,
@@ -91,7 +93,13 @@ def quant_dsv3(config_path, output_dir, quant_type,
     datasets = create_ds(ds_path, tokenizer, ds_type=ds_type)
     model = AutoQuantForCausalLM.from_pretrained(config_path)
     cfg, layers_policy = create_ptq_config(quant_type)
-    model.calibrate(cfg, layers_policy, datasets)
+    calibrate_options = {
+        'algorithm_cache_path': {'osl': 'osl_cache'},
+        'always_use_fp_input_in_processer': True,
+        'skip_offload_in_processing': True,
+    }
+    ms.mint.distributed.barrier()
+    model.calibrate(cfg, layers_policy, datasets, **calibrate_options)
     ckpt_path = model.save_quantized(output_dir)
     logger.info(f'Save quantized model to {ckpt_path}')
 
