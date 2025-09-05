@@ -303,6 +303,14 @@ class PTQ(CompAlgo):
             TypeError: If input `network` is not a Cell.
             ValueError: If input datasets is None.
         """
+        def catch_layer_output(layer, input_args, input_kwargs, output_args, output_kwargs, do_update=True):
+            for index, (args, kwargs) in enumerate(zip(input_args, input_kwargs)):
+                output = layer(*args, **kwargs)
+                if do_update:
+                    if "hidden_states" in all_kwargs[index]:
+                        output_kwargs[index]["hidden_states"] = output[0] if isinstance(output, tuple) else output
+                    else:
+                        output_args[index][0] = output[0] if isinstance(output, tuple) else output
         self._config.update_comm_info()
         self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
@@ -328,10 +336,8 @@ class PTQ(CompAlgo):
             layer_name, layer = self.decoder_layers[i]
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             if self._config.always_use_fp_input_in_processer:
-                for index, (args, kwargs) in enumerate(zip(cur_args, cur_kwargs)):
-                    output = layer(*args, **kwargs)
-                    if len(self.decoder_layers) > 1:
-                        all_args[index][0] = output[0] if isinstance(output, tuple) else output
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs,
+                                   do_update=len(self.decoder_layers) > 1)
             for processor in self.pipeline:
                 processor.replace(layer_name, layer, search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
 
@@ -339,21 +345,14 @@ class PTQ(CompAlgo):
                 start_time = time.time()
 
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook(self._config.experimental))
-                index = 0
-                for args, kwargs in zip(cur_args, cur_kwargs):
-                    output = layer(*args, **kwargs)
-                    if len(self.decoder_layers) > 1 and not self._config.always_use_fp_input_in_processer:
-                        # FIXME: 'always_use_fp_input_in_processer' is a temporary switch for fixing activation between
-                        # layers. This branch may introduces error to the next layer, because previous processors in the
-                        # pipeline changes the layer, and thus, gives a inaccurate output. Set the switch to True to
-                        # avoid this issue. The switch should be removed after the issue is fixed. -- @tongl2
-                        if "hidden_states" in all_kwargs[index]:
-                            all_kwargs[index]["hidden_states"] = output[0] if isinstance(output, tuple) else output
-                        else:
-                            all_args[index][0] = output[0] if isinstance(output, tuple) else output
-                    index += 1
+                # FIXME: 'always_use_fp_input_in_processer' is a temporary switch for fixing activation between
+                # layers. This branch may introduces error to the next layer, because previous processors in the
+                # pipeline changes the layer, and thus, gives a inaccurate output. Set the switch to True to
+                # avoid this issue. The switch should be removed after the issue is fixed. -- @tongl2
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs, do_update= \
+                    len(self.decoder_layers) > 1 and not self._config.always_use_fp_input_in_processer)
 
-                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.remove_hook(self._config.experimental))
+                transform_network_inplace(layer, WrapperCell, lambda _, c: c.remove_hook(self._config.experimental))
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
                 processor.process(layer_name, layer)
@@ -361,13 +360,7 @@ class PTQ(CompAlgo):
                 network.update_parameters_name()
                 gc.collect()
             if self._config.reflash_inputs_after_each_processor:
-                index = 0
-                for args, kwargs in zip(cur_args, cur_kwargs):
-                    if "hidden_states" in all_kwargs[index]:
-                        all_kwargs[index]["hidden_states"] = layer(*args, **kwargs)
-                    else:
-                        all_args[index][0] = layer(*args, **kwargs)
-                    index += 1
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs)
             start_time = time.time()
             offload_network(layer)
             gc.collect()
