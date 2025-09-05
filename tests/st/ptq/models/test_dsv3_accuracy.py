@@ -24,6 +24,7 @@ from safetensors import safe_open
 import pytest
 
 from mindspore import dtype as msdtype
+from mindspore.communication import get_rank
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
                               PrecisionRecovery, QuantGranularity, GPTQQuantConfig)
@@ -78,20 +79,19 @@ class DeepSeekV3Tester(PTQModelTester):
         }
         return score_mapping.get(quant_type)
 
-    def _load_file(self, quant_ckpt_path, rank_num):
+    def _load_file(self, quant_ckpt_path):
         """load_file"""
         if not os.path.exists(quant_ckpt_path):
             raise ValueError(f"{quant_ckpt_path} not exists.")
 
         # load safetensors files
-        files = []
-        for file in (f"{quant_ckpt_path}/rank_{i}/quant.safetensors" for i in range(rank_num)):
-            files.append(safe_open(file, framework="np"))
-        files = tuple(files)
-        param_keys = files[0].keys()
-        return files, param_keys
+        rank_id = get_rank()
+        filename = f"{quant_ckpt_path}/rank_{rank_id}/quant.safetensors"
+        file = safe_open(filename, framework="np")
+        param_keys = file.keys()
+        return file, param_keys
 
-    def _check_qkv_split(self, files, param_keys):
+    def _check_qkv_split(self, file, param_keys):
         """check_qkv_split"""
         layer_prefix = 'model.layers.0.self_attn.'
         layer_names = ['q_a_proj.',
@@ -112,41 +112,41 @@ class DeepSeekV3Tester(PTQModelTester):
                     raise ValueError(f"{param_full_name} not in unify safetensors.")
                 if 'q_a' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (1536, 7168), \
+                        assert file.get_tensor(param_full_name).shape == (1536, 7168), \
                             f"{param_full_name} error, expect (1536, 7168)"
                     if param_full_name.endswith("weight_scale"):
-                        assert files[0].get_tensor(param_full_name).shape == (1536,), \
+                        assert file.get_tensor(param_full_name).shape == (1536,), \
                             f"{param_full_name} error, expect (1536,),"
                     if param_full_name.endswith("weight_offset"):
-                        assert files[0].get_tensor(param_full_name).shape == (1536,), \
+                        assert file.get_tensor(param_full_name).shape == (1536,), \
                             f"{param_full_name} error, expect (1536,),"
                     if param_full_name.endswith("input_scale"):
-                        assert files[0].get_tensor(param_full_name).shape == (7168,), \
+                        assert file.get_tensor(param_full_name).shape == (7168,), \
                             f"{param_full_name} error, expect (7168,)"
                     if param_full_name.endswith("input_offset"):
-                        assert files[0].get_tensor(param_full_name).shape == (7168,), \
+                        assert file.get_tensor(param_full_name).shape == (7168,), \
                             f"{param_full_name} error, expect (7168,)"
                     if param_full_name.endswith("smooth_scale"):
-                        assert files[0].get_tensor(param_full_name).shape == (7168,), \
+                        assert file.get_tensor(param_full_name).shape == (7168,), \
                             f"{param_full_name} error, expect (7168,)"
                     if param_full_name.endswith("deq_scale"):
-                        assert files[0].get_tensor(param_full_name).shape == (1536,), \
+                        assert file.get_tensor(param_full_name).shape == (1536,), \
                             f"{param_full_name} error, expect (1536,),"
                     if param_full_name.endswith("quant_bias"):
-                        assert files[0].get_tensor(param_full_name).shape == (1536,), \
+                        assert file.get_tensor(param_full_name).shape == (1536,), \
                             f"{param_full_name} error, expect (1536,),"
                 elif 'q_b' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (6144, 1536), \
+                        assert file.get_tensor(param_full_name).shape == (6144, 1536), \
                             f"{param_full_name} error, expect (6144, 1536)"
                 elif 'kv_a' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (576, 7168), \
+                        assert file.get_tensor(param_full_name).shape == (576, 7168), \
                             f"{param_full_name} error, expect (576, 7168)"
                 else:
                     raise ValueError(f"{param_full_name} is not expected.")
 
-    def _check_ffn_split(self, files, param_keys):
+    def _check_ffn_split(self, file, param_keys):
         """check_ffn_split"""
         layer_prefix = 'model.layers.0.mlp.'
         layer_names = ['gate_proj.',
@@ -162,26 +162,26 @@ class DeepSeekV3Tester(PTQModelTester):
                     raise ValueError(f"{param_full_name} not in unify safetensors.")
                 if 'gate' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (4608, 7168), \
+                        assert file.get_tensor(param_full_name).shape == (4608, 7168), \
                             f"{param_full_name} error, expect (4608, 7168)"
                     if param_full_name.endswith("weight_scale"):
-                        assert files[0].get_tensor(param_full_name).shape == (4608,), \
+                        assert file.get_tensor(param_full_name).shape == (4608,), \
                             f"{param_full_name} error, expect (4608,)"
                     if param_full_name.endswith("weight_offset"):
-                        assert files[0].get_tensor(param_full_name).shape == (4608,), \
+                        assert file.get_tensor(param_full_name).shape == (4608,), \
                             f"{param_full_name} error, expect (4608,)"
                 elif 'down' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (7168, 4608), \
+                        assert file.get_tensor(param_full_name).shape == (7168, 4608), \
                             f"{param_full_name} error, expect (7168, 4608)"
                 elif 'up' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (4608, 7168), \
+                        assert file.get_tensor(param_full_name).shape == (4608, 7168), \
                             f"{param_full_name} error, expect (4608, 7168)"
                 else:
                     raise ValueError(f"{param_full_name} is not expected.")
 
-    def _check_moe_split(self, files, param_keys):
+    def _check_moe_split(self, file, param_keys):
         """check_moe_split"""
         layer_prefix = 'model.layers.3.mlp.experts.'
         layer_names = ['gate_proj.',
@@ -204,34 +204,34 @@ class DeepSeekV3Tester(PTQModelTester):
 
                 if 'gate' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (512, 7168), \
+                        assert file.get_tensor(param_full_name).shape == (512, 7168), \
                             f"{param_full_name} error, expect (512, 7168)"
                     if param_full_name.endswith("weight_scale"):
-                        assert files[0].get_tensor(param_full_name).shape == (512, 28), \
+                        assert file.get_tensor(param_full_name).shape == (512, 28), \
                             f"{param_full_name} error, expect (512, 28)"
                     if param_full_name.endswith("weight_offset"):
-                        assert files[0].get_tensor(param_full_name).shape == (512, 28), \
+                        assert file.get_tensor(param_full_name).shape == (512, 28), \
                             f"{param_full_name} error, expect (512, 28)"
                 elif 'down' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (7168, 512), \
+                        assert file.get_tensor(param_full_name).shape == (7168, 512), \
                             f"{param_full_name} error, expect (7168, 512)"
                 elif 'up' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert files[0].get_tensor(param_full_name).shape == (512, 7168), \
+                        assert file.get_tensor(param_full_name).shape == (512, 7168), \
                             f"{param_full_name} error, expect (512, 7168)"
                 else:
                     raise ValueError(f"{param_full_name} is not expected.")
 
-    def check_safetensor_split(self, quant_ckpt_path, rank_num):
+    def check_safetensor_split(self, quant_ckpt_path):
         """check_safetensor_split"""
-        files, param_keys = self._load_file(quant_ckpt_path, rank_num)
+        file, param_keys = self._load_file(quant_ckpt_path)
         print("checking qkv split...")
-        self._check_qkv_split(files, param_keys)
+        self._check_qkv_split(file, param_keys)
         print("checking moe split...")
-        self._check_moe_split(files, param_keys)
+        self._check_moe_split(file, param_keys)
         print("checking ffn split...")
-        self._check_ffn_split(files, param_keys)
+        self._check_ffn_split(file, param_keys)
 
 
 if __name__ == "__main__":
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     tester = DeepSeekV3Tester()
     tester.quant_model(calibrate_config_path, q_ckpt_path, input_quant_algo, dataset_path)
     if uargs.quant_algo.lower() == 'a8w4':
-        tester.check_safetensor_split(q_ckpt_path, 4)
+        tester.check_safetensor_split(q_ckpt_path)
 
 def ptq_predict_2stage_4p_run(quant_algo):
     """

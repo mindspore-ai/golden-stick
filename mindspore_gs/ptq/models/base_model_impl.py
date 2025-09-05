@@ -264,6 +264,10 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         # pylint: disable=protected-access
         ptq._config.experimental = True
         ptq._config.use_fake_quant = kwargs.get('fake_quant', False)
+        ptq._config.algorithm_cache_path = kwargs.get('algorithm_cache_path', {})
+        ptq._config.always_use_fp_input_in_processer = kwargs.get('always_use_fp_input_in_processer', False)
+        ptq._config.skip_offload_in_processing = kwargs.get('skip_offload_in_processing', False)
+
         transformer_layers = self._transformer_layers()
         _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
         quant_start = time.time()
