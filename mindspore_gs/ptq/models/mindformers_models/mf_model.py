@@ -141,6 +141,9 @@ class MFModel(BaseQuantForCausalLMImpl):
 
         return decorator
 
+    def _after_network_load_weights(self):
+        return
+
     def __init__(self, yaml_path):
         """Initialize the MindFormers quantized model.
 
@@ -160,6 +163,7 @@ class MFModel(BaseQuantForCausalLMImpl):
         self._original_sf_path = config.load_checkpoint
         if config.load_checkpoint:
             self.network.load_weights(config.load_checkpoint)
+            self._after_network_load_weights()
 
     # pylint: disable=arguments-differ
     @classmethod
