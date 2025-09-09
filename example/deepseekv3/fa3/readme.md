@@ -1,5 +1,7 @@
 # DeepSeekR1网络Flash Attention 3(FA3) 量化算法指南
 
+Flash Attention 3(FA3)校准算法现属于demo特性。
+
 本指南基于单机16卡，如果使用双机16卡，请将msrun命令替换为双机16卡形式。
 
 运行前请检查yaml配置中的tp并行数，load_checkpoint配置，tokenizer配置是否合理。
