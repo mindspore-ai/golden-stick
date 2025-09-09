@@ -1,7 +1,7 @@
 mindspore_gs.ptq.PTQ
 ============================================================
 
-.. py:class:: mindspore_gs.ptq.PTQ(config: Union[dict, PTQConfig] = None, layer_policies=None)
+.. py:class:: mindspore_gs.ptq.PTQ(config=None, layer_policies=None)
 
     量化算法PTQ的基本实现，支持激活、权重和kvcache的组合量化。
 
@@ -16,7 +16,7 @@ mindspore_gs.ptq.PTQ
         - **ValueError** - 当act_quant_dtype是int8类型，weight_quant_dtype为None时。
         - **TypeError** - `layer_policies` 的类型不为 OrderedDict。
 
-    .. py:method:: apply(network: Cell, network_helper: NetworkHelper = None, datasets=None, **kwargs)
+    .. py:method:: apply(network, network_helper=None, datasets=None, **kwargs)
 
         将 `network` 中添加伪量化节点，转换成一个伪量化网络。
 
@@ -33,7 +33,7 @@ mindspore_gs.ptq.PTQ
             - **TypeError** - `network` 不是一个 `Cell` 对象。
             - **ValueError** - 当datasets为空。
 
-    .. py:method:: convert(net_opt: Cell, ckpt_path="")
+    .. py:method:: convert(net_opt, ckpt_path="")
 
         将量化网络 `net_opt` 转换为真实量化网络，后续导出用于部署。
 

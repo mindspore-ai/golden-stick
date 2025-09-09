@@ -10,7 +10,7 @@ mindspore_gs.ptq.QuantGranularity
     - ``PER_TOKEN`` : 配置量化粒度为 per_token 。
     - ``PER_GROUP`` : 配置量化粒度为 per_group 。
 
-    .. py:method:: from_str(name: str)
+    .. py:method:: from_str(name)
         :classmethod:
 
         将 `name` 转换成量化粒度类型。

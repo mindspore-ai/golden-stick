@@ -8,7 +8,7 @@ mindspore_gs.ptq.PrecisionRecovery
     - ``GPTQ`` : 使用GPTQ算法做精度补偿。
     - ``NONE`` : 不做精度补偿。
 
-    .. py:method:: from_str(name: str)
+    .. py:method:: from_str(name)
         :classmethod:
 
         将 `name` 转换成精度补偿算法类型。

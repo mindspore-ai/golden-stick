@@ -11,7 +11,7 @@ mindspore_gs.ptq.OutliersSuppressionType
     - ``OUTLIER_SUPPRESSION_LITE`` : 使用OUTLIER_SUPPRESSION_LITE方法做异常值抑制。
     - ``NONE`` : 不做异常值抑制。
 
-    .. py:method:: from_str(name: str)
+    .. py:method:: from_str(name)
         :classmethod:
 
         将 `name` 转换成异常值抑制算法类型。
