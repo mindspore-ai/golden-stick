@@ -598,8 +598,8 @@ def test_a8w4_config_error():
 
     with pytest.raises(ValueError):
         config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.qint4x2,
-                           act_quant_granularity=QuantGranularity.PER_TENSOR,
-                           weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
+                           weight_quant_granularity=QuantGranularity.PER_CHANNEL,
                            precision_recovery=PrecisionRecovery.GPTQ,
                            algo_args=algo_args,
                            group_size=256)
@@ -609,7 +609,25 @@ def test_a8w4_config_error():
         config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.qint4x2,
                            act_quant_granularity=QuantGranularity.PER_TOKEN,
                            weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           algo_args=algo_args,
+                           group_size=256)
+        _ = PTQ(config)
+
+    with pytest.raises(ValueError):
+        config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.qint4x2,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
+                           weight_quant_granularity=QuantGranularity.PER_GROUP,
                            precision_recovery=PrecisionRecovery.GPTQ,
+                           group_size=256)
+        _ = PTQ(config)
+
+    with pytest.raises(ValueError):
+        algo_args = GPTQQuantConfig(desc_act=False, static_groups=False)
+        config = PTQConfig(act_quant_dtype=dtype.int8, weight_quant_dtype=dtype.qint4x2,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
+                           weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           precision_recovery=PrecisionRecovery.GPTQ,
+                           algo_args=algo_args,
                            group_size=256)
         _ = PTQ(config)
 
