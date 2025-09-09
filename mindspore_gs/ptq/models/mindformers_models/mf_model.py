@@ -394,7 +394,7 @@ class MFModelEnableSafeTensors(MFModel):
 
             def _try_append_shard_axis(self, linear, param_name, axis):
                 """Append sharding axis information for a parameter."""
-                if not hasattr(linear, param_name):
+                if not hasattr(linear, param_name) or getattr(linear, param_name) is None:
                     return
                 self.shard_axis[getattr(linear, param_name).name] = axis
 
@@ -411,6 +411,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'smooth_scale', 0)
                     self._try_append_shard_axis(cell, 'deq_scale', None)
                     self._try_append_shard_axis(cell, 'quant_bias', None)
+                    self._try_append_shard_axis(cell, 'bias', None)
                 elif 'linear_fc2' in cell_name:
                     self._try_append_shard_axis(cell, 'weight', 1)
                     self._try_append_shard_axis(cell, 'weight_scale', None)
@@ -420,6 +421,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'smooth_scale', 0)
                     self._try_append_shard_axis(cell, 'deq_scale', None)
                     self._try_append_shard_axis(cell, 'quant_bias', None)
+                    self._try_append_shard_axis(cell, 'bias', None)
                 elif any(seg in cell_name for seg in ('linear_q', 'linear_k',
                                                       'linear_v', 'linear_qkv')):
                     # pylint: disable=protected-access
@@ -432,6 +434,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'smooth_scale', None)
                     self._try_append_shard_axis(cell, 'deq_scale', 0)
                     self._try_append_shard_axis(cell, 'quant_bias', 0)
+                    self._try_append_shard_axis(cell, 'bias', 0)
                 elif any(seg in cell_name for seg in ('hidden', 'gating',
                                                       'linear_fc1')):
                     self._try_append_shard_axis(cell, 'weight', 0)
@@ -442,6 +445,7 @@ class MFModelEnableSafeTensors(MFModel):
                     self._try_append_shard_axis(cell, 'smooth_scale', None)
                     self._try_append_shard_axis(cell, 'deq_scale', 0)
                     self._try_append_shard_axis(cell, 'quant_bias', 0)
+                    self._try_append_shard_axis(cell, 'bias', 0)
                 elif 'output_layer' in cell_name:
                     self._try_append_shard_axis(cell, 'weight', 0)
                 elif 'embedding.word_embeddings' in cell_name:

@@ -54,6 +54,7 @@ class MLAParamProcessor:
             'weight_scale': 0,
             'deq_scale': 0,
             'quant_bias': 0,
+            'bias': 0,
         }
 
         new_param_dict = {}
@@ -157,6 +158,7 @@ class FFNParamProcessor:
             'weight_scale': 0,
             'deq_scale': 0,
             'quant_bias': 0,
+            'bias': 0,
             'input_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
             'input_offset': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
             'smooth_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
@@ -316,6 +318,7 @@ class QKVParamProcessor:
             'weight_scale': 0,
             'deq_scale': 0,
             'quant_bias': 0,
+            'bias': 0,
             'input_scale': -1,   # Input quantization params don't need splitting
             'input_offset': -1,  # Input quantization params don't need splitting
             'smooth_scale': -1,  # Input quantization params don't need splitting
