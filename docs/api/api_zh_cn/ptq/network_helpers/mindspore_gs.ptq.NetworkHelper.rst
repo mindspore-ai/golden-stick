@@ -5,7 +5,7 @@ mindspore_gs.ptq.NetworkHelper
 
     工具类，用于解耦算法层和网络框架层，使算法实现不依赖于具体的框架。
 
-    .. py:method:: assemble_inputs(input_ids: np.ndarray, **kwargs)
+    .. py:method:: assemble_inputs(input_ids, **kwargs)
 
         根据输入的tokens，编译网络推理所需的输入。
 
@@ -33,7 +33,7 @@ mindspore_gs.ptq.NetworkHelper
         返回：
             一个对象，表示网络分词器。
 
-    .. py:method:: generate(network: Cell, input_ids: Union[np.ndarray, List[int], List[List[int]]], max_new_tokens=None, **kwargs)
+    .. py:method:: generate(network, input_ids, max_new_tokens=None, **kwargs)
 
         对网络进行自递归式推理，生成一系列tokens。
 
@@ -46,7 +46,7 @@ mindspore_gs.ptq.NetworkHelper
         返回：
             一个列表，表示生成的tokens。
 
-    .. py:method:: get_spec(name: str)
+    .. py:method:: get_spec(name)
 
         获取网络的规格，比如batch_size、seq_length等。
 

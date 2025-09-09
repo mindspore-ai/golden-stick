@@ -1,7 +1,7 @@
 mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
 ====================================================================
 
-.. py:class:: mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper(config: Union[str, MindFormerConfig] = None)
+.. py:class:: mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper(config=None)
 
     从 `NetworkHelper` 类派生，用于MindFormers框架Llama2网络的工具类。
 
@@ -11,7 +11,7 @@ mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     异常：
         - **TypeError** - `config` 数据类型不是 `MindFormerConfig`。
 
-    .. py:method:: assemble_inputs(input_ids: np.ndarray, **kwargs)
+    .. py:method:: assemble_inputs(input_ids, **kwargs)
 
         根据输入的numpy格式的tokens，编译网络推理所需的输入。
 

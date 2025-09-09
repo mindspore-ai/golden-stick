@@ -24,7 +24,7 @@ mindspore_gs.ptq.BaseQuantForCausalLM
         异常：
             - **NotImplementedError** - 子类必须实现此方法。
 
-    .. py:method:: fake_quant(ptq_config, layers_policy, quant_safetensors_path: str = "")
+    .. py:method:: fake_quant(ptq_config, layers_policy, quant_safetensors_path="")
 
         对模型应用伪量化。
 

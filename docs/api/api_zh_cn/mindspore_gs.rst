@@ -11,7 +11,7 @@ mindspore_gs
           - **save_mindir** (bool) - 如果为 ``True``，则在训练后自动导出 MindIR，否则不导出。 默认值：``False``。
           - **save_mindir_path** (str) - 导出MindIR的路径，路径包括目录和文件名，可以是相对路径或绝对路径，用户需要保证写入权限。默认值：``'./network'``。
 
-    .. py:method:: apply(network: Cell, **kwargs)
+    .. py:method:: apply(network, **kwargs)
         :abstractmethod:
 
         定义如何压缩输入的 `network` 。此方法必须由所有算法子类重写。
@@ -34,7 +34,7 @@ mindspore_gs
         返回：
             回调实例的列表。
 
-    .. py:method:: convert(net_opt: Cell, ckpt_path="")
+    .. py:method:: convert(net_opt, ckpt_path="")
 
         定义如何在导出到MindIR之前将压缩网络转换为标准网络。
 
@@ -45,7 +45,7 @@ mindspore_gs
         返回：
             转换后的网络实例。
 
-    .. py:method:: loss(loss_fn: callable)
+    .. py:method:: loss(loss_fn)
 
         定义如何调整算法的损失函数。如果当前算法不关心损失函数，子类不需要复写此方法。
 
@@ -55,7 +55,7 @@ mindspore_gs
         返回：
             调整后的损失函数。
 
-    .. py:method:: set_save_mindir(save_mindir: bool)
+    .. py:method:: set_save_mindir(save_mindir)
 
         设置训练后是否自动导出MindIR。
 
@@ -65,7 +65,7 @@ mindspore_gs
         异常：
             - **TypeError** - `save_mindir` 数据类型不是bool。
 
-    .. py:method:: set_save_mindir_path(save_mindir_path: str)
+    .. py:method:: set_save_mindir_path(save_mindir_path)
 
         设置导出MindIR的路径，仅当 `save_mindir` 为True时才生效。
 

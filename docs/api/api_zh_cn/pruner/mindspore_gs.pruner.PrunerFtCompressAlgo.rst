@@ -28,7 +28,7 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
         异常：
             - **TypeError** - `network` 不是Cell。
 
-    .. py:method:: set_prune_rate(prune_rate: float)
+    .. py:method:: set_prune_rate(prune_ratet)
 
         设置剪枝率。
 
