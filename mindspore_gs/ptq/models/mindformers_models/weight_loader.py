@@ -138,7 +138,9 @@ class WeightProcessor:
         # Check if split FFN parameters exist in safetensors
         ffn_split_exists = any([
             f"model.decoder.layers.{layer_id}.mlp.gating.weight" in self._param_map,
-            f"model.decoder.layers.{layer_id}.mlp.hidden.weight" in self._param_map
+            f"model.decoder.layers.{layer_id}.mlp.hidden.weight" in self._param_map,
+            f"model.decoder.layers.{layer_id}.mlp.gating.bias" in self._param_map,
+            f"model.decoder.layers.{layer_id}.mlp.hidden.bias" in self._param_map,
         ])
 
         if ffn_split_exists:
@@ -151,10 +153,8 @@ class WeightProcessor:
                 # Determine split_axis based on parameter type
                 if suffix in ['weight']:
                     split_axis = 0  # FFN weight split axis
-                elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']:
                     split_axis = 0  # FFN quantization parameters split axis
-                elif suffix == 'bias':
-                    split_axis = 0  # FFN bias also needs to be split
                 else:
                     split_axis = -1  # No split needed
 
@@ -171,10 +171,8 @@ class WeightProcessor:
                 # Determine split_axis based on parameter type
                 if suffix in ['weight']:
                     split_axis = 0  # FFN weight split axis
-                elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                elif suffix in ['weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']:
                     split_axis = 0  # FFN quantization parameters split axis
-                elif suffix == 'bias':
-                    split_axis = 0  # FFN bias also needs to be split
                 else:
                     split_axis = -1  # No split needed
 
@@ -193,7 +191,10 @@ class WeightProcessor:
         qkv_split_exists = any([
             f"model.decoder.layers.{layer_id}.self_attention.linear_q.weight" in self._param_map,
             f"model.decoder.layers.{layer_id}.self_attention.linear_k.weight" in self._param_map,
-            f"model.decoder.layers.{layer_id}.self_attention.linear_v.weight" in self._param_map
+            f"model.decoder.layers.{layer_id}.self_attention.linear_v.weight" in self._param_map,
+            f"model.decoder.layers.{layer_id}.self_attention.linear_q.bias" in self._param_map,
+            f"model.decoder.layers.{layer_id}.self_attention.linear_k.bias" in self._param_map,
+            f"model.decoder.layers.{layer_id}.self_attention.linear_v.bias" in self._param_map,
         ])
 
         if qkv_split_exists:
@@ -204,10 +205,8 @@ class WeightProcessor:
 
             for suffix in param_suffixes:
                 # Determine split_axis based on parameter type
-                if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']:
                     split_axis = 0  # QKV split axis
-                elif suffix == 'bias':
-                    split_axis = 0  # QKV bias also needs to be split
                 else:
                     split_axis = -1  # No split needed
 
@@ -223,10 +222,8 @@ class WeightProcessor:
 
             for suffix in param_suffixes:
                 # Determine split_axis based on parameter type
-                if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias']:
+                if suffix in ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']:
                     split_axis = 0  # QKV split axis
-                elif suffix == 'bias':
-                    split_axis = 0  # QKV bias also needs to be split
                 else:
                     split_axis = -1  # No split needed
 
