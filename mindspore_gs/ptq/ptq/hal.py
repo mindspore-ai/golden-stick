@@ -228,7 +228,8 @@ class QuantWithSmoothHighPerformance(QuantWithSmooth):
             return
         # fuse smooth.mul and quant
         if use_experimental: # FIXME: hangangqiang, remove after refactor
-            self.smooth_scale = Tensor(smooth_scale)
+            self.smooth_scale = Tensor(smooth_scale) if smooth_scale is not None else \
+                Tensor(np.ones(shape=(ic,)), dtype=dst_dtype)
         input_scale_np = x_qparam.scale.asnumpy().astype(np.float16)
         if self.is_perchannel:
             final_scale_np = input_scale_np / smooth_scale.astype(np.float16)
