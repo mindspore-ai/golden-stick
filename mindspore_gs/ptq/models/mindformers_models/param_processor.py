@@ -72,8 +72,8 @@ class MLAParamProcessor:
                                   self.qkv_split_rules[2],
                                   key)
             param_name = key.split('.')[-1]
-            split_axis = split_axis_map.get(param_name, -1)
-            if split_axis < 0:
+            split_axis = split_axis_map.get(param_name, None)
+            if split_axis is None:
                 # No need to split, just clone the param to both gating and hidden
                 new_param_dict[q_down_name] = value
                 new_param_dict[kv_down_name] = value
@@ -153,15 +153,15 @@ class FFNParamProcessor:
                             '.gating.', '.hidden.')
         self.split_axis_map = {
             # {param_name: axis}
-            'weight': 0,
+            'weight': -2,
             'weight_offset': 0,
             'weight_scale': 0,
             'deq_scale': 0,
             'quant_bias': 0,
             'bias': 0,
-            'input_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-            'input_offset': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
-            'smooth_scale': -1,  # Input quantization params don't need splitting in ColumnParallelLinear
+            'input_scale': None,  # Input quantization params don't need splitting in ColumnParallelLinear
+            'input_offset': None,  # Input quantization params don't need splitting in ColumnParallelLinear
+            'smooth_scale': None,  # Input quantization params don't need splitting in ColumnParallelLinear
         }
 
     def _split_ffn_name(self, param_dict, split_rules):
@@ -197,7 +197,7 @@ class FFNParamProcessor:
                                  key)
             param_name = key.split('.')[-1]
             split_axis = split_axis_map.get(param_name, -1)
-            if split_axis < 0:
+            if split_axis is None:
                 # No need to split, just clone the param to both gating and hidden
                 new_param_dict[gating_name] = value
                 new_param_dict[hidden_name] = value
@@ -246,11 +246,19 @@ class FFNParamProcessor:
         return param_dict
 
 
-class MoeParamProcessor(FFNParamProcessor):
+class MoeParamProcessor():
     """Parameter processor for MoE (Mixture of Experts) models."""
     def __init__(self, network):
-        super().__init__(network)
-        self.num_experts = self.network.config.n_routed_experts
+        self.network = network
+        # Try to get num_experts from different config attributes
+        if hasattr(self.network.config, 'n_routed_experts'):
+            self.num_experts = self.network.config.n_routed_experts
+        elif hasattr(self.network.config, 'num_experts'):
+            self.num_experts = self.network.config.num_experts
+        elif hasattr(self.network.config, 'expert_num'):
+            self.num_experts = self.network.config.expert_num
+        else:
+            logger.error(f"Warning: Could not find experts number in config")
         self.moe_split_rules = (r'\.mlp\.experts\.',
                                 *(f'.mlp.experts.{i}.' for i in range(self.num_experts)))
 
@@ -269,8 +277,17 @@ class MoeParamProcessor(FFNParamProcessor):
 
     def _split_route_moe_weight(self, param_dict):
         """Split merged routed moe to saperated experts.
-        Params for each expert are cloned so far, just do the narrow operation."""
+        Params for each expert are cloned so far, just do the narrow operation.
+
+        Args:
+            param_dict (dict): Original parameter dictionary.
+
+        Returns:
+            tuple: A tuple containing (new_param_dict, param_name_trace), where
+                  param_name_trace maps original parameter names to lists of split parameter names.
+        """
         new_param_dict = {}
+        param_name_trace = {}
         # need to transpose after split, i.e. [ic, oc] -> [oc, ic]
         need_transpose_params = ['weight', 'weight_scale', 'weight_offset']
         for key, value in tqdm(param_dict.items(), desc="split moe ffn weights"):
@@ -282,26 +299,30 @@ class MoeParamProcessor(FFNParamProcessor):
             for expert_id in range(self.num_experts):
                 experts_name = re.sub(self.moe_split_rules[0],
                                       f'.mlp.experts.{expert_id}.', key)
-                experts_value = value.asnumpy()[expert_id]
+                experts_value = value[expert_id]
 
                 param_name = experts_name.split('.')[-1]
                 if param_name in need_transpose_params:
                     experts_value = experts_value.transpose()
                 new_param_dict[experts_name] = Parameter(ms.Tensor(experts_value, dtype=value_dtype))
-        return new_param_dict
+                param_name_trace[experts_name] = key
+        return new_param_dict, param_name_trace
 
     def split_param(self, param_dict):
-        """split_param"""
-        param_name_trace = {}
-        param_dict = self._split_route_moe_weight(param_dict)
-        param_dict, cur_trace = super().split_param(param_dict)
-        param_name_trace.update(cur_trace)
-        return param_dict, param_name_trace
+        """Split parameters for MoE model and return parameter name trace.
+
+        Args:
+            param_dict (dict): Original parameter dictionary.
+
+        Returns:
+            tuple: A tuple containing (new_param_dict, param_name_trace), where
+                  param_name_trace maps original parameter names to lists of split parameter names.
+        """
+        return self._split_route_moe_weight(param_dict)
 
     def split_name(self, param_dict):
         """split_name"""
         param_dict = self._split_moe_name(param_dict)
-        param_dict = super().split_name(param_dict)
         return param_dict
 
 
@@ -319,9 +340,9 @@ class QKVParamProcessor:
             'deq_scale': 0,
             'quant_bias': 0,
             'bias': 0,
-            'input_scale': -1,   # Input quantization params don't need splitting
-            'input_offset': -1,  # Input quantization params don't need splitting
-            'smooth_scale': -1,  # Input quantization params don't need splitting
+            'input_scale': None,   # Input quantization params don't need splitting
+            'input_offset': None,  # Input quantization params don't need splitting
+            'smooth_scale': None,  # Input quantization params don't need splitting
         }
 
     def _split_qkv_name(self, param_dict):
@@ -355,8 +376,8 @@ class QKVParamProcessor:
             v_name = re.sub(self.qkv_split_rules[0], self.qkv_split_rules[3], key)
 
             param_name = key.split('.')[-1]
-            split_axis = self.qkv_split_axis_map.get(param_name, -1)
-            if split_axis < 0:
+            split_axis = self.qkv_split_axis_map.get(param_name, None)
+            if split_axis is None:
                 # No need to split, just clone the param to Q, K, V
                 new_param_dict[q_name] = value
                 new_param_dict[k_name] = value

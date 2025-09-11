@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 
 
 class DummyQuantModel(MFModel):
