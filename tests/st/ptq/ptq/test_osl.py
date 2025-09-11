@@ -250,7 +250,7 @@ def _test_simple_net(linear_type, is_expert):
 #############################################################################
 # Testcases
 #############################################################################
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_linear():
@@ -263,7 +263,7 @@ def test_linear():
     """
     _test_simple_net('Linear', False)
 
-@pytest.mark.level0
+@pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 @pytest.mark.parametrize('linear_type', ['RowParallelLinear', 'ColumnParallelLinear'])
