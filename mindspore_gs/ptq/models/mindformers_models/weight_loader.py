@@ -126,12 +126,24 @@ class WeightProcessor:
         for i in range(self.num_experts):
             # fc1
             self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc1.weight", 1)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.gating.weight", 0)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.hidden.weight", 0)
             self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc1.weight_scale", 0)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.gating.weight_scale", 0)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.hidden.weight_scale", 0)
             self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc1.weight_offset", 0)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.gating.weight_offset", 0)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.hidden.weight_offset", 0)
             # fc2
-            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight", 0)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight", 1)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight_scale", -1)
+            self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight_offset", -1)
         mlpnorm_key = f"model.decoder.layers.{layer_id}.pre_mlp_layernorm.weight"
         self._get_split_set(mlpnorm_key, -1)
+        router_bias = f"model.decoder.layers.{layer_id}.mlp.router.expert_bias"
+        self._get_split_set(router_bias, -1)
+        router_weight = f"model.decoder.layers.{layer_id}.mlp.router.weight.weight"
+        self._get_split_set(router_weight, -1)
 
     def _split_mlp_weight(self, layer_id):
         """_split_dense_ffn_weight"""
@@ -339,12 +351,78 @@ class WeightProcessor:
         for layer_id in tqdm(range(num_layers), desc="Merge QKV weights", disable=not enable_tqdm):
             self._qkv_merge_of_each_layer(layer_id)
 
-    def _ffn_merge_of_each_layer(self, layer_id):
-        """Merge split FFN parameters back to linear_fc1 for each layer"""
+    def _ffn_merge_moe_experts(self, layer_id, expert_indices):
+        """Merge split FFN parameters back to linear_fc1 for MoE experts"""
         # Define parameter suffixes that need to be merged
-        # Note: input_scale, input_offset, smooth_scale are input-related parameters
-        # that should NOT be merged because they correspond to input channels
-        # and are fully replicated across all devices
+        merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']
+        input_param_suffixes = ['input_scale', 'input_offset', 'smooth_scale']
+
+        logger.debug(f"Layer {layer_id}: MoE experts found, performing FFN merge for each expert")
+
+        # Process each expert
+        for expert_idx in expert_indices:
+            expert_prefix = f"model.decoder.layers.{layer_id}.mlp.experts.{expert_idx}."
+
+            # Check if this expert has gating/hidden split
+            has_gating_hidden = any(
+                key for key in self._np_dict
+                if key.startswith(expert_prefix) and ("gating." in key or "hidden." in key)
+            )
+
+            if has_gating_hidden:
+                logger.debug(f"Processing FFN merge for layer {layer_id}, expert {expert_idx}")
+
+                # Process input parameters
+                for suffix in input_param_suffixes:
+                    gating_key = f"{expert_prefix}gating.{suffix}"
+                    hidden_key = f"{expert_prefix}hidden.{suffix}"
+                    fc1_key = f"{expert_prefix}linear_fc1.{suffix}"
+                    missing_keys = []
+                    if gating_key not in self._np_dict:
+                        missing_keys.append(gating_key)
+                    if hidden_key not in self._np_dict:
+                        missing_keys.append(hidden_key)
+                    if missing_keys:
+                        logger.debug(f"Expert {expert_idx}, suffix {suffix}: Missing keys {missing_keys}")
+                        continue
+
+                    # Execute merge operation
+                    gate_param = self._np_dict.pop(gating_key)
+                    _ = self._np_dict.pop(hidden_key)
+                    self._np_dict[fc1_key] = gate_param
+
+                # Process merge parameters
+                for suffix in merge_param_suffixes:
+                    gating_key = f"{expert_prefix}gating.{suffix}"
+                    hidden_key = f"{expert_prefix}hidden.{suffix}"
+                    fc1_key = f"{expert_prefix}linear_fc1.{suffix}"
+
+                    missing_keys = []
+                    if gating_key not in self._np_dict:
+                        missing_keys.append(gating_key)
+                    if hidden_key not in self._np_dict:
+                        missing_keys.append(hidden_key)
+                    if missing_keys:
+                        logger.debug(f"Expert {expert_idx}, suffix {suffix}: Missing keys {missing_keys}")
+                        continue
+
+                    # Execute merge operation
+                    gating_param = self._np_dict.pop(gating_key)
+                    hidden_param = self._np_dict.pop(hidden_key)
+
+                    # Log parameter shapes for debugging
+                    logger.debug(f"Expert {expert_idx}, {suffix}: Gating shape {gating_param.shape}, "
+                                 f"Hidden shape {hidden_param.shape}")
+
+                    # Concatenate along axis 0 (FFN split axis)
+                    merged_param = np.concatenate((gating_param, hidden_param), axis=0)
+                    self._np_dict[fc1_key] = merged_param
+                    logger.debug(f"Successfully merged FFN {suffix} for expert {expert_idx}, "
+                                 f"final shape: {merged_param.shape}")
+
+    def _ffn_merge_normal(self, layer_id):
+        """Merge split FFN parameters back to linear_fc1 for normal (non-MoE) layers"""
+        # Define parameter suffixes that need to be merged
         merge_param_suffixes = ['weight', 'weight_scale', 'weight_offset', 'deq_scale', 'quant_bias', 'bias']
         input_param_suffixes = ['input_scale', 'input_offset', 'smooth_scale']
 
@@ -391,6 +469,37 @@ class WeightProcessor:
             self._np_dict[fc1_key] = merged_param
             logger.debug(f"Successfully merged FFN {suffix} for layer {layer_id}, final shape: {merged_param.shape}")
 
+    def _ffn_merge_of_each_layer(self, layer_id):
+        """Merge split FFN parameters back to linear_fc1 for each layer"""
+        # Check if MoE experts exist for this layer
+        moe_experts_exist = any(
+            key for key in self._np_dict
+            if f"model.decoder.layers.{layer_id}.mlp.experts." in key
+        )
+
+        # If MoE experts exist for this layer, process each expert
+        if moe_experts_exist:
+            # Find all expert indices for this layer
+            expert_indices = set()
+            for key in self._np_dict:
+                if f"model.decoder.layers.{layer_id}.mlp.experts." not in key:
+                    continue
+                parts = key.split('.')
+                for i, part in enumerate(parts):
+                    if part == "experts" and i+1 < len(parts):
+                        try:
+                            expert_idx = int(parts[i+1])
+                            expert_indices.add(expert_idx)
+                        except ValueError:
+                            pass
+
+            # Process MoE experts
+            self._ffn_merge_moe_experts(layer_id, expert_indices)
+            return
+
+        # Process normal FFN (non-MoE) parameters
+        self._ffn_merge_normal(layer_id)
+
     def _ffn_merge(self):
         """Merge split FFN parameters back to linear_fc1"""
         # Check if any split FFN parameters exist in the loaded data
@@ -411,10 +520,19 @@ class WeightProcessor:
 
     def _moe_merge_of_each_layer(self, layer_id):
         """_qkv_concat_of_each_layer"""
+        separate_experts_exist = any(
+            key for key in self._np_dict
+            if f"model.decoder.layers.{layer_id}.mlp.experts.0." in key
+        )
+        if not separate_experts_exist:
+            return
+
         fc1_weights = []
-        weight_scales = []
-        weight_offsets = []
+        fc1_weight_scales = []
+        fc1_weight_offsets = []
         fc2_weights = []
+        fc2_weight_scales = []
+        fc2_weight_offsets = []
         for i in range(self.num_experts):
             # fc1
             fc1 = self._np_dict.pop(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc1.weight")
@@ -422,21 +540,47 @@ class WeightProcessor:
             fc1_weights.append(np.expand_dims(fc1, 0))
             fc1_w_scale = self._np_dict.pop(
                 f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc1.weight_scale")
-            weight_scales.append(np.expand_dims(fc1_w_scale, 0))
+            # Check if weight_scale is per_group quantized (has 2 dimensions)
+            if len(fc1_w_scale.shape) > 1:
+                fc1_w_scale = fc1_w_scale.transpose()
+            fc1_weight_scales.append(np.expand_dims(fc1_w_scale, 0))
             fc1_w_offset = self._np_dict.pop(
                 f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc1.weight_offset")
-            weight_offsets.append(np.expand_dims(fc1_w_offset, 0))
+            # Check if weight_offset is per_group quantized (has 2 dimensions)
+            if len(fc1_w_offset.shape) > 1:
+                fc1_w_offset = fc1_w_offset.transpose()
+            fc1_weight_offsets.append(np.expand_dims(fc1_w_offset, 0))
             # fc2
             fc2 = self._np_dict.pop(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight")
             fc2 = fc2.transpose()
             fc2_weights.append(np.expand_dims(fc2, 0))
+            # Handle fc2 weight_scale if exists
+            fc2_w_scale_key = f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight_scale"
+            if fc2_w_scale_key in self._np_dict:
+                fc2_w_scale = self._np_dict.pop(fc2_w_scale_key)
+                # Check if weight_scale is per_group quantized (has 2 dimensions)
+                if len(fc2_w_scale.shape) > 1:
+                    fc2_w_scale = fc2_w_scale.transpose()
+                fc2_weight_scales.append(np.expand_dims(fc2_w_scale, 0))
+            # Handle fc2 weight_offset if exists
+            fc2_w_offset_key = f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight_offset"
+            if fc2_w_offset_key in self._np_dict:
+                fc2_w_offset = self._np_dict.pop(fc2_w_offset_key)
+                # Check if weight_offset is per_group quantized (has 2 dimensions)
+                if len(fc2_w_offset.shape) > 1:
+                    fc2_w_offset = fc2_w_offset.transpose()
+                fc2_weight_offsets.append(np.expand_dims(fc2_w_offset, 0))
 
         fc1_key = f"model.decoder.layers.{layer_id}.mlp.experts.linear_fc1"
         fc2_key = f"model.decoder.layers.{layer_id}.mlp.experts.linear_fc2"
         self._np_dict[f"{fc1_key}.weight"] = np.concatenate(tuple(fc1_weights), axis=0)
-        self._np_dict[f"{fc1_key}.weight_scale"] = np.concatenate(tuple(weight_scales), axis=0)
-        self._np_dict[f"{fc1_key}.weight_offset"] = np.concatenate(tuple(weight_offsets), axis=0)
+        self._np_dict[f"{fc1_key}.weight_scale"] = np.concatenate(tuple(fc1_weight_scales), axis=0)
+        self._np_dict[f"{fc1_key}.weight_offset"] = np.concatenate(tuple(fc1_weight_offsets), axis=0)
         self._np_dict[f"{fc2_key}.weight"] = np.concatenate(tuple(fc2_weights), axis=0)
+        if fc2_weight_scales:
+            self._np_dict[f"{fc2_key}.weight_scale"] = np.concatenate(tuple(fc2_weight_scales), axis=0)
+        if fc2_weight_offsets:
+            self._np_dict[f"{fc2_key}.weight_offset"] = np.concatenate(tuple(fc2_weight_offsets), axis=0)
 
     def _moe_merge(self):
         """_moe_merge"""

@@ -19,7 +19,6 @@ from collections import OrderedDict
 from typing import Optional
 import os
 import time
-import argparse
 from safetensors import safe_open
 import pytest
 
@@ -34,50 +33,45 @@ from ptq_model_tester import PTQModelTester
 
 class DeepSeekV3Tester(PTQModelTester):
     """PTQModelTester"""
-    def create_ptq_config(self, quant_type: str):
+    def create_ptq_config(self):
         """create_ptq"""
-        if quant_type.lower() == 'a8w8':
-            cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                            act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
-                            opname_blacklist=['output_layer', 'linear_fc2', 'kv_up_proj'])
-            layer_policies = OrderedDict()
-        elif quant_type.lower() == 'a8w4':
-            cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                            act_quant_dtype=msdtype.int8,
-                            outliers_suppression=OutliersSuppressionType.SMOOTH,
-                            opname_blacklist=['output_layer', 'kv_up_proj'], weight_clip=False)
-            mlp_config = PTQConfig(backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                                   act_quant_dtype=msdtype.int8,
-                                   outliers_suppression=OutliersSuppressionType.NONE,
-                                   precision_recovery=PrecisionRecovery.NONE,
-                                   act_quant_granularity=QuantGranularity.PER_TOKEN,
-                                   weight_quant_granularity=QuantGranularity.PER_CHANNEL,
-                                   weight_clip=False)
-            gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
-            moe_cfg = PTQConfig(backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
-                                act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
-                                weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=256,
-                                algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ, weight_clip=False)
-            layer_policies = OrderedDict({r'.*\.mlp\.linear_fc1.*': mlp_config,
-                                          r'.*\.mlp\.linear_fc2.*': mlp_config,
-                                          r'.*\.mlp\.shared_experts\.linear_fc1.*': mlp_config,
-                                          r'.*\.mlp\.shared_experts\.linear_fc2.*': mlp_config,
-                                          r'.*\.mlp\.experts\.linear_fc1.*': moe_cfg,
-                                          r'.*\.mlp\.experts\.linear_fc2.*': moe_cfg})
-        else:
-            raise RuntimeError(f'Input unsupported quant type: {quant_type}.')
+        smoothquant_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                                    weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                                    outliers_suppression=OutliersSuppressionType.SMOOTH,
+                                    opname_blacklist=['output_layer', 'linear_fc2', 'kv_up_proj'])
+        cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                        act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        opname_blacklist=['output_layer', 'kv_up_proj'], weight_clip=False)
+        mlp_config = PTQConfig(backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
+                               act_quant_dtype=msdtype.int8,
+                               outliers_suppression=OutliersSuppressionType.NONE,
+                               precision_recovery=PrecisionRecovery.NONE,
+                               act_quant_granularity=QuantGranularity.PER_TOKEN,
+                               weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+                               weight_clip=False)
+        gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
+        moe_cfg = PTQConfig(backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.qint4x2,
+                            act_quant_dtype=msdtype.int8, act_quant_granularity=QuantGranularity.PER_TOKEN,
+                            weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=256,
+                            algo_args=gptq_config, precision_recovery=PrecisionRecovery.GPTQ, weight_clip=False)
+        layer_policies = OrderedDict({r'.*\.mlp\.linear_fc1.*': mlp_config,
+                                      r'.*\.mlp\.linear_fc2.*': mlp_config,
+                                      r'.*\.mlp\.shared_experts\.linear_fc1.*': mlp_config,
+                                      r'.*\.mlp\.shared_experts\.linear_fc2.*': mlp_config,
+                                      r'.*\.mlp\.experts\.linear_fc1.*': moe_cfg,
+                                      r'.*\.mlp\.experts\.linear_fc2.*': moe_cfg,
+                                      'not match': smoothquant_cfg})
         return cfg, layer_policies
 
     # pylint: disable=unused-argument
-    def check_quant_description(self, quant_ckpt_path, quant_type) -> bool:
+    def check_quant_description(self, quant_ckpt_path) -> bool:
         "quant_type_description"
         return True
 
-    def get_ds_acc_threshold(self, quant_type) -> Optional[float]:
-        score_mapping = {
-            "A8W8": 0.41,
-        }
-        return score_mapping.get(quant_type)
+    # pylint: disable=unused-argument
+    def get_ds_acc_threshold(self) -> Optional[float]:
+        return 0.41
 
     def _load_file(self, quant_ckpt_path):
         """load_file"""
@@ -235,28 +229,25 @@ class DeepSeekV3Tester(PTQModelTester):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--quant_algo', '-a', type=str, required=True)
-    uargs = parser.parse_args()
-    input_quant_algo = uargs.quant_algo
-
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     calibrate_config_path = os.path.join(cur_dir, "calibrate_deepseek3_671b.yaml")
     infer_config_path = os.path.join(cur_dir, "predict_deepseek3_671b.yaml")
-    q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant-4p-{input_quant_algo}")
+    q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant")
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = DeepSeekV3Tester()
-    tester.quant_model(calibrate_config_path, q_ckpt_path, input_quant_algo, dataset_path)
-    if uargs.quant_algo.lower() == 'a8w4':
-        tester.check_safetensor_split(q_ckpt_path)
+    tester.quant_model(calibrate_config_path, q_ckpt_path, dataset_path)
+    tester.check_safetensor_split(q_ckpt_path)
 
-def ptq_predict_2stage_4p_run(quant_algo):
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_single
+def test_ptq_dsv3_mix_accuracy():
     """
-    Feature: test dynamic quant adjust parameter in two stages with two cards.
-    Description: apply ptq on deepseek-v3/r1 and check accuracy.
-    Expectation: accuracy is good.
+    Feature: test omni quant adjust parameter in two stages with two cards.
+    Description: apply mix-quant on deepseek-v3/r1 and check score.
+    Expectation: score is good.
     """
-    os.environ['quant_algo'] = f"{quant_algo}"
     os.environ['HCCL_CONNECT_TIMEOUT'] = "1800"
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_dsv3_accuracy.py")
     port = get_available_port()
@@ -264,34 +255,8 @@ def ptq_predict_2stage_4p_run(quant_algo):
     time.sleep(1.0)
     return_code = os.system(
         f"msrun --worker_num=4 --local_worker_num=4 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_{quant_algo}_predict_dsv3_4p_logs "
-        f"python {run_file} -a {quant_algo}"
+        f"--master_port={port} --join=True --log_dir=./test_ptq_predict_dsv3_8p_logs "
+        f"python {run_file}"
     )
-    os.system("ps -u | grep 'test_dsv3_accuracy' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
     assert return_code == 0
-
-
-@pytest.mark.level2
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_dsv3_a8w8_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply A8W8 on deepseek-v3/r1 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_4p_run("A8W8")
-
-
-@pytest.mark.level0
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_dsv3_a8w4_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply A8W4 on deepseek-v3/r1 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_4p_run("A8W4")

@@ -42,6 +42,7 @@ Examples:
 import os
 import time
 import json
+from tqdm import tqdm
 import mindspore as ms
 from mindspore import Parameter, ops as msops
 from mindspore.communication import get_rank
@@ -474,14 +475,19 @@ class MFModelEnableSafeTensors(MFModel):
             to DistributedParameter objects with sharding information.
         """
         param_dict = self.network.parameters_dict()
+        logger.debug(f"network original param_dict: {param_dict}")
         param_dict, param_name_trace = self._process_params_dict_before_save(param_dict)
+        logger.debug(f"network param_dict after process: {param_dict}")
         shard_info = self._shard_dict()
+        logger.debug(f"network shard info: {shard_info}")
         dis_param_dict = {}
-        for name, param in param_dict.items():
+        for name, param in tqdm(param_dict.items(), desc="creating DistributedParameters"):
             shard_axis = shard_info.get(name)
             old_name = name
             while shard_axis is None:
+                logger.debug(f"param_name_trace searching key {old_name}")
                 old_name = param_name_trace.get(old_name)
+                logger.debug(f"param_name_trace searching value {old_name}")
                 if old_name is None:
                     break
                 shard_axis = shard_info.get(old_name)

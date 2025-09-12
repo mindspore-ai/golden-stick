@@ -22,10 +22,11 @@ import time
 import shutil
 import numpy as np
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 
 import mindspore as ms
 from mindspore import dataset
+from mindspore.communication import get_rank, get_group_size
 from mindformers import MindFormerConfig
 from mindspore_gs.datasets import create_ceval_dataset
 from mindspore_gs.ptq.models import AutoQuantForCausalLM
@@ -34,14 +35,17 @@ from transformers import AutoTokenizer
 
 class PTQModelTester:
     """PTQModelTester"""
-    def create_ptq_config(self, quant_type: str):
+    def create_ptq_config(self):
         raise NotImplementedError
 
-    def check_quant_description(self, quant_ckpt_path, quant_type) -> bool:
+    def check_quant_description(self, quant_ckpt_path) -> bool:
         raise NotImplementedError
 
-    def get_ds_acc_threshold(self, quant_type) -> Optional[float]:
-        raise NotImplementedError
+    def get_ds_acc_threshold(self) -> Optional[float]:
+        return None
+
+    def get_golden(self) -> tuple[str, str]:
+        return "", ""
 
     @staticmethod
     def create_ds(ds_path, tokenizer_, mode, n_samples=-1):
@@ -89,7 +93,7 @@ class PTQModelTester:
         ms.ms_memory_recycle()
         return correct / data_count
 
-    def quant_model(self, config_path_, output_dir_, quant_algo_, ds_path):
+    def quant_model(self, config_path_, output_dir_, ds_path):
         """quant by PTQ"""
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
         os.environ['ENFORCE_EAGER'] = "true"
@@ -105,13 +109,13 @@ class PTQModelTester:
 
         datasets = PTQModelTester.create_ds(ds_path, tokenizer, 'train', 50)
         model = AutoQuantForCausalLM.from_pretrained(config_path_)
-        cfg, layers_policy = self.create_ptq_config(quant_algo_)
+        cfg, layers_policy = self.create_ptq_config()
         model.calibrate(cfg, layers_policy, datasets, fake_quant=True)
         model.save_quantized(output_dir_)
         time.sleep(5)
         os.environ.pop('ENFORCE_EAGER', None)
 
-    def eval_model(self, config_path_, ckpt_path_, ds_path, quant_algo_):
+    def eval_model(self, config_path_, ckpt_path_, ds_path):
         """eval model by float ckpt and int ckpt"""
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
         os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
@@ -124,43 +128,92 @@ class PTQModelTester:
         mfconfig = MindFormerConfig(config_path_)
         tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir, trust_remote_code=True)
         model = AutoQuantForCausalLM.from_pretrained(config_path_)
-        cfg, layers_policy = self.create_ptq_config(quant_algo_)
+        cfg, layers_policy = self.create_ptq_config()
         model.fake_quant(cfg, layers_policy, ckpt_path_)
         os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
-        res = PTQModelTester.evaluate(model, ds_path, tokenizer)
-        return res
+        return PTQModelTester.evaluate(model, ds_path, tokenizer)
 
-    def test_accuracy(self, calibrate_config_path_, infer_config_path_, quant_ckpt_path_, quant_algo_, ds_path):
-        """test_accuracy"""
-        threshold = self.get_ds_acc_threshold(quant_algo_)
-        result = threshold is not None, f"Unsupported quant_algo: {quant_algo_}"
-        self.quant_model(calibrate_config_path_, quant_ckpt_path_, quant_algo_, ds_path)
-        result = self.check_quant_description(quant_ckpt_path_, quant_algo_)
+    def forward_model(self, config_path_, ckpt_path_, question):
+        """forward model"""
+        os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+        os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+        os.environ['MS_ALLOC_CONF'] = "enable_vmm:True"
+        os.environ.pop('ENFORCE_EAGER', None)
+        ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+        if not ascend_path:
+            os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+        mfconfig = MindFormerConfig(config_path_)
+        tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir, trust_remote_code=True)
+        model = AutoQuantForCausalLM.from_pretrained(config_path_)
+        cfg, layers_policy = self.create_ptq_config()
+        model.fake_quant(cfg, layers_policy, ckpt_path_)
+        os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
+        input_ids = tokenizer.encode(question, add_special_tokens=True)
+        outputs = model.forward(input_ids, max_new_tokens=50)
+        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    def golden_accuracy(self, calibrate_config_path_, infer_config_path_, quant_ckpt_path_, ds_path):
+        """dataset_accuracy"""
+        question, answer = self.get_golden()
+        result = question is not None and answer is not None, \
+                 f"Please implement get_golden before invoke golden_accuracy."
+        self.quant_model(calibrate_config_path_, quant_ckpt_path_, ds_path)
+        result = self.check_quant_description(quant_ckpt_path_)
         if result:
-            score = self.eval_model(infer_config_path_, quant_ckpt_path_, ds_path, quant_algo_)
+            pred = self.forward_model(infer_config_path_, quant_ckpt_path_, question)
+            result = pred == result
             print("="*50, flush=True)
-            print(f"{quant_algo_} score {score}", flush=True)
+            print(f"{question} predict: {pred}, answer: {answer}", "success" if result else "failed", flush=True)
+        try:
+            group_size = get_group_size()
+        except RuntimeError:
+            group_size = 0
+        if group_size > 0:
+            ms.mint.distributed.barrier()
+        return result
+
+    def dataset_accuracy(self, calibrate_config_path_, infer_config_path_, quant_ckpt_path_, ds_path):
+        """dataset_accuracy"""
+        # pylint: disable=assignment-from-none
+        threshold = self.get_ds_acc_threshold()
+        result = threshold is not None, f"Please implement get_ds_acc_threshold before invoke dataset_accuracy."
+        self.quant_model(calibrate_config_path_, quant_ckpt_path_, ds_path)
+        result = self.check_quant_description(quant_ckpt_path_)
+        if result:
+            score = self.eval_model(infer_config_path_, quant_ckpt_path_, ds_path)
+            print("="*50, flush=True)
+            print(f"Score {score}", flush=True)
             result = score >= threshold
             if not result:
-                print(f"Score {quant_algo_} is {score:.4f}, which is lower than standard f{threshold}", flush=True)
-        if not result:
-            log_file = open(f"./test_ptq_{quant_algo_}_predict_qwen3_moe_4p_logs/worker_0.log", "r", encoding="utf-8")
-            for line in log_file:
-                print(line, flush=True)
-            log_file.close()
-            time.sleep(10)
-        return 0 if result else -1
+                print(f"CEval score is {score:.4f}, which is lower than standard f{threshold}", flush=True)
+        try:
+            group_size = get_group_size()
+        except RuntimeError:
+            group_size = 0
+        if group_size > 0:
+            ms.mint.distributed.barrier()
+        return result
 
-    def del_files(self, quant_algo_, quant_ckpt_path_):
-        """del_files"""
+    def print_log(self, log_path_):
+        """print_log"""
+        try:
+            rank_id = get_rank()
+        except RuntimeError:
+            rank_id = 0
+        if rank_id > 0:
+            return
+        os.system(f"cat {os.path.join(log_path_, 'worker_0.log')}")
+        time.sleep(5)
+
+    def tear_down(self, quant_ckpt_path_, log_path_):
+        """tear_down"""
         try:
             print(f"to rm dir: {quant_ckpt_path_}", flush=True)
             shutil.rmtree(quant_ckpt_path_)
         except (OSError, FileNotFoundError):
             pass
         try:
-            log_dir = f"./test_ptq_{quant_algo_}_predict_qwen3_moe_4p_logs"
-            print(f"to rm dir: {log_dir}", flush=True)
-            shutil.rmtree(log_dir)
+            print(f"to rm dir: {log_path_}", flush=True)
+            shutil.rmtree(log_path_)
         except (OSError, FileNotFoundError):
             pass

@@ -19,7 +19,7 @@ import sys
 from unittest.mock import patch, MagicMock
 import pytest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 
 from mindspore_gs.ptq import AutoQuantForCausalLM
 from mindspore_gs.ptq import BaseQuantForCausalLM

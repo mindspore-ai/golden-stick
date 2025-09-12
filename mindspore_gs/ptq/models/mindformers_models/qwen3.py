@@ -84,21 +84,6 @@ class QWen3(MFModelEnableSafeTensors):
         >>> assert isinstance(model, QWen3)
     """
 
-    def _split_route_moe_weight(self, param_dict) -> tuple[dict, dict]:
-        """Split routed MoE weights.
-
-        This method handles the splitting of weights for Mixture of
-        Experts models with routing mechanisms in Qwen3 architecture.
-
-        Args:
-            param_dict (dict): Dictionary of model parameters.
-
-        Returns:
-            tuple[dict, dict]: Tuple containing the split parameter
-                dictionary and parameter name trace.
-        """
-        return param_dict, {}
-
     def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
         """Process parameter dictionary before saving.
 
@@ -124,10 +109,6 @@ class QWen3(MFModelEnableSafeTensors):
         ffn_processor = FFNParamProcessor(self.network)
         param_dict, ffn_trace = ffn_processor.split_param(param_dict)
         param_name_trace.update(ffn_trace)
-
-        # Apply MoE split (existing functionality)
-        param_dict, moe_trace = self._split_route_moe_weight(param_dict)
-        param_name_trace.update(moe_trace)
 
         return param_dict, param_name_trace
 

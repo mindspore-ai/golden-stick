@@ -19,7 +19,7 @@ import os
 import sys
 import pytest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 
