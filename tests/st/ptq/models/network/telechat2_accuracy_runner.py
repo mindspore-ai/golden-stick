@@ -15,19 +15,16 @@
 """test interfaces of ptq."""
 
 
-from collections import OrderedDict
-from typing import Optional
-import os
-import time
+import argparse
 import json
-import pytest
+import os
+from collections import OrderedDict
+
 from mindspore import dtype as msdtype
-from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq.utils import QuantType
-from mindspore_gs.common import logger
+from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import (PTQConfig, PTQMode,
                               OutliersSuppressionType)
-from tests.st.test_utils import get_available_port
+from mindspore_gs.ptq.utils import QuantType
 from ptq_model_tester import PTQModelTester
 
 
@@ -68,25 +65,25 @@ class Telechat2Tester(PTQModelTester):
             'model.decoder.layers.0.self_attention.linear_k.weight': QuantType.W8A8.value,
             'model.decoder.layers.0.self_attention.linear_v.weight': QuantType.W8A8.value,
             'model.decoder.layers.1.self_attention.linear_proj.smooth_scale': QuantType.W8A8.value,
-            'model.decoder.layers.2.self_attention.linear_q.weight_scale': QuantType.W8A8.value,
-            'model.decoder.layers.2.self_attention.linear_k.weight_scale': QuantType.W8A8.value,
+            'model.decoder.layers.1.self_attention.linear_q.weight_scale': QuantType.W8A8.value,
+            'model.decoder.layers.1.self_attention.linear_k.weight_scale': QuantType.W8A8.value,
             'model.decoder.layers.2.self_attention.linear_v.weight_scale': QuantType.W8A8.value,
-            'model.decoder.layers.3.self_attention.linear_proj.weight_offset': QuantType.W8A8.value,
-            'model.decoder.layers.4.self_attention.linear_proj.input_scale': QuantType.W8A8.value,
-            'model.decoder.layers.5.self_attention.linear_proj.input_offset': QuantType.W8A8.value,
-            'model.decoder.layers.7.mlp.gating.weight': QuantType.W8A8.value,
-            'model.decoder.layers.7.mlp.hidden.weight': QuantType.W8A8.value,
-            'model.decoder.layers.8.mlp.gating.smooth_scale': QuantType.W8A8.value,
-            'model.decoder.layers.8.mlp.hidden.smooth_scale': QuantType.W8A8.value,
-            'model.decoder.layers.9.mlp.gating.weight_scale': QuantType.W8A8.value,
-            'model.decoder.layers.9.mlp.hidden.weight_scale': QuantType.W8A8.value,
-            'model.decoder.layers.10.mlp.gating.weight_offset': QuantType.W8A8.value,
-            'model.decoder.layers.10.mlp.hidden.weight_offset': QuantType.W8A8.value,
-            'model.decoder.layers.11.mlp.gating.input_scale': QuantType.W8A8.value,
-            'model.decoder.layers.11.mlp.hidden.input_scale': QuantType.W8A8.value,
-            'model.decoder.layers.12.mlp.gating.input_offset': QuantType.W8A8.value,
-            'model.decoder.layers.12.mlp.hidden.input_offset': QuantType.W8A8.value,
-            'model.decoder.layers.13.mlp.linear_fc2.weight': QuantType.FLOAT.value,
+            'model.decoder.layers.2.self_attention.linear_proj.weight_offset': QuantType.W8A8.value,
+            'model.decoder.layers.2.self_attention.linear_proj.input_scale': QuantType.W8A8.value,
+            'model.decoder.layers.3.self_attention.linear_proj.input_offset': QuantType.W8A8.value,
+            'model.decoder.layers.3.mlp.gating.weight': QuantType.W8A8.value,
+            'model.decoder.layers.3.mlp.hidden.weight': QuantType.W8A8.value,
+            'model.decoder.layers.4.mlp.gating.smooth_scale': QuantType.W8A8.value,
+            'model.decoder.layers.4.mlp.hidden.smooth_scale': QuantType.W8A8.value,
+            'model.decoder.layers.4.mlp.gating.weight_scale': QuantType.W8A8.value,
+            'model.decoder.layers.5.mlp.hidden.weight_scale': QuantType.W8A8.value,
+            'model.decoder.layers.5.mlp.gating.weight_offset': QuantType.W8A8.value,
+            'model.decoder.layers.5.mlp.hidden.weight_offset': QuantType.W8A8.value,
+            'model.decoder.layers.6.mlp.gating.input_scale': QuantType.W8A8.value,
+            'model.decoder.layers.7.mlp.hidden.input_scale': QuantType.W8A8.value,
+            'model.decoder.layers.8.mlp.gating.input_offset': QuantType.W8A8.value,
+            'model.decoder.layers.9.mlp.hidden.input_offset': QuantType.W8A8.value,
+            'model.decoder.layers.9.mlp.linear_fc2.weight': QuantType.FLOAT.value,
         }
         for name, value in check_map.items():
             if not check(name, value):
@@ -94,52 +91,22 @@ class Telechat2Tester(PTQModelTester):
         logger.info("quant description test success.")
         return True
 
-    def get_ds_acc_threshold(self) -> Optional[float]:
-        return 0.8
-
+    def get_golden(self) -> tuple[str, str]:
+        return "介绍北京故宫", "介绍北京故宫MSN cov大一驭须知esis简称刻 hel绞小豆CQ"
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Test Telechat2 accuracy")
+    parser.add_argument("--log_path", type=str, required=True)
+    args = parser.parse_args()
+
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     calibrate_config_path = os.path.join(cur_dir, "calibrate_telechat2.yaml")
     infer_config_path = os.path.join(cur_dir, "predict_telechat2.yaml")
     q_ckpt_path = os.path.join(cur_dir, f"telechat2-quant")
-    log_path = f"./test_ptq_predict_telechat2_4p_logs"
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = Telechat2Tester()
-    result = tester.dataset_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, dataset_path)
+    result = tester.golden_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, dataset_path)
     if not result:
-        tester.print_log(log_path)
-    tester.tear_down(q_ckpt_path, log_path)
+        tester.print_log(args.log_path)
+    tester.tear_down(q_ckpt_path, args.log_path)
     assert result, 'telechat2 accuracy test failed.'
-
-
-def ptq_predict_2stage_4p_run():
-    """
-    Feature: test dynamic quant adjust parameter in two stages with four cards.
-    Description: apply ptq on telechat2 and check accuracy.
-    Expectation: accuracy is good.
-    """
-    os.environ['HCCL_CONNECT_TIMEOUT'] = "1800"
-    run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_telechat2_accuracy.py")
-    port = get_available_port()
-    os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
-    time.sleep(1.0)
-    return_code = os.system(
-        f"msrun --worker_num=4 --local_worker_num=4 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_predict_telechat2_4p_logs "
-        f"python {run_file}"
-    )
-    time.sleep(1.0)
-    assert return_code == 0
-
-
-@pytest.mark.level1
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_telechat2_a8w8_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with four cards.
-    Description: apply A8W8 on telechat2 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_4p_run()
