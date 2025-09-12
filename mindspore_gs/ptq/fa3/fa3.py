@@ -18,6 +18,7 @@ from typing import Optional, Tuple
 import time
 import warnings
 import copy
+from dataclasses import dataclass
 import gc
 import tqdm
 
@@ -40,6 +41,7 @@ from mindspore_gs.ptq.ptq.quant import InputCatcher
 from mindspore_gs.ptq.processor import Processor
 
 from mindformers.parallel_core.inference.utils import get_tp_world_size
+from research.deepseek3.deepseek3_config import DeepseekV3Config
 from research.deepseek3.deepseek3_model_infer import MLAPagedAttentionMgr, MLAInferAttention
 from research.deepseek3.infer.layers import ColumnParallelLinear
 
@@ -50,7 +52,11 @@ class FA3Config:
     dsk_config: DeepseekV3Config = None
 
 class FA3(CompAlgo):
-    """class for fa3 calibration algorithm"""
+    """
+    Class for fa3 calibration algorithm.
+    Please note that the Flash Attention 3
+    (FA3) calibration algorithm is currently a demo feature.
+    """
     def __init__(self, config=None):
         super(FA3, self).__init__()
         if config is not None:
