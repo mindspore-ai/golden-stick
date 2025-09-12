@@ -21,7 +21,9 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     LinearBase,
     RowParallelLinear,
-    ColumnParallelLinear)
+    ColumnParallelLinear,
+    ReplicatedLinear,
+)
 from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
     ColumnParallelGroupedLinear,
     RowParallelGroupedLinear)
@@ -162,9 +164,7 @@ class FakeQuantLinearCell(LinearBase):
         self.context = context
         self.cfg = cfg
         self.layer_name = layer_name
-        if isinstance(linear, Linear):
-            self.parallel_type = ParallelType.NO_PARALLEL
-        elif isinstance(linear, ColumnParallelLinear):
+        if isinstance(linear, ColumnParallelLinear):
             self.input_size = linear.input_size
             self.ic = linear.input_size
             self.gather_output = linear.gather_output
@@ -179,7 +179,14 @@ class FakeQuantLinearCell(LinearBase):
             self.tp_group = linear.tp_group
             self.bias = None if self.tp_group.rank > 0 else linear.bias
             self.parallel_type = ParallelType.ROW_PARALLEL
+        elif isinstance(linear, ReplicatedLinear):
+            self.ic = linear.input_size
+            self.bias = linear.bias if linear.has_bias else None
+            self.output_size_per_partition = linear.output_size[0]
+            self.parallel_type = ParallelType.NO_PARALLEL
         else:
+            if isinstance(linear, Linear):
+                raise RuntimeError(f"Normal Linear is not supplied by mcore")
             raise ValueError(f"Not supported linear: {linear}")
         self.compute_dtype = linear.compute_dtype
 
@@ -187,7 +194,7 @@ class FakeQuantLinearCell(LinearBase):
     def construct(self, x, weight=None):
         """linear deploy construct"""
         if self.parallel_type == ParallelType.NO_PARALLEL:
-            raise RuntimeError(f"Normal Linear is not supplied by mcore")
+            x = self.replicate_linear_forward(x, weight)
         if self.parallel_type == ParallelType.COL_PARALLEL:
             x = self.col_linear_forward(x)
         if self.parallel_type == ParallelType.ROW_PARALLEL:
@@ -221,7 +228,29 @@ class FakeQuantLinearCell(LinearBase):
         output = reduce_from_model_parallel_region(output_parallel, self.tp_group)
         return output
 
+    def replicate_linear_forward(self, input_, weight=None):
+        """
+        Forward of ReplicatedLinear.
+        Performs a linear transformation considering various parallel modes and data type conversions.
+        """
+        if weight is None:
+            if self.weight is None:
+                raise RuntimeError(
+                    "For ReplicatedLinear, weight was not supplied to construct(), "
+                    "and `skip_weight_param_allocation` is True."
+                    )
+            weight = self.weight
+        else:
+            # Check the weight passed in is the correct shape.
+            experted_shape = (self.output_size_per_partition, self.input_size)
+            if weight.shape != experted_shape:
+                raise RuntimeError(
+                    f"supplied weight's shape is {tuple(weight.shape)}, "
+                    f"not {experted_shape} as expected."
+                )
 
+        output = self.quant_method.apply(self, input_, weight, self.bias)
+        return output
 class FakeQuantGroupLinearCell(LinearBase):
     """FakeQuantLinearCell"""
     # pylint: disable=unused-argument
