@@ -22,6 +22,7 @@ from mindspore import Parameter
 from mindspore import ops as msops
 
 from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_world_size
+from mindspore_gs.common import logger
 
 
 class MLAParamProcessor:
