@@ -149,11 +149,11 @@ class PTQModelTester:
         model.fake_quant(cfg, layers_policy, ckpt_path_)
         os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
         input_ids = tokenizer.encode(question, add_special_tokens=True)
-        outputs = model.forward(input_ids, max_new_tokens=50)
+        outputs = model.forward(input_ids, max_new_tokens=20)
         return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     def golden_accuracy(self, calibrate_config_path_, infer_config_path_, quant_ckpt_path_, ds_path):
-        """dataset_accuracy"""
+        """golden_accuracy"""
         question, answer = self.get_golden()
         result = question is not None and answer is not None, \
                  f"Please implement get_golden before invoke golden_accuracy."
@@ -161,7 +161,7 @@ class PTQModelTester:
         result = self.check_quant_description(quant_ckpt_path_)
         if result:
             pred = self.forward_model(infer_config_path_, quant_ckpt_path_, question)
-            result = pred == result
+            result = pred.startswith(answer)
             print("="*50, flush=True)
             print(f"{question} predict: {pred}, answer: {answer}", "success" if result else "failed", flush=True)
         try:

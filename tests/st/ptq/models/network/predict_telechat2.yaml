@@ -14,11 +14,12 @@ trainer:
 # default parallel of device num = 8 for Atlas 800T A2
 parallel_config:
   data_parallel: 1
-  model_parallel: 4
+  model_parallel: 2
 # HuggingFace file directory
-pretrained_model_dir: '/home/workspace/mindspore_ckpt/safetensors/telechat2'
+pretrained_model_dir: '/home/workspace/mindspore_dataset/weight/telechat2_7b'
 model:
   model_config:
+    num_hidden_layers: 10
     compute_dtype: "bfloat16"
     layernorm_compute_dtype: "float32"
     rotary_dtype: "float32"

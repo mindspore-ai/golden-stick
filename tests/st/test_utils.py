@@ -176,19 +176,32 @@ def load_distribut_checkpoint(config, ckpt_path, network):
 
 
 def get_available_port(start=10000, end=11000):
-    """get_available_port"""
+    """get_available_port
+
+    Find an available port that is not currently in use.
+
+    Args:
+        start: Start of port range to search
+        end: End of port range to search
+
+    Returns:
+        An available port number
+    """
     def is_port_available(port_):
-        """is_port_available"""
+        """Check if a port is available (not in use)"""
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
-                s.connect(('localhost', port_))
+                # Try to bind to the port - if successful, port is available
+                s.bind(('localhost', port_))
                 return True
-            except ConnectionRefusedError:
+            except OSError:
+                # Port is in use
                 return False
 
     for port in range(start, end):
-        if not is_port_available(port):
+        if is_port_available(port):
             return port
+    # If no available port found, return a port from the range as fallback
     return start
 
 
