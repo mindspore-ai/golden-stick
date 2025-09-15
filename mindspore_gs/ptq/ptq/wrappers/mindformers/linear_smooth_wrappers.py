@@ -459,8 +459,6 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
-        if self.layer.has_bias:
-            raise ValueError(f"Only cell without bias is supported, but {linear_name} has bias.")
         if isinstance(self.layer, Linear) and self.layer.activation_flag:
             raise ValueError(f"Only cell without activation is supported, but {linear_name} has activation.")
 
@@ -478,6 +476,8 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         self.oc = linear.weight.shape[self.oc_axis]
         self.is_expert = (rank == 3)
         self.expert_num = linear.weight.shape[0] if self.is_expert else -1
+        if self.layer.has_bias and self.expert_num and self.expert_num > 0:
+            raise ValueError(f"Only moe cell without bias is supported, but {linear_name} has bias.")
 
         self.decoder = kwargs.get("decoder_layer", None)
         self.args = kwargs.get("layer_args", None)
@@ -488,6 +488,10 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         self.y_zp = None
         self.deq_scale = None
         self.quant_forward = False
+        self.has_bias = self.layer.has_bias
+        self.bias = None
+        if self.has_bias:
+            self.bias = self.layer.bias
 
         if "osl" in context.algorithm_cache_path:
             cache_file_path = os.path.join(context.algorithm_cache_path["osl"], f'rank_{context.rank_id}', \
@@ -524,6 +528,9 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
             x = x * self.x_scale_fast + self.x_zp
             x = msops.round(x)
             x = msops.clip(x, -128., 127.)
+            if self.has_bias:
+                self._layer.bias = None
+                self._layer.has_bias = False
         self._layer.compute_dtype = msdtype.float32
         y = self._layer(x, *args, **kwargs)
         self._layer.compute_dtype = self.compute_type
@@ -538,6 +545,10 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                 deq_scale = self._expertwise_to_tokenwise(deq_scale.squeeze(), group_list)
             y = (y - y_zp) * deq_scale
             y = msops.cast(y, self.compute_type)
+            if self.has_bias:
+                y = msops.add(y, self.bias)
+                self._layer.bias = self.bias
+                self._layer.has_bias = True
         return y
 
     @staticmethod
