@@ -134,7 +134,7 @@ class SmoothLinearCell(WrapperLinearCell):
         self._layer.weight.set_data(weight)
         logger.debug(f"SmoothLinearCell: smoothed_group_weight of Layer({self._layer_name})"
                      f"is {{{self._layer.weight.shape}, "
-                     f"{self._layer.weight.dtype}, {self._layer.weight.asnumpy()}}}")
+                     f"{self._layer.weight.dtype}}}")
 
     def _apply_act_smooth(self, smooth_scale: Tensor):
         """_apply_act_smooth"""
@@ -152,7 +152,7 @@ class SmoothLinearCell(WrapperLinearCell):
         super(SmoothLinearCell, self).process()
         smooth_scale = self._calc_smooth_scale(self.cfg.algo_args.get('alpha', 0.5))
         logger.debug(f"SmoothLinearCell: smooth_scale of Layer({self._layer_name}) is {{{smooth_scale.shape}, "
-                     f"{smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
+                     f"{smooth_scale.dtype}}}")
         self._apply_smooth(smooth_scale)
 
     def _apply_act_smooth_for_deploy(self, ic, compute_dtype):
@@ -342,7 +342,7 @@ class AWQLinearCell(SmoothLinearCell):
         smooth_scale[self.x_mean == 0] = 1
         smooth_scale[self.w_mean == 0] = 1
         logger.debug(f"AWQSmoothLinearCell: search scale alpha {alpha}, smooth scale of Layer({self._layer_name}) "
-                     f"is {{{smooth_scale.shape}, {smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
+                     f"is {{{smooth_scale.shape}, {smooth_scale.dtype}}}")
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|output0_smooth_scale", smooth_scale)
         return smooth_scale
 
@@ -762,7 +762,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
         self.w_mean = self._get_mean_weight(w_scale, self.oc_axis)
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|weight_mean|output0_weight_mean", self.w_mean)
         logger.debug(f"AWQSmoothLinearCell: w_mean of Layer({self._layer_name}) is {{{self.w_mean.shape}, "
-                     f"{self.w_mean.dtype}, {self.w_mean.asnumpy()}}}")
+                     f"{self.w_mean.dtype}}}")
         # compute mean of activation
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|activation_mean|input0_activation_inputs",
                                   self.cat_samples)
@@ -770,7 +770,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
         self.cfg.dumper.dump_data(self.layer_name, "|smooth_scale_awq|activation_mean|output0_activation_mean",
                                   self.x_mean)
         logger.debug(f"AWQSmoothLinearCell: x_mean of Layer({self._layer_name}) is {{{self.x_mean.shape}, "
-                     f"{self.x_mean.dtype}, {self.x_mean.asnumpy()}}}")
+                     f"{self.x_mean.dtype}}}")
 
     def _search_best_scale(self, alpha):
         """search best scale"""
@@ -781,7 +781,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
             if isinstance(best_scale, Tensor):
                 logger.info(
                     f"AWQSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
-                    f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+                    f"is {{{best_scale.shape}, {best_scale.dtype}}}")
             else:
                 logger.info(
                     f"AWQSmoothLinearCell: best scale alpha {best_alpha}, best_scale of Layer({self._layer_name}) "
@@ -826,7 +826,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
                                                True,
                                                self._layer.transpose_b)
             logger.debug(f"AWQSmoothLinearCell: search scale alpha {ratio}, pesudo weight of Layer({self._layer_name}) "
-                         f"is {{{pesudo_weight.shape}, {pesudo_weight.dtype}, {pesudo_weight.asnumpy()}}}")
+                         f"is {{{pesudo_weight.shape}, {pesudo_weight.dtype}}}")
             weight_scales = msops.expand_dims(scales, 0)
             if not self._layer.transpose_b:
                 weight_scales = msops.transpose(weight_scales, (1, 0))
@@ -845,7 +845,7 @@ class AWQSmoothLinearCell(AWQLinearCell):
                 best_scale = scales
         if isinstance(best_scale, Tensor):
             logger.info(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
-                        f"is {{{best_scale.shape}, {best_scale.dtype}, {best_scale.asnumpy()}}}")
+                        f"is {{{best_scale.shape}, {best_scale.dtype}}}")
         else:
             logger.info(f"AWQSmoothLinearCell: best scale alpha {best_ratio}, best_scale of Layer({self._layer_name}) "
                         f"is {best_scale}")

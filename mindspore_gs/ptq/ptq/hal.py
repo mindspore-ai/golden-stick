@@ -60,8 +60,8 @@ class QuantParam:
     quant_dtype: dtype = None
 
     def __str__(self):
-        return f"QuantParam{{scale:{{{self.scale.shape}, {self.scale.dtype}, {self.scale.asnumpy()}}}, " \
-               f"zero_point:{{{self.zero_point.shape}, {self.zero_point.dtype}, {self.zero_point.asnumpy()}}}}}, " \
+        return f"QuantParam{{scale:{{{self.scale.shape}, {self.scale.dtype}}}, " \
+               f"zero_point:{{{self.zero_point.shape}, {self.zero_point.dtype}}}}}, " \
                f"group_size: {self.group_size}, quant_dtype: {self.quant_dtype}"
 
     def __repr__(self):
@@ -135,7 +135,7 @@ class DynamicQuantCell(QuantUnitCell):
         self.smooth_scale = smooth_scale
         if not is_deploy and smooth_scale is not None:
             logger.debug(f"DynamicQuantCell: smooth scale of Layer("
-                         f"{layer_name}) is {{{smooth_scale.shape}, {smooth_scale.dtype}, {smooth_scale.asnumpy()}}}")
+                         f"{layer_name}) is {{{smooth_scale.shape}, {smooth_scale.dtype}}}")
         self.dynamic_quant = DynamicQuantExt()
 
     @staticmethod
@@ -179,16 +179,16 @@ class QuantWithSmoothHighPrecision(QuantWithSmooth):
         if smooth_scale is not None:
             final_scale_np = input_scale_np / smooth_scale.astype(np.float64)
             logger.debug(f"QuantWithSmoothHighPrecision: input scale with smooth scale of Layer({parallel_type}:"
-                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         else:
             if input_scale_np.shape == (1,):  # aclnn quant op not support pertensor
                 final_scale_np = np.tile(input_scale_np, ic)
                 logger.debug(f"QuantWithSmoothHighPrecision: input scale from vector of Layer({parallel_type}:"
-                             f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                             f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
             else:
                 final_scale_np = input_scale_np
                 logger.debug(f"QuantWithSmoothHighPrecision: input scale of Layer({parallel_type}:{layer_name}) is "
-                             f"{{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                             f"{{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         self.input_scale = Parameter(Tensor(final_scale_np, dtype=dtype.float64))
 
         if self.input_scale.shape != x_qparam.zero_point.shape:
@@ -196,11 +196,11 @@ class QuantWithSmoothHighPrecision(QuantWithSmooth):
                 raise RuntimeError("Shape of scale and zero point are not compatible.")
             self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.float64), dtype=dtype.float64))
             logger.debug(f"QuantWithSmoothHighPrecision: input zp from vector of Layer({parallel_type}:{layer_name}) is"
-                         f" {{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp}}}")
+                         f" {{{self.input_zp.shape}, {self.input_zp.dtype}}}")
         else:
             self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=dtype.float64))
             logger.debug(f"QuantWithSmoothHighPrecision: input zp of Layer({parallel_type}:{layer_name}) is "
-                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
+                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}}}")
 
     def construct(self, x):
         """forward for QuantWithSmoothHighPrecision"""
@@ -230,11 +230,11 @@ class QuantWithSmoothHighPerformance(QuantWithSmooth):
         if self.is_perchannel:
             final_scale_np = input_scale_np / smooth_scale.astype(np.float16)
             logger.debug(f"QuantWithSmoothHighPerformance: input scale with smooth scale of Layer({parallel_type}:"
-                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         else:
             final_scale_np = input_scale_np
             logger.debug(f"QuantWithSmoothHighPerformance: input scale from vector of Layer({parallel_type}:"
-                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         if zp_dtype != dtype.int8: # input_scale need divide 1 for aclnn quant ops
             self.input_scale = Parameter(Tensor(1 / final_scale_np, dtype=dst_dtype))
         else:
@@ -245,11 +245,11 @@ class QuantWithSmoothHighPerformance(QuantWithSmooth):
                 raise RuntimeError("Shape of scale and zero point are not compatible.")
             self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.float16), dtype=zp_dtype))
             logger.debug(f"QuantWithSmoothHighPerformance: input zp from vector of Layer({parallel_type}:{layer_name})"
-                         f" is {{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp}}}")
+                         f" is {{{self.input_zp.shape}, {self.input_zp.dtype}}}")
         else:
             self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=zp_dtype))
             logger.debug(f"QuantWithSmoothHighPerformance: input zp of Layer({parallel_type}:{layer_name}) is "
-                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
+                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}}}")
 
     def construct(self, x):
         """forward for QuantWithSmoothHighPerformance"""
@@ -411,16 +411,16 @@ class QuantWithOutlierSuppressionPlusHighPrecisionSmooth(QuantWithOutlierSuppres
         if smooth_scale is not None:
             final_scale_np = input_scale_np / smooth_scale.astype(np.float64)
             logger.debug(f"QuantWithSmoothHighPrecision: input scale with smooth scale of Layer({parallel_type}:"
-                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         else:
             if input_scale_np.shape == (1,):  # aclnn quant op not support pertensor
                 final_scale_np = np.tile(input_scale_np, ic)
                 logger.debug(f"QuantWithSmoothHighPrecision: input scale from vector of Layer({parallel_type}:"
-                             f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                             f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
             else:
                 final_scale_np = input_scale_np
                 logger.debug(f"QuantWithSmoothHighPrecision: input scale of Layer({parallel_type}:{layer_name}) is "
-                             f"{{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                             f"{{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         self.input_scale = Parameter(Tensor(final_scale_np, dtype=dtype.float64))
 
         if self.input_scale.shape != x_qparam.zero_point.shape:
@@ -428,11 +428,11 @@ class QuantWithOutlierSuppressionPlusHighPrecisionSmooth(QuantWithOutlierSuppres
                 raise RuntimeError("Shape of scale and zero point are not compatible.")
             self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.float64), dtype=dtype.float64))
             logger.debug(f"QuantWithSmoothHighPrecision: input zp from vector of Layer({parallel_type}:{layer_name}) is"
-                         f" {{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp}}}")
+                         f" {{{self.input_zp.shape}, {self.input_zp.dtype}}}")
         else:
             self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=dtype.float64))
             logger.debug(f"QuantWithSmoothHighPrecision: input zp of Layer({parallel_type}:{layer_name}) is "
-                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
+                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}}}")
 
     def construct(self, x):
         """forward for QuantWithOutlierSuppressionPlusHighPrecisionSmooth"""
@@ -466,11 +466,11 @@ class QuantWithOutlierSuppressionPlusHighPerformanceSmooth(QuantWithOutlierSuppr
         if self.is_perchannel:
             final_scale_np = input_scale_np / smooth_scale.astype(np.float16)
             logger.debug(f"QuantWithSmoothHighPerformance: input scale with smooth scale of Layer({parallel_type}:"
-                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         else:
             final_scale_np = input_scale_np
             logger.debug(f"QuantWithSmoothHighPerformance: input scale from vector of Layer({parallel_type}:"
-                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}, {final_scale_np}}}")
+                         f"{layer_name}) is {{{final_scale_np.shape}, {final_scale_np.dtype}}}")
         if zp_dtype != dtype.int8: # input_scale need divide 1 for aclnn quant ops
             self.input_scale = Parameter(Tensor(1 / final_scale_np, dtype=dst_dtype))
         else:
@@ -482,11 +482,11 @@ class QuantWithOutlierSuppressionPlusHighPerformanceSmooth(QuantWithOutlierSuppr
                 raise RuntimeError("Shape of scale and zero point are not compatible.")
             self.input_zp = Parameter(Tensor(np.tile(x_qparam.zero_point, ic).astype(np.float16), dtype=zp_dtype))
             logger.debug(f"QuantWithSmoothHighPerformance: input zp from vector of Layer({parallel_type}:{layer_name})"
-                         f" is {{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp}}}")
+                         f" is {{{self.input_zp.shape}, {self.input_zp.dtype}}}")
         else:
             self.input_zp = Parameter(Tensor(x_qparam.zero_point, dtype=zp_dtype))
             logger.debug(f"QuantWithSmoothHighPerformance: input zp of Layer({parallel_type}:{layer_name}) is "
-                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}, {self.input_zp.asnumpy()}}}")
+                         f"{{{self.input_zp.shape}, {self.input_zp.dtype}}}")
 
     def construct(self, x):
         """forward for QuantWithOutlierSuppressionPlusHighPerformanceSmooth"""
@@ -502,7 +502,7 @@ class SmoothMatmul(QuantUnitCell):
         self.smooth_scale = Parameter(msops.div(1, smooth_scale_))
         self.is_group_mm = isinstance(mm, GroupedMatmulV4)
         logger.debug(f"SmoothMatmul: smooth_scale for act of Layer({layer_name}) is {{{self.smooth_scale.shape}, "
-                     f"{self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}")
+                     f"{self.smooth_scale.dtype}}}")
 
     def update(self, layer_name, mm, smooth_scale_):
         """update"""
@@ -624,7 +624,7 @@ class OutlierSuppressionPlusSmoothMatmul(QuantUnitCell):
         self.is_group_mm = isinstance(mm, GroupedMatmulV4)
         logger.debug(
             f"OSPSmoothMatmul: smooth_scale for act of Layer({layer_name}) is {{{self.smooth_scale.shape}, "
-            f"{self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}"
+            f"{self.smooth_scale.dtype}}}"
         )
 
     def update(self, layer_name, mm, smooth_scale_, beta_):
@@ -734,7 +734,7 @@ class DynamicQuantMatmul(QuantUnitCell):
         else:
             self.weight_scale = Parameter(weight_scale.astype(weight_scale_dtype))
             logger.debug(f"DynamicQuantMatmul: weight_scale of Layer({layer_name}) is {{{self.weight_scale.shape}, "
-                         f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
+                         f"{self.weight_scale.dtype}}}")
         self.is_group_mm = is_group_mm
         if is_group_mm:
             self.qbmm = GroupedMatmulV4()
@@ -829,7 +829,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
             self.weight_scale = Parameter(w_qparam.scale.astype(weight_scale_dtype))
             self.perm = Parameter(Tensor(perm.asnumpy(), dtype=dtype.int32))
             logger.debug(f"DynamicQuantMatmul: weight_scale of Layer({layer_name}) is {{{self.weight_scale.shape}, "
-                         f"{self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
+                         f"{self.weight_scale.dtype}}}")
         self.is_group_mm = is_group_mm
         transpose_b = False
         self.weight_qbmm = WeightQuantBatchMatmul(transpose_a, transpose_b, w_qparam.group_size)
@@ -900,7 +900,7 @@ class GptqDynamicQuantMatmul(QuantUnitCell):
                 q_weight = q_weight.transpose(1, 0) if transpose_b else q_weight
                 q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
             logger.debug(f"GptqDynamicQuantMatmul: pack q_weight of Layer({layer_name}) is "
-                         f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
+                         f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}}}")
             q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
         return gdqmm, q_weight, quant_op
 
@@ -946,9 +946,9 @@ class WeightQuantMatmul(QuantUnitCell):
             self.weight_scale = Parameter(Tensor(w_qparam.scale.asnumpy(), dtype=self.dst_dtype))
             self.weight_zp = Parameter(Tensor(w_qparam.zero_point.asnumpy() * -1, dtype=self.dst_dtype))
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: weight_scale of Layer({layer_name}) is "
-                         f"{{{self.weight_scale.shape}, {self.weight_scale.dtype}, {self.weight_scale.asnumpy()}}}")
+                         f"{{{self.weight_scale.shape}, {self.weight_scale.dtype}}}")
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: weight_zp of Layer({layer_name}) is "
-                         f"{{{self.weight_zp.shape}, {self.weight_zp.dtype}, {self.weight_zp.asnumpy()}}}")
+                         f"{{{self.weight_zp.shape}, {self.weight_zp.dtype}}}")
         self.is_grouped_mm = is_grouped_mm
         if self.is_grouped_mm:
             self.weight_qbmm = GroupedMatmulV4()
@@ -958,7 +958,7 @@ class WeightQuantMatmul(QuantUnitCell):
         self.smooth_scale = smooth_scale
         if self.has_smooth:
             logger.debug(f"WeightQuantMatmul {PTQMode.QUANTIZE} mode: smooth_scale of Layer({layer_name}) is "
-                         f"{{{self.smooth_scale.shape}, {self.smooth_scale.dtype}, {self.smooth_scale.asnumpy()}}}")
+                         f"{{{self.smooth_scale.shape}, {self.smooth_scale.dtype}}}")
 
     @classmethod
     def _from_matmul_prim(cls, layer_name, w_qparam: QuantParam, is_deploy, transpose_a=False, transpose_b=False,
@@ -1074,7 +1074,7 @@ class WeightQuantInt4Matmul(WeightQuantMatmul):
             else:
                 q_weight_pack = np_int4data_pack_to_int8(q_weight.asnumpy())
             logger.debug(f"WeightQuantInt4Matmul: pack q_weight of Layer({layer_name}) is "
-                         f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}, {q_weight_pack}}}")
+                         f"{{{q_weight_pack.shape}, {q_weight_pack.dtype}}}")
             q_weight = Parameter(Tensor(q_weight_pack, dtype=w_qparam.quant_dtype), name=linear.weight.name)
 
         if isinstance(linear.matmul, msops.MatMul):
@@ -1308,6 +1308,126 @@ class AllQuantMatmul(QuantUnitCell):
         raise RuntimeError(f"Not supported kernel type: {kernel_type}")
 
     @staticmethod
+    def _create_bias(
+        linear,
+        q_weight,
+        x_qparam: QuantParam,
+        w_qparam: QuantParam,
+        is_deploy,
+        parallel_type: ParallelType,
+        tp_size,
+        trans_b,
+        oc,
+        dst_dtype,
+        bias_osp=None,
+    ) -> Parameter:
+        """Create bias parameter for quantized matmul."""
+        is_osp = isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul)
+        bias_name = linear.bias.name if linear.has_bias else q_weight.name + "_bias"
+
+        if is_deploy:
+            export_num = q_weight.shape[0] if len(q_weight.shape) == 3 else None
+            bias_shape = (export_num, oc) if export_num else (oc,)
+            return Parameter(initializer("zeros", bias_shape, dtype.int32), name=bias_name)
+
+        # fuse bias
+        if parallel_type is ParallelType.ROW_PARALLEL:
+            if not is_osp:
+                t_bias = AllQuantMatmul._correction_into_bias(
+                    q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
+                )
+                # set quant_bias=0 on other card when doing pynative eval
+                if RANK_ID != 0:
+                    t_bias = msops.zeros_like(t_bias)
+            else:
+                t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                    linear.matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, bias_osp
+                )
+        else:
+            if not is_osp:
+                t_bias = AllQuantMatmul._correction_into_bias(
+                    q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype
+                )
+            else:
+                t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
+                    linear.matmul, q_weight, x_qparam, w_qparam, trans_b, False, bias_osp
+                )
+        return Parameter(t_bias, name=bias_name)
+
+    @staticmethod
+    def _create_qmm_and_quant(
+        layer_name,
+        linear,
+        x_qparam: QuantParam,
+        w_qparam: QuantParam,
+        is_deploy,
+        parallel_type: ParallelType,
+        trans_a,
+        trans_b,
+        quant_bias,
+        ic,
+        dst_dtype,
+        kernel_type: KernelType,
+    ):
+        """Create quantized matmul and quant objects based on linear.matmul type."""
+        if isinstance(linear.matmul, (msops.MatMul, GroupedMatmulV4)):
+            qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(
+                layer_name, linear.matmul, x_qparam, w_qparam, is_deploy, trans_a,
+                trans_b, quant_bias, dst_dtype, kernel_type
+            )
+            quant = QuantWithSmooth.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
+                smooth_scale, kernel_type
+            )
+        elif isinstance(linear.matmul, SmoothMatmul):
+            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul(
+                layer_name, linear.matmul, x_qparam, w_qparam, is_deploy, trans_a,
+                trans_b, quant_bias, dst_dtype, kernel_type
+            )
+            quant = QuantWithSmooth.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
+                smooth_scale, kernel_type
+            )
+        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
+            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul_for_deploy(
+                layer_name, linear.matmul, x_qparam, w_qparam, is_deploy, trans_a,
+                trans_b, quant_bias, dst_dtype, kernel_type
+            )
+            quant = QuantWithSmooth.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, kernel_type
+            )
+        elif isinstance(linear.matmul, OutlierSuppressionPlusMatmulForDeploy):
+            qmm, beta = AllQuantMatmul._from_outlier_suppression_plus_matmul_for_deploy(
+                layer_name, linear.matmul, x_qparam, w_qparam, is_deploy, trans_a,
+                trans_b, quant_bias, dst_dtype, kernel_type
+            )
+            quant = QuantWithOutlierSuppressionPlus.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, beta,
+                kernel_type
+            )
+        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul):
+            qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul(
+                layer_name, linear.matmul, x_qparam, w_qparam, is_deploy, trans_a,
+                trans_b, quant_bias, dst_dtype, kernel_type
+            )
+            quant = QuantWithOutlierSuppressionPlusSmooth.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
+                smooth_scale, beta_osp, kernel_type
+            )
+        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmulForDeploy):
+            qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul_for_deploy(
+                layer_name, linear.matmul, x_qparam, w_qparam, is_deploy, trans_a,
+                trans_b, quant_bias, dst_dtype, kernel_type
+            )
+            quant = QuantWithOutlierSuppressionPlusSmooth.create(
+                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type,
+                smooth_scale, beta_osp, kernel_type
+            )
+        else:
+            raise ValueError(f"Not support creating AllQuantMatmul from {linear.matmul}.")
+        return quant, qmm
+
+    @staticmethod
     def create(
         layer_name,
         linear,
@@ -1331,98 +1451,17 @@ class AllQuantMatmul(QuantUnitCell):
         ic_idx, oc_idx = (rank - 1, rank - 2) if trans_b else (rank - 2, rank - 1)
         ic, oc = q_weight.shape[ic_idx], q_weight.shape[oc_idx]
 
-        # dequant offset
-        bias_name = linear.bias.name if linear.has_bias else q_weight.name + "_bias"
-        if is_deploy:
-            export_num = q_weight.shape[0] if len(q_weight.shape) == 3 else None
-            bias_shape = (export_num, oc) if export_num else (oc,)
-            quant_bias = Parameter(initializer("zeros", bias_shape, dtype.int32), name=bias_name)
-        else:
-            # fuse bias
-            if parallel_type is ParallelType.ROW_PARALLEL:
-                if not is_osp:
-                    t_bias = AllQuantMatmul._correction_into_bias(
-                        q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, dst_dtype
-                    )
-                    # set quant_bias=0 on other card when doing pynative eval
-                    if RANK_ID != 0:
-                        t_bias = msops.zeros_like(t_bias)
-                else:
-                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
-                        linear.matmul, q_weight, x_qparam, w_qparam, trans_b, tp_size > 1, bias_osp
-                    )
-            else:
-                if not is_osp:
-                    t_bias = AllQuantMatmul._correction_into_bias(
-                        q_weight, x_qparam, w_qparam, trans_b, False, dst_dtype
-                    )
-                else:
-                    t_bias = AllQuantMatmul._correction_into_bias_for_osp_into_bias(
-                        linear.matmul, q_weight, x_qparam, w_qparam, trans_b, False, bias_osp
-                    )
-            quant_bias = Parameter(t_bias, name=bias_name)
+        # create bias
+        quant_bias = AllQuantMatmul._create_bias(
+            linear, q_weight, x_qparam, w_qparam, is_deploy, parallel_type,
+            tp_size, trans_b, oc, dst_dtype, bias_osp
+        )
 
-        # create qmm
-        if isinstance(linear.matmul, (msops.MatMul, GroupedMatmulV4)):
-            qmm, smooth_scale = AllQuantMatmul._from_matmul_prim(layer_name, linear.matmul, x_qparam, w_qparam,
-                                                                 is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
-                                                                 kernel_type)
-            quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type)
-        elif isinstance(linear.matmul, SmoothMatmul):
-            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul(layer_name, linear.matmul, x_qparam, w_qparam,
-                                                                   is_deploy, trans_a, trans_b, quant_bias, dst_dtype,
-                                                                   kernel_type)
-            quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type)
-        elif isinstance(linear.matmul, SmoothMatmulForDeploy):
-            qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul_for_deploy(layer_name, linear.matmul, x_qparam,
-                                                                              w_qparam, is_deploy, trans_a, trans_b,
-                                                                              quant_bias, dst_dtype, kernel_type)
-            quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type)
-        elif isinstance(linear.matmul, OutlierSuppressionPlusMatmulForDeploy):
-            qmm, beta = AllQuantMatmul._from_outlier_suppression_plus_matmul_for_deploy(layer_name, linear.matmul,
-                                                                                        x_qparam, w_qparam, is_deploy,
-                                                                                        trans_a, trans_b, quant_bias,
-                                                                                        dst_dtype, kernel_type)
-            quant = QuantWithOutlierSuppressionPlus.create(layer_name, x_qparam, ic, dst_dtype, is_deploy,
-                                                           parallel_type, beta, kernel_type)
-        # for osp of omniquant
-        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmul):
-            qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul(
-                layer_name,
-                linear.matmul,
-                x_qparam,
-                w_qparam,
-                is_deploy,
-                trans_a,
-                trans_b,
-                quant_bias,
-                dst_dtype,
-                kernel_type,
-            )
-            quant = QuantWithOutlierSuppressionPlusSmooth.create(
-                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, kernel_type
-            )
-        elif isinstance(linear.matmul, OutlierSuppressionPlusSmoothMatmulForDeploy):
-            qmm, smooth_scale, beta_osp = AllQuantMatmul._from_outlier_suppression_plus_smooth_matmul_for_deploy(
-                layer_name,
-                linear.matmul,
-                x_qparam,
-                w_qparam,
-                is_deploy,
-                trans_a,
-                trans_b,
-                quant_bias,
-                dst_dtype,
-                kernel_type,
-            )
-            quant = QuantWithOutlierSuppressionPlusSmooth.create(
-                layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale, beta_osp, kernel_type
-            )
-        else:
-            raise ValueError(f"Not support creating AllQuantMatmul from {linear.matmul}.")
+        # create qmm and quant
+        quant, qmm = AllQuantMatmul._create_qmm_and_quant(
+            layer_name, linear, x_qparam, w_qparam, is_deploy, parallel_type,
+            trans_a, trans_b, quant_bias, ic, dst_dtype, kernel_type
+        )
         return quant, qmm
 
     # pylint: disable=arguments-differ
@@ -1459,7 +1498,7 @@ class AllQuantMatmulHighPrecision(AllQuantMatmul):
             np_dequant_scale = x_qparam.scale.asnumpy().astype(np.float64) * w_qparam.scale.asnumpy().astype(np.float64)
             self.dequant_scale = Parameter(Tensor(np_dequant_scale))
             logger.debug(f"AllQuantMatmulHighPrecision: dequant_scale of Layer({layer_name}) is "
-                         f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}, {self.dequant_scale.asnumpy()}}}")
+                         f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}}}")
 
         if w_qparam.zero_point is None:
             self.offset = None
@@ -1469,7 +1508,7 @@ class AllQuantMatmulHighPrecision(AllQuantMatmul):
             self.offset = Parameter(Tensor(w_qparam.zero_point, dtype=dtype.float64))
             if not is_deploy:
                 logger.debug(f"AllQuantMatmulHighPrecision: offset of Layer({layer_name}) is {{{self.offset.shape}, "
-                             f"{self.offset.dtype}, {self.offset.asnumpy()}}}")
+                             f"{self.offset.dtype}}}")
 
         self.quant_bias = quant_bias
 
@@ -1516,7 +1555,7 @@ class AllQuantMatmulHighPerformance(AllQuantMatmul):
                                                                               w_qparam.scale.asnumpy(),
                                                                               dst_dtype), dtype=scale_dtype))
             logger.debug(f"AllQuantMatmul: dequant_scale of Layer({layer_name}) is "
-                         f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}, {self.dequant_scale.asnumpy()}}}")
+                         f"{{{self.dequant_scale.shape}, {self.dequant_scale.dtype}}}")
 
         if self.is_group_mm:
             self.gmm = GroupedMatmulV4()

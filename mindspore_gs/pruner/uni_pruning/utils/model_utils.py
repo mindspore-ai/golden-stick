@@ -67,24 +67,50 @@ def save_model_and_mask(net, output_path, exp_name, cur_step_num,
     """
     Save model as .MINDIR and .AIR, weights as .ckpt and mask as .json.
     """
+    # Normalize and validate the output path
+    output_path = os.path.realpath(output_path)
+    if not os.path.exists(output_path) or not os.path.isdir(output_path):
+        raise ValueError(f"Invalid output path: {output_path}")
+
     fake_input = np.random.uniform(0.0, 1.0, size=input_size).astype(np.float32)
     fake_input = Tensor(fake_input, ms_f32)
-    save_checkpoint(net, f'{os.path.join(output_path, exp_name)}_epoch{cur_step_num}.ckpt')
+
+    # Construct and validate checkpoint path
+    ckpt_path = os.path.join(output_path, f'{exp_name}_epoch{cur_step_num}.ckpt')
+    ckpt_path = os.path.realpath(ckpt_path)
+    if not ckpt_path.startswith(output_path):
+        raise ValueError(f"Path traversal detected in checkpoint path: {ckpt_path}")
+
+    save_checkpoint(net, ckpt_path)
     if save_model:
         logger.info(f'Exporting model {exp_name} into MINDIR')
-        export(net, fake_input,
-               file_name=f'{os.path.join(output_path, exp_name)}_epoch{cur_step_num}.mindir',
-               file_format='MINDIR')
+        # Construct and validate MINDIR path
+        mindir_path = os.path.join(output_path, f'{exp_name}_epoch{cur_step_num}.mindir')
+        mindir_path = os.path.realpath(mindir_path)
+        if not mindir_path.startswith(output_path):
+            raise ValueError(f"Path traversal detected in MINDIR path: {mindir_path}")
+
+        export(net, fake_input, file_name=mindir_path, file_format='MINDIR')
+
         if device_target == 'Ascend' and export_air:
             logger.info(f'Exporting model {exp_name} into AIR')
-            export(net, fake_input,
-                   file_name=f'{os.path.join(output_path, exp_name)}_epoch{cur_step_num}.air',
-                   file_format='AIR')
+            # Construct and validate AIR path
+            air_path = os.path.join(output_path, f'{exp_name}_epoch{cur_step_num}.air')
+            air_path = os.path.realpath(air_path)
+            if not air_path.startswith(output_path):
+                raise ValueError(f"Path traversal detected in AIR path: {air_path}")
+
+            export(net, fake_input, file_name=air_path, file_format='AIR')
 
     if mask is not None:
         logger.info('saving mask into JSON')
         save_mask = {key: val.tolist() for key, val in mask.items()}
-        mask_save_path = f"{os.path.join(output_path, exp_name)}_epoch{cur_step_num}_mask.json"
+        # Construct and validate mask JSON path
+        mask_save_path = os.path.join(output_path, f"{exp_name}_epoch{cur_step_num}_mask.json")
+        mask_save_path = os.path.realpath(mask_save_path)
+        if not mask_save_path.startswith(output_path):
+            raise ValueError(f"Path traversal detected in mask path: {mask_save_path}")
+
         with open(mask_save_path, 'w+', encoding='utf8') as file_path:
             json.dump(save_mask, file_path, indent=3)
 
@@ -93,7 +119,19 @@ def load_model(output_path, exp_name, cur_step_num, input_size, dtype):
     """
     Load mindir model.
     """
-    file_name = f'{os.path.join(output_path, exp_name)}_epoch{cur_step_num}.mindir'
+    # Normalize and validate the output path
+    output_path = os.path.realpath(output_path)
+    if not os.path.exists(output_path) or not os.path.isdir(output_path):
+        raise ValueError(f"Invalid output path: {output_path}")
+
+    # Construct and validate model file path
+    file_name = os.path.join(output_path, f'{exp_name}_epoch{cur_step_num}.mindir')
+    file_name = os.path.realpath(file_name)
+    if not file_name.startswith(output_path):
+        raise ValueError(f"Path traversal detected in model path: {file_name}")
+    if not os.path.isfile(file_name):
+        raise ValueError(f"Model file does not exist: {file_name}")
+
     graph = load(file_name)
     net = nn.GraphCell(graph)
     fake_input = Tensor(np.ones(input_size).astype(np.float32), dtype)
