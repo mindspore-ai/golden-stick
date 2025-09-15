@@ -66,7 +66,17 @@ class UniPrunerCallback(Callback):
         Validator.check_value_type("device_target", device_target, [str], self.__class__.__name__)
         Validator.check_value_type("rank", rank, [int], self.__class__.__name__)
         self.exp_name = exp_name
+        # Normalize and validate the output path
+        output_path = os.path.realpath(output_path)
+        if not os.path.exists(output_path) or not os.path.isdir(output_path):
+            raise ValueError(f"Invalid output path: {output_path}")
+
         self.output_path = os.path.join(output_path, exp_name)
+        # Normalize and validate the constructed path
+        self.output_path = os.path.realpath(self.output_path)
+        if not self.output_path.startswith(output_path):
+            raise ValueError(f"Path traversal detected: {self.output_path}")
+
         self.input_size = input_size
         self._frequency = frequency
         self._target_sparsity = target_sparsity
@@ -298,16 +308,23 @@ class UniPruner(CompAlgo):
         if not isinstance(ckpt_path, str):
             raise TypeError(
                 f'The parameter `ckpt_path` must be isinstance of str, but got {type(ckpt_path)}.')
-        real_path = os.path.realpath(ckpt_path)
+
         if ckpt_path != "":
-            if os.path.isfile(real_path):
-                param_dict = load_checkpoint(ckpt_path)
-                not_load_param = load_param_into_net(net_opt, param_dict)
-                if not_load_param[0]:
-                    raise RuntimeError("Load param into net fail.")
-            else:
+            # Normalize and validate the checkpoint path
+            real_path = os.path.realpath(ckpt_path)
+            if not os.path.isfile(real_path):
                 raise ValueError(
                     f'The parameter `ckpt_path` can only be empty or a valid file, but got {real_path}.')
+
+            # Additional security check: ensure the resolved path is reasonable
+            # This helps prevent path traversal attacks
+            if not real_path.endswith('.ckpt'):
+                raise ValueError(f'Invalid checkpoint file extension: {real_path}')
+
+            param_dict = load_checkpoint(real_path)
+            not_load_param = load_param_into_net(net_opt, param_dict)
+            if not_load_param[0]:
+                raise RuntimeError("Load param into net fail.")
         for name, layer in net_opt.cells_and_names():
             if not isinstance(layer, MaskedCell):
                 continue

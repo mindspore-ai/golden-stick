@@ -382,8 +382,8 @@ class PTQ(CompAlgo):
         total_count = ds.get_dataset_size()
         data_count = 1
         for _, ds_item in enumerate(ds.create_dict_iterator()):
-            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
             input_ids = ds_item['input_ids'].asnumpy()
+            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
             try:
                 self._generate_func(network, input_ids, helper)
             except GeneratorExit:

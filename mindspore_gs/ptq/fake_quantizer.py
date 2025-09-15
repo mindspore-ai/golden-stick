@@ -238,12 +238,10 @@ class MinMaxPerLayer(LinearFakeQuantizer):
         return False
 
     def __repr__(self):
-        fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={}, first_el="\
+        fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={})"\
             .format(self.float_min.name, self.float_min.shape, self.float_min.dtype, self.float_min.requires_grad)
-        fminrepr += str(self.float_min.asnumpy().flatten()[0:2]) + ")"
-        fmaxrepr = "float_max: (name={}, shape={}, dtype={}, requires_grad={}, first_el="\
+        fmaxrepr = "float_max: (name={}, shape={}, dtype={}, requires_grad={})"\
             .format(self.float_max.name, self.float_max.shape, self.float_max.dtype, self.float_max.requires_grad)
-        fmaxrepr += str(self.float_max.asnumpy().flatten()[0:2]) + ")"
         res = "MinMaxPerLayer<{}, {}>".format(fminrepr, fmaxrepr)
         return res
 
@@ -343,11 +341,9 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         return self.axis
 
     def __repr__(self):
-        fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={}, first_el="\
+        fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={})"\
             .format(self.float_min.name, self.float_min.shape, self.float_min.dtype, self.float_min.requires_grad)
-        fminrepr += str(self.float_min.asnumpy().flatten()[0:2]) + ")"
-        fmaxrepr = "float_max: (name={}, shape={}, dtype={}, requires_grad={}, first_el="\
+        fmaxrepr = "float_max: (name={}, shape={}, dtype={}, requires_grad={})"\
             .format(self.float_max.name, self.float_max.shape, self.float_max.dtype, self.float_max.requires_grad)
-        fmaxrepr += str(self.float_max.asnumpy().flatten()[0:2]) + ")"
         res = "MinMaxPerChannel<{}, {}>".format(fminrepr, fmaxrepr)
         return res

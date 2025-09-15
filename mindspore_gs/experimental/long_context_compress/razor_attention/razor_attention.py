@@ -169,7 +169,7 @@ class RazorAttention(CompAlgo):
         """_get_compress_network"""
         for i in tqdm.tqdm(range(len(self.attention_layers)), desc="Running RazorAttention..."):
             _, layer = self.attention_layers[i]
-            attention_compress_creator = partial(RACompressCell, cfg=self._config)
+            attention_compress_creator = partial(RACompressCell)
             network_replace(layer, Attention, RACompressCell, attention_compress_creator, [])
             network.update_parameters_name()
         return network

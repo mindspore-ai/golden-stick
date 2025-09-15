@@ -68,51 +68,136 @@ def trans_int4_to_qint4x2(np_data):
     return np_int4_pack_data
 
 
-def convert_hf_ckpt(torch_ckpt_dir, ms_ckpt_file, dtype=ms.float16):
-    """convert hf weight to ms."""
-    print(f"Trying to convert huggingface checkpoint in '{torch_ckpt_dir}'.", flush=True)
+def _validate_paths(torch_ckpt_dir, ms_ckpt_file):
+    """Validate input and output paths."""
+    # Normalize and validate torch_ckpt_dir
+    torch_ckpt_dir = os.path.normpath(torch_ckpt_dir)
+    if not os.path.isabs(torch_ckpt_dir):
+        raise ValueError("torch_ckpt_dir must be an absolute path")
 
+    # Check for path traversal attempts
+    if ".." in torch_ckpt_dir:
+        raise ValueError("Path traversal detected in torch_ckpt_dir")
+
+    # Validate torch_ckpt_dir exists and is a directory
+    if not os.path.exists(torch_ckpt_dir):
+        raise ValueError(f"Directory does not exist: {torch_ckpt_dir}")
+
+    if not os.path.isdir(torch_ckpt_dir):
+        raise ValueError(f"Path is not a directory: {torch_ckpt_dir}")
+
+    # Normalize and validate ms_ckpt_file
+    ms_ckpt_file = os.path.normpath(ms_ckpt_file)
+    if not os.path.isabs(ms_ckpt_file):
+        raise ValueError("ms_ckpt_file must be an absolute path")
+
+    # Check for path traversal attempts
+    if ".." in ms_ckpt_file:
+        raise ValueError("Path traversal detected in ms_ckpt_file")
+
+    # Validate output directory exists
+    output_dir = os.path.dirname(ms_ckpt_file)
+    if not os.path.exists(output_dir):
+        raise ValueError(f"Output directory does not exist: {output_dir}")
+
+    if not os.path.isdir(output_dir):
+        raise ValueError(f"Output directory path is not a directory: {output_dir}")
+
+    # Validate file extension
+    allowed_extensions = ['.ckpt', '.safetensors']
+    if not any(ms_ckpt_file.endswith(ext) for ext in allowed_extensions):
+        raise ValueError(f"Invalid file extension. Allowed: {allowed_extensions}")
+
+    return torch_ckpt_dir, ms_ckpt_file, output_dir
+
+
+def _load_safetensors_files(torch_ckpt_dir):
+    """Load all safetensors files from directory."""
     param_dict = {}
     for file_name in os.listdir(torch_ckpt_dir):
         if not file_name.endswith('.safetensors'):
             continue
+
+        # Sanitize file name to prevent path traversal
+        sanitized_file_name = file_name.replace("..", "").replace("/", "_").replace("\\", "_")
+
+        # Construct and validate file path
+        file_path = os.path.join(torch_ckpt_dir, sanitized_file_name)
+        file_path = os.path.normpath(file_path)
+
+        # Ensure the file path is within the torch_ckpt_dir
+        if not file_path.startswith(torch_ckpt_dir):
+            print(f"Skipping file with invalid path: {file_name}", flush=True)
+            continue
+
         try:
             param_dict.update(
                 load_checkpoint(
-                    os.path.join(torch_ckpt_dir, file_name),
+                    file_path,
                     format='safetensors')
             )
         # pylint: disable=W0703
         except Exception as e:
             print(
                 f"Do not find huggingface checkpoint in '{torch_ckpt_dir}', "
-                f"Error {e.message}.",
+                f"Error {e}.",
                 flush=True
             )
-            return False
+            return None
+    return param_dict
+
+
+def _process_parameter(name, value):
+    """Process a single parameter based on its type and name."""
+    name = name_replace(name)
+    value = value.asnumpy()
+    print(f'\rprocessing parameter: {name} {value.shape}', end='', flush=True)
+
+    if value.dtype == np.int32 and "._layer.weight" in name:
+        value = trans_int32_to_int4(value)
+        value = value - np.ones(value.shape, dtype=np.int8) * 8
+        value = trans_int4_to_qint4x2(value)
+        dtype = ms.qint4x2
+    elif value.dtype == np.int32 and ".matmul.weight_zp" in name:
+        value = trans_int32_to_int4(value)
+        value = -1 * value + np.ones(value.shape, dtype=np.int8) * 8
+        dtype = ms.float16
+    elif value.dtype == np.float16:
+        dtype = ms.float16
+    else:
+        dtype = ms.float16
+
+    return {'name': name, 'data': ms.Tensor(value, dtype=dtype)}
+
+
+def convert_hf_ckpt(torch_ckpt_dir, ms_ckpt_file):
+    """convert hf weight to ms."""
+    torch_ckpt_dir, ms_ckpt_file, output_dir = _validate_paths(torch_ckpt_dir, ms_ckpt_file)
+
+    print(f"Trying to convert huggingface checkpoint in '{torch_ckpt_dir}'.", flush=True)
+
+    param_dict = _load_safetensors_files(torch_ckpt_dir)
+    if param_dict is None:
+        return False
 
     ckpt_list = []
     time_start = time.time()
     for name, value in param_dict.items():
-        name = name_replace(name)
-        value = value.asnumpy()
-        print(f'\rprocessing parameter: {name} {value.shape}', end='', flush=True)
-        if value.dtype == np.int32 and "._layer.weight" in name:
-            value = trans_int32_to_int4(value)
-            value = value - np.ones(value.shape, dtype=np.int8) * 8
-            value = trans_int4_to_qint4x2(value)
-            dtype = ms.qint4x2
-        elif value.dtype == np.int32 and ".matmul.weight_zp" in name:
-            value = trans_int32_to_int4(value)
-            value = -1 * value + np.ones(value.shape, dtype=np.int8) * 8
-            dtype = ms.float16
-        elif value.dtype == np.float16:
-            dtype = ms.float16
-        ckpt_list.append({'name': name, 'data': ms.Tensor(value, dtype=dtype)})
+        ckpt_list.append(_process_parameter(name, value))
     time_end = time.time()
     print(f'Trans takes {time_end - time_start} s')
     time_start = time.time()
-    ms.save_checkpoint(ckpt_list, os.path.join(ms_ckpt_file), format=ms_ckpt_file.split('.')[-1])
+
+    # Additional validation before saving
+    if not ms_ckpt_file.startswith(output_dir):
+        raise ValueError("Invalid output file path construction")
+
+    # Extract and validate file format
+    file_format = ms_ckpt_file.split('.')[-1]
+    if file_format not in ['ckpt', 'safetensors']:
+        raise ValueError(f"Invalid file format: {file_format}")
+
+    ms.save_checkpoint(ckpt_list, ms_ckpt_file, format=file_format)
     time_end = time.time()
     print(f'Save takes {time_end - time_start} s')
     print(f"\rConvert huggingface checkpoint finished, "

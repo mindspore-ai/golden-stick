@@ -188,5 +188,4 @@ if __name__ == "__main__":
     network = create_llama()
     output = network(create_input()).asnumpy()
     logger.debug(f'output shape: {output.shape},'
-                 f'output dtype: {output.dtype},'
-                 f'output value: {output}')
+                 f'output dtype: {output.dtype}')

@@ -234,32 +234,87 @@ class Qwen2WeightProcessor(BaseWeightProcessor):
         self.infer_process_dense_ffn_weight(src_hf_dir, layer_id, hf_weight_map)
         self.infer_process_norm_weight(src_hf_dir, layer_id, hf_weight_map)
 
-    def load_safetensors_shard(self, src_hf_dir):
-        """qwen load safetensors and shard """
-        rank_id = 0 # get_rank()
-        param_json_path = ""
+    def _validate_and_normalize_path(self, src_hf_dir):
+        """Validate and normalize input path."""
+        if not isinstance(src_hf_dir, str) or not src_hf_dir.strip():
+            raise ValueError("src_hf_dir must be a non-empty string")
+
+        # Normalize and convert to absolute path
+        src_hf_dir = os.path.normpath(os.path.abspath(src_hf_dir))
+
+        # Check for path traversal
+        if ".." in src_hf_dir or src_hf_dir.startswith("/"):
+            if not os.path.commonpath([src_hf_dir, os.getcwd()]).startswith(os.getcwd()):
+                raise ValueError("Invalid path: potential path traversal detected")
+
+        # Verify directory exists and is a directory
+        if not os.path.exists(src_hf_dir):
+            raise FileNotFoundError(f"Directory does not exist: {src_hf_dir}")
+        if not os.path.isdir(src_hf_dir):
+            raise ValueError(f"Path is not a directory: {src_hf_dir}")
+        return src_hf_dir
+
+    def _find_index_json_path(self, src_hf_dir):
+        """Find index.json file path."""
         for file in os.listdir(src_hf_dir):
+            # Sanitize filename
+            if not isinstance(file, str) or ".." in file or "/" in file or "\\" in file:
+                continue
             if file.endswith('index.json'):
-                param_json_path = os.path.join(src_hf_dir, file)
-                break
+                # Construct and validate file path
+                file_path = os.path.normpath(os.path.join(src_hf_dir, file))
+                # Ensure the file path is within the source directory
+                if not file_path.startswith(src_hf_dir + os.sep) and file_path != src_hf_dir:
+                    continue
+                return file_path
+        return ""
+
+    def _create_weight_map_from_json(self, param_json_path):
+        """Create weight map from index.json file."""
+        if param_json_path and os.path.exists(param_json_path):
+            with open(param_json_path, "r") as fp:
+                return json.load(fp)['weight_map']
+        return {}
+
+    def _create_weight_map_from_safetensor(self, src_hf_dir):
+        """Create weight map from single safetensor file."""
+        safetensor_file = "model.safetensors"
+        # Sanitize and validate safetensor filename
+        if ".." in safetensor_file or "/" in safetensor_file or "\\" in safetensor_file:
+            raise ValueError("Invalid safetensor filename")
+
+        safetensor_path = os.path.normpath(os.path.join(src_hf_dir, safetensor_file))
+        # Ensure the file path is within the source directory
+        if not safetensor_path.startswith(src_hf_dir + os.sep) and safetensor_path != src_hf_dir:
+            raise ValueError("Safetensor file path outside source directory")
 
         hf_weight_map = {}
-        if os.path.exists(param_json_path):
-            with open(param_json_path, "r") as fp:
-                hf_weight_map = json.load(fp)['weight_map']
-        else:
-            # only one safetensor, create a hf_weight_map
-            safetensor_file = "model.safetensors"
-            with safe_open(f"{src_hf_dir}/{safetensor_file}", framework="np") as sf_file:
-                all_keys = sf_file.keys()
-                for key in all_keys:
-                    hf_weight_map[str(key).strip()] = safetensor_file
+        with safe_open(safetensor_path, framework="np") as sf_file:
+            all_keys = sf_file.keys()
+            for key in all_keys:
+                hf_weight_map[str(key).strip()] = safetensor_file
+        return hf_weight_map
 
+    def _load_weights_for_layers(self, src_hf_dir, hf_weight_map, rank_id):
+        """Load weights for all layers."""
         self.infer_convert_outer_weight(src_hf_dir, hf_weight_map)
         num_layers = self.config.model.model_config.num_layers
         enable_tqdm = rank_id == 0
         for layer_id in tqdm(range(num_layers), desc="Weight loading", disable=not enable_tqdm):
             self.infer_convert_layer_weight(src_hf_dir, layer_id, hf_weight_map)
+
+    def load_safetensors_shard(self, src_hf_dir):
+        """qwen load safetensors and shard """
+        src_hf_dir = self._validate_and_normalize_path(src_hf_dir)
+        rank_id = 0  # get_rank()
+
+        param_json_path = self._find_index_json_path(src_hf_dir)
+        hf_weight_map = self._create_weight_map_from_json(param_json_path)
+
+        if not hf_weight_map:
+            hf_weight_map = self._create_weight_map_from_safetensor(src_hf_dir)
+
+        self._load_weights_for_layers(src_hf_dir, hf_weight_map, rank_id)
 
         ms.load_param_into_net(self.network, self.parameter_dict)
         del self.parameter_dict

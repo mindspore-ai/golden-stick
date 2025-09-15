@@ -1559,6 +1559,11 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         rank_id = get_rank()
         param_json_path = ""
 
+        # Normalize and validate the source directory path
+        src_hf_dir = os.path.realpath(src_hf_dir)
+        if not os.path.exists(src_hf_dir) or not os.path.isdir(src_hf_dir):
+            raise ValueError(f"Invalid source directory: {src_hf_dir}")
+
         for file in os.listdir(src_hf_dir):
             if file.endswith('index.json'):
                 # mtp model do not support quantization, needs to load bf16 weight.
@@ -1566,11 +1571,19 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                 is_no_quant_mtp = 'quant' not in file and (not self.is_quant or is_mtp_model)
                 if is_quant or is_no_quant_mtp:
                     param_json_path = os.path.join(src_hf_dir, file)
+                    # Validate the constructed path is within the source directory
+                    param_json_path = os.path.realpath(param_json_path)
+                    if not param_json_path.startswith(src_hf_dir + os.sep):
+                        raise ValueError(f"Path traversal detected: {param_json_path}")
                     with open(param_json_path, "r") as fp:
                         hf_weight_map = json.load(fp)['weight_map']
                     break
             elif file.endswith('_name_map.json'):
                 param_json_path = os.path.join(src_hf_dir, file)
+                # Validate the constructed path is within the source directory
+                param_json_path = os.path.realpath(param_json_path)
+                if not param_json_path.startswith(src_hf_dir + os.sep):
+                    raise ValueError(f"Path traversal detected: {param_json_path}")
                 with open(param_json_path, "r") as fp:
                     hf_weight_map = json.load(fp)
                     if hf_weight_map.get('weight_map'):
