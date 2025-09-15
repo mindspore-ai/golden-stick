@@ -116,7 +116,7 @@ class GptqDynamicQuantLinearInferCell(LinearInferCell):
             logger.debug(f"GptqDynamicQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is "
                          f"{w_qparam}")
             logger.debug(f"GptqDynamicQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
-                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+                         f"{{{q_weight.shape}, {q_weight.dtype}}}")
         qmm, q_weight, dynamic_quant_op = GptqDynamicQuantMatmul.create(layer_name, q_weight, linear,
                                                                         w_qparam, is_deploy, False,
                                                                         self.layer.transpose_b, compute_type,

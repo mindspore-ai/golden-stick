@@ -15,7 +15,6 @@
 """unify_safetensors"""
 
 import argparse
-import json
 import os
 import mindspore as ms
 import numpy as np
@@ -27,9 +26,19 @@ QK_ROPE_HEAD_DIM = 64
 
 def trans_int8_to_int4(ckpt_path):
     """trans_int8_to_int4"""
+    # Normalize and validate the checkpoint path
+    ckpt_path = os.path.realpath(ckpt_path)
+    if not os.path.exists(ckpt_path) or not os.path.isdir(ckpt_path):
+        raise ValueError(f"Invalid checkpoint path: {ckpt_path}")
+
     for folder_name in os.listdir(ckpt_path):
         if folder_name.endswith(".safetensors"):
             folder_path = os.path.join(ckpt_path, folder_name)
+            # Normalize and validate the file path
+            folder_path = os.path.realpath(folder_path)
+            if not folder_path.startswith(ckpt_path):
+                raise ValueError(f"Path traversal detected: {folder_path}")
+
             ori_param = ms.load_checkpoint(folder_path, format="safetensors")
             for name in sorted(ori_param.keys()):
                 value = ori_param[name]
@@ -38,7 +47,7 @@ def trans_int8_to_int4(ckpt_path):
                     ori_param[name] = ms.Parameter(ms.Tensor(value.asnumpy(), ms.qint4x2), name=name,
                                                    requires_grad=False)
             ms.save_checkpoint(ori_param, folder_path, format="safetensors")
-            print(f"save {folder_path} int4 safetensors success.")
+    print(f"save {folder_path} int4 safetensors success.")
 
 
 def split_1_dim_w_gate_hidden(value, rank_num):
@@ -255,34 +264,18 @@ def process_routed_experts_w_gate_hidden_pergroup_quant(name, ori_param, rank_nu
                                       requires_grad=False)
 
 
-def process_name_map(ckpt_path, folder_name, ffn_split, qkv_split):
-    """process_name_map"""
-    param_json_path = os.path.join(ckpt_path, folder_name)
-    with open(param_json_path, "r") as fp:
-        origin_map = json.load(fp)
-    weight_map = origin_map['weight_map']
-    keys = list(weight_map.keys())
-    for key in keys:
-        value = weight_map[key]
-        if ffn_split and "w_gate_hidden" in key:
-            w1_key = key.replace("w_gate_hidden", "w1")
-            w3_key = key.replace("w_gate_hidden", "w3")
-            weight_map.pop(key)
-            weight_map[w1_key] = value
-            weight_map[w3_key] = value
-        if qkv_split and "qkv2l" in key:
-            q2l_key = key.replace("qkv2l", "q2l_proj")
-            kv2l_key = key.replace("qkv2l", "kv2l")
-            weight_map.pop(key)
-            weight_map[q2l_key] = value
-            weight_map[kv2l_key] = value
-    origin_map["weight_map"] = weight_map
-    with open(param_json_path, "w") as fp:
-        json.dump(weight_map, fp, indent=2)
+def _validate_checkpoint_path(ckpt_path):
+    """Validate checkpoint path."""
+    ckpt_path = os.path.realpath(ckpt_path)
+    if not os.path.exists(ckpt_path) or not os.path.isdir(ckpt_path):
+        raise ValueError(f"Invalid checkpoint path: {ckpt_path}")
+    return ckpt_path
 
 
 def split_for_smooth_quant(ckpt_path, rank_num, ffn_split, qkv_split):
     """trans_int8_to_int4"""
+    ckpt_path = _validate_checkpoint_path(ckpt_path)
+
     for folder_name in os.listdir(ckpt_path):
         if folder_name.endswith(".safetensors"):
             folder_path = os.path.join(ckpt_path, folder_name)
@@ -326,7 +319,6 @@ def split_for_a8w4(ckpt_path, rank_num, ffn_split, qkv_split):
             print(f"save {folder_path} {folder_name} success.")
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--src_dir', required=True, type=str)
@@ -339,6 +331,17 @@ if __name__ == "__main__":
     parser.add_argument('--rank_num', required=False, default=16, type=int)
     args = parser.parse_args()
     print(f"args:---{args}")
+
+    # Normalize and validate input paths
+    args.src_dir = os.path.realpath(args.src_dir)
+    args.src_strategy_file = os.path.realpath(args.src_strategy_file)
+    args.dst_dir = os.path.realpath(args.dst_dir)
+
+    if not os.path.exists(args.src_dir) or not os.path.isdir(args.src_dir):
+        raise ValueError(f"Invalid source directory: {args.src_dir}")
+    if not os.path.exists(args.src_strategy_file) or not os.path.isfile(args.src_strategy_file):
+        raise ValueError(f"Invalid strategy file: {args.src_strategy_file}")
+
     ms.unified_safetensors(args.src_dir, args.src_strategy_file, args.dst_dir)
     print("unified_safetensors success.")
     if args.int4_trans:
