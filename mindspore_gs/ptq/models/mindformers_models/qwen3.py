@@ -168,11 +168,43 @@ class QWen3(MFModelEnableSafeTensors):
         ffn_processor = FFNParamProcessor(self.network)
         results = ffn_processor.split_name(results)
 
+        hf_results = {}
+        for key, value in results.items():
+            hf_results[self._convert_param_names_to_hf(key)] = value
+
         desc_info = {}
         param_dict = self.parameters_dict()
         for key, _ in param_dict.items():
-            if key in results.keys():
-                desc_info[key] = results[key]
+            if key in hf_results.keys():
+                desc_info[key] = hf_results[key]
             else:
                 desc_info[key] = QuantType.FLOAT.value
         return desc_info
+
+    @classmethod
+    def _convert_param_names_to_hf(cls, param_name):
+        """Convert mcore name to huggingface name.
+        One parameter may correspond to multiple parameters in huggingface,
+        so return a list of names."""
+        rules = {
+            "model.": "",
+            "decoder.layers.": "model.layers.",
+            ".self_attention.": ".self_attn.",
+            "embedding.word_embeddings.": "model.embed_tokens.",
+            "decoder.final_layernorm.": "model.norm.",
+            ".pre_mlp_layernorm.": ".post_attention_layernorm.",
+            ".q_layernorm.": ".q_norm.",
+            ".k_layernorm.": ".k_norm.",
+            ".linear_proj.": ".o_proj.",
+            ".linear_q.": ".q_proj.",
+            ".linear_k.": ".k_proj.",
+            ".linear_v.": ".v_proj.",
+            ".gating.": ".gate_proj.",
+            ".hidden.": ".up_proj.",
+            ".linear_fc2.": ".down_proj."
+        }
+
+        for old, new in rules.items():
+            param_name = param_name.replace(old, new)
+
+        return param_name

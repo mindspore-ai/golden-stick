@@ -321,7 +321,7 @@ class MFModelEnableSafeTensors(MFModel):
         """
         from .weight_loader import WeightProcessor
         processor = WeightProcessor()
-        processor.load_safetensors_shard(quant_safetensors_path, self.network)
+        processor.load_safetensors_shard(quant_safetensors_path, self.network, self._convert_param_names_to_hf)
 
     def _process_params_dict_before_save(self, param_dict) -> tuple[dict, dict]:
         """Process parameter dictionary before saving to SafeTensors.
@@ -496,7 +496,10 @@ class MFModelEnableSafeTensors(MFModel):
                 dis_param_dict[name] = DistributedParameter(param)
             else:
                 dis_param_dict[name] = DistributedParameter(param, shard_axis)
-        return dis_param_dict
+        hf_param_dict = {}
+        for name, param in dis_param_dict.items():
+            hf_param_dict[self._convert_param_names_to_hf(name)] = param
+        return hf_param_dict
 
     def save_quantized(self, save_path):
         """Save the quantized model in SafeTensors format.
@@ -521,6 +524,20 @@ class MFModelEnableSafeTensors(MFModel):
 
         Args:
             network: The network to analyze for quantization descriptions.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def _convert_param_names_to_hf(cls, param_name):
+        """Convert the parameter to huggingface format.
+
+        This is an abstract method that must be implemented by derived classes.
+
+        Args:
+            param_name: The parameter name to convert to huggingface format.
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.
