@@ -7,3 +7,4 @@ prettytable
 
 # for ut/st
 pytest >= 1.6.0
+aiohttp < 3.9; python_version == '3.9'

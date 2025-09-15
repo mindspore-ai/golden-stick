@@ -1450,7 +1450,7 @@ class AllQuantMatmul(QuantUnitCell):
                                                                  w_qparam, is_deploy, trans_a, trans_b, quant_bias,
                                                                  dst_dtype, kernel_type)
             quant = QuantWithSmooth.create(layer_name, x_qparam, ic, dst_dtype, is_deploy, parallel_type, smooth_scale,
-                                           kernel_type, use_experimental)
+                                           KernelType.ACLNN, use_experimental)
         elif isinstance(matmul, SmoothMatmul):
             qmm, smooth_scale = AllQuantMatmul._from_smooth_matmul(layer_name, matmul, x_qparam,
                                                                    w_qparam, is_deploy, trans_a, trans_b, quant_bias,
