@@ -212,7 +212,7 @@ class WeightQuantLinearInferCell(LinearInferCell):
         if not is_deploy:
             logger.debug(f"WeightQuantLinearInferCell: w_qparam of Layer({parallel_type}:{layer_name}) is {w_qparam}")
             logger.debug(f"WeightQuantLinearInferCell: q_weight of Layer({parallel_type}:{layer_name}) is "
-                         f"{{{q_weight.shape}, {q_weight.dtype}, {q_weight.asnumpy()}}}")
+                         f"{{{q_weight.shape}, {q_weight.dtype}}}")
         if w_qparam.quant_dtype == dtype.int8:
             qmm = WeightQuantMatmul.create(layer_name, linear, q_weight, w_qparam, is_deploy, False,
                                            self.layer.transpose_b, compute_type)

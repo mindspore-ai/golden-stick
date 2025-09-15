@@ -93,6 +93,11 @@ class BaseWeightProcessor:
         """get_moe_safetensor_from_file"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
+        # Normalize and validate the file path
+        filename = os.path.realpath(filename)
+        src_hf_dir_real = os.path.realpath(src_hf_dir)
+        if not filename.startswith(src_hf_dir_real + os.sep):
+            raise ValueError(f"Path traversal detected: {filename}")
         sf_file = self.get_file_handles(filename)
         qint4 = False
         if sf_file.metadata() is not None and hf_param_name in sf_file.metadata().keys():
@@ -122,6 +127,11 @@ class BaseWeightProcessor:
         """get_routed_safetensor_3_dim"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
+        # Normalize and validate the file path
+        filename = os.path.realpath(filename)
+        src_hf_dir_real = os.path.realpath(src_hf_dir)
+        if not filename.startswith(src_hf_dir_real + os.sep):
+            raise ValueError(f"Path traversal detected: {filename}")
         sf_file = self.get_file_handles(filename)
         qint4 = False
         if sf_file.metadata() is not None and hf_param_name in sf_file.metadata().keys():
@@ -155,6 +165,11 @@ class BaseWeightProcessor:
         """get_moe_routed_safetensor_2_dim"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
+        # Normalize and validate the file path
+        filename = os.path.realpath(filename)
+        src_hf_dir_real = os.path.realpath(src_hf_dir)
+        if not filename.startswith(src_hf_dir_real + os.sep):
+            raise ValueError(f"Path traversal detected: {filename}")
         sf_file = self.get_file_handles(filename)
         qint4 = False
         if sf_file.metadata() is not None and hf_param_name in sf_file.metadata().keys():
@@ -185,6 +200,11 @@ class BaseWeightProcessor:
         split_num = split_num if split_num != -1 else self.tp_group_size
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
+        # Normalize and validate the file path
+        filename = os.path.realpath(filename)
+        src_hf_dir_real = os.path.realpath(src_hf_dir)
+        if not filename.startswith(src_hf_dir_real + os.sep):
+            raise ValueError(f"Path traversal detected: {filename}")
         sf_file = self.get_file_handles(filename)
         qint4 = False
         if sf_file.metadata() is not None and hf_param_name in sf_file.metadata().keys():

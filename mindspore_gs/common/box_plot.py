@@ -15,6 +15,7 @@
 
 """ Plot box figure. """
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -23,6 +24,20 @@ def plot_box(data: np.ndarray, out_path: str, title='box figure', x_label='x', y
     """plot_box"""
     if len(data.shape) != 2:
         raise ValueError("Only support 2D data.")
+
+    # Normalize and validate the output path
+    out_path = os.path.realpath(out_path)
+    out_dir = os.path.dirname(out_path)
+    if not os.path.exists(out_dir):
+        raise ValueError(f"Output directory does not exist: {out_dir}")
+    if not os.path.isdir(out_dir):
+        raise ValueError(f"Output directory path is not a directory: {out_dir}")
+
+    # Validate file extension for security
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.pdf', '.svg']
+    if not any(out_path.lower().endswith(ext) for ext in allowed_extensions):
+        raise ValueError(f"Invalid file extension. Allowed: {allowed_extensions}")
+
     x_len = data.shape[1]
     plt.figure(figsize=(14, 8))
     bplot = plt.boxplot(data, patch_artist=True, boxprops=dict(facecolor='#3274A1'))
@@ -44,6 +59,20 @@ def plot_seaborn_box(data: np.ndarray, out_path: str, title='box figure', x_labe
     import pandas as pd
     if len(data.shape) != 2:
         raise ValueError("Only support 2D data.")
+
+    # Normalize and validate the output path
+    out_path = os.path.realpath(out_path)
+    out_dir = os.path.dirname(out_path)
+    if not os.path.exists(out_dir):
+        raise ValueError(f"Output directory does not exist: {out_dir}")
+    if not os.path.isdir(out_dir):
+        raise ValueError(f"Output directory path is not a directory: {out_dir}")
+
+    # Validate file extension for security
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.pdf', '.svg']
+    if not any(out_path.lower().endswith(ext) for ext in allowed_extensions):
+        raise ValueError(f"Invalid file extension. Allowed: {allowed_extensions}")
+
     x_len = data.shape[1]
     df = pd.DataFrame(data, columns=[f'{i + 1}' for i in range(x_len)])
     plt.figure(figsize=(14, 8))
