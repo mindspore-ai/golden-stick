@@ -6,23 +6,21 @@
 
 ## PTQ算法介绍
 
-### 设计初衷
+### 整体流程
 
-为了实现组合量化算法，以及后续金箍棒对于混合精度量化、自动搜优等复杂量化算法的支持，金箍棒引入名为PTQ的训练后量化算法。该算法依赖于MindSpore前端并行能力，得以实现更加复杂的算法实现逻辑。
+金箍棒PTQ算法提供了昇腾硬件上的大语言模型（后称LLM）SOTA训练后量化算法能力。此外，MindSpore团队与华为泰勒团队基于MindSpore做了一些算法创新，实现昇腾硬件上更友好的自动搜优的混合精度量化，也集成到了金箍棒。
 
-该算法能够提供RoundToNearest和SmoothQuant两个量化算法的能力，后续新的训练后量化算法也会在此算法上演进，所以我们将该算法命名为PTQ。
+![autoquant流程图](images/zh_cn/ptq_arch.png)
 
-### 设计思路
+金箍棒提供AutoQuantForCausalLM和BaseQuantForCausalLM接口，供用户方便地在昇腾硬件上对LLM进行训练后量化。
 
-![架构图](images/zh_cn/arch.png)
+AutoQuantForCausalLM可以根据预训练模型自动选择相应的量化模型实现，返回一个BaseQuantForCausalLM对象，进而对网络进行校准或评测。
 
-分层实现量化算法，主要分为config、量化算法、算法模块、量化Cell、量化工具函数。
+BaseQuantForCausalLM是一个接口类，方便算法支持不同来源的网络，比如MindSpore Transformers、vLLM或SGLang等。目前仅支持MindSpore Transformers，vLLM原生网络的支持正在开发中。
 
-- config主要用于用户配置算法。并且实现yaml序列化反序列化能力。
-- 量化算法是算法的主入口，PTQ算法同样继承自金箍棒算法基类CompAlgo，实现了apply和convert接口，分别实现量化checkpoint和量化部署网络导出的功能。
-- 算法模块是一些模块化的功能块，比如本次PTQ算法中内置了针对Linear层的Smooth模块，针对Linear和KVCache层的量化模块。通过这些模块的组装，可以实现各种算法，比如SmoothQuant算法。这保证了PTQ算法高度的扩展性和灵活性。
-- 量化Cell是针对特定的非量化网络层，封装得到的量化网络层，用于实现对特定网络层的量化。量化网络层通过注册方式引入，实现了不同网络框架之间的解耦，比如金箍棒和MindFormers解耦。
-- 量化工具函数是一些基础的工具函数，如量化参数的计算，矩阵的量化等。
+为了提升量化算法对不同网络的效果，BaseQuantForCausalLM支持通过PTQConfig来按层进行量化策略的配置。当前已支持OutlierSuppressionLite（后称OSL）、SmoothQuant、A8W4、AWQ、GPTQ、KVCacheInt8、RTN量化算法，以及将这些量化策略应用于网络的不同层。
+
+同时BaseQuantForCausalLM提供了量化模型保存接口save_quantized()，可以将量化后的权重直接保存成Hugging Face格式。
 
 ### 使用限制
 
@@ -31,10 +29,10 @@
 | 规格 | 规格说明 |
 | --- | --- |
 | 硬件支持 | Atlas 800I A2 |
-| 网络支持 | ParallelLlamaForCausalLM，具体请参见[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py) |
+| 网络支持 | DeepSeekV3/R1 <br> Qwen3 <br> Qwen3-moe <br> Telechat2 <br> 具体请参见[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38) |
 | 运行模式支持 | 量化checkpoint阶段仅支持PyNative模式，量化推理阶段不限定模式，建议GraphMode获得更好的性能 |
 
-> 当前PTQ算法依赖于完整的DecoderLayer做网络拓扑分析，所以不支持任意基于MindFormers的Linear层构造的网络，我们计划在后续版本改进这一点，以提升PTQ算法的网络泛化能力。
+> 当前calibrate接口依赖于MindSpore Transformers提供的基础模型GPTModel做网络拓扑分析，针对其他框架中的网络支持正在开发中。
 
 ### 算法支持
 
@@ -43,65 +41,24 @@
 本小节从业界常见的量化算法范式来介绍PTQ算法的能力，在此之前先给出其他分类维度上的一些限制：
 
 - 仅支持MinMax量化。
-- 静态激活量化只支持per-tensor量化，权重量化只支持per-channel量化。支持激活per-token的动态量化。
-- 支持KVCache静态per-channel量化和动态per-token量化。
-- 受限于硬件和算子支持，对于全量化，激活不支持per-channel的量化，权重不支持带zero point的量化。
+- 激活量化支持静态per-tensor量化和动态per-token量化。
+- 权重量化支持per-channel和per-group量化。
+- KVCache量化支持静态per-channel量化和动态per-token量化。
+- 受限于硬件和算子支持，对于全量化，激活当前不支持per-channel的量化，权重不支持带zero point的量化。
 - 硬件支持带zero point的权重量化，但当前PTQ算法没有开放这方面能力，仅支持不带zero point的权重量化。
-- PTQ算法做了分层设计，当前底层量化算子仅对MindFormers的一些Layer做了支持，因为PTQ算法仅支持对[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/layers.py#L363)做权重量化和激活量化，对[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26)做KVCache量化。如果用户需要量化不基于MindFormers的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。
+- 由于Mindspore底层量化算子限制，当前金箍棒PTQ量化算法仅对MindSpore Transformers的一些Layer做了支持，其中[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/layers.py)和[MindFormers的moe层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/grouped_layers.py)支持激活和权重量化，[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26)支持KVCache量化。如果用户需要量化其他框架的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。
 
-#### RoundToNearest算法
+金箍棒当前已支持算法如下：
 
-RoundToNearest算法是一类较朴素的后量化算法，其取整方式使用了Round to nearest，即四舍五入的方式，故名RoundToNearest。该算法能力和金箍棒独立的[RoundToNearest](../round_to_nearest/README_CN.ipynb)算法能力类似，后续金箍棒会停止对RoundToNearest算法的演进，使用PTQ算法来支持RoundToNearest算法能力。
-
-##### 1）量化过程
-
-![](images/zh_cn/round_to_nearest.png)
-
-量化算法的主要逻辑是根据浮点数据如权重的最大最小值和整型数据的最大最小值，根据计算公式计算量化参数：
-
-$$scale = \frac{X_{{float}_{max}} - {X_{float}}_{min}} {X_{{int}_{max}} - {X_{int}}_{min}}$$
-
-$$offset = round(X_{{int}_{max}} - \frac{X_{{float}_{max}}} {scale})$$
-
-其中scale是缩放因子，offset是平移因子，两者统称为量化参数。获得量化参数后就可以对权重做量化：
-
-$$x_{int} = clamp(round(x_{float} \div scale) + offset; 0, 2^b-1)$$
-
-其中涉及round操作，即四舍五入操作，这是RoundToNearest算法的含义，也是该量化算法的一部分误差来源。
-
-##### 2）权重量化
-
-将上述量化过程应用于网络中的权重矩阵，将其转换为8bit整型进行存储。在部署时加载8bit权重后，对其进行反量化，其过程的数学表达如下：
-
-$$X_{float} = (X_{int} - offset) \times scale$$
-
-将权重反量化为浮点后，网络的推理过程就和一般的浮点网络推理过程无异。权重量化并不能带来计算量的减少，相反反量化会带来额外的计算量，所以通常将反量化的操作和后续的浮点计算过程进行融合，可以有效降低部署阶段的显存开销，同时可以缓解大语言模型增量推理阶段的Memory Bound，这两者都可以提升大语言模型部署时的吞吐量。
-
-PTQ RoundToNearest算法当前支持8bit的权重量化能力，可以通过如下配置项使能：
-
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  kvcache_quant_dtype=None,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-```
-
-##### 3）KVCache量化
-
-将上述量化过程应用于大语言模型推理过程中产生的KVCache上，将计算得到的KVCache量化后进行存储，然后在Attention计算前将KVCache进行反量化，从而缓解KVCache的显存占用，以支持更大batch size或者更长序列的大语言模型生成。需要注意的是，KVCache是推理时产生的，所以针对KVCache的量化需要少量数据集进行校准。
-
-PTQ当前仅支持8bit的KVCache量化能力，可以通过如下配置项使能：
-
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                        outliers_suppression=OutliersSuppressionType.NONE)
-```
-
-> 因MindSpore Transformers的ParallelLlamaForCausalLM网络已经日落，在金箍棒1.2.0版本中，该网络不支持KVCache Int8量化，后续版本会在新的网络上支持KVCache Int8量化。
+| 已支持算法 | 简要介绍
+|-------|-------|
+| [OutlierSuppressionLite算法](#outliersuppressionlite算法) | 由华为泰勒实验室与MindSpore团队联合开发，在SmoothQuant基础上为网络中的每个矩阵分别搜索最优超参α值
+| [A8W4量化](#金箍棒支持组合量化) | 由MindSpore团队开发的层间混合量化算法，激活使用动态per-token的8-bit量化，权重使用per-group的4-bit gptq量化
+| [SmoothQuant算法](#smoothquant算法) | A8W8量化，通过smooth_scale将激活的量化难度转移至权重
+| [GPTQ算法](#gptq算法) | 对某个block内的所有参数逐个量化，弥补量化带来的精度损失
+| [动态量化](#动态量化算法) | 激活或KVCache进行动态per-token量化
+| [AWQ算法](#awq算法) | 通过离线网格搜索的方式实现权重低比特量化
+| [RoundToNearest算法](#roundtonearest算法) |朴素的后量化算法，其取整方式使用了四舍五入的方式
 
 #### SmoothQuant算法
 
@@ -123,11 +80,13 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
 
 #### OutlierSuppressionLite算法
 
-[SmoothQuant](https://arxiv.org/pdf/2211.10438)算法将激活值的量化难度转移到权重的量化上，同时引入超参数“迁移强度”(migration strength)α来控制这一幅度。论文通过整网粒度的实验得出，对于大多数模型而言α的最佳取值是0.5。然而，不同的模型结构、不同的decoder层位置、docoder层内矩阵的不同位置会导致激活值和权重的分布不同，进而导致α的最佳取值差异。
+OutlierSuppressionLite算法由华为泰勒实验室与MindSpore团队联合开发，是一种网格搜索算法，可进一步提升静态量化的精度，后续简称为OSL算法。
 
-OutlierSuppressionLite提供一种优化α的网格搜索算法，为网络中的每个矩阵分别搜索最优α值，进一步提升静态量化精度。
+OSL是[OutlierSuppressionPlus](https://arxiv.org/abs/2304.09145)算法的简化版本，在[SmoothQuant](https://arxiv.org/pdf/2211.10438)算法的基础上，对SmoothQuant中的超参数α进行网格搜索，为网络中的每个矩阵分别搜索最优α值，更好的对异常值进行抑制，提升量化模型的精度。
 
-可以通过如下配置项使能PTQ的OutlierSuppressionLite能力：
+> [SmoothQuant](https://arxiv.org/pdf/2211.10438)算法将激活值的量化难度转移到权重的量化上，同时引入超参数“迁移强度”(migration strength)α来控制这一幅度。论文通过整网粒度的实验得出，对于大多数模型而言α的最佳取值是0.5。然而，不同的模型结构、不同的decoder层位置、docoder层内矩阵的不同位置会导致激活值和权重的分布不同，进而导致α的最佳取值差异。
+
+可以通过如下配置项使能PTQ的OSL能力：
 
 ```python
 from mindspore import dtype as msdtype
@@ -173,6 +132,77 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128,
                        precision_recovery = PrecisionRecovery.GPTQ)
 ```
+
+#### 动态量化算法
+
+当前金箍棒仅支持per-token的动态量化。per-token量化是指为每个token分配独立的量化参数来减少误差。动态量化是指量化参数在推理阶段实时计算，而不需要离线计算量化参数。
+
+per-token动态量化算法是在推理过程中对激活/KVcache进行per-token在线量化，在线计算出来token维度上的scale和zp，而无需使用数据集进行校准量化，与离线静态量化相比精度更高。当前per-token动态量化仅支持对称量化。
+
+1. 激活 per-token动态量化
+
+激活per-token动态量化，首先需要对权重进行RoundToNearest量化，然后再使用量化的权重进行W8A8-per-token推理。同时激活per-token动态量化也支持smooth操作，因此也可以在量化过程中计算smooth参数。
+
+- 包含smooth参数的激活per-token动态量化
+
+  当需要包含smooth参数时，对应的配置项如下。
+
+  ```python
+  from mindspore import dtype as msdtype
+  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
+                         outliers_suppression=OutliersSuppressionType.SMOOTH)
+  ```
+
+  此时激活对应的计算公式如下：
+
+  $$scale = \frac{row\_max(abs(X_{float} \cdot smooth\_scale))} {127}$$
+
+  $$x_{int} = round(x_{float} \div scale)$$
+
+- 不包含smooth参数的激活per-token动态量化
+
+  当不包含smooth参数时，对应的配置项如下。
+
+  ```python
+  from mindspore import dtype as msdtype
+  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                         weight_quant_granularity=QuantGranularity.PER_TOKEN,
+                         outliers_suppression=OutliersSuppressionType.NONE)
+  ```
+
+  此时激活对应的计算公式如下：
+
+  $$scale = \frac{row\_max(abs(X_{{float}}))} {127}$$
+
+  $$x_{int} = round(x_{float} \div scale)$$
+
+同时也可以直接使用PTQ算法w8a16量化后的权重进行W8A8-per-token推理。
+
+2. KVCache per-token动态量化
+
+对KVCache进行per-token动态量化，无需离线量化操作，可以直接传入原始的浮点权重直接进行推理即可。对应的配置项如下。
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+
+ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
+                       kvcache_quant_dtype=msdtype.int8,
+                       kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+                       outliers_suppression=OutliersSuppressionType.NONE)
+```
+
+此时KVCache对应的计算公式如下：
+
+$$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
+
+$$KVCache_{int} = round(KVCache_{float} \div scale)$$
+
+> 因MindSpore Transformers的ParallelLlamaForCausalLM网络已经日落，在金箍棒1.2.0版本中，该网络不支持KVCache Int8量化，后续版本会在新的网络上支持KVCache Int8量化。
 
 #### AWQ算法
 
@@ -230,80 +260,43 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
                        weight_quant_granularity=QuantGranularity.PER_GROUP, group_size=128, algo_args=awq_config)
 ```
 
-#### 动态量化算法
+#### RoundToNearest算法
 
-当前金箍棒仅支持per-token的动态量化。per-token量化是指为每个token分配独立的量化参数来减少误差。动态量化是指量化参数在推理阶段实时计算，而不需要离线计算量化参数。
+RoundToNearest算法是一类较朴素的后量化算法，其取整方式使用了Round to nearest，即四舍五入的方式，故名RoundToNearest。该算法能力和金箍棒独立的[RoundToNearest](../round_to_nearest/README_CN.ipynb)算法能力类似，后续金箍棒会停止对RoundToNearest算法的演进，使用PTQ算法来支持RoundToNearest算法能力。
 
-per-token动态量化算法是在推理过程中对激活/KVcache进行per-token在线量化，在线计算出来token维度上的scale和zp，而无需使用数据集进行校准量化，与离线静态量化相比精度更高。当前per-token动态量化仅支持对称量化。
+量化算法的主要逻辑是根据浮点数据如权重的最大最小值和整型数据的最大最小值，根据计算公式计算量化参数：
 
-##### 激活 per-token动态量化
+$$scale = \frac{X_{{float}_{max}} - {X_{float}}_{min}} {X_{{int}_{max}} - {X_{int}}_{min}}$$
 
-激活per-token动态量化，首先需要对权重进行RoundToNearest量化，然后再使用量化的权重进行W8A8-per-token推理。同时激活per-token动态量化也支持smooth操作，因此也可以在量化过程中计算smooth参数。
+$$offset = round(X_{{int}_{max}} - \frac{X_{{float}_{max}}} {scale})$$
 
-- 包含smooth参数的激活per-token动态量化
+其中scale是缩放因子，offset是平移因子，两者统称为量化参数。获得量化参数后就可以对权重做量化：
 
-  当需要包含smooth参数时，对应的配置项如下。
+$$x_{int} = clamp(round(x_{float} \div scale) + offset; 0, 2^b-1)$$
 
-  ```python
-  from mindspore import dtype as msdtype
-  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+RoundToNearest算法将上述量化过程应用于网络中的权重矩阵，将其转换为8bit整型进行存储。在部署时加载8bit权重后，对其进行反量化，其过程的数学表达如下：
 
-  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
-                         outliers_suppression=OutliersSuppressionType.SMOOTH)
-  ```
+$$X_{float} = (X_{int} - offset) \times scale$$
 
-  此时激活对应的计算公式如下：
+将权重反量化为浮点后，网络的推理过程就和一般的浮点网络推理过程无异。权重量化并不能带来计算量的减少，相反反量化会带来额外的计算量，所以通常将反量化的操作和后续的浮点计算过程进行融合，可以有效降低部署阶段的显存开销，同时可以缓解大语言模型增量推理阶段的Memory Bound，这两者都可以提升大语言模型部署时的吞吐量。
 
-  $$scale = \frac{row\_max(abs(X_{float} \cdot smooth\_scale))} {127}$$
+![](images/zh_cn/round_to_nearest.png)
 
-  $$x_{int} = round(x_{float} \div scale)$$
-
-- 不包含smooth参数的激活per-token动态量化
-
-  当不包含smooth参数时，对应的配置项如下。
-
-  ```python
-  from mindspore import dtype as msdtype
-  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
-
-  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-                         weight_quant_granularity=QuantGranularity.PER_TOKEN,
-                         outliers_suppression=OutliersSuppressionType.NONE)
-  ```
-
-  此时激活对应的计算公式如下：
-
-  $$scale = \frac{row\_max(abs(X_{{float}}))} {127}$$
-
-  $$x_{int} = round(x_{float} \div scale)$$
-
-同时也可以直接使用PTQ算法w8a16量化后的权重进行W8A8-per-token推理。
-
-##### KVCache per-token动态量化
-
-对KVCache进行per-token动态量化，无需离线量化操作，可以直接传入原始的浮点权重直接进行推理即可。对应的配置项如下。
+PTQ RoundToNearest算法当前支持8bit的权重量化能力，可以通过如下配置项使能：
 
 ```python
 from mindspore import dtype as msdtype
-from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
-                       kvcache_quant_dtype=msdtype.int8,
-                       kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  kvcache_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.NONE)
 ```
 
-此时KVCache对应的计算公式如下：
+#### 金箍棒支持组合量化
 
-$$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
+1. AxWx量化组合KVCache量化
 
-$$KVCache_{int} = round(KVCache_{float} \div scale)$$
-
-> 因MindSpore Transformers的ParallelLlamaForCausalLM网络已经日落，在金箍棒1.2.0版本中，该网络不支持KVCache Int8量化，后续版本会在新的网络上支持KVCache Int8量化。
-
-#### 组合量化
-
-得益于分层解耦框架设计，PTQ算法可以方便的将不同的算法能力组合在一起：
+得益于分层解耦框架设计，金箍棒的PTQ算法可以方便的将不同的算法能力组合在一起，例如：
 
 - 8bit权重量化组合8bit KVCache量化：
 
@@ -325,23 +318,32 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
                          outliers_suppression=OutliersSuppressionType.SMOOTH)
   ```
 
-- 层间混合精度量化
+2. 层间组合量化-A8W4量化
 
-  支持层间混合精度量化，根据不同层对于量化的敏感程度，应用a16w8、a8w8等量化算法。例如，通过layer_policies配置，支持feed_forward模块中的层使用a16w8量化，其他层使用a8w8量化。
+金箍棒也支持针对不同的层配置不同的量化策略，例如A8W4量化是一种组合量化算法。
 
-  ```python
-  from collections import OrderedDict
-  from mindspore import dtype as msdtype
-  from mindspore_gs.ptq import PTQ, PTQConfig, OutliersSuppressionType
+以DeepSeekV3/R1网络为例，针对网络中的Attention模块采用OSL量化，稠密feed_froward模块采用动态A8W8量化，moe模块则采用动态A8W4量化。
 
-  net_policy = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
-                         outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=[])
-  ffn_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=None,
-                         outliers_suppression=OutliersSuppressionType.NONE, opname_blacklist=['w2'])
-  layer_policies = OrderedDict({r'.*\.feed_forward\..*': ffn_config})
+由于算子限制，金箍棒当前仅支持针对moe结构的A8W4量化。moe结构可参考[moe block](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/transformer/moe/moe_layer.py#L100)。其中激活进行8-bit动态per-token量化，权重使用gptq进行4-bit per-group量化。
 
-  ptq = PTQ(config=net_policy, layer_policies=layer_policies)
-  ```
+以DeepSeekR1模型为例，A8W4模型权重压缩率可达70%，实现单机可部署，数据集精度误差在1%以内。
+
+对应的PTQConfig配置如下：
+
+```python
+from mindspore import dtype as msdtype
+from mindspore_gs.ptq import (PTQConfig, PTQMode, BackendTarget,
+                              QuantGranularity, PrecisionRecovery,
+                              GPTQQuantConfig)
+
+gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
+ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                            weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
+                            weight_quant_granularity=QuantGranularity.PER_GROUP,
+                            group_size=64, algo_args=gptq_config,
+                            act_quant_granularity=QuantGranularity.PER_TOKEN,
+                            precision_recovery=PrecisionRecovery.GPTQ)
+```
 
   备注：
 
@@ -349,37 +351,35 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
   2) PTQConfig中的mode和backend参数，以net_policy为准。
 
+  3) 当前配置策略仅支持人工按经验手动配置，后续规划为可自动配置。
+
 ## 示例
 
-跟金箍棒所有算法一样，PTQ算法的应用主要可以分为两个阶段：量化阶段和部署阶段。
+PTQ量化通常分为两个阶段：一个是量化校准阶段，另一个是部署阶段。
 
-量化阶段是部署前提前完成的，主要的工作是：收集权重的分布、计算量化参数、量化权重数据、插入反量化节点。
+量化校准阶段包括：收集权重的分布、计算量化参数、量化权重数据、量化模型保存。
 
-部署阶段通常是指在生产环境，使用MindSpore框架对量化后的模型进行推理的过程。
+部署阶段包括：在生产环境下，使用MindSpore框架对量化后的模型进行推理的过程。
 
-本用例使用ParallelLlamaForCausalLM 7B网络进行演示，主要分四个步骤：环境准备、模型量化、模型部署评估、效果分析。
+### Qwen3-0.6B 混合精度量化
 
-### 步骤1. 环境准备
+本用例使用Mindformers框架下的Qwen3网络进行演示，主要分四个步骤：环境准备、模型量化、模型部署评估、效果分析。
 
-#### 1.1. Ascend环境
+#### 步骤1. 环境准备
+
+1.1. Ascend环境
 
 PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[MindSpore安装指南](https://www.mindspore.cn/install)安装昇腾AI处理器配套软件包小节和配置环境变量小节。
 
-#### 1.2. MindSpore环境
+1.2. MindSpore环境
 
 金箍棒依赖于MindSpore，需要提前安装合适的MindSpore。可以从[MindSpore官网](https://www.mindspore.cn/versions)下载预编译好的安装包并安装。
 
-#### 1.3. MindFormers环境
+1.3. MindFormers环境
 
 本样例对MindFormers中的网络进行量化并推理，所以需要提前安装合适的MindFormers。可以从[MindSpore官网](https://www.mindspore.cn/versions)下载预编译好的安装包并安装。
 
-#### 1.4. 金箍棒环境
-
-从[MindSpore官网](https://www.mindspore.cn/versions)下载预编译好的安装包并安装。
-
-#### 1.5. 相关文件准备
-
-需要预先下载[squad1.1数据集](https://data.deepai.org/squad1.1.zip)、[Llama2 7B预训练权重](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/llama2_7b.ckpt)和[Llama2分词器文件](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model)。
+1.4. 相关文件准备
 
 **第一步**创建工作目录：
 
@@ -387,311 +387,145 @@ PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[Mind
 mkdir workspace
 ```
 
-**第二步**准备数据集，由于权限限制，需要手动下载squad数据集：
+**第二步**下载开源CEval数据集，拷贝至workspace目录下：
 
-数据集下载地址：[squad1.1数据集](https://data.deepai.org/squad1.1.zip)
+Ceval下载地址：[CEval Dataset](https://huggingface.co/ceval)
 
-下载完成后，将得到的数据集squad1.1.zip拷贝至第一步创建的workspace目录下，并确保数据集名称为squad1.1.zip，然后运行解压代码：
+**第三步** 下载Qwen3-0.6B权重，由于权限限制，需要手动下载：
 
-```shell
-cd workspace
-unzip squad1.1.zip -d ./squad
+模型下载地址：[Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B)
+
+下载完成后，将得到的模型权重拷贝至第一步创建的workspace目录下。
+
+**第四步** 下载Qwen3的yaml文件：
+
+yaml下载地址：[predict_qwen3.yaml](https://gitee.com/mindspore/mindformers/blob/master/configs/qwen3/predict_qwen3.yaml)
+下载完成后，将得到的yaml拷贝至第一步创建的workspace目录下。
+
+**第五步** 进入workspace空间，下载金箍棒源码，并使用源码安装：
+
+```python
+git clone https://gitee.com/mindspore/golden-stick.git
+
+cd golden-stick
+pip install -e .
 ```
-
-使用unzip命令解压squad1.1.zip文件后，可以得到train-v1.1.json和dev-v1.1.json量化数据集文件，我们先使用train数据集进行量化校准，然后使用dev数据集进行量化评测。
-
-**第三步**准备Llama2 7b网络的checkpoint文件，Llama2分词器文件，Llama2模型配置文件：
-
-下载地址：
-
-[Llama2 7b checkpoint](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/llama2_7b.ckpt)
-
-[Llama2分词器文件](https://ascend-repo-modelzoo.obs.cn-east-2.myhuaweicloud.com/MindFormers/llama2/tokenizer.model)
-
-下载好上述3个文件后，将其拷贝至workspace目录下。
 
 准备完上述文件后，目录结构为：
 
 ```shell
 workspace
-  ├── squad
-  ├     ├── train-v1.1.json
-  ├     └── dev-v1.1.json
-  ├── predict_llama2_7b.yaml
-  ├── tokenizer.model
-  └── llama2_7b.ckpt
+  └── ceval
+  └── predict_qwen3.yaml
+  └── Qwen3-0.6B
+  └── golden-stick
 ```
 
-### 步骤2. 模型量化
+#### 步骤2. 模型量化
 
-#### 2.1. 构造非量化网络
+2.1. 修改yaml文件
 
-构造MindFormers仓的ParallelLlamaForCausalLM 7B网络，首先需要修改predict_llama2_7b.yaml文件的如下内容：
+1. 修改predict_qwen3.yaml文件中的`load_checkpoint`和`pretrained_model_dir`字段为Qwen3-0.6B权重所在路径。
 
-1. 更新load_checkpoint字段为llama2_7b.ckpt所在路径。
+2. 若使用多卡进行量化校准，修改`use_parallel`为True，`model_parallel`为对应卡数。
 
-2. 更新process中的vocab_file字段为tokenizer.model所在路径。没有该字段的话，可手动添加。
+3. 修改`mode`为1，使用动态图进行量化校准。
 
-3. 修改context中的device_id为当前机器空闲的设备id，context中的mode为1，即PYNATIVE模式。
-
-4. 修改model.arch.type字段为ParallelLlamaForCausalLM。
-
-5. 修改use_parallel为False，parallel.parallel_mode为'STAND_ALONE'，parallel_config.data_parallel为1，parallel.full_batch为False。（此步骤是并行策略的修改，与具体网络有关，当前配置是ParallelLlamaForCausalLM 7B网络的配置）
-
-修改后的yaml配置文件中，并行相关的配置应该类似于这样：
-
-```yaml
-use_parallel: False
-parallel:
-  parallel_mode: "STAND_ALONE"
-  gradients_mean: False
-  enable_alltoall: False
-  full_batch: False
-  search_mode: "sharding_propagation"
-  enable_parallel_optimizer: False
-  strategy_ckpt_save_file: "./ckpt_strategy.ckpt"
-  parallel_optimizer_config:
-    gradient_accumulation_shard: False
-    parallel_optimizer_threshold: 64
-parallel_config:
-  data_parallel: 1
-  model_parallel: 1
-  pipeline_stage: 1
-  use_seq_parallel: False
-  micro_batch_num: 16
-  vocab_emb_dp: True
-  gradient_aggregation_group: 4
-```
-
-完整的样例代码可以参考[quant_ckpt.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/quant_ckpt.py)。
-
-修改完成后，可以使用金箍棒提供的MFParallelLlama2Helper方便地通过配置文件构造网络并加载checkpoint，代码如下：
+修改完成后，可以使用金箍棒提供的AutoQuantForCausalLM，方便地通过配置文件构造网络并加载checkpoint，代码如下：
 
 ```python
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
+from mindspore_gs.ptq.models import AutoQuantForCausalLM
 
-config_path = '/path/to/workspace/predict_llama2_7b.yaml'
-helper = MFParallelLlama2Helper(config_path)
-network = helper.create_network()
+config_path = '/path/to/workspace/predict_qwen3.yaml'
+model = AutoQuantForCausalLM.from_pretrained(config_path)
 ```
 
-#### 2.2. 构造squad-v1.1数据集loader
+2.2. 构造校准数据集
 
-我们基于squad的train-v1.1.json进行量化过程中的校准，用mindspore_gs的get_datasets接口构造squad-v1.1数据集loader。
-
-一般量化校准阶段只会使用数百条数据进行校准，当前样例中，我们使用n_samples参数指定仅加载数据集中的200条数据，代码如下：
+我们可以使用Ceval数据来进行量化校准，一般量化校准阶段只会使用数百条数据进行校准。当前样例中，我们使用n_samples参数指定仅加载数据集中的200条数据，代码如下：
 
 ```python
+from mindformers import MindFormerConfig
 from mindspore_gs.datasets import get_datasets
+from transformers import AutoTokenizer
 
-ds_path = '/path/to/workspace/squad/train-v1.1.json'
-bs_ = helper.get_spec('batch_size')
-seq_ = helper.get_spec('seq_length')
-max_decode_length = helper.get_spec('max_decode_length')
-ignore_token_id = helper.get_spec('ignore_token_id')
-tokenizer = helper.create_tokenizer()
-ds = get_datasets('squad1.1', ds_path, "train", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
-                  False, n_samples=200)
+config_path = '/path/to/workspace/predict_qwen3.yaml'
+mfconfig = MindFormerConfig(config_path)
+tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir, trust_remote_code=True)
+
+seq = 2048
+max_decode_length = 1024
+ignore_token_id = tokenizer.pad_token_id
+ds_path = "/path/to/ceval/dev"
+datasets = get_datasets("ceval", ds_path, 'train', 1, seq, max_decode_length, tokenizer, ignore_token_id, 1, False, n_samples=200)
 ```
 
-#### 2.3. 构造量化算法
+2.3. 构造量化校准策略及模型量化校准
 
-PTQ算法支持基础的round to nearest方法实现的a16w8权重量化和c8（kvcache int8）算法，也支持smooth-quant方法实现的a8w8算法，同时也支持a16w8权重量化算法和c8算法组合量化算法，smooth-quant和c8组合量化算法。
+我们可以根据PTQConfig配置来启用不同的量化能力，PTQConfig的含义可以参考其[API文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.PTQConfig.html#mindspore_gs.ptq.PTQConfig)，这里我们以混合精度量化为例：
 
-我们可以根据PTQConfig配置来启用不同的量化能力，PTQConfig的含义可以参考其[API文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.PTQConfig.html#mindspore_gs.ptq.PTQConfig)，这里我们以SmoothQuant为例：
+1. 0~9层的attention模块使用OSL进行校准。
+
+2. 10~19层的attention模块使用SmoothQuant进行校准。
+
+3. 整网的feed_forward模块使用动态A8W8进行校准。
 
 ```python
+from collections import OrderedDict
 from mindspore import dtype as msdtype
-from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
-
-ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=None,
-                       outliers_suppression=OutliersSuppressionType.SMOOTH)
-```
-
-有了PTQConfig以后，接下来构造PTQ算法了，代码如下：
-
-> 对于ParallelLlamaForCausalLM网络，某些层对于量化比较敏感，不适合量化，我们通常通过opname_blacklist字段来帮助跳过这些层的量化。
-
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQMode, PTQConfig
+from mindspore_gs.ptq import (PTQConfig, PTQMode,
+                              OutliersSuppressionType,
+                              QuantGranularity)
 
-ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
-                       weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8)
-ptq = PTQ(config=ptq_config)
+a8w8_dynamic_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                             weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                             act_quant_granularity=QuantGranularity.PER_TOKEN,
+                             opname_blacklist=['output_layer'])
+smoothquant_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                            weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                            act_quant_granularity=QuantGranularity.PER_TENSOR,
+                            outliers_suppression=OutliersSuppressionType.SMOOTH,
+                            opname_blacklist=['output_layer', 'linear_fc2'])
+osl_cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                    weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                    act_quant_granularity=QuantGranularity.PER_TENSOR,
+                    outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
+                    opname_blacklist=['output_layer', 'linear_fc2'])
+cfg = a8w8_dynamic_cfg
+layer_policies = OrderedDict({r'.*\.[0-9]\.self_attention.*': osl_cfg,
+                              r'.*\.1[0-9]\.self_attention.*': smoothquant_cfg,
+                              })
 ```
 
-#### 2.4. 量化网络并保存量化checkpoint文件
+有了PTQConfig以后，接下来可模型的通过calibrate结构进行模型的量化校准，代码如下：
 
-接下来对网络进行量化矫正，主要分为两个步骤：**第一步**是使用PTQ的apply接口，对网络进行量化矫正；**第二步**是使用PTQ的convert接口，将量化矫正后的网络改造成对应后端的真实量化网络：
+> 对于Qwen3网络，某些层对于量化比较敏感，不适合量化，我们通常通过opname_blacklist字段来帮助跳过这些层的量化。
 
 ```python
-import mindspore as ms
-
-ptq.apply(network, ds)
-ptq.convert(network)
-ms.save_checkpoint(network.parameters_dict(), "a8w8c8.ckpt",
-                   choice_func=lambda x: "key_cache" not in x and "value_cache" not in x and "float_weight" not in x)
-print("quant checkpoint saved at 'a8w8c8.ckpt'", flush=True)
+model.calibrate(cfg, layer_policies, datasets)
 ```
 
-成功运行后，量化后的checkpoint文件会保存在 `/path/to/workspace/a8w8c8.ckpt` 路径下。
+2.4. 量化网络的保存
 
-### 步骤3. 模型部署
-
-#### 3.1. 评估FP16网络的F1EM指标
-
-使用squad1.1 dev数据集评估ParallelLlamaForCausalLM-7B网络的F1EM指标。完整样例可以参考[eval_squad.py](https://gitee.com/mindspore/golden-stick/blob/master/example/ptq/eval_squad.py)。
-
-> 评测前请确认yaml配置文件中的load_checkpoint字段已正确配置了非量化的网络checkpoint文件路径:`/path/to/workspace/llama2_7b.ckpt`。并配置context.mode为0，即静态图模式。
+接下来可通过模型的save_quantized()接口对量化校准后的网络进行保存。
 
 ```python
-import numpy as np
-from mindformers.core.metric import EmF1Metric
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
-from mindspore_gs.datasets import get_datasets
-from mindspore_gs.common import logger
-
-config_path = '/path/to/workspace/predict_llama2_7b.yaml'
-helper = MFParallelLlama2Helper(config_path)
-network = helper.create_network()
-
-ds_path = '/path/to/workspace/squad/dev-v1.1.json'
-bs_ = helper.get_spec('batch_size')
-seq_ = helper.get_spec('seq_length')
-max_decode_length = helper.get_spec('max_decode_length')
-ignore_token_id = helper.get_spec('ignore_token_id')
-top_k = helper.get_spec("top_k")
-top_p = helper.get_spec("top_p")
-do_sample = helper.get_spec("do_sample")
-pad_token_id = helper.get_spec("pad_token_id")
-tokenizer = helper.create_tokenizer()
-ds = get_datasets('squad1.1', ds_path, "eval", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
-                  False, n_samples=1000)
-
-metric = EmF1Metric()
-metric.clear()
-
-data_count = 0
-total_count = ds.get_dataset_size()
-for _, ds_item in enumerate(ds.create_dict_iterator()):
-    data_count += 1
-    logger.info(f"Dataset count: {data_count}/{total_count}")
-    input_ids = ds_item['input_ids'].asnumpy()
-    labels = ds_item['labels'].asnumpy()
-
-    valid_length_each_example = []
-    for j in range(input_ids.shape[0]):
-        # As the nonzero returns the index and we need length
-        valid_length_each_example.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
-    valid_length_each_example = np.array(valid_length_each_example)
-
-    outputs = network.generate(input_ids, do_sample=do_sample, max_length=seq_, top_p=top_p, top_k=top_k, max_new_tokens=200)
-    output_ids = []
-    for j in range(input_ids.shape[0]):
-        output_ids.append(outputs[j][int(valid_length_each_example[j]):])
-
-    pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
-    labels_str = tokenizer.decode(labels, skip_special_tokens=True)
-    metric.update(pres_str, labels_str)
-metric.eval()
+output_dir = "./output/Qwen3-mix-quant"
+model.save_quantized(output_dir)
 ```
 
-#### 3.2. 评估量化后网络的F1EM指标
+成功运行后，量化后的权重文件和量化策略描述文件会保存在 `./output/Qwen3-mix-quant` 路径下。
 
-由于MindSpore当前不支持保存修改后的网络，所以在加载量化ckpt之前，需要先用算法恢复带量化结构的网络，然后再加载checkpoint到网络。
+output/Qwen3-mix-quant的目录结构应为：
 
-评估脚本逻辑与非量化网络的一致，不过中间增加一步修改网络为量化网络的过程。
-
-> 评测前请确认yaml配置文件中的load_checkpoint字段已经配置了正确的量化的网络checkpoint文件路径: `/path/to/workspace/a8w8c8.ckpt`。
-
-```python
-import numpy as np
-import mindspore as ms
-from mindspore.communication.management import init
-from mindformers.core.metric import EmF1Metric
-from mindformers import MindFormerConfig, AutoModel
-from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFParallelLlama2Helper
-from mindspore_gs.datasets import get_datasets
-from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq import PTQ
-from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import PTQMode, PTQConfig
-
-
-config_path = '/path/to/workspace/predict_llama2_7b.yaml'
-mf_config = MindFormerConfig(config_path)
-
-ms.set_context(mode=mf_config.context.mode, device_target=mf_config.context.device_target,
-                jit_config={"jit_level": "O0", "infer_boost": "on"})
-init()
-network = AutoModel.from_config(mf_config, download_checkpoint=False)
-network.set_train(False)
-network.phase = 'predict'
-
-ptq_config = PTQConfig(mode=PTQMode.DEPLOY, backend=BackendTarget.ASCEND, opname_blacklist=["w2", "lm_head"],
-                       weight_quant_dtype=ms.dtype.int8, act_quant_dtype=ms.dtype.int8, kvcache_quant_dtype=ms.dtype.int8)
-ptq = PTQ(config=ptq_config)
-ptq.apply(network)
-ptq.convert(network)
-
-ms.load_checkpoint(mf_config.load_checkpoint, network)
-
-helper = MFParallelLlama2Helper(mf_config)
-ds_path = '/path/to/squad/dev-v1.1.json'
-bs_ = helper.get_spec('batch_size')
-seq_ = helper.get_spec('seq_length')
-max_decode_length = helper.get_spec('max_decode_length')
-ignore_token_id = helper.get_spec('ignore_token_id')
-top_k = helper.get_spec("top_k")
-top_p = helper.get_spec("top_p")
-do_sample = helper.get_spec("do_sample")
-pad_token_id = helper.get_spec("pad_token_id")
-tokenizer = helper.create_tokenizer()
-ds = get_datasets('squad1.1', ds_path, "eval", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
-                  False, n_samples=1000)
-
-metric = EmF1Metric()
-metric.clear()
-
-data_count = 0
-total_count = ds.get_dataset_size()
-for _, ds_item in enumerate(ds.create_dict_iterator()):
-    data_count += 1
-    logger.info(f"Dataset count: {data_count}/{total_count}")
-    input_ids = ds_item['input_ids'].asnumpy()
-    labels = ds_item['labels'].asnumpy()
-
-    valid_length_each_example = []
-    for j in range(input_ids.shape[0]):
-        # As the nonzero returns the index and we need length
-        valid_length_each_example.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
-    valid_length_each_example = np.array(valid_length_each_example)
-
-    outputs = network.generate(input_ids, do_sample=do_sample, max_length=seq_, top_p=top_p, top_k=top_k, max_new_tokens=200)
-    output_ids = []
-    for j in range(input_ids.shape[0]):
-        output_ids.append(outputs[j][int(valid_length_each_example[j]):])
-
-    pres_str = tokenizer.decode(output_ids, skip_special_tokens=True)
-    labels_str = tokenizer.decode(labels, skip_special_tokens=True)
-    metric.update(pres_str, labels_str)
-metric.eval()
+```shell
+Qwen3-mix-quant
+  └── config.json
+  └── generation_config.json
+  └── model.safetensors.index.json
+  └── quant-model-00001-of-00001.safetensors
+  └── quantization_description.json
+  └── tokenizer_config.json
+  └── vocab.json
 ```
-
-### 步骤4. 效果分析
-
-表2：ParallelLlamaForCausalLM-7B网络使用PTQ算法进行A8W8C8量化前后对比
-
-| 指标 | FP16 | PTQ-A8W8C8 | 收益 |
-| --- | --- | --- | --- |
-| ckpt-size(GB)↓ | 13 | 7.9 | 39.2% |
-| F1↓ | 33% | 32% | -1% |
-| EM↓ | 0 | 0 | - |
-
-可以看到，经过PTQ算法进行A8W8C8量化后：
-
-1. 量化后网络的参数量缩减了39.2%，即网络部署时，用于静态显存占用下降到Float16时的60.8%。因而量化后的网络可以在资源更紧张的环境上部署，或者在相同的环境中提供更大的吞吐量。
-2. 量化后网络的在squad1.1数据集上的F1下降1%，即量化后网络在squad1.1数据集判别式任务上效果略有下降。

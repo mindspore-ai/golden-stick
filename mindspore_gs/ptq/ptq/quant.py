@@ -380,6 +380,12 @@ class PTQ(CompAlgo):
         for validating quantization effects without actually converting to
         integer operations.
 
+        Args:
+            network (Cell): Network to be fake quantized.
+
+        Returns:
+            fake quantized network.
+
         Raises:
             TypeError: If `network` type is not Cell.
         """
