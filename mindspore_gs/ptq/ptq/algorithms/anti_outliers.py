@@ -101,6 +101,7 @@ class LinearAWQ(LinearSmoother):
     """smoother for linear"""
 
     linear_map = {}
+    fake_quant_linear_map = {}
 
     def target_layer_type(self) -> tuple:
         return tuple(self.linear_map.keys())
@@ -116,10 +117,10 @@ class LinearAWQ(LinearSmoother):
         else:
             LinearAWQ.linear_map[layer_type].append((checker, quant_layer_type))
 
-    @staticmethod
-    def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+    def get_wrapper_layer(self, layer_type, config: InnerPTQConfig):
         """get wrapper layer"""
-        wrappers = LinearAWQ.linear_map.get(layer_type)
+        wrappers = LinearAWQ.linear_map.get(layer_type) if not self.is_fake_quant else \
+            LinearAWQ.fake_quant_linear_map.get(layer_type)
         if not wrappers:
             return None
         for checker_wrapper in wrappers:
@@ -143,7 +144,7 @@ class LinearAWQ(LinearSmoother):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, True
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
-                wrapper_cell_type = LinearAWQ.get_wrapper_layer(type(cell), layer_policy)
+                wrapper_cell_type = self.handler.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):
@@ -160,6 +161,7 @@ class LinearAutoSmoother(LinearSmoother):
     """LinearAutoSmoother"""
 
     linear_map = {}
+    fake_quant_linear_map = {}
 
     def target_layer_type(self) -> tuple:
         return tuple(self.linear_map.keys())
@@ -175,10 +177,10 @@ class LinearAutoSmoother(LinearSmoother):
         else:
             LinearAutoSmoother.linear_map[layer_type].append((checker, quant_layer_type))
 
-    @staticmethod
-    def get_wrapper_layer(layer_type, config: InnerPTQConfig):
+    def get_wrapper_layer(self, layer_type, config: InnerPTQConfig):
         """get wrapper layer"""
-        wrappers = LinearAutoSmoother.linear_map.get(layer_type)
+        wrappers = LinearAutoSmoother.linear_map.get(layer_type) if not self.is_fake_quant else \
+            LinearAutoSmoother.fake_quant_linear_map.get(layer_type)
         if not wrappers:
             return None
         for checker_wrapper in wrappers:
@@ -212,7 +214,7 @@ class LinearAutoSmoother(LinearSmoother):
                     logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
                     return cell, False
                 logger.debug(f"{cell_name} layer policy: {layer_policy}.")
-                wrapper_cell_type = LinearAutoSmoother.get_wrapper_layer(type(cell), layer_policy)
+                wrapper_cell_type = self.handler.get_wrapper_layer(type(cell), layer_policy)
                 if not wrapper_cell_type:
                     return cell, False
                 if not issubclass(wrapper_cell_type, WrapperCell):

@@ -24,7 +24,8 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
     RowParallelLinear,
     ColumnParallelLinear,
     QKVParallelLinear,
-    MergedColumnParallelLinear)
+    MergedColumnParallelLinear,
+    ReplicatedLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import LinearMethodBase
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
@@ -90,6 +91,7 @@ class FakeQuantW8A8Wrapper(WrapperCell):
         Quantizer.reg_fake_quant_layer_map(RowParallelLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
         Quantizer.reg_fake_quant_layer_map(QKVParallelLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
         Quantizer.reg_fake_quant_layer_map(MergedColumnParallelLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(ReplicatedLinear, FakeQuantW8A8Wrapper, FakeQuantChecker())
 
 
     def _quant_info(self) -> str:

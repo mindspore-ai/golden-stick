@@ -13,30 +13,30 @@
 # limitations under the License.
 # ============================================================================
 """Unit Tests for Outlier Suppression Lite"""
-import sys
 import os
 import argparse
 import json
 import pytest
 import numpy as np
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
-
 import mindspore as ms
+from mindspore import ops as msops
 from mindspore import dtype as msdtype
 from mindspore import nn, Tensor
 from mindspore.dataset import GeneratorDataset
-from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.mappings import scatter_to_model_parallel_region
 from mindformers.parallel_core.inference.parallel_state import (default_pgs, get_tensor_model_parallel_group,
                                                                 is_initialized)
+from mindformers.parallel_core.inference.tensor_parallel.layers import (
+    ColumnParallelLinear,
+    RowParallelLinear,
+    ReplicatedLinear,
+)
+from mindformers.parallel_core.transformer_config import TransformerConfig
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
-# pylint: disable=wrong-import-position
-from research.llama3_1.infer.layers import ColumnParallelLinear, RowParallelLinear
-
+ms.set_context(pynative_synchronize=True)
 
 #############################################################################
 # Parallel runner
@@ -80,10 +80,9 @@ def invoke_parallel(entry_func, **entry_kwargs):
         for i in os.listdir('test_osl_logs'):
             if i.endswith('.log'):
                 filepath = os.path.join('test_osl_logs', i)
-                with open(filepath, 'r') as f:
+                with open(filepath, 'r', encoding='utf-8') as f:
                     print(f'===================={filepath}====================')
                     print(f.read())
-    os.system("ps -u | grep 'test_osl' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
     os.system(f'kill -9 $(lsof -i:{port} | ' + "awk '{print $2}')")
     os.system('rm -rf test_osl_logs')
     assert return_code == 0
@@ -110,58 +109,56 @@ class SimpleNet(nn.Cell):
                 x = scatter_to_model_parallel_region(x, self.tp_group)
             return self.linear(x, *args, **kwargs)
 
-    class ParallelConfig(nn.Cell):
-        """ParallelConfig"""
-        def __init__(self):
-            super().__init__()
-            self.use_sequence_parallel = False
-
-    def __init__(self, linear_type, is_expert, foo_seq_length=1024):
-        assert not (linear_type == 'Linear' and is_expert), 'expert gmm is not supported for Linear'
+    def __init__(self, linear_type, dtype_str, foo_seq_length=1024):
         super(SimpleNet, self).__init__()
-        self.config = SimpleNet.ParallelConfig()
-        self.is_expert = is_expert
+
+        dtype_map = {
+            'float32': msdtype.float32,
+            'bfloat16': msdtype.bfloat16,
+        }
+        dtype = dtype_map.get(dtype_str, None)
+        if dtype is None:
+            raise ValueError(f'Unsupported dtype: {dtype_str}')
+
+        self.config = TransformerConfig(
+            num_attention_heads=1,
+            num_layers=1,
+            params_dtype=dtype_str,
+        )
         self.foo_seq_length = foo_seq_length
         tp_group = get_tensor_model_parallel_group() if is_initialized() else default_pgs
         if linear_type == 'ColumnParallelLinear':
             linear = ColumnParallelLinear(
                 foo_seq_length, foo_seq_length,
+                compute_dtype=dtype,
                 config=self.config,
                 bias=False,
-                param_init_type=msdtype.bfloat16,
-                compute_dtype=msdtype.bfloat16,
-                is_expert=is_expert,
-                expert_num=10 if is_expert else 1,
                 tp_group=tp_group
             )
         elif linear_type == 'RowParallelLinear':
             linear = RowParallelLinear(
                 foo_seq_length, foo_seq_length,
+                compute_dtype=dtype,
                 config=self.config,
-                input_is_parallel=True,
                 bias=False,
-                param_init_type=msdtype.bfloat16,
-                compute_dtype=msdtype.bfloat16,
-                is_expert=is_expert,
-                expert_num=10 if is_expert else 1,
                 tp_group=tp_group
             )
-        elif linear_type == 'Linear':
-            linear = Linear(
+        elif linear_type == 'ReplicatedLinear':
+            linear = ReplicatedLinear(
                 foo_seq_length, foo_seq_length,
-                has_bias=False,
-                param_init_type=msdtype.bfloat16,
-                compute_dtype=msdtype.bfloat16,
+                compute_dtype=dtype,
+                config=self.config,
+                bias=False
             )
+        else:
+            raise ValueError(f'Unsupported linear type: {linear_type}')
 
+        linear.weight.set_data(msops.rand_like(linear.weight, seed=42))
         self.decoder = SimpleNet.DecoderCell(linear, tp_group)
-        self.group_list = Tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 2], dtype=msdtype.int64)
 
     def construct(self, x):
         """decoder"""
-        if not self.is_expert:
-            return self.decoder(x)
-        return self.decoder(x, group_list=self.group_list)
+        return self.decoder(x)
 
     # pylint: disable=unused-argument
     def generate(self, input_ids, do_sample=False, max_new_tokens=1):
@@ -178,6 +175,8 @@ def create_ptq(mode):
     ptq._config.always_use_fp_input_in_processer = True
     ptq._config.skip_offload_in_processing = True
     ptq._config.algorithm_cache_path = {} # Disable cache for testing
+    ptq._config.experimental = True
+    ptq._config.use_fake_quant = True
     ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
     return ptq
 
@@ -193,16 +192,17 @@ def get_save_file_name(save_name):
         return f'rank{RANK_ID}_{save_name}'
     return save_name
 
-def quant_net(linear_type, is_expert):
+def quant_net(linear_type, dtype):
     """Quantize: Saves quantized weight to ./osl-quant.ckpt, and returns the original float point output."""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
     os.environ['ENFORCE_EAGER'] = 'true'
     os.environ["RUN_MODE"] = "predict"
+    os.environ['MS_ENABLE_LCCL'] = 'off'
     ascend_path = os.environ.get('ASCEND_HOME_PATH', '')
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'
 
-    network = SimpleNet(linear_type, is_expert, 1024)
+    network = SimpleNet(linear_type, dtype, 1024)
     dataset = create_dataset(10)
     fp_output = [network.generate(i['input_ids']) for i in dataset.create_dict_iterator(output_numpy=True)]
 
@@ -214,72 +214,55 @@ def quant_net(linear_type, is_expert):
                        choice_func=lambda x: all(i not in x for i in ['key_cache', 'value_cache', 'float_weight']))
     return fp_output
 
-def infer_net(linear_type, is_expert):
+def infer_net(linear_type, dtype):
     """Infer: Load quantized weight from ./osl-quant.ckpt, and returns inference output."""
     os.environ['MS_ENABLE_INTERNAL_KERNELS'] = 'on'
     os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = 'QbmmAllReduceAdd,QbmmAdd'
+    os.environ['MS_ENABLE_LCCL'] = 'off'
     os.environ.pop('ENFORCE_EAGER', None)
     ascend_path = os.environ.get('ASCEND_HOME_PATH', '')
     if not ascend_path:
         os.environ['ASCEND_HOME_PATH'] = '/usr/local/Ascend/latest'
 
-    network = SimpleNet(linear_type, is_expert, 1024)
+    network = SimpleNet(linear_type, dtype, 1024)
     dataset = create_dataset(10)
 
     ms.set_context(mode=ms.GRAPH_MODE, jit_config={'jit_level': 'O0', 'infer_boost': 'on'})
     ptq = create_ptq(PTQMode.DEPLOY)
-    network = ptq.apply(network, datasets=dataset)
-    network = ptq.convert(network)
+    network = ptq.fake_quant(network)
     param_dict = ms.load_checkpoint(get_save_file_name('osl-quant.ckpt'))
     ms.load_param_into_net(network, param_dict)
     qoutput = [network.generate(i['input_ids']) for i in dataset.create_dict_iterator(output_numpy=True)]
     return qoutput
 
-def _test_simple_net(linear_type, is_expert):
+def _test_simple_net(linear_type, dtype):
     """Test procedure: Quantize and evaluate one SimpleNet with one Decoder layer, including one given linear cell."""
-    fpoutput = quant_net(linear_type, is_expert)
-    qoutput = infer_net(linear_type, is_expert)
+    fpoutput = quant_net(linear_type, dtype)
+    qoutput = infer_net(linear_type, dtype)
+    os.remove(get_save_file_name('osl-quant.ckpt'))
     for i, (fpout, qout) in enumerate(zip(fpoutput, qoutput)):
         fpout = fpout.astype(msdtype.float32)
         qout = qout.astype(msdtype.float32)
         cos_sim = ms.ops.mean(ms.ops.cosine_similarity(fpout, qout))
         assert cos_sim > 0.99, f'Sample {i} output cos similarity is {cos_sim}, fpout={fpout}, qout={qout}'
-    os.remove(get_save_file_name('osl-quant.ckpt'))
 
 
 #############################################################################
 # Testcases
 #############################################################################
-@pytest.mark.level1
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_onecard
-def test_linear():
-    """
-    Feature: Quantize and evaluate one SimpleNet with one Decoder layer, including one Linear cell.
-    Description: Quantize and evaluate one SimpleNet with PTQ algorithm using OSL outlier suppression.
-        is_expert is set to False since Linear cell does not come with expert gmm in real networks.
-        Work on one single card.
-    Expectation: Cos similarity between original float-point and quantized results is supposed to be greater than 99%.
-    """
-    _test_simple_net('Linear', False)
-
-@pytest.mark.level1
+@pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize('linear_type', ['RowParallelLinear', 'ColumnParallelLinear'])
-@pytest.mark.parametrize('is_expert', [True, False])
-def test_parallel_linear(linear_type, is_expert):
+@pytest.mark.parametrize('linear_type', ['RowParallelLinear', 'ColumnParallelLinear', 'ReplicatedLinear'])
+@pytest.mark.parametrize('dtype', ['float32', 'bfloat16'])
+def test_parallel_linear(linear_type, dtype):
     """
     Feature: Quantize and evaluate one SimpleNet with one Decoder layer, including one ParallelLinear cell.
-        is_expert might can be enabled for routed experts GMM.
         Work on two cards in parallel mode.
     Description: Quantize and evaluate one SimpleNet with PTQ algorithm using OSL outlier suppression.
     Expectation: Cos similarity between original float-point and quantized results is supposed to be greater than 99%.
     """
-    if linear_type == 'RowParallelLinear' and is_expert:
-        pytest.skip('RowParallelLinear with is_expert=True is not supported.') # FIXME
-        return
-    invoke_parallel(_test_simple_net, linear_type=linear_type, is_expert=is_expert)
+    invoke_parallel(_test_simple_net, linear_type=linear_type, dtype=dtype)
 
 
 if __name__ == '__main__':
