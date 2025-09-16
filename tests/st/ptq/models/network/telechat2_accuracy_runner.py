@@ -33,7 +33,8 @@ class Telechat2Tester(PTQModelTester):
     def create_ptq_config(self):
         """create_ptq"""
         cfg = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND, weight_quant_dtype=msdtype.int8,
-                        act_quant_dtype=msdtype.int8, outliers_suppression=OutliersSuppressionType.SMOOTH,
+                        act_quant_dtype=msdtype.int8,
+                        outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
                         opname_blacklist=['output_layer', 'linear_fc2'])
         layer_policies = OrderedDict()
         return cfg, layer_policies
@@ -92,7 +93,7 @@ class Telechat2Tester(PTQModelTester):
         return True
 
     def get_golden(self) -> tuple[str, str]:
-        return "介绍北京故宫", "介绍北京故宫MSN cov大一驭须知esis简称刻 hel绞小豆CQ"
+        return "介绍北京故宫", "介绍北京故宫湿疣沃沃担联网担湿疣沃 Passage"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test Telechat2 accuracy")
@@ -106,7 +107,5 @@ if __name__ == "__main__":
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = Telechat2Tester()
     result = tester.golden_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, dataset_path)
-    if not result:
-        tester.print_log(args.log_path)
     tester.tear_down(q_ckpt_path, args.log_path)
     assert result, 'telechat2 accuracy test failed.'

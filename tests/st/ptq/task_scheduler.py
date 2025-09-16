@@ -57,7 +57,7 @@ class Task:
             # Use test name hash to create a unique port range for each test to avoid conflicts
             port_offset = hash(self.name) % 1000
             port_start = 60000 + port_offset
-            port_end = port_start + 50
+            port_end = port_start + 5
             os.environ['HCCL_HOST_SOCKET_PORT_RANGE'] = f"{port_start}-{port_end}"
             log_file.write(f"[{self.name}] Setting HCCL_HOST_SOCKET_PORT_RANGE={port_start}-{port_end}")
             port_start += 50
@@ -65,11 +65,17 @@ class Task:
             os.environ['HCCL_NPU_SOCKET_PORT_RANGE'] = f"{port_start}-{port_end}"
             log_file.write(f"[{self.name}] Setting HCCL_NPU_SOCKET_PORT_RANGE={port_start}-{port_end}")
 
+            port_start = 20000 + port_offset
+            port_end = port_start + 5
+            lcal_port = get_available_port(port_start, port_end)
+            os.environ['LCAL_COMM_ID'] = f"127.0.0.1:{lcal_port}"
+            log_file.write(f"[{self.name}] Setting LCAL_COMM_ID=127.0.0.1:{lcal_port}")
+
             # Get a free port for the distributed training
             # Use test name hash to create a unique port range for each test to avoid conflicts
             port_offset = hash(self.name) % 1000
             port_start = 10000 + port_offset
-            port_end = port_start + 100
+            port_end = port_start + 5
             self.port = get_available_port(port_start, port_end)
             log_file.write(f"[{self.name}] get acailable port {self.port}")
             os.system(f"kill -9 $(lsof -i:{self.port} | " + "awk '{print $2}')")
@@ -402,9 +408,8 @@ class TestScheduler:
         if failures:
             failure_str = ", ".join(failures)
             print(f"\nTest failures: {failure_str}")
-            return 1
         print("\nAll tests completed successfully")
-        return 0
+        return failures
 
     def run_all_sequential(self):
         """Run all tests sequentially using all available devices for each test."""

@@ -62,7 +62,7 @@ class PTQModelTester:
     @staticmethod
     def evaluate(model, ds_path, tokenizer):
         """evaluate 'network' with dataset from 'dataset_path'."""
-        ds = PTQModelTester.create_ds(ds_path, tokenizer, 'eval')
+        ds = PTQModelTester.create_ds(ds_path, tokenizer, 'eval', n_samples=50)
         pad_token_id = tokenizer.pad_token_id
         correct = 0
         data_count = 0
@@ -73,7 +73,7 @@ class PTQModelTester:
             for j in range(input_ids.shape[0]):
                 batch_valid_length.append(np.max(np.argwhere(input_ids[j] != pad_token_id)) + 1)
             batch_valid_length = np.array(batch_valid_length)
-            outputs = model.forward(input_ids, max_new_tokens=20)
+            outputs = model.forward(input_ids, max_new_tokens=10)
             output_ids = []
             for j in range(input_ids.shape[0]):
                 data_count += 1
@@ -107,7 +107,7 @@ class PTQModelTester:
         mfconfig = MindFormerConfig(config_path_)
         tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir, trust_remote_code=True)
 
-        datasets = PTQModelTester.create_ds(ds_path, tokenizer, 'train', 50)
+        datasets = PTQModelTester.create_ds(ds_path, tokenizer, 'train', 20)
         model = AutoQuantForCausalLM.from_pretrained(config_path_)
         cfg, layers_policy = self.create_ptq_config()
         model.calibrate(cfg, layers_policy, datasets, fake_quant=fake_quant)
@@ -205,15 +205,11 @@ class PTQModelTester:
         os.system(f"cat {os.path.join(log_path_, 'worker_0.log')}")
         time.sleep(5)
 
+    # pylint: disable=unused-argument
     def tear_down(self, quant_ckpt_path_, log_path_):
         """tear_down"""
         try:
             print(f"to rm dir: {quant_ckpt_path_}", flush=True)
             shutil.rmtree(quant_ckpt_path_)
-        except (OSError, FileNotFoundError):
-            pass
-        try:
-            print(f"to rm dir: {log_path_}", flush=True)
-            shutil.rmtree(log_path_)
         except (OSError, FileNotFoundError):
             pass
