@@ -93,7 +93,7 @@ class PTQModelTester:
         ms.ms_memory_recycle()
         return correct / data_count
 
-    def quant_model(self, config_path_, output_dir_, ds_path):
+    def quant_model(self, config_path_, output_dir_, ds_path, fake_quant=True):
         """quant by PTQ"""
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
         os.environ['ENFORCE_EAGER'] = "true"
@@ -110,7 +110,7 @@ class PTQModelTester:
         datasets = PTQModelTester.create_ds(ds_path, tokenizer, 'train', 50)
         model = AutoQuantForCausalLM.from_pretrained(config_path_)
         cfg, layers_policy = self.create_ptq_config()
-        model.calibrate(cfg, layers_policy, datasets, fake_quant=True)
+        model.calibrate(cfg, layers_policy, datasets, fake_quant=fake_quant)
         model.save_quantized(output_dir_)
         time.sleep(5)
         os.environ.pop('ENFORCE_EAGER', None)
