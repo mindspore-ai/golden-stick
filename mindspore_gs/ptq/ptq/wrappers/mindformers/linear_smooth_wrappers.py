@@ -33,7 +33,7 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
 from mindformers.parallel_core.inference.tensor_parallel.layers import QKVParallelLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import ReplicatedLinear
 from mindformers.parallel_core.inference.tensor_parallel.layers import MergedColumnParallelLinear
-from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (
     ColumnParallelGroupedLinear,
     RowParallelGroupedLinear
 )
