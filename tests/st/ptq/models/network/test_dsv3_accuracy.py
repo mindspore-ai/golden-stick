@@ -19,6 +19,7 @@ from collections import OrderedDict
 from typing import Optional
 import os
 import time
+import shutil
 from safetensors import safe_open
 import pytest
 
@@ -198,8 +199,8 @@ class DeepSeekV3Tester(PTQModelTester):
 
                 if 'gate' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert file.get_tensor(param_full_name).shape == (512, 7168), \
-                            f"{param_full_name} error, expect (512, 7168)"
+                        assert file.get_tensor(param_full_name).shape == (256, 7168), \
+                            f"{param_full_name} error, expect (256, 7168)"
                     if param_full_name.endswith("weight_scale"):
                         assert file.get_tensor(param_full_name).shape == (512, 28), \
                             f"{param_full_name} error, expect (512, 28)"
@@ -208,12 +209,12 @@ class DeepSeekV3Tester(PTQModelTester):
                             f"{param_full_name} error, expect (512, 28)"
                 elif 'down' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert file.get_tensor(param_full_name).shape == (7168, 512), \
-                            f"{param_full_name} error, expect (7168, 512)"
+                        assert file.get_tensor(param_full_name).shape == (3584, 512), \
+                            f"{param_full_name} error, expect (3584, 512)"
                 elif 'up' in param_full_name:
                     if param_full_name.endswith("weight"):
-                        assert file.get_tensor(param_full_name).shape == (512, 7168), \
-                            f"{param_full_name} error, expect (512, 7168)"
+                        assert file.get_tensor(param_full_name).shape == (256, 7168), \
+                            f"{param_full_name} error, expect (256, 7168)"
                 else:
                     raise ValueError(f"{param_full_name} is not expected.")
 
@@ -235,8 +236,13 @@ if __name__ == "__main__":
     q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant")
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = DeepSeekV3Tester()
-    tester.quant_model(calibrate_config_path, q_ckpt_path, dataset_path)
+    tester.quant_model(calibrate_config_path, q_ckpt_path, dataset_path, fake_quant=False)
     tester.check_safetensor_split(q_ckpt_path)
+    try:
+        print(f"mv: {q_ckpt_path} to: '/home/workspace/mindspore_dataset/weight'", flush=True)
+        shutil.move(q_ckpt_path, "/home/workspace/mindspore_dataset/weight/dsv3-a8w4-quant")
+    except (OSError, FileNotFoundError):
+        pass
 
 
 @pytest.mark.level0
