@@ -21,7 +21,7 @@ from mindformers.modules.layers import Linear
 from mindformers.parallel_core.inference.tensor_parallel.mappings import (gather_from_model_parallel_region,
                                                                           reduce_from_model_parallel_region,
                                                                           scatter_to_model_parallel_region)
-from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (
     ColumnParallelGroupedLinear,
     RowParallelGroupedLinear
 )

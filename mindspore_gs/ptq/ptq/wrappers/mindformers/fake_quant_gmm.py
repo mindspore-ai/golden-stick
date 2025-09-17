@@ -19,7 +19,7 @@ from mindspore import nn, Parameter, dtype as msdtype, Tensor
 from mindspore import ops as msops
 from mindspore.common.initializer import initializer
 from mindformers.parallel_core.inference.tensor_parallel.layers import LinearBase
-from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (
+from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (
     ColumnParallelGroupedLinear,
     RowParallelGroupedLinear)
 from mindformers.parallel_core.inference.tensor_parallel.layers import LinearMethodBase

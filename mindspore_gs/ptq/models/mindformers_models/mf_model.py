@@ -53,8 +53,8 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (RowParal
                                                                         ColumnParallelLinear,
                                                                         MergedColumnParallelLinear,
                                                                         QKVParallelLinear)
-from mindformers.parallel_core.inference.tensor_parallel.gemm_layers import (ColumnParallelGroupedLinear,
-                                                                             RowParallelGroupedLinear)
+from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (ColumnParallelGroupedLinear,
+                                                                                RowParallelGroupedLinear)
 from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 from mindspore_gs.common import logger
