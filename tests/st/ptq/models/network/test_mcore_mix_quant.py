@@ -22,7 +22,7 @@ from tests.st.ptq.task_scheduler import run_combined_tests
 from tests.st.test_utils import get_available_port
 
 
-@pytest.mark.level2
+@pytest.mark.level3
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_mcore_mix_quant_accuracy():
@@ -57,8 +57,13 @@ def test_mcore_mix_quant_accuracy():
         }
     ]
     # Run the tests
-    return_code = run_combined_tests(test_configs)
-    assert return_code == 0, "Combined Qwen3 tests failed"
+    failures = run_combined_tests(test_configs)
+    for failure_name in failures:
+        for test_config in test_configs:
+            if test_config['name'] == failure_name:
+                print(f"Test {failure_name} failed in {test_config['name']}")
+                os.system(f"cat {os.path.join(test_config['log_dir'], 'worker_0.log')}")
+    assert not failures, "Combined mcore tests failed"
 
 
 @pytest.mark.level0
@@ -111,7 +116,7 @@ def test_qwen3_moe_mix_quant_accuracy():
     assert return_code == 0
 
 
-@pytest.mark.level1
+@pytest.mark.level3
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_telechat2_mix_quant_accuracy():

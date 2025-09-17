@@ -142,7 +142,7 @@ class QWen3MoETester(PTQModelTester):
         return True
 
     def get_golden(self) -> tuple[str, str]:
-        return "介绍北京故宫", "介绍北京故宫"
+        return "介绍北京故宫", "介绍北京故宫(passport(passport(passport护身 tjejer"
 
 
 if __name__ == "__main__":
@@ -157,7 +157,5 @@ if __name__ == "__main__":
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = QWen3MoETester()
     result = tester.golden_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, dataset_path)
-    if not result:
-        tester.print_log(args.log_path)
     tester.tear_down(q_ckpt_path, args.log_path)
     assert result, 'qwen3 moe accuracy test failed.'

@@ -395,6 +395,9 @@ if __name__ == "__main__":
     model_parallel = uargs.model_parallel
     quant_algo = uargs.quant_algo
 
+    os.environ["MS_ENABLE_LCCL"] = "off"
+    os.environ["ENABLE_LCCL"] = "0"
+
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     if model_parallel == 1:
         config_path = os.path.join(cur_dir, "../../../data/test_llama2/predict_parallelLlama2_13b_1p.yaml")
