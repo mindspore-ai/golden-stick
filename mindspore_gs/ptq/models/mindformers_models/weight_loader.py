@@ -107,11 +107,12 @@ class WeightProcessor:
 
     def _get_split_set(self, name, split_axis=-1):
         """_get_split_set"""
-        if self._param_map.get(name) is None:
-            logger.debug(f"No parameter named {name} in safetensors, skip.")
+        hf_name = self._convert_param_names_to_hf(name)
+        if self._param_map.get(hf_name) is None:
+            logger.debug(f"No parameter named {hf_name} in safetensors, skip.")
             return
         is_split_param = split_axis != -1
-        np_data, _ = self.get_safetensor_from_file(name, self._src_dir, self._param_map, is_split_param, split_axis)
+        np_data, _ = self.get_safetensor_from_file(hf_name, self._src_dir, self._param_map, is_split_param, split_axis)
         self._np_dict[name] = np_data
 
     def _split_outer_weight(self):
@@ -148,12 +149,14 @@ class WeightProcessor:
     def _split_mlp_weight(self, layer_id):
         """_split_dense_ffn_weight"""
         # Check if split FFN parameters exist in safetensors
-        ffn_split_exists = any([
-            f"model.decoder.layers.{layer_id}.mlp.gating.weight" in self._param_map,
-            f"model.decoder.layers.{layer_id}.mlp.hidden.weight" in self._param_map,
-            f"model.decoder.layers.{layer_id}.mlp.gating.bias" in self._param_map,
-            f"model.decoder.layers.{layer_id}.mlp.hidden.bias" in self._param_map,
-        ])
+        ffn_names = [
+            f"model.decoder.layers.{layer_id}.mlp.gating.weight",
+            f"model.decoder.layers.{layer_id}.mlp.hidden.weight",
+            f"model.decoder.layers.{layer_id}.mlp.gating.bias",
+            f"model.decoder.layers.{layer_id}.mlp.hidden.bias"
+        ]
+        hf_ffn_names = [self._convert_param_names_to_hf(name) for name in ffn_names]
+        ffn_split_exists = any(hf_name in self._param_map for hf_name in hf_ffn_names)
 
         if ffn_split_exists:
             # Load split FFN parameters (gating, hidden)
@@ -200,14 +203,16 @@ class WeightProcessor:
     def _split_attention_weight(self, layer_id):
         """_split_attention_weight"""
         # Check if split QKV parameters exist in safetensors
-        qkv_split_exists = any([
-            f"model.decoder.layers.{layer_id}.self_attention.linear_q.weight" in self._param_map,
-            f"model.decoder.layers.{layer_id}.self_attention.linear_k.weight" in self._param_map,
-            f"model.decoder.layers.{layer_id}.self_attention.linear_v.weight" in self._param_map,
-            f"model.decoder.layers.{layer_id}.self_attention.linear_q.bias" in self._param_map,
-            f"model.decoder.layers.{layer_id}.self_attention.linear_k.bias" in self._param_map,
-            f"model.decoder.layers.{layer_id}.self_attention.linear_v.bias" in self._param_map,
-        ])
+        qkv_names = [
+            f"model.decoder.layers.{layer_id}.self_attention.linear_q.weight",
+            f"model.decoder.layers.{layer_id}.self_attention.linear_k.weight",
+            f"model.decoder.layers.{layer_id}.self_attention.linear_v.weight",
+            f"model.decoder.layers.{layer_id}.self_attention.linear_q.bias",
+            f"model.decoder.layers.{layer_id}.self_attention.linear_k.bias",
+            f"model.decoder.layers.{layer_id}.self_attention.linear_v.bias"
+        ]
+        hf_qkv_names = [self._convert_param_names_to_hf(name) for name in qkv_names]
+        qkv_split_exists = any(hf_name in self._param_map for hf_name in hf_qkv_names)
 
         if qkv_split_exists:
             # Load split QKV parameters (linear_q, linear_k, linear_v)
@@ -631,9 +636,10 @@ class WeightProcessor:
                 process(cell, full_cell_name)
         process(network, 'network')
 
-    def load_safetensors_shard(self, src_hf_dir, network):
+    def load_safetensors_shard(self, src_hf_dir, network, convert_param_names_to_hf):
         """qwen load safetensors and shard """
         self._src_dir = src_hf_dir
+        self._convert_param_names_to_hf = convert_param_names_to_hf
 
         index_json_path = os.path.join(src_hf_dir, 'model.safetensors.index.json')
         if not os.path.exists(index_json_path):
