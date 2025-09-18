@@ -300,7 +300,10 @@ class MoeParamProcessor():
             for expert_id in range(self.num_experts):
                 experts_name = re.sub(self.moe_split_rules[0],
                                       f'.mlp.experts.{expert_id}.', key)
-                experts_value = value.asnumpy()[expert_id]
+                if value_dtype == ms.dtype.qint4x2:
+                    experts_value = value.asnumpy()[expert_id]
+                else:
+                    experts_value = value[expert_id]
 
                 param_name = experts_name.split('.')[-1]
                 if param_name in need_transpose_params:
