@@ -136,7 +136,7 @@ class BaseQuantForCausalLM:
         It should handle loading pretrained model weights and configuration.
 
         Args:
-            **kwargs: Arbitrary keyword arguments for model creation.
+            **kwargs (dict): Arbitrary keyword arguments for model creation.
 
         Returns:
             BaseQuantForCausalLM. An instance of the quantized model.
