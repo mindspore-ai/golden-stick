@@ -61,7 +61,8 @@ class QWen3MoETester(PTQModelTester):
                                      opname_blacklist=['output_layer'])
         layer_policies = OrderedDict({r".*\.[0,1]\.self_attention.*": osl_cfg,
                                       r".*\.[2,3]\.self_attention.*": smoothquant_cfg,
-                                      'not match': a8w4_dynamic_cfg,
+                                      r'.*\.[0,1]\.mlp\.experts.*': a8w8_dynamic_cfg,
+                                      r'.*\.[2,3]\.mlp\.experts.*': a8w4_dynamic_cfg,
                                      })
         return a8w8_dynamic_cfg, layer_policies
 
@@ -102,13 +103,13 @@ class QWen3MoETester(PTQModelTester):
             'model.layers.5.self_attn.o_proj.weight_offset': QuantType.W8A8_DYNAMIC.value,
             'model.layers.0.mlp.experts.0.gate_proj.weight': QuantType.W8A8_DYNAMIC.value,
             'model.layers.1.mlp.experts.10.up_proj.weight': QuantType.W8A8_DYNAMIC.value,
-            'model.layers.2.mlp.experts.20.gate_proj.weight_scale': QuantType.W8A8_DYNAMIC.value,
-            'model.layers.3.mlp.experts.30.up_proj.weight_scale': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.2.mlp.experts.20.gate_proj.weight_scale': QuantType.W4A8_DYNAMIC.value,
+            'model.layers.3.mlp.experts.30.up_proj.weight_scale': QuantType.W4A8_DYNAMIC.value,
             'model.layers.4.mlp.experts.40.gate_proj.weight_offset': QuantType.W8A8_DYNAMIC.value,
             'model.layers.5.mlp.experts.50.up_proj.weight_offset': QuantType.W8A8_DYNAMIC.value,
             'model.layers.0.mlp.experts.60.down_proj.weight': QuantType.W8A8_DYNAMIC.value,
             'model.layers.1.mlp.experts.70.down_proj.weight_scale': QuantType.W8A8_DYNAMIC.value,
-            'model.layers.2.mlp.experts.80.down_proj.weight_offset': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.2.mlp.experts.80.down_proj.weight_offset': QuantType.W4A8_DYNAMIC.value,
 
             'model.layers.0.self_attn.q_proj.weight': QuantType.W8A8.value,
             'model.layers.1.self_attn.k_proj.weight': QuantType.W8A8.value,
@@ -142,7 +143,7 @@ class QWen3MoETester(PTQModelTester):
         return True
 
     def get_golden(self) -> tuple[str, str]:
-        return "介绍北京故宫", "介绍北京故宫(passport(passport(passport护身 tjejer"
+        return "介绍北京故宫", "介绍北京故宫(passport(passport(passport…the,…,"
 
 
 if __name__ == "__main__":
