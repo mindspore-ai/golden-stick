@@ -21,6 +21,7 @@ def get_args():
     parser.add_argument("--config_path", type=str, required=True, help="Path to the calibrate yaml config file.")
     parser.add_argument("--output_dir", type=str, required=True, help="Directory to save the quantized model.")
     parser.add_argument("--ds_path", type=str, required=True, help="Path to the dataset.")
+    parser.add_argument("--ds_type", type=str, required=True, help="Dataset type.")
     return parser.parse_args()
 
 
@@ -40,7 +41,7 @@ def create_ptq_config():
     return cfg, layer_policies
 
 
-def create_ds(ds_path, tokenizer, ds_type='ceval', n_samples=200):
+def create_ds(ds_path, tokenizer, ds_type, n_samples=200):
     """Create datasets."""
     dataset.config.set_numa_enable(False)
     seq_ = 200 # 2048
@@ -51,11 +52,11 @@ def create_ds(ds_path, tokenizer, ds_type='ceval', n_samples=200):
     return ds
 
 
-def quant_dsv3(config_path, output_dir, ds_path):
+def quant_dsv3(config_path, output_dir, ds_path, ds_type):
     """PTQ quant to quant qwen3"""
     mfconfig = MindFormerConfig(config_path)
     tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir)
-    datasets = create_ds(ds_path, tokenizer)
+    datasets = create_ds(ds_path, tokenizer, ds_type)
     model = AutoQuantForCausalLM.from_pretrained(config_path)
     cfg, layers_policy = create_ptq_config()
     calibrate_options = {
@@ -73,7 +74,7 @@ def main():
     """Main function."""
     args = get_args()
     os.makedirs(args.output_dir, exist_ok=True)
-    quant_dsv3(args.config_path, args.output_dir, args.ds_path)
+    quant_dsv3(args.config_path, args.output_dir, args.ds_path, args.ds_type)
 
 if __name__ == "__main__":
     main()

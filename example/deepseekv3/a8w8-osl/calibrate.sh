@@ -26,6 +26,13 @@ yaml_path=${base_path}/calibrate_deepseek3_671b.yaml
 calibrate_path=${base_path}/calibrate.py
 unify_path=${base_path}/unify_safetensors.py
 
+calibrate_fc=0 # set to 1 to enable function call calibration
+ds_type="ceval"
+if [ $calibrate_fc -eq 1 ]; then
+    echo "Use function call calibration."
+    ds_path=$base_path/../../../tests/data/calibrate-dataset/calibrationFCv2.jsonl
+    ds_type="calibrate"
+fi
 
 msrun \
     --worker_num=${worker_num} \
@@ -37,7 +44,8 @@ msrun \
     python $calibrate_path \
         --config_path $yaml_path \
         --output_dir $output_dir \
-        --ds_path $ds_path 2>&1 | tee calibrate.log
+        --ds_path $ds_path \
+        --ds_type $ds_type 2>&1 | tee calibrate.log
 
 python $unify_path \
     --input_dir $output_dir \
