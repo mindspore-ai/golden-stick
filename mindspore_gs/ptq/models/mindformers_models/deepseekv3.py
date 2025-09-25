@@ -74,8 +74,8 @@ class DeepSeekV3(MFModelEnableSafeTensors):
             key = key.replace('.gating.', '.gate_proj.')
             key = key.replace('.hidden.', '.up_proj.')
             key = key.replace('.linear_fc2.', '.down_proj.')
-            key = key.replace('.router.weight.', '.gate.')
-            key = key.replace('.router.expert_bias', '.gate.e_score_correction_bias')
+            key = key.replace('.router.', '.gate.')
+            key = key.replace('.expert_bias', '.e_score_correction_bias')
             new_param_dict[key] = value
         return new_param_dict
 
@@ -177,3 +177,15 @@ class DeepSeekV3(MFModelEnableSafeTensors):
         logger.info(f'Describle json file saved to {save_json_path}', flush=True)
         logger.info(f'Save describle json cost time is {time.time() - start} s.')
         return save_json_path
+
+    @classmethod
+    def _convert_param_names_to_hf(cls, param_name):
+        """Convert the parameter to huggingface format.
+        Args:
+            param_name: The parameter name to convert to huggingface format.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
+        # Have not implemented yet
+        raise NotImplementedError
