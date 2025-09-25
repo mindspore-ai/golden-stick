@@ -15,6 +15,8 @@
 # ============================================================================
 
 export GSLOG=1
+export MS_ENABLE_INTERNAL_KERNELS=on
+export ENFORCE_EAGER=true
 export MS_ENABLE_LCCL=off
 export HCCL_OP_EXPANSION_MODE=AIV
 export MS_DEV_RUNTIME_CONF="parallel_dispatch_kernel:True"
@@ -23,25 +25,29 @@ export MS_ALLOC_CONF="enable_vmm:True"
 export MS_PARALLEL_DISPATCH_NUM=4 #2
 export MS_ENABLE_SYNC_COPY_INPUT=1
 
-mf_path=$1
-ceval_path=$2
-worker_num=${3:-16}
+ds_path=$1
+worker_num=${2:-16}
+output_dir=${3:-quantized_model}
 base_path=$(cd "$(dirname $0)"; pwd)
-yaml=${base_path}/predict_deepseek_r1_671b_calibrate.yaml
-calibrate_path=${base_path}/../calibrate.py
+yaml_path=${base_path}/calibrate_deepseek3_671b.yaml
+calibrate_path=${base_path}/calibrate.py
+unify_path=${base_path}/unify_safetensors.py
 
-export PYTHONPATH=${mf_path}:${PYTHONPATH}
 
-export MS_JIT="0"
-export ENFORCE_EAGER="true"
-msrun --worker_num=${worker_num} \
-      --local_worker_num=${worker_num} \
-      --master_port=8188 \
-      --cluster_time_out=300 \
-      --join=False \
-      --log_dir=calibrate_smoothquant_log \
-      python ${calibrate_path} \
-            --config ${yaml} \
-            --approach smoothquant \
-            -t ceval \
-            -s ${ceval_path} > log_calibrate_smoothquant 2>&1 &
+msrun \
+    --worker_num=${worker_num} \
+    --local_worker_num=${worker_num} \
+    --master_port=8188 \
+    --cluster_time_out=300 \
+    --join=True \
+    --log_dir=log_calibrate \
+    python $calibrate_path \
+        --config_path $yaml_path \
+        --output_dir $output_dir \
+        --ds_path $ds_path 2>&1 | tee calibrate.log
+
+python $unify_path \
+    --input_dir $output_dir \
+    --output_dir ${output_dir}_unified \
+    --output_file_prefix quantized_model \
+    --rank_num $worker_num 2>&1 | tee unify.log
