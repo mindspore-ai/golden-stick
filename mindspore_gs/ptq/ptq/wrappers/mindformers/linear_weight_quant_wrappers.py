@@ -252,6 +252,8 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
         del self.layer.weight
         self.layer.weight = None
         self.weight = q_weight
+        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
+        self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
         self.has_bias = self.layer.has_bias
         if self.has_bias:
             self.bias = self.layer.bias
@@ -260,9 +262,9 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
     def quant_type_dict(self):
         """quant_type_dict"""
         if self.cfg.weight_quant_dtype == dtype.int8:
-            type_ = QuantType.W8A8_DYNAMIC.value
+            type_ = QuantType.W8A16.value
         elif self.cfg.weight_quant_dtype == dtype.qint4x2:
-            type_ = QuantType.W4A8_DYNAMIC.value
+            type_ = QuantType.W4A16.value
         quant_type = {
             self.weight_scale.name: type_,
             self.weight_offset.name: type_,
