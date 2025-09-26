@@ -7,9 +7,9 @@
 ### 主要特性和增强
 
 * 新增 `AutoQuantForCausalLM` 和 `BaseQuantForCausalLM` 类，提升对因果语言模型量化的易用性。主要改进包括：
-    * **自动模型选择**：根据预训练模型路径自动识别并实例化适当的量化模型实现，无需手动指定模型类型
-    * **标准化接口**：通过 `BaseQuantForCausalLM` 基类定义标准接口，方便后续扩展和新模型适配
-    * **一键HuggingFace格式权重保存**：支持直接保存为HuggingFace兼容的量化权重格式，简化模型部署流程
+    * **自动模型选择**：根据预训练模型路径自动识别并实例化适当的量化模型实现，无需手动指定模型类型。
+    * **标准化接口**：通过 `BaseQuantForCausalLM` 基类定义标准接口，方便后续扩展和新模型适配。
+    * **一键HuggingFace格式权重保存**：支持直接保存为HuggingFace兼容的量化权重格式，简化模型部署流程。
 
 * OSL（OutlierSuppression-Lite）A8W8 量化技术新增对 MindSpore Transformers MCore 架构 DeepSeekV3/R1、QWen3 系列模型的支持。
 

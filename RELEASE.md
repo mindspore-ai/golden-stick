@@ -7,9 +7,9 @@
 ### Major Features and Improvements
 
 * Added `AutoQuantForCausalLM` and `BaseQuantForCausalLM` classes, improving the usability of causal language model quantization. Key improvements include:
-    * **Automatic Model Selection**: Automatically identifies and instantiates appropriate quantization model implementations based on pretrained model paths, eliminating the need to manually specify model types
-    * **Standardized Interface**: Defines standard interfaces through the `BaseQuantForCausalLM` base class, facilitating future extensions and new model adaptations
-    * **One-Click HuggingFace Format Weights Saving**: Supports direct saving to HuggingFace-compatible quantized weight formats, simplifying model deployment workflows
+    * **Automatic Model Selection**: Automatically identifies and instantiates appropriate quantization model implementations based on pretrained model paths, eliminating the need to manually specify model types.
+    * **Standardized Interface**: Defines standard interfaces through the `BaseQuantForCausalLM` base class, facilitating future extensions and new model adaptations.
+    * **One-Click HuggingFace Format Weights Saving**: Supports direct saving to HuggingFace-compatible quantized weight formats, simplifying model deployment workflows.
 
 * OSL (OutlierSuppression-Lite) A8W8 quantization technique adds support for MindSpore Transformers MCore architecture DeepSeekV3/R1 and QWen3 series models.
 
