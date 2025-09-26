@@ -2,6 +2,35 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 1.3.0 Release Notes
+
+### Major Features and Improvements
+
+* Added `AutoQuantForCausalLM` and `BaseQuantForCausalLM` classes, improving the usability of causal language model quantization. Key improvements include:
+    * **Automatic Model Selection**: Automatically identifies and instantiates appropriate quantization model implementations based on pretrained model paths, eliminating the need to manually specify model types
+    * **Standardized Interface**: Defines standard interfaces through the `BaseQuantForCausalLM` base class, facilitating future extensions and new model adaptations
+    * **One-Click HuggingFace Format Weights Saving**: Supports direct saving to HuggingFace-compatible quantized weight formats, simplifying model deployment workflows
+
+* OSL (OutlierSuppression-Lite) A8W8 quantization technique adds support for MindSpore Transformers MCore architecture DeepSeekV3/R1 and QWen3 series models.
+
+* Added A8W4 post-training quantization algorithm, supporting MindSpore Transformers MCore architecture DeepSeekV3/R1 and QWen3 series models.
+
+* [Demo] Added FAQuant post-training quantization algorithm, supporting MindSpore Transformers MCore architecture DeepSeekV3/R1 models.
+
+### API Changes
+
+* Added [mindspore_gs.ptq.AutoQuantForCausalLM](https://www.mindspore.cn/golden_stick/docs/en/master/ptq/mindspore_gs.ptq.AutoQuantForCausalLM.html) class: An automatic model quantization class that automatically selects appropriate quantization model implementations based on pretrained model paths.
+
+* Added [mindspore_gs.ptq.BaseQuantForCausalLM](https://www.mindspore.cn/golden_stick/docs/en/master/ptq/mindspore_gs.ptq.BaseQuantForCausalLM.html) class: A base class for causal language model quantization that defines standard interfaces for quantization models, which provides the basic structure and required methods that all derived classes must implement, including core methods such as `from_pretrained`, `calibrate`, `forward`, `save_quantized`, etc.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+tongl, zhuxiaochen, guoguopot, ccsszz, yyyyrf, hangangqiang, HeadSnake
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 1.2.0 Release Notes
 
 ### Major Features and Improvements
