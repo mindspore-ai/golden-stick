@@ -2,6 +2,35 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 1.3.0 Release Notes
+
+### 主要特性和增强
+
+* 新增 `AutoQuantForCausalLM` 和 `BaseQuantForCausalLM` 类，提升对因果语言模型量化的易用性。主要改进包括：
+    * **自动模型选择**：根据预训练模型路径自动识别并实例化适当的量化模型实现，无需手动指定模型类型
+    * **标准化接口**：通过 `BaseQuantForCausalLM` 基类定义标准接口，方便后续扩展和新模型适配
+    * **一键HuggingFace格式权重保存**：支持直接保存为HuggingFace兼容的量化权重格式，简化模型部署流程
+
+* OSL（OutlierSuppression-Lite）A8W8 量化技术新增对 MindSpore Transformers MCore 架构 DeepSeekV3/R1、QWen3 系列模型的支持。
+
+* 新增 A8W4 训练后量化算法，支持 MindSpore Transformers MCore 架构 DeepSeekV3/R1、QWen3 系列模型。
+
+* [Demo] 新增 FAQuant 训练后量化算法，支持 MindSpore Transformers MCore 架构 DeepSeekV3/R1 模型。
+
+### API变更
+
+* 新增 [mindspore_gs.ptq.AutoQuantForCausalLM](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.AutoQuantForCausalLM.html) 类：自动模型量化类，根据预训练模型路径自动选择合适的量化模型实现。
+
+* 新增 [mindspore_gs.ptq.BaseQuantForCausalLM](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.BaseQuantForCausalLM.html) 类：因果语言模型量化基类，定义了量化模型的标准接口。提供了所有派生类必须实现的基本结构和必需方法，包括 `from_pretrained`、 `calibrate`、`forward`、`save_quantized` 等核心方法。
+
+### 贡献者
+
+感谢以下人员做出的贡献：
+
+tongl, zhuxiaochen, guoguopot, ccsszz, yyyyrf, hangangqiang, HeadSnake
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 1.2.0 Release Notes
 
 ### 主要特性和增强
