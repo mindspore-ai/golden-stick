@@ -45,7 +45,7 @@ def ptq_predict_deepseek_4p_run(quant_algo):
     assert return_code == 0
 
 
-@pytest.mark.level0
+@pytest.mark.level4
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
 def test_ptq_deepseek_smoothquant_accuracy():

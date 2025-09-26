@@ -19,15 +19,25 @@ from collections import OrderedDict
 from typing import Optional
 import os
 import time
+import json
 import shutil
+from pathlib import Path
 from safetensors import safe_open
 import pytest
 
+import mindspore as ms
 from mindspore import dtype as msdtype
-from mindspore.communication import get_rank
-from mindspore_gs.common import BackendTarget
+from mindspore.communication import get_rank, get_group_size
+from mindspore.nn.utils import no_init_parameters
+
+from mindformers import (AutoModel, MindFormerConfig,
+                         build_context, build_parallel_config)
+from transformers import AutoTokenizer
+
+from mindspore_gs.common import BackendTarget, logger
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
                               PrecisionRecovery, QuantGranularity, GPTQQuantConfig)
+from mindspore_gs.ptq.utils import QuantType
 from tests.st.test_utils import get_available_port
 from ptq_model_tester import PTQModelTester
 
@@ -68,6 +78,46 @@ class DeepSeekV3Tester(PTQModelTester):
     # pylint: disable=unused-argument
     def check_quant_description(self, quant_ckpt_path) -> bool:
         "quant_type_description"
+        if not os.path.exists(quant_ckpt_path):
+            logger.error(f"{quant_ckpt_path} dose not exist.")
+            return False
+        desc_json_path = ""
+        for file_name in os.listdir(quant_ckpt_path):
+            if file_name.endswith(".json") and "quantization_description" in file_name:
+                desc_json_path = os.path.join(quant_ckpt_path, file_name)
+        if desc_json_path is None:
+            logger.error("No quant description json file.")
+            return False
+        with open(desc_json_path, "r") as fp:
+            desc_map = json.load(fp)
+
+        def check(name, expect):
+            cur = desc_map.get(name)
+            ret = cur == expect
+            if not ret:
+                logger.error(f"quant info of {name} should be {expect}, but got: {cur}.")
+            return ret
+
+        check_map = {
+            'model.layers.0.self_attn.q_a_proj.weight': QuantType.W8A8.value,
+            'model.layers.1.self_attn.q_b_proj.weight_scale': QuantType.W8A8.value,
+            'model.layers.2.self_attn.kv_a_proj_with_mqa.weight_offset': QuantType.W8A8.value,
+            'model.layers.0.self_attn.o_proj.smooth_scale': QuantType.W8A8.value,
+            'model.layers.1.self_attn.kv_b_proj.weight': QuantType.FLOAT.value,
+            'model.layers.0.mlp.gate_proj.weight': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.1.mlp.up_proj.weight_scale': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.2.mlp.down_proj.weight_offset': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.3.mlp.experts.0.gate_proj.weight': QuantType.W4A8_DYNAMIC.value,
+            'model.layers.3.mlp.experts.4.up_proj.weight_scale': QuantType.W4A8_DYNAMIC.value,
+            'model.layers.3.mlp.experts.118.up_proj.weight_offset': QuantType.W4A8_DYNAMIC.value,
+            'model.layers.3.mlp.shared_experts.gate_proj.weight': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.3.mlp.shared_experts.up_proj.weight_scale': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.3.mlp.shared_experts.down_proj.weight_offset': QuantType.W8A8_DYNAMIC.value,
+        }
+        for name, value in check_map.items():
+            if not check(name, value):
+                return False
+        logger.info("quant description test success.")
         return True
 
     # pylint: disable=unused-argument
@@ -228,21 +278,158 @@ class DeepSeekV3Tester(PTQModelTester):
         print("checking ffn split...")
         self._check_ffn_split(file, param_keys)
 
+    def _copy_original_json(self, original_path, save_path):
+        src_path = Path(original_path)
+        for json_file in src_path.glob('*.json'):
+            if json_file.name.endswith('.index.json'):
+                continue
+            shutil.copy2(json_file, os.path.join(save_path, json_file.name))
 
-if __name__ == "__main__":
+    def _modify_description_file(self, quant_ckpt_path, unify_quant_ckpt_path):
+        """_modify_description_file"""
+        file_path = os.path.join(quant_ckpt_path, "quantization_description.json")
+        save_path = os.path.join(unify_quant_ckpt_path, "quantization_description.json")
+        if not os.path.exists(file_path):
+            raise ValueError(f"Not found quantization_description.json in {quant_ckpt_path}, "
+                             "please check the quantization process.")
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+            data["group_size"] = 256
+            with open(save_path, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=4)
+        except Exception as e:
+            raise RuntimeError("Found error when Modify description file."
+                               f"The details of error are {e}")
+
+    def unify_safetensors(self, float_ckpt_path, quant_ckpt_path,
+                          unify_quant_ckpt_path):
+        """unify_safetensors"""
+        run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "utils/unify_safetensors.py")
+        return_code = os.system(
+            f"python {run_file} --input_dir={quant_ckpt_path} "
+            f"--output_dir={unify_quant_ckpt_path} "
+            f"--output_file_prefix=a8w4 "
+            f"--rank_num=4 "
+            f"--quant_type=a8w4")
+        time.sleep(1.0)
+        assert return_code == 0
+
+        # copy origin *.json file to unify quant ckpt path
+        self._copy_original_json(float_ckpt_path, unify_quant_ckpt_path)
+        # add group_size to quantization_description.json
+        self._modify_description_file(quant_ckpt_path, unify_quant_ckpt_path)
+
+    # pylint: disable=arguments-differ
+    def forward_model(self, yaml_path_, ckpt_path_, question):
+        """forward model"""
+        os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
+        os.environ['MS_INTERNAL_ENABLE_CUSTOM_KERNAL_LIST'] = "QbmmAllReduceAdd,QbmmAdd"
+        os.environ['MS_ALLOC_CONF'] = "enable_vmm:True"
+        os.environ.pop('ENFORCE_EAGER', None)
+        ascend_path = os.environ.get("ASCEND_HOME_PATH", "")
+        if not ascend_path:
+            os.environ['ASCEND_HOME_PATH'] = "/usr/local/Ascend/latest"
+
+        set_load_checkpoint = [
+            "sed",
+            "-i",
+            f's#"load_checkpoint: .*"#"load_checkpoint: {ckpt_path_}"#g',
+            yaml_path_
+        ]
+        set_pretrained_model_dir = [
+            "sed",
+            "-i",
+            f's#"pretrained_model_dir: .*"#"pretrained_model_dir: {ckpt_path_}"#g',
+            yaml_path_
+        ]
+        return_code = os.system(" ".join(set_load_checkpoint))
+        assert return_code == 0, "Set load_checkpoint failed."
+        return_code = os.system(" ".join(set_pretrained_model_dir))
+        assert return_code == 0, "Set pretrained_model_dir failed."
+
+        config = MindFormerConfig(yaml_path_)
+        build_context(config)
+        build_parallel_config(config)
+        with no_init_parameters():
+            network = AutoModel.from_config(yaml_path_)
+        if config.load_checkpoint:
+            network.load_weights(config.load_checkpoint)
+
+        os.environ['MS_INTERNAL_DISABLE_CUSTOM_KERNEL_LIST'] = "PagedAttention"
+        tokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_dir,
+                                                  trust_remote_code=True)
+        input_ids = tokenizer.encode(question, add_special_tokens=True)
+        outputs = network.generate(input_ids, max_new_tokens=20)
+        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    def get_golden(self) -> tuple[str, str]:
+        return "介绍下北京故宫", "介绍下北京故宫博物院ODాలు"
+
+    # pylint: disable=arguments-differ
+    def golden_accuracy(self, infer_config_path_, unify_quant_ckpt_path_):
+        """golden_accuracy"""
+        question, answer = self.get_golden()
+        result = question is not None and answer is not None, \
+                 f"Please implement get_golden before invoke golden_accuracy."
+
+        result = self.check_quant_description(unify_quant_ckpt_path_)
+        if result:
+            pred = self.forward_model(infer_config_path_, unify_quant_ckpt_path_, question)
+            result = pred.startswith(answer)
+            print("="*50, flush=True)
+            print(f"{question} predict: {pred}, answer: {answer}", "success" if result else "failed", flush=True)
+        try:
+            group_size = get_group_size()
+        except RuntimeError:
+            group_size = 0
+        if group_size > 0:
+            ms.mint.distributed.barrier()
+        return result
+
+def test_quant_deepseek():
+    """
+    Feature: test mixture quant adjust parameter in two stages with two cards.
+    Description: apply mix-quant on deepseek-v3/r1 and check score.
+    Expectation: the quantization process is successful.
+    """
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     calibrate_config_path = os.path.join(cur_dir, "calibrate_deepseek3_671b.yaml")
-    infer_config_path = os.path.join(cur_dir, "predict_deepseek3_671b.yaml")
     q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant")
     dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
     tester = DeepSeekV3Tester()
-    tester.quant_model(calibrate_config_path, q_ckpt_path, dataset_path, fake_quant=False)
+    tester.quant_model(calibrate_config_path, q_ckpt_path,
+                       dataset_path, fake_quant=False)
     tester.check_safetensor_split(q_ckpt_path)
-    try:
-        print(f"mv: {q_ckpt_path} to: '/home/workspace/mindspore_dataset/weight'", flush=True)
-        shutil.move(q_ckpt_path, "/home/workspace/mindspore_dataset/weight/dsv3-a8w4-quant")
-    except (OSError, FileNotFoundError):
-        pass
+
+
+def test_unify_safetensor():
+    """
+    Feature: test unify safetensors for quantized tp split safetensors.
+    Description: unify safetensors from tp split safetensors.
+    Expectation: unify successfully.
+    """
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    float_ckpt_path = "/home/workspace/mindspore_dataset/weight/DeepSeek-R1-bf16"
+    q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant")
+    unify_q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant-unify")
+    tester = DeepSeekV3Tester()
+    tester.unify_safetensors(float_ckpt_path, q_ckpt_path,
+                             unify_q_ckpt_path)
+
+
+def test_eval_deepseek():
+    """
+    Feature: test evaluation of deepseek v3/r1 a8w4 quantization.
+    Description: evaluate the quant model output.
+    Expectation: score or output id is good.
+    """
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    infer_config_path = os.path.join(cur_dir, "predict_deepseek3_671b.yaml")
+    unify_q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant-unify")
+    tester = DeepSeekV3Tester()
+    tester.golden_accuracy(infer_config_path, unify_q_ckpt_path)
 
 
 @pytest.mark.level0
@@ -250,7 +437,7 @@ if __name__ == "__main__":
 @pytest.mark.env_single
 def test_ptq_dsv3_mix_accuracy():
     """
-    Feature: test omni quant adjust parameter in two stages with two cards.
+    Feature: test mixture quant adjust parameter in two stages with two cards.
     Description: apply mix-quant on deepseek-v3/r1 and check score.
     Expectation: score is good.
     """
@@ -259,10 +446,25 @@ def test_ptq_dsv3_mix_accuracy():
     port = get_available_port()
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
+    # Step1: quant deepseek
     return_code = os.system(
         f"msrun --worker_num=4 --local_worker_num=4 --master_addr=127.0.0.1 "
-        f"--master_port={port} --join=True --log_dir=./test_ptq_predict_dsv3_8p_logs "
-        f"python {run_file}"
+        f"--master_port={port} --join=True --log_dir=./test_ptq_quant_dsv3_4p_logs "
+        f"pytest -sv {run_file}::test_quant_deepseek"
+    )
+    time.sleep(1.0)
+    assert return_code == 0
+    # Step2: unify safetensors
+    return_code = os.system(
+        f"pytest -sv {run_file}::test_unify_safetensor"
+    )
+    time.sleep(1.0)
+    assert return_code == 0
+    # step3: eval deepseek
+    return_code = os.system(
+        f"msrun --worker_num=4 --local_worker_num=4 --master_addr=127.0.0.1 "
+        f"--master_port={port} --join=True --log_dir=./test_ptq_predict_dsv3_4p_logs "
+        f"pytest -sv {run_file}::test_eval_deepseek"
     )
     time.sleep(1.0)
     assert return_code == 0

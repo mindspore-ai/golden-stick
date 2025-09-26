@@ -16,7 +16,7 @@ parallel_config:
   model_parallel: 4
 
 # HuggingFace file directory
-pretrained_model_dir: '/path/hf_dir'
+pretrained_model_dir: ''
 model:
   model_config:
     num_hidden_layers: 4
@@ -27,11 +27,12 @@ model:
     params_dtype: "bfloat16"
     block_size: 128
     num_blocks: 512
+    quantization: golden-stick
 
 # mindspore context init config
 context:
   mode: 0 #0--Graph Mode; 1--Pynative Mode
-  max_device_memory: "28GB"
+  max_device_memory: "58GB"
   device_id: 0
   device_target: "Ascend"
   affinity_cpu_list: None
