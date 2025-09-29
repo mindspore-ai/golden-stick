@@ -29,10 +29,7 @@ BaseQuantForCausalLM是一个接口类，方便算法支持不同来源的网络
 | 规格 | 规格说明 |
 | --- | --- |
 | 硬件支持 | Atlas 800I A2 |
-| 网络支持 | DeepSeekV3/R1 <br> Qwen3 <br> Qwen3-moe <br> Telechat2 <br> 具体请参见[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38) |
 | 运行模式支持 | 量化checkpoint阶段仅支持PyNative模式，量化推理阶段不限定模式，建议GraphMode获得更好的性能 |
-
-> 当前calibrate接口依赖于MindSpore Transformers提供的基础模型GPTModel做网络拓扑分析，针对其他框架中的网络支持正在开发中。
 
 ### 算法支持
 
@@ -62,11 +59,13 @@ BaseQuantForCausalLM是一个接口类，方便算法支持不同来源的网络
 
 #### SmoothQuant算法
 
-研究发现，不同于CNN和小型的transformer网络，当大语言模型参数量超过6.8B时，网络的激活中出现“systematic outliers with large magnitude”，由于浮点的分布很广且不均匀，导致难以量化。
+研究发现，不同于CNN和小型的transformer网络，当大语言模型参数量超过6.8B时，网络的激活中出现"systematic outliers with large magnitude"，由于浮点的分布很广且不均匀，导致难以量化。
 
 ![](images/zh_cn/smooth_quant.png)
 
 [SmoothQuant](https://arxiv.org/pdf/2211.10438)算法通过数学等价变换，将激活上的异常值转移一部分到权重上，从而将难以量化的激活和极易量化的权重转化为较易量化的激活和较易量化的权重，实现量化精度的提升。
+
+**网络支持：** DeepSeekV3/R1、Qwen3、Qwen3-moe、Telechat2，具体请参见[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38)。
 
 可以通过如下配置项使能PTQ的SmoothQuant能力：
 
@@ -84,7 +83,9 @@ OutlierSuppressionLite算法由华为泰勒实验室与MindSpore团队联合开�
 
 OSL是[OutlierSuppressionPlus](https://arxiv.org/abs/2304.09145)算法的简化版本，在[SmoothQuant](https://arxiv.org/pdf/2211.10438)算法的基础上，对SmoothQuant中的超参数α进行网格搜索，为网络中的每个矩阵分别搜索最优α值，更好的对异常值进行抑制，提升量化模型的精度。
 
-> [SmoothQuant](https://arxiv.org/pdf/2211.10438)算法将激活值的量化难度转移到权重的量化上，同时引入超参数“迁移强度”(migration strength)α来控制这一幅度。论文通过整网粒度的实验得出，对于大多数模型而言α的最佳取值是0.5。然而，不同的模型结构、不同的decoder层位置、docoder层内矩阵的不同位置会导致激活值和权重的分布不同，进而导致α的最佳取值差异。
+> [SmoothQuant](https://arxiv.org/pdf/2211.10438)算法将激活值的量化难度转移到权重的量化上，同时引入超参数"迁移强度"(migration strength)α来控制这一幅度。论文通过整网粒度的实验得出，对于大多数模型而言α的最佳取值是0.5。然而，不同的模型结构、不同的decoder层位置、docoder层内矩阵的不同位置会导致激活值和权重的分布不同，进而导致α的最佳取值差异。
+
+**网络支持：** DeepSeekV3/R1、Qwen3、Qwen3-moe、Telechat2，[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38)。
 
 可以通过如下配置项使能PTQ的OSL能力：
 
@@ -104,6 +105,8 @@ GPTQ算法的核心思想是对某个block内的所有参数逐个量化，每�
 ![](images/zh_cn/gptq.png)
 
 PTQ算法支持使用GPTQ算法进行8bit和4bit权重量化，并将其添加到了精度恢复算法集中，精度恢复算法当前仅GPTQ算法可选。
+
+**网络支持：** [MindSpore Transformers Llama3.1/Llama2 网络](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) 和 [MindSpore Transformers DeepSeekV3/R1 网络](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3)。
 
 GPTQ算法支持per_group和per_channel量化，可以通过如下配置项使能GPTQ算法的per_channel量化:
 
@@ -138,6 +141,8 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
 当前金箍棒仅支持per-token的动态量化。per-token量化是指为每个token分配独立的量化参数来减少误差。动态量化是指量化参数在推理阶段实时计算，而不需要离线计算量化参数。
 
 per-token动态量化算法是在推理过程中对激活/KVcache进行per-token在线量化，在线计算出来token维度上的scale和zp，而无需使用数据集进行校准量化，与离线静态量化相比精度更高。当前per-token动态量化仅支持对称量化。
+
+**网络支持：** [MindSpore Transformers Llama3.1/Llama2 网络](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) 和 [MindSpore Transformers DeepSeekV3/R1 网络](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3)。
 
 1. 激活 per-token动态量化
 
@@ -212,6 +217,8 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
 [Activation-Aware Weight Quantization，简称AWQ](https://arxiv.org/pdf/2306.00978)基于激活值分布挑选显著权重，并且考虑到硬件效率，通过缩放的方式来保护显著权重，避免同一个权重张量使用不同数据类型存储，从而实现了硬件友好的高精度权重量化算法，可以实现4bit甚至更低bit的量化。除了显著权重的保护，AWQ还引入了动态权重截断技术进一步提升量化的精度。
 
+**网络支持：** [MindSpore Transformers Llama3.1/Llama2 网络](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) 和 [MindSpore Transformers DeepSeekV3/R1 网络](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3)。
+
 金箍棒通过新增一种异常值抑制方法来支持AWQ，当前仅支持[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py)。
 
 AWQ同时支持PerChannel量化和PerGroup量化，可以通过如下配置项使能PTQ的PerChannel AWQ算法:
@@ -282,6 +289,8 @@ $$X_{float} = (X_{int} - offset) \times scale$$
 
 ![](images/zh_cn/round_to_nearest.png)
 
+**网络支持：** [MindSpore Transformers Llama3.1/Llama2 网络](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) 和 [MindSpore Transformers DeepSeekV3/R1 网络](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3)。
+
 PTQ RoundToNearest算法当前支持8bit的权重量化能力，可以通过如下配置项使能：
 
 ```python
@@ -321,6 +330,8 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  
 2. 层间组合量化-A8W4量化
 
 金箍棒也支持针对不同的层配置不同的量化策略，例如A8W4量化是一种组合量化算法。
+
+**网络支持：** DeepSeekV3/R1、Qwen3、Qwen3-moe、Telechat2，具体请参见[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38)。
 
 以DeepSeekV3/R1网络为例，针对网络中的Attention模块采用OSL量化，稠密feed_froward模块采用动态A8W8量化，moe模块则采用动态A8W4量化。
 
