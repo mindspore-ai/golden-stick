@@ -31,10 +31,7 @@ Table 1: PTQ algorithm specifications
 | Specifications | Specification Descriptions |
 | --- | --- |
 | Hardware Support | Atlas 800I A2 |
-| Network Support | DeepSeekV3/R1 <br> Qwen3 <br> Qwen3-moe <br> Telechat2 <br> For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38). |
 | Operation Mode Support | The quantization checkpoint phase supports only PyNative mode, and the quantization inference phase is not limited to modes, suggesting GraphMode for better performance. |
-
-> The current calibrate API relies on the base GPTModel provided by MindSpore Transformers for network-topology analysis; support for models from other frameworks is under active development.
 
 ### Algorithmic Support
 
@@ -70,6 +67,8 @@ It is found that, unlike CNNs and small transformer networks, when the number of
 
 The [SmoothQuant](https://arxiv.org/pdf/2211.10438) algorithm transfers a portion of the outliers on the activations to the weights through a mathematically equivalent transformation, thus transforming the difficult-to-quantify activations and very easy-to-quantify weights into easy-to-quantify activations and easy-to-quantify weights, and realizing the improvement of quantization accuracy.
 
+**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
+
 User can enable the SmoothQuant capability of PTQ with the following configuration item:
 
 ```python
@@ -89,6 +88,8 @@ This finer-grained tuning better suppresses activation outliers and thereby boos
 
 > [SmoothQuant](https://arxiv.org/pdf/2211.10438) algorithm migrates the quantization difficulty from activations to weights, and introduces a hyper-parameter, migration strength α, to control how much difficulty is migrated. Through whole-model experiments, the paper found that α = 0.5 is the well-balanced point for most models. However, different network structures, different positions of decoder layers, and different positions of matrices within decoder layers can lead to different distributions of activation values and weights, thereby resulting in different optimal values of α.
 
+**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
+
 User can enable the OutlierSuppressionLite capability of PTQ with the following configuration item:
 
 ```python
@@ -107,6 +108,9 @@ The core idea of the GPTQ algorithm is to quantize all weights in a block one by
 ![](images/en/gptq.png)
 
 The PTQ algorithm supports the use of the GPTQ algorithm for 8-bit and 4-bit weight quantization and has incorporated it into the set of accuracy recovery algorithms. Currently, GPTQ is the only optional algorithm for accuracy recovery.
+
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
+
 The GPTQ algorithm supports per_group and per_channel quantization, and you can enable the per_channel quantization of the GPTQ algorithm through the following configuration items:
 
 ```python
@@ -140,6 +144,8 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
 Currently, the Golden Stick supports only per-token dynamic quantization. The per-token quantization algorithm refers to the allocation of independent quantization parameters for each token to minimize errors. Dynamic quantization implies that the quantization parameters are computed in real time during the inference phase, without the need for offline calculation of quantization parameters.
 
 per-token dynamic quantization algorithm is to execute per-token online quantization of activation or KVcache in the process of inference, and calculate the scale and zp of token dimension online without using dataset for calibration quantization, which is more accurate than offline static quantization. Currently, per-token dynamic quantization supports only symmetric quantization.
+
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
 
 1. Activation per-token Dynamic Quantization
 
@@ -208,11 +214,13 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
 #### AWQ Algorithm
 
-The [Research](https://arxiv.org/pdf/2306.00978) finds that weights are not equally important for LLMs’ performance. There is a small fraction (0.1%-1%) of weights called salient weights which are significantly important to LLMs’ performance. Skipping the quantization of these salient weights while quantization other weights to low bits can archive dramatically reducation of LLM inference memory footprint with low quantization accuracy loss.
+The [Research](https://arxiv.org/pdf/2306.00978) finds that weights are not equally important for LLMs' performance. There is a small fraction (0.1%-1%) of weights called salient weights which are significantly important to LLMs' performance. Skipping the quantization of these salient weights while quantization other weights to low bits can archive dramatically reducation of LLM inference memory footprint with low quantization accuracy loss.
 
 ![](images/en/awq.png)
 
 In [Activation-Aware Weight Quantization, AWQ](https://arxiv.org/pdf/2306.00978), the salient weights are selected based on the distribution of activation values, and considering the hardware efficiency, the salient weights are protected by scaling to avoid the same weight tensor from being stored by different data types, so as to realize the hardware-friendly and high-precision weighting algorithm, which can realize the quantization to 4bits or even lower bits. In addition to the protection of significant weights, AWQ also introduces dynamic weight truncation technology to further improve the accuracy of quantization.
+
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
 
 MindSpore Golden Stick supports AWQ by adding an `OutliersSuppressionType` method called `OutliersSuppressionType.AWQ`, which is currently only supported the [ParallelLlamaForCausalLM network](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py).
 
@@ -284,6 +292,8 @@ After inverse quantization of weights to floating point, the inference process o
 
 ![](images/en/round_to_nearest.png)
 
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
+
 PTQ RoundToNearest Algorithm currently supports only 8bit weight quantization capability, which can be enabled by the following configuration item:
 
 ```python
@@ -323,6 +333,8 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
 2. Layer-wise combination Quantization – A8W4
 
 Golden Stick also lets you assign a different quantization policy to each layer, A8W4 is one such composite recipe.
+
+**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
 
 Taking the DeepSeek-V3/R1 network as an example, attention blocks are quantized with OSL, dense feed-forward blocks use dynamic A8W8, moe blocks use dynamic A8W4.
 
