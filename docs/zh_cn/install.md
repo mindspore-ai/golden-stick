@@ -17,7 +17,7 @@
 
 ## MindSpore版本依赖关系
 
-MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表中所指示的对应关系，并参考[MindSpore安装指导](https://mindspore.cn/install)安装对应版本的MindSpore：
+MindSpore Golden Stick依赖MindSpore训练推理框架，请根据下表所示的对应关系，并参考[MindSpore安装指导](https://mindspore.cn/install)安装对应版本的MindSpore：
 
 | MindSpore Golden Stick版本 |                             分支                                  | MindSpore版本 |
 | :---------------------: | :-----------------------------------------------------------------: | :-------: |
@@ -37,7 +37,7 @@ MindSpore Golden Stick依赖MindSpore训练推理框架，请按照根据下表�
 
 ## pip安装
 
-使用pip命令安装，请从[MindSpore Golden Stick Releases](https://gitee.com/mindspore/golden-stick/releases)下载对应whl包并安装whl。
+使用pip命令安装，可从[MindSpore Golden Stick Releases](https://gitee.com/mindspore/golden-stick/releases)下载对应whl包并安装。
 
 > - 在联网状态下，安装whl包时会自动下载MindSpore Golden Stick安装包的依赖项（依赖项详情参见requirement.txt），其余情况需自行安装。
 

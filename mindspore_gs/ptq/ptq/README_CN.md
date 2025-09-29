@@ -8,7 +8,7 @@
 
 ### 整体流程
 
-金箍棒PTQ算法提供了昇腾硬件上的大语言模型（后称LLM）SOTA训练后量化算法能力。此外，MindSpore团队与华为泰勒团队基于MindSpore做了一些算法创新，实现昇腾硬件上更友好的自动搜优的混合精度量化，也集成到了金箍棒。
+金箍棒PTQ算法提供了昇腾硬件上的大语言模型（后称LLM）SOTA训练后量化算法能力。此外，MindSpore团队与华为泰勒团队基于MindSpore进行了算法创新，实现了昇腾硬件上更友好的自动搜优混合精度量化，这些能力也已集成到金箍棒中。
 
 ![autoquant流程图](images/zh_cn/ptq_arch.png)
 
@@ -20,7 +20,7 @@ BaseQuantForCausalLM是一个接口类，方便算法支持不同来源的网络
 
 为了提升量化算法对不同网络的效果，BaseQuantForCausalLM支持通过PTQConfig来按层进行量化策略的配置。当前已支持OutlierSuppressionLite（后称OSL）、SmoothQuant、A8W4、AWQ、GPTQ、KVCacheInt8、RTN量化算法，以及将这些量化策略应用于网络的不同层。
 
-同时BaseQuantForCausalLM提供了量化模型保存接口save_quantized()，可以将量化后的权重直接保存成Hugging Face格式。
+同时，BaseQuantForCausalLM提供了量化模型保存接口save_quantized()，可以将量化后的权重直接保存成Hugging Face格式。
 
 ### 使用限制
 
@@ -33,7 +33,7 @@ BaseQuantForCausalLM是一个接口类，方便算法支持不同来源的网络
 
 ### 算法支持
 
-训练后量化算法有很多种分类维度，比如静态量化和动态量化；权重量化、激活量化和KVCache量化；MinMax量化、MSE量化、KL散度量化和直方图量化；还有各种量化的优化技术，从最简单的四舍五入量化，到SmoothQuant量化，GPTQ量化，AWQ量化等。
+训练后量化算法有很多种分类维度，比如静态量化和动态量化；权重量化、激活量化和KVCache量化；MinMax量化、MSE量化、KL散度量化和直方图量化；还有各种量化的优化技术，从最简单的四舍五入量化，到SmoothQuant量化、GPTQ量化、AWQ量化等。
 
 本小节从业界常见的量化算法范式来介绍PTQ算法的能力，在此之前先给出其他分类维度上的一些限制：
 
@@ -43,19 +43,19 @@ BaseQuantForCausalLM是一个接口类，方便算法支持不同来源的网络
 - KVCache量化支持静态per-channel量化和动态per-token量化。
 - 受限于硬件和算子支持，对于全量化，激活当前不支持per-channel的量化，权重不支持带zero point的量化。
 - 硬件支持带zero point的权重量化，但当前PTQ算法没有开放这方面能力，仅支持不带zero point的权重量化。
-- 由于Mindspore底层量化算子限制，当前金箍棒PTQ量化算法仅对MindSpore Transformers的一些Layer做了支持，其中[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/layers.py)和[MindFormers的moe层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/grouped_layers.py)支持激活和权重量化，[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26)支持KVCache量化。如果用户需要量化其他框架的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。
+- 由于MindSpore底层量化算子限制，当前金箍棒PTQ量化算法仅对MindSpore Transformers的一些Layer做了支持，其中[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/layers.py)和[MindFormers的moe层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/grouped_layers.py)支持激活和权重量化，[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26)支持KVCache量化。如果用户需要量化其他框架的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。
 
 金箍棒当前已支持算法如下：
 
-| 已支持算法 | 简要介绍
+| 已支持算法 | 简要介绍 |
 |-------|-------|
-| [OutlierSuppressionLite算法](#outliersuppressionlite算法) | 由华为泰勒实验室与MindSpore团队联合开发，在SmoothQuant基础上为网络中的每个矩阵分别搜索最优超参α值
-| [A8W4量化](#金箍棒支持组合量化) | 由MindSpore团队开发的层间混合量化算法，激活使用动态per-token的8-bit量化，权重使用per-group的4-bit gptq量化
-| [SmoothQuant算法](#smoothquant算法) | A8W8量化，通过smooth_scale将激活的量化难度转移至权重
-| [GPTQ算法](#gptq算法) | 对某个block内的所有参数逐个量化，弥补量化带来的精度损失
-| [动态量化](#动态量化算法) | 激活或KVCache进行动态per-token量化
-| [AWQ算法](#awq算法) | 通过离线网格搜索的方式实现权重低比特量化
-| [RoundToNearest算法](#roundtonearest算法) |朴素的后量化算法，其取整方式使用了四舍五入的方式
+| [OutlierSuppressionLite算法](#outliersuppressionlite算法) | 由华为泰勒实验室与MindSpore团队联合开发，在SmoothQuant基础上为网络中的每个矩阵分别搜索最优超参α值 |
+| [A8W4量化](#金箍棒支持组合量化) | 由MindSpore团队开发的层间混合量化算法，激活使用动态per-token的8-bit量化，权重使用per-group的4-bit GPTQ量化 |
+| [SmoothQuant算法](#smoothquant算法) | A8W8量化，通过smooth_scale将激活的量化难度转移至权重 |
+| [GPTQ算法](#gptq算法) | 对某个block内的所有参数逐个量化，弥补量化带来的精度损失 |
+| [动态量化](#动态量化算法) | 激活或KVCache进行动态per-token量化 |
+| [AWQ算法](#awq算法) | 通过离线网格搜索的方式实现权重低比特量化 |
+| [RoundToNearest算法](#roundtonearest算法) |朴素的后量化算法，其取整方式使用了四舍五入的方式 |
 
 #### SmoothQuant算法
 
@@ -81,11 +81,11 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.
 
 OutlierSuppressionLite算法由华为泰勒实验室与MindSpore团队联合开发，是一种网格搜索算法，可进一步提升静态量化的精度，后续简称为OSL算法。
 
-OSL是[OutlierSuppressionPlus](https://arxiv.org/abs/2304.09145)算法的简化版本，在[SmoothQuant](https://arxiv.org/pdf/2211.10438)算法的基础上，对SmoothQuant中的超参数α进行网格搜索，为网络中的每个矩阵分别搜索最优α值，更好的对异常值进行抑制，提升量化模型的精度。
+OSL是[OutlierSuppressionPlus](https://arxiv.org/abs/2304.09145)算法的简化版本，在[SmoothQuant](https://arxiv.org/pdf/2211.10438)算法的基础上，对SmoothQuant中的超参数α进行网格搜索，为网络中的每个矩阵分别搜索最优α值，更好地对异常值进行抑制，提升量化模型的精度。
 
-> [SmoothQuant](https://arxiv.org/pdf/2211.10438)算法将激活值的量化难度转移到权重的量化上，同时引入超参数"迁移强度"(migration strength)α来控制这一幅度。论文通过整网粒度的实验得出，对于大多数模型而言α的最佳取值是0.5。然而，不同的模型结构、不同的decoder层位置、docoder层内矩阵的不同位置会导致激活值和权重的分布不同，进而导致α的最佳取值差异。
+> [SmoothQuant](https://arxiv.org/pdf/2211.10438)算法将激活值的量化难度转移到权重的量化上，同时引入超参数"迁移强度"(migration strength)α来控制这一幅度。论文通过整网粒度的实验得出，对于大多数模型而言α的最佳取值是0.5。然而，不同的模型结构、不同的decoder层位置、decoder层内矩阵的不同位置会导致激活值和权重的分布不同，进而导致α的最佳取值差异。
 
-**网络支持：** DeepSeekV3/R1、Qwen3、Qwen3-moe、Telechat2，[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38)。
+**网络支持：** DeepSeekV3/R1、Qwen3、Qwen3-moe、Telechat2，具体请参见[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38)。
 
 可以通过如下配置项使能PTQ的OSL能力：
 
@@ -140,75 +140,76 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
 
 当前金箍棒仅支持per-token的动态量化。per-token量化是指为每个token分配独立的量化参数来减少误差。动态量化是指量化参数在推理阶段实时计算，而不需要离线计算量化参数。
 
-per-token动态量化算法是在推理过程中对激活/KVcache进行per-token在线量化，在线计算出来token维度上的scale和zp，而无需使用数据集进行校准量化，与离线静态量化相比精度更高。当前per-token动态量化仅支持对称量化。
+per-token动态量化算法是在推理过程中对激活/KVcache进行per-token在线量化，在线计算出token维度上的scale和zp，而无需使用数据集进行校准量化，与离线静态量化相比精度更高。当前per-token动态量化仅支持对称量化。
 
 **网络支持：** [MindSpore Transformers Llama3.1/Llama2 网络](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) 和 [MindSpore Transformers DeepSeekV3/R1 网络](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3)。
 
 1. 激活 per-token动态量化
 
-激活per-token动态量化，首先需要对权重进行RoundToNearest量化，然后再使用量化的权重进行W8A8-per-token推理。同时激活per-token动态量化也支持smooth操作，因此也可以在量化过程中计算smooth参数。
+    激活per-token动态量化，首先需要对权重进行RoundToNearest量化，然后再使用量化的权重进行W8A8-per-token推理。同时，激活per-token动态量化也支持smooth操作，因此也可以在量化过程中计算smooth参数。
 
-- 包含smooth参数的激活per-token动态量化
+    - 包含smooth参数的激活per-token动态量化
 
-  当需要包含smooth参数时，对应的配置项如下。
+      当需要包含smooth参数时，对应的配置项如下：
 
-  ```python
-  from mindspore import dtype as msdtype
-  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+      ```python
+      from mindspore import dtype as msdtype
+      from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-                         act_quant_granularity=QuantGranularity.PER_TOKEN,
-                         outliers_suppression=OutliersSuppressionType.SMOOTH)
-  ```
+      ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                             act_quant_granularity=QuantGranularity.PER_TOKEN,
+                             outliers_suppression=OutliersSuppressionType.SMOOTH)
+      ```
 
-  此时激活对应的计算公式如下：
+      此时激活对应的计算公式如下：
 
-  $$scale = \frac{row\_max(abs(X_{float} \cdot smooth\_scale))} {127}$$
+      $$scale = \frac{row\_max(abs(X_{float} \cdot smooth\_scale))} {127}$$
 
-  $$x_{int} = round(x_{float} \div scale)$$
+      $$x_{int} = round(x_{float} \div scale)$$
 
-- 不包含smooth参数的激活per-token动态量化
+    - 不包含smooth参数的激活per-token动态量化
 
-  当不包含smooth参数时，对应的配置项如下。
+      当不包含smooth参数时，对应的配置项如下：
 
-  ```python
-  from mindspore import dtype as msdtype
-  from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+      ```python
+      from mindspore import dtype as msdtype
+      from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-                         act_quant_granularity=QuantGranularity.PER_TOKEN,
-                         outliers_suppression=OutliersSuppressionType.NONE)
-  ```
+      ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                             act_quant_granularity=QuantGranularity.PER_TOKEN,
+                             outliers_suppression=OutliersSuppressionType.NONE)
 
-  此时激活对应的计算公式如下：
+      ```
 
-  $$scale = \frac{row\_max(abs(X_{{float}}))} {127}$$
+      此时激活对应的计算公式如下：
 
-  $$x_{int} = round(x_{float} \div scale)$$
+      $$scale = \frac{row\_max(abs(X_{{float}}))} {127}$$
 
-同时也可以直接使用PTQ算法w8a16量化后的权重进行W8A8-per-token推理。
+      $$x_{int} = round(x_{float} \div scale)$$
+
+    同时也可以直接使用PTQ算法w8a16量化后的权重进行W8A8-per-token推理。
 
 2. KVCache per-token动态量化
 
-对KVCache进行per-token动态量化，无需离线量化操作，可以直接传入原始的浮点权重直接进行推理即可。对应的配置项如下。
+    对KVCache进行per-token动态量化，无需离线量化操作，可以直接传入原始的浮点权重进行推理。对应的配置项如下：
 
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
-                       kvcache_quant_dtype=msdtype.int8,
-                       kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
-                       outliers_suppression=OutliersSuppressionType.NONE)
-```
+    ptq_config = PTQConfig(weight_quant_dtype=None, act_quant_dtype=None,
+                           kvcache_quant_dtype=msdtype.int8,
+                           kvcache_quant_granularity=QuantGranularity.PER_TOKEN,
+                           outliers_suppression=OutliersSuppressionType.NONE)
+    ```
 
-此时KVCache对应的计算公式如下：
+    此时KVCache对应的计算公式如下：
 
-$$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
+    $$scale = \frac{row\_max(abs(KVCache_{{float}}))} {127}$$
 
-$$KVCache_{int} = round(KVCache_{float} \div scale)$$
+    $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
-> 因MindSpore Transformers的ParallelLlamaForCausalLM网络已经日落，在金箍棒1.2.0版本中，该网络不支持KVCache Int8量化，后续版本会在新的网络上支持KVCache Int8量化。
+    > 因MindSpore Transformers的ParallelLlamaForCausalLM网络已经停止维护，在金箍棒1.2.0版本中，该网络不支持KVCache Int8量化，后续版本会在新的网络上支持KVCache Int8量化。
 
 #### AWQ算法
 
@@ -216,13 +217,13 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
 ![](images/zh_cn/awq.png)
 
-[Activation-Aware Weight Quantization，简称AWQ](https://arxiv.org/pdf/2306.00978)基于激活值分布挑选显著权重，并且考虑到硬件效率，通过缩放的方式来保护显著权重，避免同一个权重张量使用不同数据类型存储，从而实现了硬件友好的高精度权重量化算法，可以实现4bit甚至更低bit的量化。除了显著权重的保护，AWQ还引入了动态权重截断技术进一步提升量化的精度。
+[Activation-Aware Weight Quantization，简称AWQ](https://arxiv.org/pdf/2306.00978)基于激活值分布挑选显著权重，并且考虑到硬件效率，通过缩放的方式来保护显著权重，避免同一个权重张量使用不同数据类型存储，从而实现了硬件友好的高精度权重量化算法，可以实现4bit甚至更低bit的量化。除了显著权重的保护，AWQ还引入了动态权重截断技术，进一步提升量化的精度。
 
 **网络支持：** [MindSpore Transformers Llama3.1/Llama2 网络](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) 和 [MindSpore Transformers DeepSeekV3/R1 网络](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3)。
 
 金箍棒通过新增一种异常值抑制方法来支持AWQ，当前仅支持[ParallelLlamaForCausalLM网络](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py)。
 
-AWQ同时支持PerChannel量化和PerGroup量化，可以通过如下配置项使能PTQ的PerChannel AWQ算法:
+AWQ同时支持PerChannel量化和PerGroup量化，可以通过如下配置项使能PTQ的PerChannel AWQ算法：
 
 ```python
 from mindspore import dtype as msdtype
@@ -243,7 +244,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
                        weight_quant_granularity=QuantGranularity.PER_CHANNEL, group_size=0)
 ```
 
-可以通过如下配置项使能PTQ的PerGroup AWQ算法:
+可以通过如下配置项使能PTQ的PerGroup AWQ算法：
 
 ```python
 from mindspore import dtype as msdtype
@@ -306,64 +307,64 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  
 
 1. AxWx量化组合KVCache量化
 
-得益于分层解耦框架设计，金箍棒的PTQ算法可以方便的将不同的算法能力组合在一起，例如：
+    得益于分层解耦框架设计，金箍棒的PTQ算法可以方便地将不同的算法能力组合在一起，例如：
 
-- 8bit权重量化组合8bit KVCache量化：
+    - 8bit权重量化组合8bit KVCache量化：
 
-  ```python
-  from mindspore import dtype as msdtype
-  from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+      ```python
+      from mindspore import dtype as msdtype
+      from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
-                         outliers_suppression=OutliersSuppressionType.NONE)
-  ```
+      ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=None, kvcache_quant_dtype=msdtype.int8,
+                             outliers_suppression=OutliersSuppressionType.NONE)
+      ```
 
-- SmoothQuant量化组合8bit KVCache量化：
+    - SmoothQuant量化组合8bit KVCache量化：
 
-  ```python
-  from mindspore import dtype as msdtype
-  from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
+      ```python
+      from mindspore import dtype as msdtype
+      from mindspore_gs.ptq import PTQConfig, OutliersSuppressionType
 
-  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
-                         outliers_suppression=OutliersSuppressionType.SMOOTH)
-  ```
+      ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, kvcache_quant_dtype=msdtype.int8,
+                             outliers_suppression=OutliersSuppressionType.SMOOTH)
+      ```
 
 2. 层间组合量化-A8W4量化
 
-金箍棒也支持针对不同的层配置不同的量化策略，例如A8W4量化是一种组合量化算法。
+    金箍棒也支持针对不同的层配置不同的量化策略，例如A8W4量化是一种组合量化算法。
 
-**网络支持：** DeepSeekV3/R1、Qwen3、Qwen3-moe、Telechat2，具体请参见[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38)。
+    **网络支持：** DeepSeekV3/R1、Qwen3、Qwen3-moe、Telechat2，具体请参见[MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38)。
 
-以DeepSeekV3/R1网络为例，针对网络中的Attention模块采用OSL量化，稠密feed_froward模块采用动态A8W8量化，moe模块则采用动态A8W4量化。
+    以DeepSeekV3/R1网络为例，针对网络中的Attention模块采用OSL量化，稠密feed_forward模块采用动态A8W8量化，moe模块则采用动态A8W4量化。
 
-由于算子限制，金箍棒当前仅支持针对moe结构的A8W4量化。moe结构可参考[moe block](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/transformer/moe/moe_layer.py#L100)。其中激活进行8-bit动态per-token量化，权重使用gptq进行4-bit per-group量化。
+    由于算子限制，金箍棒当前仅支持针对moe结构的A8W4量化。moe结构可参考[moe block](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/transformer/moe/moe_layer.py#L100)。其中激活进行8-bit动态per-token量化，权重使用GPTQ进行4-bit per-group量化。
 
-以DeepSeekR1模型为例，A8W4模型权重压缩率可达70%，实现单机可部署，数据集精度误差在1%以内。
+    以DeepSeekR1模型为例，A8W4模型权重压缩率可达70%，实现单机可部署，数据集精度误差在1%以内。
 
-对应的PTQConfig配置如下：
+    对应的PTQConfig配置如下：
 
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import (PTQConfig, PTQMode, BackendTarget,
-                              QuantGranularity, PrecisionRecovery,
-                              GPTQQuantConfig)
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq import (PTQConfig, PTQMode, BackendTarget,
+                                  QuantGranularity, PrecisionRecovery,
+                                  GPTQQuantConfig)
 
-gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
-ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
-                            weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
-                            weight_quant_granularity=QuantGranularity.PER_GROUP,
-                            group_size=64, algo_args=gptq_config,
-                            act_quant_granularity=QuantGranularity.PER_TOKEN,
-                            precision_recovery=PrecisionRecovery.GPTQ)
-```
+    gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
+    ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                           weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
+                           weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           group_size=64, algo_args=gptq_config,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
+                           precision_recovery=PrecisionRecovery.GPTQ)
+    ```
 
-  备注：
+    备注：
 
-  1) layer_policies中参数配置的优先级高于net_policy，当某层匹配到layer_policies配置，优先使用该策略。否则，使用net_policy策略。
+    1) layer_policies中参数配置的优先级高于net_policy，当某层匹配到layer_policies配置，优先使用该策略。否则，使用net_policy策略。
 
-  2) PTQConfig中的mode和backend参数，以net_policy为准。
+    2) PTQConfig中的mode和backend参数，以net_policy为准。
 
-  3) 当前配置策略仅支持人工按经验手动配置，后续规划为可自动配置。
+    3) 当前配置策略仅支持人工按经验手动配置，后续规划为可自动配置。
 
 ## 示例
 
@@ -381,7 +382,7 @@ PTQ量化通常分为两个阶段：一个是量化校准阶段，另一个是�
 
 1.1. Ascend环境
 
-PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[MindSpore安装指南](https://www.mindspore.cn/install)安装昇腾AI处理器配套软件包小节和配置环境变量小节。
+PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[MindSpore安装指南](https://www.mindspore.cn/install)中的“安装昇腾AI处理器配套软件包”小节和“配置环境变量”小节。
 
 1.2. MindSpore环境
 
@@ -393,13 +394,13 @@ PTQ算法需要运行在Ascend硬件上，Ascend的环境配置可以参考[Mind
 
 1.4. 相关文件准备
 
-**第一步**创建工作目录：
+**第一步** 创建工作目录：
 
 ```shell
 mkdir workspace
 ```
 
-**第二步**下载开源CEval数据集，拷贝至workspace目录下：
+**第二步** 下载开源CEval数据集，拷贝至workspace目录下：
 
 Ceval下载地址：[CEval Dataset](https://huggingface.co/ceval)
 
@@ -510,7 +511,7 @@ layer_policies = OrderedDict({r'.*\.[0-9]\.self_attention.*': osl_cfg,
                               })
 ```
 
-有了PTQConfig以后，接下来可模型的通过calibrate结构进行模型的量化校准，代码如下：
+有了PTQConfig以后，接下来可通过模型的calibrate接口进行模型的量化校准，代码如下：
 
 > 对于Qwen3网络，某些层对于量化比较敏感，不适合量化，我们通常通过opname_blacklist字段来帮助跳过这些层的量化。
 

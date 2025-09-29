@@ -8,14 +8,14 @@ SimQAT是一种最基础的感知量化算法，其具体原理来源于谷歌�
 
 ### 伪量化节点
 
-伪量化节点，是指感知量化训练时，往网络中插入的一类节点，其用途是寻找网络数据分布，并反馈损失精度，具体作用如下：
+伪量化节点是指在感知量化训练时往网络中插入的一类节点，其用途是寻找网络数据分布，并反馈损失精度。具体作用如下：
 
 - 找到参数的分布，即找到待量化参数的最大值和最小值；
 - 模拟量化为低比特时的精度损失，把该损失作用到网络中，传递给损失函数，让优化器在训练过程中对该损失值进行优化。
 
 ### BatchNorm折叠
 
-为了归一化输出数据，卷积或者全连接层后通常会加入BatchNorm算子，在训练阶段BatchNorm作为一个独立的算子，统计输出的均值和方差（如下左图），在推理阶段则将其融入权重和Bias中，称为BatchNorm折叠（如下右图）。
+为了归一化输出数据，卷积或者全连接层后通常会加入BatchNorm算子。在训练阶段，BatchNorm作为一个独立的算子，统计输出的均值和方差（如下左图）。在推理阶段，则将其融入权重和Bias中，称为BatchNorm折叠（如下右图）。
 
 ![](images/zh_cn/bnfold_in_infer.png)
 
@@ -44,7 +44,7 @@ MindSpore的感知量化训练是指在训练时使用伪量化节点来模拟�
 
 ## 感知量化训练示例
 
-感知量化训练与一般训练步骤基本一致,在构造网络阶段需要应用MindSpore Golden Stick的量化算法生成量化网络，完整流程如下：
+感知量化训练与一般训练步骤基本一致，在构造网络阶段需要应用MindSpore Golden Stick的量化算法生成量化网络。完整流程如下：
 
 1. 加载数据集，处理数据。
 2. 定义网络。
@@ -97,7 +97,7 @@ LeNet5网络定义见[lenet.py](https://gitee.com/mindspore/models/blob/master/r
 
 ### 应用量化算法
 
-量化网络是指在原网络定义的基础上，修改需要量化的网络层后生成的带有伪量化节点的网络，通过构造MindSpore Golden Stick下的`SimulatedQuantizationAwareTraining`类，并将其应用到原网络上将原网络转换为量化网络。
+量化网络是指在原网络定义的基础上，修改需要量化的网络层后生成的带有伪量化节点的网络。通过构造MindSpore Golden Stick下的`SimulatedQuantizationAwareTraining`类，并将其应用到原网络上，将原网络转换为量化网络。
 
 ```python
 from mindspore_gs import SimulatedQuantizationAwareTraining as SimQAT

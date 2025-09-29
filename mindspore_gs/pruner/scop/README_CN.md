@@ -4,17 +4,25 @@
 
 ## 背景
 
-卷积神经网络（CNN）等深度学习模型已在计算机视觉、自然语言处理等多个领域广泛应用并取得了巨大的成功，但由于神经网络对计算能力和内存要求很高，很难将性能强大的神经网络直接部署在手机、可穿戴设备等边缘设备上。因此，神经网络剪枝等模型压缩方法对模型在边缘设备上的部署十分重要。
+卷积神经网络（CNN）等深度学习模型已在计算机视觉、自然语言处理等多个领域广泛应用，并取得了巨大的成功。但由于神经网络对计算能力和内存要求很高，很难将性能强大的神经网络直接部署在手机、可穿戴设备等边缘设备上。因此，神经网络剪枝等模型压缩方法对模型在边缘设备上的部署十分重要。
 
 ### 剪枝方法
 
-神经网络剪枝技术是一种通用的模型压缩方法，它通过去除神经网络中的部分参数来减少参数量和计算量，主要分为非结构化剪枝和结构化剪枝两类。以卷积神经网络（CNN）为例，非结构化剪枝是去除卷积核中的部分权值，尽管它可以实现很高的压缩比，但实际的加速依赖于特殊的硬件设计，难以在通用的Ascend、GPU、CPU平台上获得收益。而结构化剪枝直接去除CNN中完整的卷积核，不破坏网络的拓扑结构，无需特定的软件和硬件设计即可直接实现模型的推理加速。
+神经网络剪枝技术是一种通用的模型压缩方法。它通过去除神经网络中的部分参数来减少参数量和计算量，主要分为非结构化剪枝和结构化剪枝两类。
 
-发现冗余的卷积核是结构化剪枝的关键一步，常用的方法可分为两种：第一种方法不需要训练数据，通过定义一些卷积核重要性的假设，来判定不同卷积核的重要性。一个典型的假设是范数小的卷积核不重要，砍掉一些范数小的卷积核不会太多地影响网络的表现。 还有一类方法是数据驱动的方法，引入训练数据来学习不同卷积核的重要性。比如通过给每个卷积核引入额外的控制系数，学习这些控制系数，来度量不同卷积核的重要性，小的控制系数对应的卷积核被认为不重要。
+以卷积神经网络（CNN）为例，非结构化剪枝是去除卷积核中的部分权值。尽管它可以实现很高的压缩比，但实际的加速依赖于特殊的硬件设计，难以在通用的Ascend、GPU、CPU平台上获得收益。而结构化剪枝直接去除CNN中完整的卷积核，不破坏网络的拓扑结构，无需特定的软件和硬件设计即可直接实现模型的推理加速。
+
+发现冗余的卷积核是结构化剪枝的关键一步，常用的方法可分为两种：
+
+第一种方法不需要训练数据，通过定义一些卷积核重要性的假设来判定不同卷积核的重要性。一个典型的假设是范数小的卷积核不重要，砍掉一些范数小的卷积核不会太多地影响网络的表现。
+
+还有一类方法是数据驱动的方法，引入训练数据来学习不同卷积核的重要性。比如通过给每个卷积核引入额外的控制系数，学习这些控制系数来度量不同卷积核的重要性，小的控制系数对应的卷积核被认为不重要。
 
 ![](images/zh_cn/scop.png)
 
-一个典型的神经网络剪枝方法：基于科学控制法的神经网络剪枝（SCOP: Scientific Control for Reliable Neural Network Pruning）是在数据驱动下，通过引入高仿特征作为参照，通过设置对照实验来减少各种无关因素对剪枝过程的干扰，提高剪枝结果的可靠性。整体流程如上图所示，真实数据（Real data）和高仿数据（Knockoff data）同时输入到网络中，分别生成真实特征和高仿特征。如果一个卷积核对应的高仿特征抑制住了真实特征，则认为这个卷积核是冗余的，应当被删除。
+一个典型的神经网络剪枝方法：基于科学控制法的神经网络剪枝（SCOP: Scientific Control for Reliable Neural Network Pruning）是在数据驱动下，通过引入高仿特征作为参照，通过设置对照实验来减少各种无关因素对剪枝过程的干扰，提高剪枝结果的可靠性。
+
+整体流程如上图所示，真实数据（Real data）和高仿数据（Knockoff data）同时输入到网络中，分别生成真实特征和高仿特征。如果一个卷积核对应的高仿特征抑制住了真实特征，则认为这个卷积核是冗余的，应当被删除。
 
 ## SCOP剪枝训练
 
@@ -32,7 +40,7 @@ SCOP采用数据驱动的方式，通过引入训练数据学习不同卷积核�
 
 ## SCOP剪枝训练示例
 
-SCOP训练分为Knockoff阶段和Finetune阶段，Knockoff阶段对应于前文介绍的通过高仿特征来去除冗余卷积核，Finetune阶段即在去掉冗余卷积核后完整训练网络，完整流程如下：
+SCOP训练分为Knockoff阶段和Finetune阶段。Knockoff阶段对应于前文介绍的通过高仿特征来去除冗余卷积核，Finetune阶段即在去掉冗余卷积核后完整训练网络。完整流程如下：
 
 1. 加载数据集，处理数据。
 2. 初始化ResNet50网络。
@@ -46,7 +54,9 @@ SCOP训练分为Knockoff阶段和Finetune阶段，Knockoff阶段对应于前文�
 
 ### Knockoff Data阶段
 
-初始化ResNet50网络，加载预训练模型，通过PrunerKfCompressAlgo进行节点替换(详情用户可参考[API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py))，得到Knockoff阶段的网络，并进行训练。(注：Knockoff Data阶段的dataset_sink_mode必须设置为False，因为在Knockoff Data阶段SCOP算法会修改数据。)
+初始化ResNet50网络，加载预训练模型，通过PrunerKfCompressAlgo进行节点替换（详情用户可参考[API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)），得到Knockoff阶段的网络，并进行训练。
+
+> Knockoff Data阶段的dataset_sink_mode必须设置为False，因为在Knockoff Data阶段SCOP算法会修改数据。
 
 ```python
 from mindspore import ModelCheckpoint, CheckpointConfig, LossMonitor, TimeMonitor
@@ -82,7 +92,7 @@ model = ms.Model(net, loss_fn=loss_fn, optimizer=optimizer)
 model.train(config.epoch_kf, dataset, callbacks=cb, dataset_sink_mode=False)
 ```
 
-运行结果如下:
+运行结果如下：
 
 ```text
 step_0: loss=3.5922117
@@ -95,7 +105,7 @@ step_5: loss=4.715785
 
 ### Finetune阶段
 
-通过Knockoff阶段确认冗余的卷积核，通过PrunerFtCompressAlgo进行节点替换(详情用户可参考[API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py))删除冗余卷积核，进行完整的训练并保存模型。
+通过Knockoff阶段确认冗余的卷积核，通过PrunerFtCompressAlgo进行节点替换（详情用户可参考[API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)）删除冗余卷积核，进行完整的训练并保存模型。
 
 ```python
 from mindspore_gs import PrunerFtCompressAlgo
@@ -136,7 +146,7 @@ model_ft.train(config.epochs_ft, dataset, callbacks=ft_cb,
                 sink_size=dataset.get_dataset_size(), dataset_sink_mode=True)
 ```
 
-运行结果如下:
+运行结果如下：
 
 ```text
 epoch: 1 step: 1, loss is 1.776729941368103
@@ -177,7 +187,7 @@ if __name__ == "__main__":
     print("result:", res, "prune_rate=", config.prune_rate, "ckpt=", config.checkpoint_file_path, "params=", total_params)
 ```
 
-模型评估的精度(top_1_accuracy)、剪枝率(prune_rate)、模型存储位置(ckpt)及参数量(params)如下：
+模型评估的精度（top_1_accuracy）、剪枝率（prune_rate）、模型存储位置（ckpt）及参数量（params）如下：
 
 ```text
 result:{'top_1_accuracy': 0.9273838141025641} prune_rate=0.45 ckpt=~/resnet50_cifar10/train_parallel0/resnet-400_390.ckpt params=10587835
@@ -185,7 +195,7 @@ result:{'top_1_accuracy': 0.9273838141025641} prune_rate=0.45 ckpt=~/resnet50_ci
 
 ## 导出剪枝模型
 
-在端侧硬件平台上部署的量化模型为通用模型格式（AIR、MindIR等）。导出步骤为：
+在端侧硬件平台上部署的剪枝模型为通用模型格式（AIR、MindIR等）。导出步骤为：
 
 1. 定义剪枝网络。
 2. 加载剪枝训练时保存的CheckPoint格式文件。
@@ -201,7 +211,7 @@ if __name__ == "__main__":
     net = PrunerKfCompressAlgo({}).apply(net)
     net = PrunerFtCompressAlgo({}).apply(net)
 
-    # load quantization aware network checkpoint
+    # load pruning aware network checkpoint
     param_dict = load_checkpoint(config.ckpt_path)
     load_param_into_net(net, param_dict)
 
