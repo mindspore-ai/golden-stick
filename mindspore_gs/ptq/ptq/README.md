@@ -159,7 +159,8 @@ For activation per-token dynamic quantization, RoundToNearest quantization of we
     from mindspore import dtype as msdtype
     from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
+    ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
                            outliers_suppression=OutliersSuppressionType.SMOOTH)
     ```
 
@@ -178,7 +179,7 @@ For activation per-token dynamic quantization, RoundToNearest quantization of we
     from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
     ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-                           weight_quant_granularity=QuantGranularity.PER_TOKEN,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
                            outliers_suppression=OutliersSuppressionType.NONE)
     ```
 
