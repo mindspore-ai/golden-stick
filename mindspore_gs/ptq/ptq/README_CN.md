@@ -156,7 +156,8 @@ per-token动态量化算法是在推理过程中对激活/KVcache进行per-token
   from mindspore import dtype as msdtype
   from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
-  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8, weight_quant_granularity=QuantGranularity.PER_TOKEN,
+  ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
+                         act_quant_granularity=QuantGranularity.PER_TOKEN,
                          outliers_suppression=OutliersSuppressionType.SMOOTH)
   ```
 
@@ -175,7 +176,7 @@ per-token动态量化算法是在推理过程中对激活/KVcache进行per-token
   from mindspore_gs.ptq.ptq_config import PTQConfig, OutliersSuppressionType, QuantGranularity
 
   ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8, act_quant_dtype=msdtype.int8,
-                         weight_quant_granularity=QuantGranularity.PER_TOKEN,
+                         act_quant_granularity=QuantGranularity.PER_TOKEN,
                          outliers_suppression=OutliersSuppressionType.NONE)
   ```
 
