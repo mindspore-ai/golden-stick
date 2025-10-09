@@ -29,6 +29,7 @@ from .distributed_parameter import DistributedParameter
 
 class SafeTensorsMgr:
     """SafeTensorsMgr"""
+
     def __init__(self, file_limit_g=4):
         self._parameters = []
         self.file_limit_g = file_limit_g
@@ -48,10 +49,10 @@ class SafeTensorsMgr:
             self._tp_merge(dis_params_dict)
         if self.rank_id == 0:
             os.makedirs(save_path, exist_ok=True)
-            index_json, inv_index_json = self._index(dis_params_dict)
+            index_json, inv_index_json, total_bytes = self._index_and_size(dis_params_dict)
 
             SafeTensorsMgr._copy_original_json(original_path, save_path)
-            SafeTensorsMgr._save_sf_index_json(save_path, index_json)
+            SafeTensorsMgr._save_sf_index_json(save_path, index_json, total_bytes)
             SafeTensorsMgr._save_quant_desc_json(save_path, quant_desc_info)
             SafeTensorsMgr._save_safetensors(save_path, inv_index_json)
             logger.info(f'Save safetensors cost time is {time.time() - start} s.')
@@ -89,8 +90,8 @@ class SafeTensorsMgr:
     def _get_sf_file_name(cur_index, total_num_str):
         return f"quant-model-{SafeTensorsMgr._get_num_str(cur_index)}-of-{total_num_str}.safetensors"
 
-    def _index(self, dis_params_dict: dict[str, DistributedParameter]):
-        """_index"""
+    def _index_and_size(self, dis_params_dict: dict[str, DistributedParameter]):
+        """get index and size from dis_params_dict"""
         total_bytes = 0
         cur_bytes = 0
         cur_index = 1
@@ -117,7 +118,7 @@ class SafeTensorsMgr:
         new_inv_index_json = {}
         for index, cur_params in inv_index_json.items():
             new_inv_index_json[SafeTensorsMgr._get_sf_file_name(index, total_num_str)] = cur_params
-        return new_index_json, new_inv_index_json
+        return new_index_json, new_inv_index_json, total_bytes
 
     @staticmethod
     def _save_quant_desc_json(save_path, quant_desc):
@@ -129,12 +130,16 @@ class SafeTensorsMgr:
         logger.info(f'Quantization describle json file saved to {save_json_path}', flush=True)
 
     @staticmethod
-    def _save_sf_index_json(save_path, index_json):
+    def _save_sf_index_json(save_path, index_json, total_bytes):
         """_save_desc_json"""
         save_json_path = os.path.join(save_path, f"model.safetensors.index.json")
         os.makedirs(save_path, exist_ok=True)
+        index_data = {
+            "metadata": {"total_size": total_bytes},
+            "weight_map": index_json
+        }
         with open(save_json_path, "w", encoding="utf-8") as f:
-            json.dump(index_json, f, ensure_ascii=False, indent=4)
+            json.dump(index_data, f, ensure_ascii=False, indent=4)
         logger.info(f'SafeTensors index json file saved to {save_json_path}', flush=True)
 
     @staticmethod

@@ -645,7 +645,7 @@ class WeightProcessor:
         if not os.path.exists(index_json_path):
             raise RuntimeError(f"Not found index json file: 'model.safetensors.index.json'")
         with open(index_json_path, "r") as fp:
-            self._param_map = json.load(fp)
+            self._param_map = json.load(fp)['weight_map']
 
         config_json_path = os.path.join(src_hf_dir, 'config.json')
         if not os.path.exists(index_json_path):
