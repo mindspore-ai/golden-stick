@@ -397,7 +397,7 @@ def test_quant_deepseek():
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     calibrate_config_path = os.path.join(cur_dir, "calibrate_deepseek3_671b.yaml")
     q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant")
-    dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
+    dataset_path = os.path.join(cur_dir, '/home/workspace/mindspore_dataset/ceval/dev')
     tester = DeepSeekV3Tester()
     tester.quant_model(calibrate_config_path, q_ckpt_path,
                        dataset_path, fake_quant=False)
