@@ -142,7 +142,7 @@ if __name__ == "__main__":
     calibrate_config_path = os.path.join(cur_dir, "calibrate_qwen3.yaml")
     infer_config_path = os.path.join(cur_dir, "predict_qwen3.yaml")
     q_ckpt_path = os.path.join(cur_dir, f"qwen3-quant")
-    dataset_path = os.path.join(cur_dir, '/nfs/dataset/workspace/mindspore_dataset/ceval/dev')
+    dataset_path = os.path.join(cur_dir, '/home/workspace/mindspore_dataset/ceval/dev')
     tester = QWen3Tester()
     result = tester.dataset_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, dataset_path)
     tester.tear_down(q_ckpt_path, args.log_path)
