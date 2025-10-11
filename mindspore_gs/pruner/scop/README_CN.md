@@ -68,7 +68,7 @@ from copy import deepcopy
 net = resnet50(10)
 load_checkpoint(config.pre_trained, net=net)
 algo_kf = PrunerKfCompressAlgo({})
-net = algo_kf.apply(net) # Get konckoff stage network
+net = algo_kf.apply(net) # Get knockoff stage network
 
 lr = get_lr(lr_init=config.lr_init,
             lr_end=0.0,

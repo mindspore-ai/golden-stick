@@ -13,14 +13,14 @@ mindspore_gs.pruner.PrunerKfCompressAlgo
 
     .. py:method:: apply(network, **kwargs)
 
-        将网络变成Konckoff网络。
+        将网络变成Knockoff网络。
 
         参数：
             - **network** (Cell) - 原始待剪枝网络。
             - **kwargs** (Dict) - 用于子类的可扩展入参。
 
         返回：
-            返回变换后的Konckoff网络。
+            返回变换后的Knockoff网络。
         
         异常：
             - **TypeError** - `network` 不是Cell。

@@ -304,7 +304,7 @@ The running results are as follows:
 ------------------------- Checkpoint saved to ./output/w8a16_ckpt/rank_0/...
 ```
 
-After successfully running, the quantized checkpoint file is saved under the `. /output/w8a16_ckpt/rank_0/w8a16.ckpt` path.
+After successfully running, the quantized checkpoint file is saved under the `./output/w8a16_ckpt/rank_0/w8a16.ckpt` path.
 
 ### Step 3. Model Deployment
 

@@ -10,7 +10,7 @@ With the development of deep learning, neural networks are widely used in variou
 
 Take mobile phones as an example. To provide user-friendly and intelligent services, the AI function is integrated into operating systems and applications which introduce network files and weight files to mobile applications. For example, the original weight files of AlexNet have exceeded 200 MB, and the new networks are developing towards a more complex structure with more parameters.
 
-Due to limited hardware resources of a mobile or edge device, network need to be simplified and the quantization technology is used to solve this problem. Network quantization is a technology that converts floating-point computing into low-bit fixed-point computing. It can effectively reduce the network operational intensity, parameters, and memory consumption, but often causes some accuracy loss.
+Due to limited hardware resources of a mobile or edge device, the network needs to be simplified and the quantization technology is used to solve this problem. Network quantization is a technology that converts floating-point computing into low-bit fixed-point computing. It can effectively reduce the network operational intensity, parameters, and memory consumption, but often causes some accuracy loss.
 
 ## Quantization Method
 
@@ -28,7 +28,7 @@ Currently, there are two types of quantization solutions in the industry: **quan
 
 (2) **Post-training quantization** is easy to use. Only a small amount of calibration data is required. It is applicable to scenarios that require high usability and lack of training resources.
 
-This section mainly contains some **quantization aware training** algorithms, **post-training quantization** can refer to [post-training quantization chapter](../ptq/README.md)
+This section mainly contains some **quantization aware training** algorithms, and **post-training quantization** can refer to [post-training quantization chapter](../ptq/README.md).
 
 ## Examples
 

@@ -55,7 +55,7 @@ The procedure of quantization aware training is basically the same as that of co
 
 The following uses the LeNet5 as an example to describe these steps.
 
-> For the complete code, see the [LeNet model repository](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/README.md#apply-algorithm-in-mindspore-golden-stick).The [train.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/train.py) is the complete training code, and the [eval.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/eval.py) is the accuracy verification code.
+> For the complete code, see the [LeNet model repository](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/README.md#apply-algorithm-in-mindspore-golden-stick). The [train.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/train.py) is the complete training code, and the [eval.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/eval.py) is the accuracy verification code.
 
 ### Loading a Dataset
 
@@ -108,7 +108,7 @@ quanted_network = algo.apply(network)
 print(quanted_network)
 ```
 
-The quantized network structure is as follows. QuantizerWrapperCell is the encapsulation class of perceptual quantization training for the original Conv2d or Dense, including the original operator and pseudo-quantization nodes of input, output and weight.  Users can refer to [API](https://www.mindspore.cn/golden_stick/docs/en/master/quantization/mindspore_gs.quantization.SimulatedQuantizationAwareTraining.html#mindspore_gs.quantization.SimulatedQuantizationAwareTraining) to modify the algorithm configuration, and verify that the algorithm is configured successfully by checking the QuantizeWrapperCell properties.
+The quantized network structure is as follows. QuantizerWrapperCell is the encapsulation class of perceptual quantization training for the original Conv2d or Dense, including the original operator and pseudo-quantization nodes of input, output and weight. Users can refer to [API](https://www.mindspore.cn/golden_stick/docs/en/master/quantization/mindspore_gs.quantization.SimulatedQuantizationAwareTraining.html#mindspore_gs.quantization.SimulatedQuantizationAwareTraining) to modify the algorithm configuration, and verify that the algorithm is configured successfully by checking the QuantizeWrapperCell properties.
 
 ```text
 LeNet5Opt<

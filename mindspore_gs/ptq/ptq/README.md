@@ -20,7 +20,7 @@ AutoQuantForCausalLM inspects the pretrained model, selects the appropriate quan
 
 BaseQuantForCausalLM is an abstract interface that allows different front-ends (MindSpore Transformers, vLLM, SGLang, etc.) to plug in the same quantization algorithms; at present only MindSpore Transformers is fully supported, while native vLLM support is under active development.
 
-To maximize accuracy across diverse model architectures, BaseQuantForCausalLM accepts a PTQConfig that specifies quantization policies on a per-layer basis.Currently supported algorithms include OutlierSuppressionLite (OSL), SmoothQuant, A8W4, AWQ, GPTQ, KV-Cache-INT8, and RTN, any of which can be applied selectively to different layers.
+To maximize accuracy across diverse model architectures, BaseQuantForCausalLM accepts a PTQConfig that specifies quantization policies on a per-layer basis. Currently supported algorithms include OutlierSuppressionLite (OSL), SmoothQuant, A8W4, AWQ, GPTQ, KV-Cache-INT8, and RTN, any of which can be applied selectively to different layers.
 
 Finally, BaseQuantForCausalLM provides a save_quantized() method that exports the quantized weights directly in Hugging Face format for immediate deployment.
 
@@ -143,7 +143,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
 
 Currently, the Golden Stick supports only per-token dynamic quantization. The per-token quantization algorithm refers to the allocation of independent quantization parameters for each token to minimize errors. Dynamic quantization implies that the quantization parameters are computed in real time during the inference phase, without the need for offline calculation of quantization parameters.
 
-per-token dynamic quantization algorithm is to execute per-token online quantization of activation or KVcache in the process of inference, and calculate the scale and zp of token dimension online without using dataset for calibration quantization, which is more accurate than offline static quantization. Currently, per-token dynamic quantization supports only symmetric quantization.
+The per-token dynamic quantization algorithm is to execute per-token online quantization of activation or KVcache in the process of inference, and calculate the scale and zp of token dimension online without using dataset for calibration quantization, which is more accurate than offline static quantization. Currently, per-token dynamic quantization supports only symmetric quantization.
 
 **Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
 
@@ -215,7 +215,7 @@ $$KVCache_{int} = round(KVCache_{float} \div scale)$$
 
 #### AWQ Algorithm
 
-The [Research](https://arxiv.org/pdf/2306.00978) finds that weights are not equally important for LLMs' performance. There is a small fraction (0.1%-1%) of weights called salient weights which are significantly important to LLMs' performance. Skipping the quantization of these salient weights while quantization other weights to low bits can archive dramatically reducation of LLM inference memory footprint with low quantization accuracy loss.
+The [Research](https://arxiv.org/pdf/2306.00978) finds that weights are not equally important for LLMs' performance. There is a small fraction (0.1%-1%) of weights called salient weights which are significantly important to LLMs' performance. Skipping the quantization of these salient weights while quantization other weights to low bits can archive dramatically reduction of LLM inference memory footprint with low quantization accuracy loss.
 
 ![](images/en/awq.png)
 
@@ -235,7 +235,7 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=None,
                        outliers_suppression=OutliersSuppressionType.AWQ)
 ```
 
-or：
+or:
 
 ```python
 from mindspore import dtype as msdtype
@@ -416,7 +416,7 @@ After downloading, copy them to the workspace directory.
 
 **Step 4** Download Qwen3 network yaml file:
 
-Download address:：[predict_qwen3.yaml](https://gitee.com/mindspore/mindformers/blob/master/configs/qwen3/predict_qwen3.yaml)
+Download address: [predict_qwen3.yaml](https://gitee.com/mindspore/mindformers/blob/master/configs/qwen3/predict_qwen3.yaml)
 
 After downloading, copy yaml file to the workspace directory.
 

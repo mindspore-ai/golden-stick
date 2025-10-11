@@ -17,7 +17,7 @@ The following table lists the environment required for installing, compiling and
 
 ## Version Dependency
 
-The MindSpore Golden Stick depends on the MindSpore training and inference framework, please refer to the table below and [MindSpore Installation Guide](https://mindspore.cn/install) to install the corresponding MindSpore verision:
+The MindSpore Golden Stick depends on the MindSpore training and inference framework, please refer to the table below and [MindSpore Installation Guide](https://mindspore.cn/install) to install the corresponding MindSpore version:
 
 | MindSpore Golden Stick Version |                         Branch                               | MindSpore Version |
 | :---------------------: | :-----------------------------------------------------------------: | :-------: |
@@ -39,7 +39,7 @@ After MindSpore is installed, you can use pip or source code build for MindSpore
 
 If you use the pip command, please download the whl package from [MindSpore Golden Stick Releases](https://gitee.com/mindspore/golden-stick/releases) page and install it.
 
-> - Installing whl package will download MindSpore Golden Stick dependencies automatically (detail of dependencies is shown in requirement.txt),  other dependencies should install manually.
+> - Installing whl package will download MindSpore Golden Stick dependencies automatically (detail of dependencies is shown in requirement.txt), other dependencies should install manually.
 
 ## Installing from Source Code
 
@@ -54,7 +54,7 @@ pip install output/mindspore_gs-{mg_version}-py3-none-any.whl
 
 ## Verification
 
-If you can successfully execute following command, then the installation is completed.
+If you can successfully execute the following command, then the installation is completed.
 
 ```python
 import mindspore_gs

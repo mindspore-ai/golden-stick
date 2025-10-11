@@ -16,10 +16,10 @@ mindspore_gs.pruner.PrunerFtCompressAlgo
 
     .. py:method:: apply(network, **kwargs)
 
-        将Konckoff网络变为剪枝后的网络。
+        将Knockoff网络变为剪枝后的网络。
 
         参数：
-            - **network** (Cell) - Konckoff网络。
+            - **network** (Cell) - Knockoff网络。
             - **kwargs** (Dict) - 用于子类的可扩展入参。
 
         返回：
