@@ -46,7 +46,7 @@ Then, ResNet-50 is used as an example to describe steps related to SCOP training
 
 ### Knockoff Data
 
-Initialize the ResNet-50, load the pre-trained model, replace nodes using PrunerKfCompressAlgo to obtain the network in the knockoff phase (For details, users can refer to [API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)), and train the network.（Note: dataset_sink_mode in Knockoff Data phase must be set to False, because SCOP will modify dataset in Knockoff Data phase）
+Initialize the ResNet-50, load the pre-trained model, replace nodes using PrunerKfCompressAlgo to obtain the network in the knockoff phase (For details, users can refer to [API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)), and train the network. (Note: dataset_sink_mode in Knockoff Data phase must be set to False, because SCOP will modify dataset in Knockoff Data phase)
 
 ```python
 from mindspore import ModelCheckpoint, CheckpointConfig, LossMonitor, TimeMonitor
@@ -58,7 +58,7 @@ from copy import deepcopy
 net = resnet50(10)
 load_checkpoint(config.pre_trained, net=net)
 algo_kf = PrunerKfCompressAlgo({})
-net = algo_kf.apply(net) # Get konckoff stage network
+net = algo_kf.apply(net) # Get knockoff stage network
 
 lr = get_lr(lr_init=config.lr_init,
             lr_end=0.0,

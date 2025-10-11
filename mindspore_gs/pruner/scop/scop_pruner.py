@@ -277,7 +277,7 @@ class PrunerKfCompressAlgo(CompAlgo):
         >>> net = NetToPrune()
         >>> ## 2) Define Knockoff Algorithm
         >>> kf_pruning = PrunerKfCompressAlgo({})
-        >>> ## 3) Apply Konckoff-algorithm to origin network
+        >>> ## 3) Apply Knockoff-algorithm to origin network
         >>> net_pruning = kf_pruning.apply(net)
         >>> ## 4) Print network and check the result. Conv2d and bn should be transformed to KfConv2d.
         >>> print(net_pruning)
