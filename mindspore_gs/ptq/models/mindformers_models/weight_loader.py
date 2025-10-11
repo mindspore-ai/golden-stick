@@ -143,7 +143,7 @@ class WeightProcessor:
         self._get_split_set(mlpnorm_key, -1)
         router_bias = f"model.decoder.layers.{layer_id}.mlp.router.expert_bias"
         self._get_split_set(router_bias, -1)
-        router_weight = f"model.decoder.layers.{layer_id}.mlp.router.weight.weight"
+        router_weight = f"model.decoder.layers.{layer_id}.mlp.router.weight"
         self._get_split_set(router_weight, -1)
 
     def _split_mlp_weight(self, layer_id):

@@ -143,7 +143,7 @@ class QWen3MoETester(PTQModelTester):
         return True
 
     def get_golden(self) -> tuple[str, str]:
-        return "介绍北京故宫", "介绍北京故宫(passport(passport(passport…the,…,"
+        return "介绍北京故宫", "介绍北京故宫(passport(passport(passport(passport…the,"
 
 
 if __name__ == "__main__":
