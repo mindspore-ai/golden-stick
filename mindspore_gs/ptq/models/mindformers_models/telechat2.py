@@ -70,6 +70,36 @@ class Telechat2(MFModelEnableSafeTensors):
         quant_types = QKVParamProcessor(self.network).split_name(quant_types)
         # Apply FFN parameter name splitting to match quantization types
         quant_types = FFNParamProcessor(self.network).split_name(quant_types)
+
+        hf_quant_types = {}
+        for key, value in quant_types.items():
+            hf_quant_types[self._convert_param_names_to_hf(key)] = value
+
         param_dict = self.parameters_dict()
-        desc_info = dict((key, quant_types.get(key, QuantType.FLOAT.value)) for key in param_dict)
+        desc_info = dict((key, hf_quant_types.get(key, QuantType.FLOAT.value)) for key in param_dict)
         return desc_info
+
+    @classmethod
+    def _convert_param_names_to_hf(cls, param_name):
+        """Convert mcore name to huggingface name.
+        One parameter may correspond to multiple parameters in huggingface,
+        so return a list of names."""
+        rules = {
+            "model.": "",
+            "decoder.layers": "transformer.h",
+            "embedding.word_embeddings.": "transformer.word_embeddings.",
+            ".pre_mlp_layernorm.": ".post_attention_layernorm.",
+            ".linear_q.": ".query.",
+            ".linear_k.": ".key.",
+            ".linear_v.": ".value.",
+            ".linear_proj.": ".dense.",
+            ".gating.": ".gate_proj.",
+            ".hidden.": ".up_proj.",
+            ".linear_fc2.": ".down_proj.",
+            "output_layer": "transformer.ln_f"
+        }
+
+        for old, new in rules.items():
+            param_name = param_name.replace(old, new)
+
+        return param_name
