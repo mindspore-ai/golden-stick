@@ -1,7 +1,7 @@
 name: 📚 Documentation
 description: Report an issue related to https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html
-title: "[Doc]: "
-labels: ["documentation"]
+title: "[Doc] "
+labels: ["documentation", "未立项任务"]
 
 body:
 - type: textarea
