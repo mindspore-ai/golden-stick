@@ -32,6 +32,12 @@ NetworkHelper
     :template: classtemplate.rst
 
     mindspore_gs.ptq.NetworkHelper
+
+.. autosummary::
+    :toctree: ptq/network_helpers
+    :nosignatures:
+    :template: classtemplate.rst
+
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
