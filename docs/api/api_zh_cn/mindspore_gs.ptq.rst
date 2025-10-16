@@ -32,6 +32,12 @@ PTQ 配置
     :template: classtemplate.rst
 
     mindspore_gs.ptq.NetworkHelper
+
+.. mscnautosummary::
+    :toctree: ptq/network_helpers
+    :nosignatures:
+    :template: classtemplate.rst
+
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFLlama2Helper
     mindspore_gs.ptq.network_helpers.mf_net_helpers.MFParallelLlama2Helper
 
