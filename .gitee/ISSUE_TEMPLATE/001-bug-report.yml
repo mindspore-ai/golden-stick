@@ -19,7 +19,6 @@ body:
       description: |
         请提供关于错误是什么的清晰而简洁的描述。
 
-
         请添加一个最简洁的示例，以便我们通过运行代码重现错误。代码片段尽可能简洁（最小化）非常重要，因此请花时间精简任何不相关的代码，以帮助我们高效调试。您的示例应完全独立，并且不依赖于任何需要下载的构件。**否则，该问题将被关闭** 
 
         请粘贴或描述您观察到的结果，如果您发现错误，请粘贴错误消息，包括异常的**完整**栈信息，将错误信息包含在```` ```triple quotes blocks``` ````内.
@@ -38,7 +37,22 @@ body:
   - type: textarea
     attributes:
       label: 详细的环境信息描述
-      description: 请提供必要的全部环境信息，包括所有的软件、硬件、驱动等信息. **否则，该问题将被关闭** 
+      description: |
+        请提供必要的全部环境信息，包括所有的软件、硬件、驱动等信息，以及问题定位所需的推理服务启动命令、环境变量等. **否则，该问题将被关闭**
+
+        查看CANN版本信息：cat /usr/local/Ascend/ascend-toolkit/latest/version.cfg
+
+        查看硬件及驱动信息：npu-smi info
+
+        查看MindOne commitId：cat /usr/local/Python-3.11/lib/python3.11/site-packages/mindone/version.py
+        
+        查看MindSpore commitId：cat /usr/local/Python-3.11/lib/python3.11/site-packages/mindspore/.commit_id
+        
+        查看Mindformers commitId：cat /usr/local/Python-3.11/lib/python3.11/site-packages/mindformers/.commit_id
+        
+        查看MindSpore Golden Stick commitId：cat /usr/local/Python-3.11/lib/python3.11/site-packages/mindspore_gs/.commit_id
+        
+        请提供运行的模型、部署的设备数及卡数；推理服务启动命令、相关的环境变量等
       placeholder: "包括但不限于该问题出现所依赖的软件及版本、硬件、驱动等信息，尽可能的详细."
     validations:
       required: true
