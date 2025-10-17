@@ -43,7 +43,7 @@ BaseQuantForCausalLM是一个接口类，方便算法支持不同来源的网络
 - KVCache量化支持静态per-channel量化和动态per-token量化。
 - 受限于硬件和算子支持，对于全量化，激活当前不支持per-channel的量化，权重不支持带zero point的量化。
 - 硬件支持带zero point的权重量化，但当前PTQ算法没有开放这方面能力，仅支持不带zero point的权重量化。
-- 由于MindSpore底层量化算子限制，当前金箍棒PTQ量化算法仅对MindSpore Transformers的一些Layer做了支持，其中[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/layers.py)和[MindFormers的moe层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/grouped_layers.py)支持激活和权重量化，[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/dev/mindformers/modules/paged_attention_mgr.py#L26)支持KVCache量化。如果用户需要量化其他框架的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。
+- 由于MindSpore底层量化算子限制，当前金箍棒PTQ量化算法仅对MindSpore Transformers的一些Layer做了支持，其中[MindFormers的Linear层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/layers.py)和[MindFormers的moe层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/grouped_layers.py)支持激活和权重量化，[MindFormers的PageAttention层](https://gitee.com/mindspore/mindformers/blob/master/mindformers/modules/paged_attention_mgr.py#L26)支持KVCache量化。如果用户需要量化其他框架的网络，需要用户提供相关量化算子实现，当前这方面自定义能力没有形成明确的接口，会在未来提供。
 
 金箍棒当前已支持算法如下：
 

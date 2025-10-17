@@ -17,7 +17,7 @@ Table 1: RTN algorithm specifications
 | Specifications | Specification Descriptions |
 | --- | --- |
 | Hardware support | The quantization phase runs on the CPU, and quantization model inference is only supported in Ascend |
-| Network support | Llama2 13B/70B. For details, refer to [Llama2 network](https://gitee.com/mindspore/mindformers/tree/dev/mindformers/models/llama) |
+| Network support | Llama2 13B/70B. For details, refer to [Llama2 network](https://gitee.com/mindspore/mindformers/tree/master/mindformers/models/llama) |
 | Running mode support | Graph mode and PyNative mode |
 
 Table 2: Before and after quantization of the network using RTN algorithm
