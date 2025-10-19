@@ -4,6 +4,6 @@ description: Create a new issue from scratch.
 body:
   - type: textarea
     attributes:
-      label: =============================================================
+      label: Add a description
     validations:
       required: true
