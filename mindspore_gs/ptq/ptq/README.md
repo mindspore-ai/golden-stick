@@ -333,42 +333,42 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
 
 2. Layer-wise combination Quantization – A8W4
 
-Golden Stick also lets you assign a different quantization policy to each layer, A8W4 is one such composite recipe.
+    Golden Stick also lets you assign a different quantization policy to each layer, A8W4 is one such composite recipe.
 
-**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
+    **Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
 
-Taking the DeepSeek-V3/R1 network as an example, attention blocks are quantized with OSL, dense feed-forward blocks use dynamic A8W8, moe blocks use dynamic A8W4.
+    Taking the DeepSeek-V3/R1 network as an example, attention blocks are quantized with OSL, dense feed-forward blocks use dynamic A8W8, moe blocks use dynamic A8W4.
 
-Because of current operator constraints, only moe layers can be quantized with A8W4. The moe structure is defined here[moe block](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/transformer/moe/moe_layer.py#L100).
+    Because of current operator constraints, only moe layers can be quantized with A8W4. The moe structure is defined here[moe block](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/transformer/moe/moe_layer.py#L100).
 
-Inside an moe block, activations are quantized with dynamic 8-bit per-token, while weights are compressed to 4-bit via per-group GPTQ.
+    Inside an moe block, activations are quantized with dynamic 8-bit per-token, while weights are compressed to 4-bit via per-group GPTQ.
 
-On DeepSeek-R1 this recipe yields 70% weight-size reduction, fits the model on a single server, and keeps accuracy drop within 1% on the evaluation set.
+    On DeepSeek-R1 this recipe yields 70% weight-size reduction, fits the model on a single server, and keeps accuracy drop within 1% on the evaluation set.
 
-The corresponding PTQConfig snippet is shown below.
+    The corresponding PTQConfig snippet is shown below.
 
-```python
-from mindspore import dtype as msdtype
-from mindspore_gs.ptq import (PTQConfig, PTQMode, BackendTarget,
-                              QuantGranularity, PrecisionRecovery,
-                              GPTQQuantConfig)
+    ```python
+    from mindspore import dtype as msdtype
+    from mindspore_gs.ptq import (PTQConfig, PTQMode, BackendTarget,
+                                  QuantGranularity, PrecisionRecovery,
+                                  GPTQQuantConfig)
 
-gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
-ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
-                            weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
-                            weight_quant_granularity=QuantGranularity.PER_GROUP,
-                            group_size=64, algo_args=gptq_config,
-                            act_quant_granularity=QuantGranularity.PER_TOKEN,
-                            precision_recovery=PrecisionRecovery.GPTQ)
-```
+    gptq_config = GPTQQuantConfig(static_groups=True, desc_act=True)
+    ptq_config = PTQConfig(mode=PTQMode.QUANTIZE, backend=BackendTarget.ASCEND,
+                           weight_quant_dtype=msdtype.qint4x2, act_quant_dtype=msdtype.int8,
+                           weight_quant_granularity=QuantGranularity.PER_GROUP,
+                           group_size=64, algo_args=gptq_config,
+                           act_quant_granularity=QuantGranularity.PER_TOKEN,
+                           precision_recovery=PrecisionRecovery.GPTQ)
+    ```
 
-Note:
+    Note:
 
-1) The priority of parameter configurations in layer_policies is higher than that of net_policy. If a layer matches the layer_policies configuration, this policy is used preferentially. Otherwise, use the net_policy policy.
+    1) The priority of parameter configurations in layer_policies is higher than that of net_policy. If a layer matches the layer_policies configuration, this policy is used preferentially. Otherwise, use the net_policy policy.
 
-2) The mode and backend parameters in PTQConfig are subject to net_policy.
+    2) The mode and backend parameters in PTQConfig are subject to net_policy.
 
-3) At present, the configuration policy can only be set manually based on heuristics; automatic generation is on the roadmap.
+    3) At present, the configuration policy can only be set manually based on heuristics; automatic generation is on the roadmap.
 
 ## Samples
 
@@ -463,16 +463,19 @@ model = AutoQuantForCausalLM.from_pretrained(config_path)
 We can use the CEval dataset to calibrate model, in practice only a few hundred samples are needed. In this example we load 200 samples by setting n_samples=200:
 
 ```python
+from mindformers import MindFormerConfig
 from mindspore_gs.datasets import get_datasets
+from transformers import AutoTokenizer
 
-ds_path = '/path/to/workspace/squad/train-v1.1.json'
-bs_ = helper.get_spec('batch_size')
-seq_ = helper.get_spec('seq_length')
-max_decode_length = helper.get_spec('max_decode_length')
-ignore_token_id = helper.get_spec('ignore_token_id')
-tokenizer = helper.create_tokenizer()
-ds = get_datasets('squad1.1', ds_path, "train", bs_, seq_, max_decode_length, tokenizer, ignore_token_id, 1,
-                  False, n_samples=200)
+config_path = '/path/to/workspace/predict_qwen3.yaml'
+mfconfig = MindFormerConfig(config_path)
+tokenizer = AutoTokenizer.from_pretrained(mfconfig.pretrained_model_dir, trust_remote_code=True)
+
+seq = 2048
+max_decode_length = 1024
+ignore_token_id = tokenizer.pad_token_id
+ds_path = "/path/to/ceval/dev"
+datasets = get_datasets("ceval", ds_path, 'train', 1, seq, max_decode_length, tokenizer, ignore_token_id, 1, False, n_samples=200)
 ```
 
 2.3. Create the Calibration Strategy and Run Model Calibration
