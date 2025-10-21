@@ -1,5 +1,5 @@
 name: ⚡Report a security vulnerability
-labels: ["security", "未立项任务"]
+labels: ["security"]
 body:
   - type: textarea
     attributes:
