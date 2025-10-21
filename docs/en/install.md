@@ -21,6 +21,7 @@ The MindSpore Golden Stick depends on the MindSpore training and inference frame
 
 | MindSpore Golden Stick Version |                         Branch                               | MindSpore Version |
 | :---------------------: | :-----------------------------------------------------------------: | :-------: |
+|          1.3.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1   |
 |          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0   |
 |          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0   |
 |          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0   |
