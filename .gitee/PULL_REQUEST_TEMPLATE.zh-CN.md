@@ -12,13 +12,16 @@
 - /kind task
 - /kind feature
 - /kind refactor
+- /kind clean_code
 如PR描述不符合规范，修改PR描述后需要/check-pr重新检查PR规范。
 -->
 /kind <label>
 
+---
 
 **What does this PR do / why do we need it**:
-* Need to describe clearly
+
+---
 
 **Which issue(s) this PR fixes**:
 <!-- 
@@ -27,10 +30,13 @@
 -->
 Fixes #
 
-**What scenarios were tested, and what were the verification results（Function, performance, reliability, etc.）**：
-* Need to describe clearly
+---
 
-**Self-checklist**:（**请认真自检，在[ ]内打上x，我们将检视你的完成情况**）
+**Test Plan and Test result：What scenarios were tested, and what were the verification results（Function, performance, reliability, etc.）**：
+
+---
+
+**Self-checklist**:（**请自检，在[ ]内打上x，我们将检视你的完成情况，否则会导致pr无法合入**）
 
 + - [ ] **设计**：PR对应的方案是否已经经过Maintainer评审，方案检视意见是否均已答复并完成方案修改
 + - [ ] **测试**：PR中的代码是否已有UT/ST测试用例进行充分的覆盖，新增测试用例是否随本PR一并上库或已经上库

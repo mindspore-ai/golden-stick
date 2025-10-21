@@ -1,6 +1,6 @@
 name: 💬 Request for comments (RFC).
 description: Ask for feedback on major architectural changes or design choices.
-title: "[RFC]: "
+title: "[RFC] "
 labels: ["RFC"]
 
 body:
