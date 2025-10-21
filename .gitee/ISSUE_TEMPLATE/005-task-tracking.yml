@@ -1,7 +1,7 @@
 name: 🧭 Task Tracking
 description: Task tracking derived from Feature/RFC
 title: "[Task] "
-labels: ["task", "未立项任务"]
+labels: ["task"]
 body:
   - type: input
     attributes:
