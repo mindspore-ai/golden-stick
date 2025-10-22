@@ -1,133 +1,116 @@
+<div align="center">
+
 # MindSpore Golden Stick
 
-[查看中文](./README_CN.md)
+#### MindSpore Golden Stick is a model compression tool for the MindSpore open source community, supporting quantization of Hugging Face weights on Ascend hardware and deployment on [vllm-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers).
 
-## Overview
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://gitee.com/mindspore/golden-stick)
+[![version](https://img.shields.io/badge/release-1.3.0-green)](https://gitee.com/mindspore/golden-stick/releases)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
 
-MindSpore Golden Stick is a model compression algorithm set jointly designed and developed by Huawei's Noah team and Huawei's MindSpore team. The architecture diagram of MindSpore Golden Stick is shown in the figure below, which is divided into five parts:
+[**Architecture**](docs/en/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Workflow**](docs/en/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Documentation**](https://www.mindspore.cn/golden_stick/docs/en/master/index.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Issue Feedback**](https://gitee.com/mindspore/golden-stick/issues)
 
-1. The underlying MindSpore Rewrite module provides the ability to modify the front-end network. Based on the interface provided by this module, algorithm developers can add, delete, query and modify the nodes and topology relationships of the MindSpore front-end network according to specific rules;
+[English](README.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[中文](README_CN.md)
 
-2. Based on MindSpore Rewrite, MindSpore Golden Stick will provide various types of algorithms, such as SimQAT algorithm, SLB quantization algorithm, SCOP pruning algorithm, etc.;
+<div align="left">
 
-3. At the upper level of the algorithm, MindSpore Golden Stick also plans advanced technologies such as AMC (AutoML for Model Compression), NAS (Neural Architecture Search), and HAQ (Hardware-aware Automated Quantization). This feature will be provided in future;
+MindSpore Golden Stick is a model compression tool jointly designed and developed by MindSpore team and Huawei Noah's Ark Lab. We have two main goals: on one hand, we aim to build model compression capabilities for the MindSpore open source ecosystem and provide simple and easy-to-use interfaces to help users improve the deployment efficiency of MindSpore networks; on the other hand, we aim to shield the complexity of frameworks and hardware, providing good extensibility and foundational capabilities for model compression algorithms.
 
-4. In order to facilitate developers to analyze and debug algorithms, MindSpore Golden Stick provides some tools, such as visualization tool, profiler tool, summary tool, etc. This feature will be provided in future;
+- **SoTA Algorithms:** The model compression algorithms in Golden Stick mainly come from two sources: one is the state-of-the-art algorithms from the industry, which we continuously follow up on in the MindSpore ecosystem; the other is innovative algorithms provided by Huawei's algorithm teams.
+- **Easy-to-use Interface:** Golden Stick provides Transformers-like interfaces and supports direct compression of Hugging Face community weights, with output weights that also conform to the Hugging Face community weight format.
+- **Layered Decoupling:** Golden Stick is committed to building an easy-to-use algorithm research platform. We have designed the framework with layered and modular architecture, which on one hand shields the complexity of frameworks and hardware, and on the other hand facilitates algorithm engineers to quickly innovate and experiment at different levels of algorithms.
 
-5. In the outermost layer, MindSpore Golden Stick encapsulates a set of concise user interface.
+## What's New🔥
 
-![MindSpore_GS_Architecture](docs/en/images/golden-stick-arch.png)
+* [2025/09] OutlierSuppressionLite provides higher precision A8W8 quantization capabilities.
+* [2025/09] Combined OutlierSuppressionLite and GPTQ algorithms to achieve A8W4 quantization for DeepSeekV3/R1 networks, further lowering the deployment threshold for full-featured DeepSeek. Quantized weights can be found at [Modelers](https://modelers.cn/models/MindSpore-Lab/R1-0528-A8W4).
+* [2025/09] Support for [Transformers-Like-API](https://www.mindspore.cn/golden_stick/docs/en/master/ptq/mindspore_gs.ptq.AutoQuantForCausalLM.html#mindspore_gs.ptq.AutoQuantForCausalLM) and support for saving weights in Hugging Face format, see [BaseQuantForCausalLM](https://www.mindspore.cn/golden_stick/docs/en/master/ptq/mindspore_gs.ptq.BaseQuantForCausalLM.html#mindspore_gs.ptq.BaseQuantForCausalLM.save_quantized) interface for details.
+* [2025/06] Support for SmoothQuant-8bit and GPTQ-4bit quantization of DeepSeekV3/R1 networks.
 
-> The architecture diagram is the overall picture of MindSpore Golden Stick, which includes the features that have been implemented in the current version and the capabilities planned in RoadMap. Please refer to release notes for available features in current version.
+## Installation
 
-## Design Features
+Please refer to [Installation Tutorials](docs/en/install.md).
 
-In addition to providing rich model compression algorithms, an important design concept of MindSpore Golden Stick is try to provide users with the most unified and concise experience for a wide variety of model compression algorithms in the industry, and reduce the cost of algorithm application for users. MindSpore Golden Stick implements this philosophy through two initiatives:
-
-1. Unified algorithm interface design to reduce user application costs:
-
-   There are many types of model compression algorithms, such as quantization-aware training algorithms, pruning algorithms, matrix decomposition algorithms, knowledge distillation algorithms, etc. In each type of compression algorithm, there are also various specific algorithms, such as LSQ and PACT, which are both quantization-aware training algorithms. Different algorithms are often applied in different ways, which increases the learning cost for users to apply algorithms. MindSpore Golden Stick sorts out and abstracts the algorithm application process, and provides a set of unified algorithm application interfaces to minimize the learning cost of algorithm application. At the same time, this also facilitates the exploration of advanced technologies such as AMC, NAS and HAQ based on the algorithm ecology.
-
-2. Provide front-end network modification capabilities to reduce algorithm development costs：
-
-   Model compression algorithms are often designed or optimized for specific network structures. For example, perceptual quantization algorithms often insert fake-quantization nodes on the Conv2d, Conv2d + BatchNorm2d, or Conv2d + BatchNorm2d + Relu structures in the network. MindSpore Golden Stick provides the ability to modify the front-end network through API. Based on this ability, algorithm developers can formulate general network transform rules to implement the algorithm logic without needing to implement the algorithm logic for each specific network. In addition, MindSpore Golden Stick also provides some debugging capabilities, including visualization tool, profiler tool, summary tool, aiming to help algorithm developers improve development and research efficiency, and help users find algorithms that meet their needs.
-
-## General Process of Applying the MindSpore Golden Stick
-
-![workflow](docs/en/images/workflow.png)
-
-1. Compress Phase
-
-    Taking the quantization algorithm as an example, the compression phase mainly includes transforming the network into a fake-quantized network, quantization retraining or calibration, quantizing parameter statistics, quantizing weights, and transforming the network into a real quantized network.
-
-2. Deplyment Phase
-
-    The deployment phase is the process of inferring the compressed network in the deployment environment. Since MindSpore does not support serialization of the front-end network, the deployment also needs to call the corresponding algorithm interface to transform the network to load the compressed checkpoint file. The flow after loading the compressed checkpoint file is the same as the normal inference process.
-
-> - For details about how to apply the MindSpore Golden Stick, see the detailed description and sample code in each algorithm section.
-> - For details about the "ms.export" step in the process, see [Exporting MINDIR Model](https://www.mindspore.cn/tutorials/en/master/beginner/save_load.html#saving-and-loading-mindir).
-> - For details about the "MindSpore infer" step in the process, see [MindSpore Inference Runtime](https://www.mindspore.cn/tutorials/en/master/model_infer/ms_infer/ms_infer_model_infer.html).
-
-## Documents
-
-### Installation
-
-Please refer to [MindSpore Golden Stick Installation](docs/en/install.md).
-
-### Quick Start
+## Quick Start
 
 Take [Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quantization/README.md) as an example for demonstrating how to use MindSpore Golden Stick.
 
-### Compression Algorithm
+## Documentation
 
-<table text-align="center" width="95%">
+<table text-align="center" width="100%">
   <thead>
   <tr>
-    <th colspan="8"><div align="center">Overview</div></th>
+    <th colspan="60"><div align="center">Overview</div></th>
   </tr>
   </thead>
   <tbody>
     <tr>
-      <td colspan="2" align="center"><div>Architecture</div></td>
-      <td colspan="2" align="center"><div>Workflow</div></td>
-      <td colspan="2" align="center"><a href="https://www.mindspore.cn/golden_stick/docs/en/master">APIs</a></td>
-      <td colspan="2" align="center"><a href="example/">examples</a></td>
+      <td colspan="20" align="center"><div>Architecture</div></td>
+      <td colspan="20" align="center"><div>Workflow</div></td>
+      <td colspan="20" align="center"><a href="example/">Examples</a></td>
     </tr>
-  </tbody>
+    <tr>
+      <td colspan="30" align="center"><a href="https://www.mindspore.cn/golden_stick/docs/en/master/ptq/mindspore_gs.ptq.AutoQuantForCausalLM.html#mindspore_gs.ptq.AutoQuantForCausalLM">Transformers like APIs🔥</a></td>
+      <td colspan="30" align="center"><a href="https://www.mindspore.cn/golden_stick/docs/en/master/mindspore_gs.ptq.html">APIs</a></td>
+    </tr>
   <thead>
     <tr>
-      <th colspan="8"><div align="center">AutoCompress(TBD)</div></th>
-    </tr>
-  </thead>
-  <thead>
-    <tr>
-      <th colspan="8"><a href="mindspore_gs/ptq/README.md"><div align="center">Post-Training Quantization</div></a></th>
+      <th colspan="60"><a href="mindspore_gs/ptq/README.md"><div align="center">Post-Training Quantization</div></a></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td colspan="4" align="center"><a href="mindspore_gs/ptq/ptq/README.md">PTQ</a></td>
-      <td colspan="4" align="center"><a href="mindspore_gs/ptq/round_to_nearest/README.md">RoundToNearest</a></td>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">RoundToNearest-A16W8</a></td>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">SmoothQuant-A8W8</a></td>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">AWQ-A16W4</a></td>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">GPTQ-A16W4</a></td>
+    <tr>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">QoQ-A8W4🔥</a></td>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">FAQuant(demo)</a></td>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">Dynamic Quantization</a></td>
+      <td colspan="15" align="center"><a href="mindspore_gs/ptq/ptq/README.md">KVCacheInt8(demo)</a></td>
+    </tr>
+    <tr>
+      <td colspan="30" align="center"><a href="mindspore_gs/ptq/ptq/README.md">OutlierSuppressionLite🔥</a></td>
+      <td colspan="30" align="center"><a href="mindspore_gs/ptq/ptq/README.md">OutlierSuppressionPlus(demo)</a></td>
     </tr>
   </tbody>
   <thead>
     <tr>
-      <th colspan="8"><a href="mindspore_gs/quantization/README.md"><div align="center">Quant-Aware Quantization</div></a></th>
+      <th colspan="60"><div align="center">Others</div></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td colspan="4" align="center"><a href="mindspore_gs/quantization/simulated_quantization/README.md">SimQAT</a></td>
-      <td colspan="4" align="center"><a href="mindspore_gs/quantization/slb/README.md">SLB</a></td>
+      <td colspan="20" align="center">Auto Quantization Strategy</td>
+      <td colspan="20" align="center">Fake Quant Evaluation</td>
+      <td colspan="20" align="center">Ascend Hardware Adapter layer</td>
     </tr>
   </tbody>
   <thead>
     <tr>
-      <th colspan="8"><a href="mindspore_gs/pruner/README.md"><div align="center">Pruner</div></a></th>
+      <th colspan="60"><div align="center">End Of Life</div></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td colspan="2" align="center"><a href="mindspore_gs/pruner/scop/README.md">SCOP</a></td>
-      <td colspan="3" align="center"><a href="mindspore_gs/pruner/uni_pruning/README.md">uni_pruning(demo)</a></td>
-      <td colspan="3" align="center"><a href="mindspore_gs/pruner/heads/lrp/README.md">LRP(demo)</a></td>
+      <td colspan="30" align="center"><a href="mindspore_gs/quantization/simulated_quantization/README.md">QAT-SimQAT</a></td>
+      <td colspan="30" align="center"><a href="mindspore_gs/quantization/slb/README.md">QAT-SLB</a></td>
+    <tr>
+    </tr>
+      <td colspan="20" align="center"><a href="mindspore_gs/pruner/scop/README.md">pruner-SCOP</a></td>
+      <td colspan="20" align="center"><a href="mindspore_gs/pruner/uni_pruning/README.md">pruner-uni_pruning(demo)</a></td>
+      <td colspan="20" align="center"><a href="mindspore_gs/pruner/heads/lrp/README.md">pruner-LRP(demo)</a></td>
+    <tr>
+    </tr>
+      <td colspan="60" align="center"><a href="mindspore_gs/ghost/README.md">Ghost</a></td>
     </tr>
   </tbody>
-  <thead>
-    <tr>
-      <th colspan="8"><div align="center">Others</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td colspan="8" align="center"><a href="mindspore_gs/ghost/README.md">Ghost</a></td>
-    </tr>
-  </tbody>  
 </table>
 
 ### Model Deployment
 
-Please refer to [MindSpore Golden Stick Model Deployment](docs/en/deployment/overview.md)。
+The model compression results from Golden Stick are weights in Hugging Face format. It is recommended to deploy them on [vllm-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers). You can also try deploying them on mainstream frameworks such as PyTorch, ONNX Runtime, TensorRT, etc.
 
 ## Community
 
@@ -137,11 +120,17 @@ Please refer to [MindSpore Golden Stick Model Deployment](docs/en/deployment/ove
 
 ### Communication
 
-- [MindSpore Slack](https://join.slack.com/t/mindspore/shared_invite/zt-dgk65rli-3ex4xvS4wHX7UDmsQmfu8w) developer communication platform
+🎯Video Conference：https://meeting.tencent.com/dm/U5EJCKl1FP8z
 
-## Contributions
+📬SIG：https://www.mindspore.cn/sig/LLM%20Inference%20Serving
 
-Welcome to MindSpore contribution.
+📍WeChat Group：https://gitee.com/mindspore/golden-stick/issues/ID2UGQ
+
+## Contributing
+
+Please read [CONTRIBUTING](./CONTRIBUTING.md) for details on setting up development environments, testing functions, and submitting PR.
+
+We welcome and value any form of contribution and cooperation. Please use [Issue](https://gitee.com/mindspore/golden-stick/issues) to inform us of any bugs you encounter, or to submit your feature requests, improvement suggestions, and technical solutions.
 
 ## License
 

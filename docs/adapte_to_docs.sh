@@ -24,6 +24,30 @@ version=$1
 
 CUR_DIR=$(cd "$(dirname $0)"; pwd)
 
+# README.md
+sed -i '/^<div align="center">/d' ${CUR_DIR}/../README_CN.md
+sed -i '/\[\!\[python\]/d' ${CUR_DIR}/../README_CN.md
+sed -i '/\[\!\[version\]/d' ${CUR_DIR}/../README_CN.md
+sed -i '/\[\!\[license\]/d' ${CUR_DIR}/../README_CN.md
+sed -i '/^\[\*\*架构\*\*\](docs\/zh_cn\/design\.md)/d' ${CUR_DIR}/../README_CN.md
+sed -i 's/^\[English\](README\.md).*/[View English](\.\/README\.md)/' ${CUR_DIR}/../README_CN.md
+sed -i '/^<div align="left">/d' ${CUR_DIR}/../README_CN.md
+sed -i '1,/^[^[:space:]]*$/{ /^[[:space:]]*$/d; }' ${CUR_DIR}/../README_CN.md
+awk 'BEGIN{blank=0} /^[[:space:]]*$/ {blank++; if(blank==1) print; next} {blank=0; print}' ${CUR_DIR}/../README_CN.md > ${CUR_DIR}/../README_CN_temp.md 
+mv ${CUR_DIR}/../README_CN_temp.md ${CUR_DIR}/../README_CN.md
+
+sed -i '/^<div align="center">/d' ${CUR_DIR}/../README.md
+sed -i '/\[\!\[python\]/d' ${CUR_DIR}/../README.md
+sed -i '/\[\!\[version\]/d' ${CUR_DIR}/../README.md
+sed -i '/\[\!\[license\]/d' ${CUR_DIR}/../README.md
+sed -i '/^\[\*\*Architecture\*\*\](docs\/en\/design\.md)/d' ${CUR_DIR}/../README.md
+sed -i 's/^\[English\](README\.md).*/[查看中文](\.\/README_CN\.md)/' ${CUR_DIR}/../README.md
+sed -i '/^<div align="left">/d' ${CUR_DIR}/../README.md
+sed -i '1,/^[^[:space:]]*$/{ /^[[:space:]]*$/d; }' ${CUR_DIR}/../README.md
+awk 'BEGIN{blank=0} /^[[:space:]]*$/ {blank++; if(blank==1) print; next} {blank=0; print}' ${CUR_DIR}/../README.md > ${CUR_DIR}/../README_temp.md 
+mv ${CUR_DIR}/../README_temp.md ${CUR_DIR}/../README.md
+
+
 # mindspore_gs/pruner/README.md
 sed -i "s/\.\/scop\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/pruner\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README_CN.md
 sed -i "s/\.\/scop\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/pruner\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README.md
