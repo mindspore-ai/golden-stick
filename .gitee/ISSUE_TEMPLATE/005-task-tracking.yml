@@ -6,8 +6,8 @@ body:
   - type: input
     attributes:
       label: 任务来源链接/编号
-      description: Link or ID to the Feature/RFC document.
-      placeholder: \#xxxxxx
+      description: Link or ID to the Feature/RFC, or self-plan.
+      placeholder: 自规划/#xxxxxx
     validations:
       required: true
 
