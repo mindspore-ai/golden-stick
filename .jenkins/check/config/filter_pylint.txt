@@ -72,6 +72,9 @@
 "golden-stick/mindspore_gs/common/json_cache.py"                                                         "unused-argument"
 "golden-stick/mindspore_gs/common/logger.py"                                                             "unused-argument"
 "golden-stick/mindspore_gs/ptq/transformer_inspect.py"                                                   "unidiomatic-typecheck"
+"golden-stick/mindspore_gs/ptq/models/mindformers_models/mf_model.py"                                    "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_smooth_wrappers.py"                       "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_smooth_wrappers.py"                       "super-with-arguments"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
@@ -123,6 +126,8 @@
 "golden-stick/tests/st/ptq/models/network/ptq_model_tester.py"                                           "wrong-import-position"
 "golden-stick/tests/st/ptq/models/api/test_auto_model.py"                                                "wrong-import-position"
 "golden-stick/tests/st/ptq/models/api/test_base_model.py"                                                "wrong-import-position"
+"golden-stick/tests/st/ptq/models/api/test_safetensors_mgr.py"                                           "wrong-import-position"
+"golden-stick/tests/st/ptq/models/api/test_safetensors_mgr.py"                                           "protected-access"
 
 # for version check
 "golden-stick/mindspore_gs/__init__.py"                           "wrong-import-position"

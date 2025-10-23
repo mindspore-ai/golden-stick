@@ -1,6 +1,6 @@
 seed: 0
 output_dir: './output' # path to save checkpoint/strategy
-load_checkpoint: '/home/workspace/mindspore_dataset/weight/DeepSeek-R1-bf16'
+load_checkpoint: ''
 use_parallel: True
 run_mode: 'predict'
 use_legacy: False

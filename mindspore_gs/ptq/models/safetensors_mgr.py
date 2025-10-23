@@ -51,7 +51,7 @@ class SafeTensorsMgr:
             os.makedirs(save_path, exist_ok=True)
             index_json, inv_index_json, total_bytes = self._index_and_size(dis_params_dict)
 
-            SafeTensorsMgr._copy_original_json(original_path, save_path)
+            SafeTensorsMgr._copy_original_files(original_path, save_path)
             SafeTensorsMgr._save_sf_index_json(save_path, index_json, total_bytes)
             SafeTensorsMgr._save_quant_desc_json(save_path, quant_desc_info)
             SafeTensorsMgr._save_safetensors(save_path, inv_index_json)
@@ -61,12 +61,56 @@ class SafeTensorsMgr:
             logger.info(f"barrier finish at rank {self.rank_id}.")
 
     @staticmethod
-    def _copy_original_json(original_path, save_path):
+    def _copy_original_files(original_path, save_path):
+        """
+        Copy files from original directory to save directory with blacklist filtering.
+
+        This method copies all files from the original directory to the save directory,
+        except for files that match patterns in the blacklist. The blacklist currently
+        includes files ending with '.index.json' and '.safetensors' to avoid copying
+        index files and safetensors files that will be regenerated.
+
+        Args:
+            original_path (str): Path to the source directory containing original files.
+            save_path (str): Path to the destination directory where files will be copied.
+
+        Raises:
+            FileNotFoundError: If the original_path does not exist.
+            NotADirectoryError: If the original_path is not a directory.
+
+        Note:
+            - Path validation is performed before file operations to ensure robustness.
+            - Only files in the root of original_path are processed (no subdirectories).
+            - File permissions and metadata are preserved using shutil.copy2.
+            - Files matching blacklist patterns are silently skipped.
+        """
         src_path = Path(original_path)
-        for json_file in src_path.glob('*.json'):
-            if json_file.name.endswith('.index.json'):
-                continue
-            shutil.copy2(json_file, os.path.join(save_path, json_file.name))
+
+        # Validate that the source path exists and is a directory
+        if not src_path.exists():
+            raise FileNotFoundError(f"Source path does not exist: {original_path}")
+        if not src_path.is_dir():
+            raise NotADirectoryError(f"Source path is not a directory: {original_path}")
+
+        # Define blacklist for files that should not be copied
+        blacklist_patterns = [
+            '.index.json',  # Original blacklist item
+            '.safetensors'  # Exclude safetensors files as requested
+        ]
+
+        # Iterate through all files in the source directory
+        for file_path in src_path.iterdir():
+            if file_path.is_file():
+                # Check if file matches any blacklist pattern
+                should_skip = False
+                for pattern in blacklist_patterns:
+                    if file_path.name.endswith(pattern):
+                        should_skip = True
+                        break
+
+                # Copy file if it's not in blacklist
+                if not should_skip:
+                    shutil.copy2(file_path, os.path.join(save_path, file_path.name))
 
     def _tp_merge(self, dis_params_dict: dict[str, DistributedParameter]):
         sorted_params = sorted(dis_params_dict)
@@ -123,7 +167,7 @@ class SafeTensorsMgr:
     @staticmethod
     def _save_quant_desc_json(save_path, quant_desc):
         """_save_desc_json"""
-        save_json_path = os.path.join(save_path, f"quantization_description.json")
+        save_json_path = os.path.join(save_path, "quantization_description.json")
         os.makedirs(save_path, exist_ok=True)
         with open(save_json_path, "w", encoding="utf-8") as f:
             json.dump(quant_desc, f, ensure_ascii=False, indent=4)
@@ -132,7 +176,7 @@ class SafeTensorsMgr:
     @staticmethod
     def _save_sf_index_json(save_path, index_json, total_bytes):
         """_save_desc_json"""
-        save_json_path = os.path.join(save_path, f"model.safetensors.index.json")
+        save_json_path = os.path.join(save_path, "model.safetensors.index.json")
         os.makedirs(save_path, exist_ok=True)
         index_data = {
             "metadata": {"total_size": total_bytes},
