@@ -25,9 +25,14 @@ from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, Checker, SearchInputs
 
 class LinearSmoother(Algorithm):
     """LinearSmoother"""
+
     def load_mindformers_plugin(self):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
+
+    def load_mindone_plugin(self):
+        # pylint: disable=unused-import
+        import mindspore_gs.ptq.ptq.wrappers.mindone
 
     def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
         raise NotImplementedError

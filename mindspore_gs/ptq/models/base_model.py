@@ -45,6 +45,7 @@ Examples:
 """
 
 from mindspore_gs.common import logger
+from mindspore_gs.ptq.ptq_config import BackendTarget
 
 
 class BaseQuantForCausalLM:
@@ -183,7 +184,7 @@ class BaseQuantForCausalLM:
         """
         raise NotImplementedError
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.NONE):
         """Save the quantized model to disk.
 
         This is an abstract method that must be implemented by derived classes.

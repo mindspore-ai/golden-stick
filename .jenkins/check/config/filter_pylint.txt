@@ -75,6 +75,10 @@
 "golden-stick/mindspore_gs/ptq/models/mindformers_models/mf_model.py"                                    "import-outside-toplevel"
 "golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_smooth_wrappers.py"                       "import-outside-toplevel"
 "golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_smooth_wrappers.py"                       "super-with-arguments"
+"golden-stick/mindspore_gs/ptq/ptq/algorithms/anti_outliers.py"                                          "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/algorithms/clipper.py"                                                "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/algorithms/quantizer.py"                                              "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/quant.py"                                                             "import-outside-toplevel"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
@@ -134,3 +138,7 @@
 "golden-stick/mindspore_gs/ghost/__init__.py"                     "wrong-import-position"
 "golden-stick/mindspore_gs/pruner/__init__.py"                    "wrong-import-position"
 "golden-stick/mindspore_gs/quantization/__init__.py"              "wrong-import-position"
+
+# for ptq models
+"golden-stick/mindspore_gs/ptq/models/auto_model.py"              "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/models/mindone_models/glm4v.py"    "import-outside-toplevel"
