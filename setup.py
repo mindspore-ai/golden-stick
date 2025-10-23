@@ -20,7 +20,6 @@ import sys
 import re
 import stat
 import shutil
-import time
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
@@ -112,8 +111,7 @@ def version_from_file():
 
 
 version_num = version_from_file()
-date_str = time.strftime('%Y%m%d', time.localtime())
-version = f"{version_num}.dev{date_str}"
+version = f"{version_num}"
 
 
 setup(
