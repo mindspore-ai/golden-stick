@@ -401,7 +401,7 @@ class SearchLinearCell(nn.Cell):
                 min_loss = loss
                 best_hyper_param = hyper_param
         if not best_hyper_param:
-            raise RuntimeError(f"No search space found.")
+            raise RuntimeError("No search space found.")
         self._settle_best(best_hyper_param)
 
 
@@ -474,7 +474,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
         self.ic_axis = rank - 1 if self._transpose_b() else rank - 2
         self.oc_axis = rank - 2 if self._transpose_b() else rank - 1
         self.oc = linear.weight.shape[self.oc_axis]
-        self.is_expert = (rank == 3)
+        self.is_expert = rank == 3
         self.expert_num = linear.weight.shape[0] if self.is_expert else -1
         if self.layer.has_bias and self.expert_num and self.expert_num > 0:
             raise ValueError(f"Only moe cell without bias is supported, but {linear_name} has bias.")
@@ -619,7 +619,7 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
             self.x_zp = Tensor(x_zp)
             self._layer.weight.set_data(msops.cast(q_weight, self._layer.weight.dtype))
             self.y_zp = q_weight.sum(axis=self.ic_axis, dtype=msdtype.int32) * self.x_zp.astype(msdtype.int32)
-            if self.is_rowparallel:
+            if self.is_rowparallel and self.context.tp_size > 1:
                 self.y_zp = msops.AllReduce(op=ReduceOp.SUM, group=GlobalComm.WORLD_COMM_GROUP)(self.y_zp)
             quant_output = self._module_forward(True)
             msops.assign(self._layer.weight, fp16_weight)

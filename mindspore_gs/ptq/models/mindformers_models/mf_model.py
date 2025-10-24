@@ -161,10 +161,11 @@ class MFModel(BaseQuantForCausalLMImpl):
         with no_init_parameters():
             self.network = AutoModel.from_config(yaml_path)
 
-        self._original_sf_path = config.load_checkpoint
-        if config.load_checkpoint:
-            self.network.load_weights(config.load_checkpoint)
-            self._after_network_load_weights()
+        self._original_sf_path = config.pretrained_model_dir
+        if not self._original_sf_path:
+            raise ValueError(f"Make sure pretrained_model_dir in yaml-file is not empty: {yaml_path}")
+        self.network.load_weights(self._original_sf_path)
+        self._after_network_load_weights()
 
     # pylint: disable=arguments-differ
     @classmethod
@@ -340,8 +341,8 @@ class MFModelEnableSafeTensors(MFModel):
         # _del_experts_weight
         experts_dict = {k: v for k, v in param_dict.items()
                         if ".mlp.experts." in k}
-        is_fc1_quant = any([".linear_fc1.weight_scale" in k for k in experts_dict.keys()])
-        is_fc2_quant = any([".linear_fc2.weight_scale" in k for k in experts_dict.keys()])
+        is_fc1_quant = any(".linear_fc1.weight_scale" in k for k in experts_dict.keys())
+        is_fc2_quant = any(".linear_fc2.weight_scale" in k for k in experts_dict.keys())
         def process(root, name_prefix):
             """Iterate the whole network and call callback function `process_cell`."""
             if root is None:
@@ -362,8 +363,7 @@ class MFModelEnableSafeTensors(MFModel):
             if (is_fc1_quant and "weight1" in key) or \
                 (is_fc2_quant and "weight2" in key):
                 continue
-            else:
-                new_param_dict[key] = value
+            new_param_dict[key] = value
         return new_param_dict, param_name_trace
 
     def _shard_dict(self):
@@ -602,8 +602,8 @@ class MFModelNotEnableSafeTensors(MFModel):
                         if ".mlp.experts." in k}
         other_dict = dict(param_dict.items() - experts_dict.items())
         new_param_dict.update(other_dict)
-        is_fc1_quant = any([".linear_fc1.weight_scale" in k for k in experts_dict.keys()])
-        is_fc2_quant = any([".linear_fc2.weight_scale" in k for k in experts_dict.keys()])
+        is_fc1_quant = any(".linear_fc1.weight_scale" in k for k in experts_dict.keys())
+        is_fc2_quant = any(".linear_fc2.weight_scale" in k for k in experts_dict.keys())
 
         experts_fc1_dict = {k: v for k, v in experts_dict.items()
                             if ".mlp.experts" in k and ".linear_fc1" in k}
@@ -637,11 +637,11 @@ class MFModelNotEnableSafeTensors(MFModel):
                 new_name = f"{prefix_str}.{suffix_str}"
             else:
                 new_name = f"{prefix_str}.{weight_name}"
-            if new_name in new_param_dict.keys():
+            if new_name in new_param_dict:
                 continue
             experts_dict = {k: v for k, v in param_dict.items()
                             if k.startswith(prefix_str) and k.endswith(suffix_str)}
-            num_experts = len(experts_dict.keys())
+            num_experts = len(experts_dict)
             value_list = []
             for i in range(num_experts):
                 key_ = f"{prefix_str}.{i}.{suffix_str}"
@@ -741,7 +741,7 @@ class MFModelNotEnableSafeTensors(MFModel):
             str. Path to the saved SafeTensors file.
         """
         start = time.time()
-        logger.info(f"Saving checkpoint...", flush=True)
+        logger.info("Saving checkpoint...", flush=True)
         param_dict = self.parameters_dict()
         try:
             rank_id = get_rank()
@@ -764,9 +764,9 @@ class MFModelNotEnableSafeTensors(MFModel):
             str. Path to the saved description JSON file.
         """
         start = time.time()
-        logger.info(f"Saving describle json file...", flush=True)
+        logger.info("Saving describle json file...", flush=True)
         desc_info = self.get_description_file(self._network())
-        save_json_path = os.path.join(save_path, f"quantization_description.json")
+        save_json_path = os.path.join(save_path, "quantization_description.json")
         os.makedirs(save_path, exist_ok=True)
         with open(save_json_path, "w", encoding="utf-8") as f:
             json.dump(desc_info, f, ensure_ascii=False, indent=4)

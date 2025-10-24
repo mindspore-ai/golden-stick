@@ -22,7 +22,6 @@ from mindspore import Parameter
 from mindspore import ops as msops
 
 from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_world_size
-from mindspore_gs.common import logger
 
 
 class MLAParamProcessor:
@@ -259,7 +258,7 @@ class MoeParamProcessor():
         elif hasattr(self.network.config, 'expert_num'):
             self.num_experts = self.network.config.expert_num
         else:
-            logger.error(f"Warning: Could not find experts number in config")
+            raise RuntimeError("Could not find experts number in config.json")
         self.moe_split_rules = (r'\.mlp\.experts\.',
                                 *(f'.mlp.experts.{i}.' for i in range(self.num_experts)))
 
