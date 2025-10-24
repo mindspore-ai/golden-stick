@@ -5,19 +5,19 @@ labels: ["task"]
 body:
   - type: input
     attributes:
-      label: 任务来源链接/编号
-      description: Link or ID to the Feature/RFC, or self-plan.
+      label: 父任务
+      description: 从哪个任务分解出来
       placeholder: 自规划/#xxxxxx
     validations:
       required: true
 
   - type: input
     attributes:
-      label: 任务名称
-      description: Brief title of the task.
-      placeholder: 例如：新增xxx算法
+      label: 前置依赖的任务
+      description: 前置依赖的任务，可以有多个依赖项
+      placeholder: #xxxxxx #xxxxxx #xxxxxx
     validations:
-      required: true
+      required: false
 
   - type: textarea
     attributes:
@@ -30,20 +30,5 @@ body:
         - [ ] 单元测试与集成测试
         - [ ] 文档与示例更新
         - [ ] 性能与稳定性验证
-    validations:
-      required: true
-
-  - type: textarea
-    attributes:
-      label: 任务详细方案（How）
-      description: Technical solution, API/struct changes, dependencies, risks and rollback.
-      placeholder: |-
-        方案要点：
-        - 架构与模块边界：
-        - 关键算法/流程：
-        - 接口/配置项变更：
-        - 外部依赖与兼容性：
-        - 测试方案：
-        - 配套资料：
     validations:
       required: true
