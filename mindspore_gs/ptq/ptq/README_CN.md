@@ -368,15 +368,11 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  
 
 ## 示例
 
-PTQ量化通常分为两个阶段：一个是量化校准阶段，另一个是部署阶段。
-
-量化校准阶段包括：收集权重的分布、计算量化参数、量化权重数据、量化模型保存。
-
-部署阶段包括：在生产环境下，使用MindSpore框架对量化后的模型进行推理的过程。
+量化通常分为两个阶段：
+1）第一个是量化校准阶段，解决量化权重从哪里来的问题，这一部分能力由金箍棒提供；
+2）第二个是量化部署阶段，解决量化权重如何高效得部署在生产环境的问题，这一部分能力由vllm-MindSpore Plugin、MindSpore Transformers或其他部署框架提供。
 
 ### Qwen3-0.6B 混合精度量化
-
-本用例使用Mindformers框架下的Qwen3网络进行演示，主要分四个步骤：环境准备、模型量化、模型部署评估、效果分析。
 
 #### 步骤1. 环境准备
 
@@ -434,11 +430,13 @@ workspace
   └── golden-stick
 ```
 
-#### 步骤2. 模型量化
+#### 步骤2. 量化校准
+
+量化校准阶段包括：收集权重的分布、计算量化参数、量化权重数据、量化模型保存。
 
 2.1. 修改yaml文件
 
-1. 修改predict_qwen3.yaml文件中的`load_checkpoint`和`pretrained_model_dir`字段为Qwen3-0.6B权重所在路径。
+1. 修改predict_qwen3.yaml文件中的`pretrained_model_dir`字段为Qwen3-0.6B权重所在路径。
 
 2. 若使用多卡进行量化校准，修改`use_parallel`为True，`model_parallel`为对应卡数。
 
@@ -458,6 +456,7 @@ model = AutoQuantForCausalLM.from_pretrained(config_path)
 我们可以使用Ceval数据来进行量化校准，一般量化校准阶段只会使用数百条数据进行校准。当前样例中，我们使用n_samples参数指定仅加载数据集中的200条数据，代码如下：
 
 ```python
+from mindspore import dataset
 from mindformers import MindFormerConfig
 from mindspore_gs.datasets import get_datasets
 from transformers import AutoTokenizer
@@ -470,6 +469,7 @@ seq = 2048
 max_decode_length = 1024
 ignore_token_id = tokenizer.pad_token_id
 ds_path = "/path/to/ceval/dev"
+dataset.config.set_numa_enable(False)
 datasets = get_datasets("ceval", ds_path, 'train', 1, seq, max_decode_length, tokenizer, ignore_token_id, 1, False, n_samples=200)
 ```
 
@@ -542,3 +542,17 @@ Qwen3-mix-quant
   └── tokenizer_config.json
   └── vocab.json
 ```
+
+#### 步骤3. 量化部署
+
+金箍棒生成的量化权重是Hugging Face社区格式，可以加载到 [vllm-MindSpore Plugin](https://www.mindspore.cn/vllm_mindspore/docs/zh-CN/master/user_guide/supported_features/quantization/quantization.html) 或者 [MindSpore Transformers](https://gitee.com/mindspore/mindformers/tree/master/configs/qwen3#%E6%8E%A8%E7%90%86%E6%A0%B7%E4%BE%8B) 中进行部署。
+
+需要注意的是，MindSpore Transformers量化推理流程要求权重的 `config.json` 中必须包含量化相关的配置，才能正常推理，所以需要用户手动修改该文件，添加如下配置：
+
+```yaml
+"quantization_config": {
+    "quant_method": "golden-stick"
+}
+```
+
+我们会在后续版本中改进这一点，在生成量化权重时，自动在 `config.json` 中添加量化相关的配置。
