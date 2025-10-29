@@ -3,6 +3,8 @@ scipy >= 1.5.2
 pyyaml >= 6.0
 matplotlib
 prettytable
+mindspore == 2.7.1
+mindformers == 1.7.0
 
 
 # for ut/st

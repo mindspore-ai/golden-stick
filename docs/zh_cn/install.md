@@ -10,39 +10,76 @@
 
 | 软件名称 |  版本   |
 | :-----: | :-----: |
-| Ubuntu  |  18.04  |
-| Python  |  3.9-3.11 |
+| OS  | openEuler/Ubuntu/Linux |
+| Python  |  >=3.9, <3.12 |
 
 > 其他的三方依赖请参考[requirements文件](https://gitee.com/mindspore/golden-stick/blob/master/requirements.txt)。
 
-## MindSpore版本依赖关系
+## 版本生命周期及版本配套策略
 
-MindSpore Golden Stick依赖MindSpore训练推理框架，请根据下表所示的对应关系，并参考[MindSpore安装指导](https://mindspore.cn/install)安装对应版本的MindSpore：
+MindSpore Golden Stick版本有以下五个维护阶段：
 
-| MindSpore Golden Stick版本 |                             分支                                  | MindSpore版本 |
-| :---------------------: | :-----------------------------------------------------------------: | :-------: |
-|          1.3.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1   |
-|          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0   |
-|          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0   |
-|          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0   |
-|          0.6.0          | [r0.6](https://gitee.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0   |
-|          0.5.0          | [r0.5](https://gitee.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1   |
-|          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0   |
-|          0.4.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4/)         |   2.3.0-rc1   |
-|          0.3.0          | [r0.3](https://gitee.com/mindspore/golden-stick/tree/r0.3/)         |   2.0.0-rc1, 2.0.0   |
-|       0.3.0-alpha       | [r0.3](https://gitee.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha   |
-|          0.2.0          | [r0.2](https://gitee.com/mindspore/golden-stick/tree/r0.2/)         |   1.9.0   |
-|          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/)         |   1.8.0   |
+|   **状态**    | **期限** | **说明**                         |
+|:-----------:|:------:|:-------------------------------|
+|     计划      | 1-3 个月 | 规划功能。                          |
+|     开发      |  3 个月  | 构建功能。                          |
+|     维护      |  6 个月  | 合入所有已解决的问题并发布新版本。              |
+|     无维护     | 0-3 个月 | 合入所有已解决的问题，没有专职维护团队，且不计划发布新版本。 |
+| 生命周期终止（EOL） |  N/A   | 分支进行封闭，不再接受任何修改。               |
 
-安装完MindSpore后，继续安装MindSpore Golden Stick。可以采用pip安装或者源码编译安装两种方式。
+### 历史版本生命周期
 
-## pip安装
+| MindSpore Golden Stick版本 | 当前状态  |   发布时间  |         后续状态         |   EOL日期   |
+| :---------------------: | :--------: | :--------: | :--------------------: | :--------: |
+|          1.3.0          |  维护       | 2025-10-23 | 预计2026-04-23终止维护   | 2026-07-23 |
+|          1.2.0          |  维护       | 2025-08-13 | 预计2026-02-13终止维护   | 2026-05-13 |
+|          1.1.0          |  维护       | 2025-05-21 | 预计2026-11-21终止维护   | 2026-02-21 |
+|          1.0.0          | 无维护      | 2025-02-13 | 预计2025-11-23终止生命周期| 2025-11-13 |
+|          0.6.0          | 生命周期终止 | 2024-10-30 |                        | 2025-07-30 |
+|          0.5.0          | 生命周期终止 | 2024-08-01 |                        | 2025-05-01 |
+|          0.4.1          | 生命周期终止 | 2024-07-15 |                        | 2025-04-15 |
+|          0.4.0          | 生命周期终止 | 2024-03-30 |                        | 2024-12-30 |
+|          0.3.0          | 生命周期终止 | 2023-06-15 |                        | 2024-03-15 |
+|       0.3.0-alpha       | 生命周期终止 | 2023-02-01 |                        | 2023-11-01 |
+|          0.2.0          | 生命周期终止 | 2022-10-26 |                        | 2023-07-26 |
+|          0.1.0          | 生命周期终止 | 2022-07-29 |                        | 2023-04-29 |
 
-使用pip命令安装，可从[MindSpore Golden Stick Releases](https://gitee.com/mindspore/golden-stick/releases)下载对应whl包并安装。
+### 历史版本依赖
 
-> - 在联网状态下，安装whl包时会自动下载MindSpore Golden Stick安装包的依赖项（依赖项详情参见requirement.txt），其余情况需自行安装。
+MindSpore Golden Stick依赖MindSpore以及MindSpore Transformers网络仓，请根据下表所示的对应关系，安装对应版本的MindSpore和MindSpore Transformers：
 
-## 源码编译安装
+> 1.3.0版本及以后，MindSpore和MindSpore Transformers正式加入到MindSpore Golden Stick的requirements.txt中，用户不再需要手动安装这两个依赖。
+
+| MindSpore Golden Stick版本 |                             分支                                  | MindSpore版本 | MindSpore Transformers版本 |
+| :---------------------: | :-----------------------------------------------------------------: | :----------: | :------------------------: |
+|          1.3.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1      |       1.7.0                |
+|          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0      |       1.6.0                |
+|          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0      |       1.5.0                |
+|          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0      |       1.4.0-beta2          |
+|          0.6.0          | [r0.6](https://gitee.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0      |       1.3.0                |
+|          0.5.0          | [r0.5](https://gitee.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1      |       1.2.0                |
+|          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0      |       1.2.0                |
+|          0.4.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4/)         |   2.3.0-rc1  |        NA                  |
+|          0.3.0          | [r0.3](https://gitee.com/mindspore/golden-stick/tree/r0.3/)         |   2.0.0-rc1, 2.0.0   |    NA              |
+|       0.3.0-alpha       | [r0.3](https://gitee.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha        |        NA          |
+|          0.2.0          | [r0.2](https://gitee.com/mindspore/golden-stick/tree/r0.2/)         |   1.9.0      |        NA                  |
+|          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/)         |   1.8.0      |        NA                  |
+
+> 金箍棒早期版本不支持MindSpore Transformers，故表中标记为NA。
+
+## 安装MindSpore Golden Stick
+
+安装完MindSpore和MindSpore Transformers后，继续安装MindSpore Golden Stick。可以采用pip安装或者源码编译安装两种方式。
+
+### pip安装
+
+我们在pypi上维护了[MindSpore Golden Stick项目](https://pypi.org/project/mindspore-gs/)，可以直接使用pip命令安装。
+
+```shell
+pip install mindspore-gs
+```
+
+### 源码编译安装
 
 下载[源码](https://gitee.com/mindspore/golden-stick)，下载后进入`golden_stick`目录。
 
@@ -50,8 +87,9 @@ MindSpore Golden Stick依赖MindSpore训练推理框架，请根据下表所示�
 git clone https://gitee.com/mindspore/golden-stick.git
 cd golden-stick
 bash build.sh
-pip install output/mindspore_gs-{mg_version}-py3-none-any.whl
 ```
+
+编译成功后会在output目录下生成whl包，使用pip安装即可。
 
 ## 验证安装是否成功
 
@@ -59,4 +97,5 @@ pip install output/mindspore_gs-{mg_version}-py3-none-any.whl
 
 ```python
 import mindspore_gs
+import mindspore_gs.ptq
 ```

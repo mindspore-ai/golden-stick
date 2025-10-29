@@ -89,7 +89,7 @@ MindSpore Golden Stick（后面简称金箍棒）是MindSpore团队和华为诺�
   </tbody>
   <thead>
     <tr>
-      <th colspan="60"><div align="center">End Of Life</div></th>
+      <th colspan="60"><div align="center">生命周期终止</div></th>
     </tr>
   </thead>
   <tbody>
@@ -128,7 +128,7 @@ MindSpore Golden Stick（后面简称金箍棒）是MindSpore团队和华为诺�
 
 ## 贡献
 
-请参考 [CONTRIBUTING](./CONTRIBUTING.md) 文档了解更多关于开发环境搭建、功能测试以及 PR 提交规范的信息。
+请参考 [CONTRIBUTING](./CONTRIBUTING_CN.md) 文档了解更多关于开发环境搭建、功能测试以及 PR 提交规范的信息。
 
 我们欢迎并重视任何形式的贡献与合作，请通过 [Issue](https://gitee.com/mindspore/golden-stick/issues) 来告知我们您遇到的任何Bug，或提交您的特性需求、改进建议、技术方案。
 

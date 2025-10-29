@@ -1,1 +1,3 @@
 https://www.mindspore.cn/sig/LLM%20Inference%20Serving
+https://www.mindspore.cn/golden_stick/docs/en/master/design.html
+https://www.mindspore.cn/golden_stick/docs/zh-CN/master/design.html
