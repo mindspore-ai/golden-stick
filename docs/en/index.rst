@@ -123,6 +123,7 @@ Supported Algorithms in MindSpore Golden Stick
 
    ptq/overview
    ptq/ptq
+   ptq/round_to_nearest
 
 .. toctree::
    :maxdepth: 1
