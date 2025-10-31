@@ -33,6 +33,7 @@ sed -i '/^\[\*\*架构\*\*\](docs\/zh_cn\/design\.md)/d' ${CUR_DIR}/../README_CN
 sed -i 's/^\[English\](README\.md).*/[View English](\.\/README\.md)/' ${CUR_DIR}/../README_CN.md
 sed -i '/^<div align="left">/d' ${CUR_DIR}/../README_CN.md
 sed -i '1,/^[^[:space:]]*$/{ /^[[:space:]]*$/d; }' ${CUR_DIR}/../README_CN.md
+sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING_CN.md
 awk 'BEGIN{blank=0} /^[[:space:]]*$/ {blank++; if(blank==1) print; next} {blank=0; print}' ${CUR_DIR}/../README_CN.md > ${CUR_DIR}/../README_CN_temp.md 
 mv ${CUR_DIR}/../README_CN_temp.md ${CUR_DIR}/../README_CN.md
 
@@ -44,32 +45,33 @@ sed -i '/^\[\*\*Architecture\*\*\](docs\/en\/design\.md)/d' ${CUR_DIR}/../README
 sed -i 's/^\[English\](README\.md).*/[查看中文](\.\/README_CN\.md)/' ${CUR_DIR}/../README.md
 sed -i '/^<div align="left">/d' ${CUR_DIR}/../README.md
 sed -i '1,/^[^[:space:]]*$/{ /^[[:space:]]*$/d; }' ${CUR_DIR}/../README.md
+sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING.md
 awk 'BEGIN{blank=0} /^[[:space:]]*$/ {blank++; if(blank==1) print; next} {blank=0; print}' ${CUR_DIR}/../README.md > ${CUR_DIR}/../README_temp.md 
 mv ${CUR_DIR}/../README_temp.md ${CUR_DIR}/../README.md
 
 
 # mindspore_gs/pruner/README.md
-sed -i "s/\.\/scop\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/pruner\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README_CN.md
-sed -i "s/\.\/scop\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/pruner\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README.md
+sed -i "s/\.\/scop\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/pruner\/scop\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README_CN.md
+sed -i "s/\.\/scop\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/pruner\/scop\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README.md
 
 # mindspore_gs/ptq/README.md
 sed -i "s/\.\.\/quantization\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/quantization\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README_CN.md
-sed -i "s/\.\/ptq\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/ptq\/ptq\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README_CN.md
-sed -i "s/\.\/round_to_nearest\/README_CN\.ipynb/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/ptq\/round_to_nearest\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README_CN.md
+sed -i "s/\.\/ptq\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/ptq\/ptq\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README_CN.md
+sed -i "s/\.\/round_to_nearest\/README_CN\.ipynb/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/ptq\/round_to_nearest\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README_CN.md
 
 sed -i "s/\.\.\/quantization\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/quantization\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README.md
-sed -i "s/\.\/ptq\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/ptq\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README.md
-sed -i "s/\.\/round_to_nearest\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/round_to_nearest\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README.md
+sed -i "s/\.\/ptq\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/ptq\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README.md
+sed -i "s/\.\/round_to_nearest\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/round_to_nearest\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/README.md
 
 # mindspore_gs/ptq/ptq/README.md
-sed -i "s/\.\.\/round_to_nearest\/README_CN\.ipynb/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/ptq\/round_to_nearest\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/ptq/README_CN.md
-sed -i "s/\.\.\/round_to_nearest\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/round_to_nearest\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/ptq/README.md
+sed -i "s/\.\.\/round_to_nearest\/README_CN\.ipynb/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/ptq\/round_to_nearest\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/ptq/README_CN.md
+sed -i "s/\.\.\/round_to_nearest\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/round_to_nearest\.html/g" ${CUR_DIR}/../mindspore_gs/ptq/ptq/README.md
 
 # mindspore_gs/quantization/README.md
-sed -i "s/\.\/simulated_quantization\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/quantization\/simqat\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README_CN.md
+sed -i "s/\.\/simulated_quantization\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/quantization\/simulated_quantization\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README_CN.md
 sed -i "s/\.\/slb\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/quantization\/slb\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README_CN.md
 sed -i "s/\.\.\/ptq\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/ptq\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README_CN.md
 
-sed -i "s/\.\/simulated_quantization\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/quantization\/simqat\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
+sed -i "s/\.\/simulated_quantization\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/quantization\/simulated_quantization\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
 sed -i "s/\.\/slb\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/quantization\/slb\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
 sed -i "s/\.\.\/ptq\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
