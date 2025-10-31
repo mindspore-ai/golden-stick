@@ -15,7 +15,7 @@
 """ptq wrapper cells for mindone."""
 
 import numpy as np
-from mindspore import nn, Parameter, Tensor, dtype
+from mindspore import nn, Parameter, Tensor, dtype, mint
 from mindspore import ops as msops
 
 from mindspore_gs.ptq.ptq_config import QuantGranularity, PrecisionRecovery
@@ -37,8 +37,8 @@ class WeightQuantLinearCell(WrapperLinearCell):
                 support_dtype = [dtype.int8, dtype.qint4x2]
                 return (config.weight_quant_dtype in support_dtype and config.act_quant_dtype is None
                         and config.precision_recovery == PrecisionRecovery.NONE)
-
         Quantizer.reg_layer_map(nn.Dense, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(mint.nn.Linear, WeightQuantLinearCell, A16WxChecker())
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
@@ -84,10 +84,6 @@ class WeightQuantLinearCell(WrapperLinearCell):
         if self.has_bias:
             self.bias = self.layer.bias
             self.layer.bias = None
-
-        self.cfg.dumper.dump_data(self.layer_name, "|weight_params|output0_qweight", self.weight)
-        self.cfg.dumper.dump_data(self.layer_name, "|weight_params|output1_weight_scale", self.weight_scale)
-        self.cfg.dumper.dump_data(self.layer_name, "|weight_params|output2_weight_zp", self.weight_offset)
 
     def process(self):
         super().process()

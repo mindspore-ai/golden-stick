@@ -15,7 +15,15 @@
 """Wrapper cells for PTQ for MindOne."""
 
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
-from .fake_quant_linear import FakeQuantA16WxWrapper
+from .linear_all_quant_wrappers import AllQuantLinearCell
+from .linear_dynamic_quant_wrappers import DynamicQuantLinearCell
+from .fake_quant_linear import FakeQuantA16WxWrapper, FakeQuantW8A8Wrapper, FakeQuantW8A8DynamicWrapper
+from .linear_smooth_wrappers import SmoothQuantLinearCell
 
 WeightQuantLinearCell.reg_self()
 FakeQuantA16WxWrapper.reg_self()
+FakeQuantW8A8Wrapper.reg_self()
+FakeQuantW8A8DynamicWrapper.reg_self()
+SmoothQuantLinearCell.reg_self()
+AllQuantLinearCell.reg_self()
+DynamicQuantLinearCell.reg_self()

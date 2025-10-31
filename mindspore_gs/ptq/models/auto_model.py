@@ -125,6 +125,7 @@ class AutoQuantForCausalLM:
         try:
             # pylint: disable=unused-import
             from .mindone_models import GLM4v
+            from .mindone_models import Qwen3_MOE
         except ImportError as e:
             raise ImportError(f"mindone plugin load failed, error: {e}") from e
         from mindspore_gs.ptq.models.mindone_models.mindone_model import MindOneModel

@@ -16,9 +16,10 @@
 
 import abc
 import dataclasses
+from mindspore import dtype
 from mindspore.nn import Cell
 from mindspore import ops as msops
-from mindspore_gs.ptq.context import InnerPTQConfig
+from mindspore_gs.ptq.context import InnerPTQConfig, OutliersSuppressionType, QuantGranularity
 
 
 class Checker:
@@ -67,6 +68,22 @@ class WrapperCell(abc.ABC, Cell):
         """process"""
         if not self.samples:
             raise RuntimeError(f"Please catch matmul inputs before quantization.")
+        # for moe matmul in the mindone, x shape may be(0, ic) or (ic) or (bs, ic)
+        # so we only need tensor.shape[0] > 0, and we also need to reshape (ic) to (1, ic),
+        # for the concat ops.
+        self.samples = [(tensor if len(tensor.shape) > 1 else tensor.reshape(1, -1))
+                        for tensor in self.samples if tensor.shape[0] > 0]
+        # in the moe matmul in the mindone, len(self.samples) may be 0 after filter of
+        # "tensor.shape[0] > 0"
+        if len(self.samples) == 0:
+            if (self.cfg.act_quant_dtype == dtype.int8 and self.cfg.act_quant_granularity != \
+                QuantGranularity.PER_TOKEN) or self.cfg.outliers_suppression != OutliersSuppressionType.NONE:
+                raise ValueError("when act_quant_dtype is dtype.int8 and act_quant_granularity != QuantGranularity.PER_TOKEN,"
+                                 "or outliers_suppression isn't OutliersSuppressionType.NONE,"
+                                 f"len(self.samples) of {self._layer_name} can't be 0.")
+            else:
+                self.cat_samples = None
+                return
         self.cat_samples = msops.cat(tuple(self.samples), axis=0)
         self.samples.clear()
 

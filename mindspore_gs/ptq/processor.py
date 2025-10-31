@@ -50,7 +50,6 @@ def transform_network_inplace(network: Cell, target_layer_type: type, transform_
                 return cell, False
             transform_fn(cell_name, cell)
             return cell, True
-
     Transformer().process(network, network_root_name)
 
 
