@@ -14,24 +14,22 @@
 # ============================================================================
 
 """
-MindFormers Models Package
+MindOne Models Package
 
 This package provides quantized model implementations for the
-MindFormers framework. It includes specific implementations for
+MindOne framework. It includes specific implementations for
 various large language models that are compatible with the
-MindFormers ecosystem.
+MindOne ecosystem.
 
 Supported Models:
-    - QWen3: Quantized implementation for Qwen3 models
-    - QWen3MoE: Quantized implementation for Qwen3 Mixture-of-Experts models
-    - DeepSeekV3: Quantized implementation for DeepSeekV3 models
+    - GLM4V: Quantized implementation for GLM4V models
 
 The implementations in this package are designed to work seamlessly
-with MindFormers' model loading, training, and inference capabilities
+with MindOne's model loading, training, and inference capabilities
 while providing efficient quantization support for deployment scenarios.
 
 Key Features:
-    - Seamless integration with MindFormers framework
+    - Seamless integration with MindOne framework
     - Support for distributed computing and tensor parallelism
     - Efficient parameter management for large-scale models
     - SafeTensors format support for model persistence
@@ -40,15 +38,9 @@ Key Features:
 Example:
     >>> from mindspore_gs.ptq.models import AutoQuantForCausalLM
     >>>
-    >>> # Automatically detect and load MindFormers-compatible model
-    >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/mindformers_model.yaml")
+    >>> # Automatically detect and load MindOne-compatible model
+    >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/mindone_model")
 """
 
-# Import mindformers wrappers to trigger their registration
-import mindspore_gs.ptq.ptq.wrappers.mindformers
-
-from .mf_model import MFModel
-from .qwen3 import QWen3
-from .qwen3_moe import QWen3MoE
-from .deepseekv3 import DeepSeekV3
-from .telechat2 import Telechat2
+from .mindone_model import MindOneModel
+from .glm4v import GLM4v

@@ -143,6 +143,16 @@ class MFModel(BaseQuantForCausalLMImpl):
 
         return decorator
 
+    @staticmethod
+    def get_model_registry():
+        """Get the registry of all registered mindformers models.
+
+        Returns:
+            dict[str, type]. Dictionary mapping mindformers model names to their
+                respective class implementations.
+        """
+        return MFModel._model_registry
+
     def _after_network_load_weights(self):
         return
 

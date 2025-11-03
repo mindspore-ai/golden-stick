@@ -132,9 +132,15 @@
 "golden-stick/tests/st/ptq/models/api/test_safetensors_mgr.py"                                           "wrong-import-position"
 "golden-stick/tests/st/ptq/models/api/test_safetensors_mgr.py"                                           "protected-access"
 "golden-stick/tests/st/ptq/ptq/test_osl.py"                                                              "import-outside-toplevel"
+"golden-stick/tests/st/ptq/models/api/test_auto_model.py"                                                "import-outside-toplevel"
 
 # for version check
 "golden-stick/mindspore_gs/__init__.py"                           "wrong-import-position"
 "golden-stick/mindspore_gs/ghost/__init__.py"                     "wrong-import-position"
 "golden-stick/mindspore_gs/pruner/__init__.py"                    "wrong-import-position"
 "golden-stick/mindspore_gs/quantization/__init__.py"              "wrong-import-position"
+
+# for ptq models
+"golden-stick/mindspore_gs/ptq/models/auto_model.py"              "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/models/auto_model.py"              "unused-import"
+"golden-stick/mindspore_gs/ptq/models/mindone_models/glm4v.py"    "import-outside-toplevel"
