@@ -27,6 +27,7 @@ from mindspore_gs.ptq.models.mindformers_models.param_processor import (
     MLAParamProcessor, MoeParamProcessor, FFNParamProcessor)
 from mindspore_gs.ptq.utils import QuantType
 from mindspore_gs.common import logger
+from mindspore_gs.ptq.ptq_config import BackendTarget
 
 
 @MFModel.reg_model('deepseek_v3')
@@ -144,7 +145,7 @@ class DeepSeekV3(MFModelEnableSafeTensors):
         desc_info = dict((key, quant_types.get(key, QuantType.FLOAT.value)) for key in param_dict)
         return desc_info
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.NONE):
         """save_pretrained"""
         _ = self._save_desc_json(save_path)
         self._save_safetenors(save_path)
@@ -152,7 +153,7 @@ class DeepSeekV3(MFModelEnableSafeTensors):
     def _save_safetenors(self, save_path) -> str:
         """_save_safetenors"""
         start = time.time()
-        logger.info(f"Saving checkpoint...", flush=True)
+        logger.info("Saving checkpoint...", flush=True)
         param_dict = self.parameters_dict()
         try:
             rank_id = get_rank()
@@ -168,9 +169,9 @@ class DeepSeekV3(MFModelEnableSafeTensors):
     def _save_desc_json(self, save_path) -> str:
         """_save_desc_json"""
         start = time.time()
-        logger.info(f"Saving describle json file...", flush=True)
+        logger.info("Saving describle json file...", flush=True)
         desc_info = self.get_description_file(self._network())
-        save_json_path = os.path.join(save_path, f"quantization_description.json")
+        save_json_path = os.path.join(save_path, "quantization_description.json")
         os.makedirs(save_path, exist_ok=True)
         with open(save_json_path, "w", encoding="utf-8") as f:
             json.dump(desc_info, f, ensure_ascii=False, indent=4)

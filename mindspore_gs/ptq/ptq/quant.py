@@ -21,6 +21,10 @@ import gc
 import os
 import copy
 import tqdm
+import numpy as np
+
+from datasets import Dataset
+import mindspore as ms
 from mindspore import dtype, get_context, PYNATIVE_MODE
 from mindspore.nn import Cell
 from mindspore.nn.utils import no_init_parameters
@@ -141,7 +145,22 @@ class PTQ(CompAlgo):
         self.context_mode = get_context("mode")
         self._target_layer_type = ()
         self._build_pipeline()
-        self._load_mindformers_plugin()
+        self._load_plugin()
+
+    def _load_plugin(self):
+        """_load_plugin"""
+        try:
+            # pylint: disable=unused-import
+            import mindformers
+            self._load_mindformers_plugin()
+        except ImportError:
+            logger.info("mindformers package not found, skipping mindformers models import")
+        try:
+            # pylint: disable=unused-import
+            import mindone
+            self._load_mindone_plugin()
+        except ImportError:
+            logger.info("mindone package not found, skipping mindone models import")
 
     def _append_algorithm(self, name, algorithm: Algorithm):
         logger.info(f"append {name} to pipeline.")
@@ -157,6 +176,12 @@ class PTQ(CompAlgo):
         self._append_algorithm('LinearAutoSmoother', awq)
         self._append_algorithm('LinearClipper', clipper)
         self._append_algorithm('Quantizer', quantizer)
+
+    def _load_mindone_plugin(self):
+        """_load_mindformers_plugin"""
+        for algorithm in self.pipeline:
+            algorithm.load_mindone_plugin()
+            self._target_layer_type += algorithm.target_layer_type()
 
     def _load_mindformers_plugin(self):
         """_load_mindformers_plugin"""
@@ -249,7 +274,7 @@ class PTQ(CompAlgo):
         if not isinstance(self.layer_policies, OrderedDict):
             raise TypeError(f'layer_policies should be an OrderedDict, bug got {type(self.layer_policies)}.')
         if any(not isinstance(key, str) for key in self.layer_policies.keys()):
-            raise TypeError(f'all key of layer_policies should be a string.')
+            raise TypeError('all key of layer_policies should be a string.')
         try:
             for key, config_ in self.layer_policies.items():
                 if config_:
@@ -281,7 +306,7 @@ class PTQ(CompAlgo):
             raise ValueError("In QUANTIZE phase, please set mode=PYNATIVE_MODE.")
         if not datasets:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
-        if not isinstance(datasets, (GeneratorDataset, RepeatDataset)):
+        if not isinstance(datasets, (GeneratorDataset, RepeatDataset, Dataset)):
             raise TypeError("The type of dataset is not correct, suppose to <RepeatDataset>, "
                             f"but got {type(datasets)}")
         logger.info(f"Visible decoder layer types: {self.decoder_layer_types}. If decoder layer type of target network "
@@ -290,7 +315,7 @@ class PTQ(CompAlgo):
 
     # pylint: disable=arguments-differ
     # pylint: disable=unused-argument
-    def apply(self, network: Cell,
+    def apply_mf(self, network: Cell,
               network_helper: NetworkHelper = None,
               datasets=None, **kwargs) -> Cell:
         """
@@ -330,7 +355,8 @@ class PTQ(CompAlgo):
             return network
         self._check_apply_inputs(datasets)
         start_time = time.time()
-        logger.info(f"Catching inputs for first decoder layer with {datasets.get_dataset_size()} datasets samples.")
+        logger.info("Catching inputs for first decoder layer with "
+                    f"{self._get_dataset_size(datasets)} datasets samples.")
         catcher, network = self._get_first_layer_input(network, datasets, network_helper)
         all_args = catcher.args
         all_kwargs = catcher.kwargs
@@ -373,6 +399,83 @@ class PTQ(CompAlgo):
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
+    # pylint: disable=arguments-differ
+    # pylint: disable=unused-argument
+    def apply(self, network: Cell,
+              network_helper: NetworkHelper = None,
+              datasets=None, **kwargs) -> Cell:
+        """
+        Define how to add fake quantizer to `network`.
+
+        Args:
+            network (Cell): Network to be fake quantized.
+            network_helper (NetworkHelper): Utils for decoupling algorithm with network framework.
+            datasets (Dataset): Datasets for calibrating.
+
+        Returns:
+            fake quantized network.
+
+        Raises:
+            RuntimeError: If PTQ is not well inited.
+            TypeError: If input `network` is not a Cell.
+            ValueError: If input datasets is None.
+        """
+        def catch_layer_output(layer, input_args, input_kwargs, output_args, output_kwargs, do_update=True):
+            for index, (args, kwargs) in enumerate(zip(input_args, input_kwargs)):
+                output = layer(*args, **kwargs)
+                if do_update:
+                    if "hidden_states" in all_kwargs[index]:
+                        output_kwargs[index]["hidden_states"] = output[0] if isinstance(output, tuple) else output
+                    else:
+                        output_args[index][0] = output[0] if isinstance(output, tuple) else output
+        self._config.update_comm_info()
+        self._get_decoder_layers(network)
+        self._check_apply_inputs(datasets)
+
+        start_time = time.time()
+        logger.info("Catching inputs for first decoder layer with "
+                    f"{self._get_dataset_size(datasets)} datasets samples.")
+        catcher, network = self._get_first_layer_input(network, datasets, network_helper)
+        all_args = catcher.args
+        all_kwargs = catcher.kwargs
+        logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
+        start_time = time.time()
+        logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
+        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ..."):
+            logger.info(f"Quantize {i}th decoder layer.")
+            layer_name, layer = self.decoder_layers[i]
+            cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
+            if self._config.always_use_fp_input_in_processer:
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs,
+                                   do_update=len(self.decoder_layers) > 1)
+            for processor in self.pipeline:
+                processor.replace(layer_name, layer, search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
+
+                logger.info("Catching inputs of all Linear in decoder layer.")
+                start_time = time.time()
+
+                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook(self._config.experimental))
+                # FIXME: 'always_use_fp_input_in_processer' is a temporary switch for fixing activation between
+                # layers. This branch may introduces error to the next layer, because previous processors in the
+                # pipeline changes the layer, and thus, gives a inaccurate output. Set the switch to True to
+                # avoid this issue. The switch should be removed after the issue is fixed. -- @tongl2
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs, do_update= \
+                    len(self.decoder_layers) > 1 and not self._config.always_use_fp_input_in_processer)
+
+                transform_network_inplace(layer, WrapperCell, lambda _, c: c.remove_hook(self._config.experimental))
+                logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
+
+                processor.process(layer_name, layer)
+                network.update_parameters_name()
+                gc.collect()
+            if self._config.reflash_inputs_after_each_processor:
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs)
+            start_time = time.time()
+            offload_network(layer)
+            gc.collect()
+            logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
+        return network
+
     def fake_quant(self, network):
         """Apply fake quantization to the model.
 
@@ -403,12 +506,37 @@ class PTQ(CompAlgo):
                 network.update_parameters_name()
         return network
 
-    def _get_first_layer_input(self, network: Cell, ds=None, helper=None):
-        """get first layer input"""
-        catcher = InputCatcher()
-        catcher.patch(self.decoder_layers[0][1])
-        if not ds:
-            raise ValueError("PTQ need dataset to calibrate, please provide dataset.")
+    def _get_dataset_size(self, datasets):
+        if isinstance(datasets, (GeneratorDataset, RepeatDataset)):
+            return datasets.get_dataset_size()
+        if isinstance(datasets, Dataset):
+            return len(datasets)
+        raise ValueError(f"Not support {type(datasets)}")
+
+    def _generate_datasets(self, network, ds):
+        """_generate_datasets"""
+        total_count = len(ds)
+        data_count = 1
+        for i in range(total_count):
+            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+            try:
+                inputs = ds[i]
+                # convert input to Tensor
+                for key, value in inputs.items():
+                    if isinstance(value, np.ndarray):
+                        inputs[key] = ms.tensor(value)
+                    elif isinstance(value, list):
+                        inputs[key] = ms.Tensor(value)
+                    if inputs[key].dtype == ms.int64:
+                        inputs[key] = inputs[key].to(ms.int32)
+                network.generate(**inputs, max_new_tokens=1)
+            except GeneratorExit:
+                if hasattr(network, "block_mgr") and network.block_mgr:
+                    network.block_mgr.clear_cache()
+            data_count += 1
+
+    def _generate_datasets_ms(self, network: Cell, ds=None, helper=None):
+        """_generate_datasets_ms"""
         total_count = ds.get_dataset_size()
         data_count = 1
         for _, ds_item in enumerate(ds.create_dict_iterator()):
@@ -420,6 +548,18 @@ class PTQ(CompAlgo):
                 if hasattr(network, "block_mgr") and network.block_mgr:
                     network.block_mgr.clear_cache()
             data_count += 1
+
+    def _get_first_layer_input(self, network: Cell, ds=None, helper=None):
+        """get first layer input"""
+        catcher = InputCatcher()
+        catcher.patch(self.decoder_layers[0][1])
+        if not ds:
+            raise ValueError("PTQ need dataset to calibrate, please provide dataset.")
+
+        if isinstance(ds, (GeneratorDataset, RepeatDataset)):
+            self._generate_datasets_ms(network, ds, helper)
+        else:
+            self._generate_datasets(network, ds)
         catcher.recover()
         offload_network(network)
         return catcher, network

@@ -37,6 +37,8 @@ Examples:
     >>> model.save_quantized("/path/to/save/location")
 """
 
+import os
+
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 
@@ -91,12 +93,53 @@ class AutoQuantForCausalLM:
         # FIXME: hangangqiang2: we load mindformers models by default.
         # FIXME: hangangqiang2: we should load them as plugin in the future.
         # pylint: disable=unused-import
-        from .mindformers_models import QWen3, QWen3MoE, DeepSeekV3
-        model_hubs = BaseQuantForCausalLM.get_model_hub_registry()
-        for name, model_hub in model_hubs.items():
-            try:
-                model = model_hub.from_pretrained(pretained)
-                logger.info(f"Create model from {name}")
-                return model
-            except ValueError:
-                pass
+        if pretained.endswith(".yaml"):
+            model_registry = AutoQuantForCausalLM._load_mindformers_plugin()
+            model_name = AutoQuantForCausalLM._get_mindformers_model_name(pretained)
+        elif os.path.isdir(pretained):
+            model_registry = AutoQuantForCausalLM._load_mindone_plugin()
+            model_name = AutoQuantForCausalLM._get_mindone_model_name(pretained)
+        else:
+            raise ValueError(f"Unsupported model type: {pretained}")
+
+        try:
+            logger.info(f"Create model from {pretained}")
+            return model_registry[model_name].from_pretrained(pretained)
+        except ValueError as e:
+            raise ValueError(f"Create model from {pretained} failed, error: {e}") from e
+
+    @staticmethod
+    def _load_mindformers_plugin():
+        """_load_mindformers_plugin"""
+        try:
+            # pylint: disable=unused-import
+            from .mindformers_models import QWen3, QWen3MoE, DeepSeekV3
+        except ImportError as e:
+            raise ImportError(f"mindformers plugin load failed, error: {e}") from e
+        from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
+        return MFModel.get_model_registry()
+
+    @staticmethod
+    def _load_mindone_plugin():
+        """_load_mindone_plugin"""
+        try:
+            # pylint: disable=unused-import
+            from .mindone_models import GLM4v
+        except ImportError as e:
+            raise ImportError(f"mindone plugin load failed, error: {e}") from e
+        from mindspore_gs.ptq.models.mindone_models.mindone_model import MindOneModel
+        return MindOneModel.get_model_registry()
+
+    @staticmethod
+    def _get_mindformers_model_name(model_path):
+        """get_mindformers_model_name"""
+        from mindformers import MindFormerConfig
+        mfconfig = MindFormerConfig(model_path)
+        return mfconfig.trainer.model_name
+
+    @staticmethod
+    def _get_mindone_model_name(model_path):
+        """get_mindone_model_name"""
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained(model_path)
+        return config.model_type

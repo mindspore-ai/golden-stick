@@ -11,3 +11,15 @@ mindformers == 1.7.0
 pytest >= 1.6.0
 tiktoken == 0.9.0
 aiohttp < 3.9; python_version == '3.9'
+
+# for mindone
+tqdm
+omegaconf
+opencv-python
+sentencepiece
+trampoline
+mindcv==0.3.0
+huggingface-hub>=0.20.2
+safetensors>=0.3.1
+better_profanity
+nltk

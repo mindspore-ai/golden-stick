@@ -48,6 +48,7 @@ import os
 import time
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq import PTQ
+from mindspore_gs.ptq.ptq_config import BackendTarget
 from mindspore_gs.common.utils import offload_network
 from .base_model import BaseQuantForCausalLM
 from .distributed_parameter import DistributedParameter
@@ -121,7 +122,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         """
         raise NotImplementedError
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.NONE):
         """Save the quantized model to disk.
 
         This is an abstract method that must be implemented by derived classes.
@@ -273,7 +274,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         quant_start = time.time()
         logger.info('Quantize-ing network...')
         start_time = time.time()
-        ptq.apply(net, datasets=datasets)
+        ptq.apply_mf(net, datasets=datasets)
         ptq.summary(net)
         offload_network(net)
         logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')

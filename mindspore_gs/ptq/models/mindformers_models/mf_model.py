@@ -59,6 +59,7 @@ from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQ
+from mindspore_gs.ptq.ptq_config import BackendTarget
 from mindspore_gs.ptq.models.distributed_parameter import DistributedParameter
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.ptq.wrappers.mindformers.mcore_linear_wrapper import McoreLinearInferCell
@@ -141,6 +142,17 @@ class MFModel(BaseQuantForCausalLMImpl):
             return cls
 
         return decorator
+
+    @staticmethod
+    def get_model_registry():
+        """Get the registry of all registered mindformers models.
+
+        Returns:
+            dict[str, type]. Dictionary mapping mindformers model names to their
+                respective class implementations.
+        """
+        return MFModel._model_registry
+
 
     def _after_network_load_weights(self):
         return
@@ -501,7 +513,7 @@ class MFModelEnableSafeTensors(MFModel):
             hf_param_dict[self._convert_param_names_to_hf(name)] = param
         return hf_param_dict
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.NONE):
         """Save the quantized model in SafeTensors format.
 
         This method saves the quantized model parameters and metadata
@@ -510,7 +522,7 @@ class MFModelEnableSafeTensors(MFModel):
         Args:
             save_path (str): Path where the quantized model should be saved.
         """
-        super().save_quantized(save_path)
+        super().save_quantized(save_path, backend=backend)
         sf_mgr = SafeTensorsMgr()
         sf_mgr.save(self._original_sf_path,
                     save_path,
@@ -721,13 +733,13 @@ class MFModelNotEnableSafeTensors(MFModel):
         param_dict, _ = self._process_params_dict_before_save(param_dict)
         return param_dict
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.NONE):
         """Save the quantized model to checkpoint files.
 
         Args:
             save_path (str): Path where the quantized model should be saved.
         """
-        super().save_quantized(save_path)
+        super().save_quantized(save_path, backend=backend)
         self._save_safetenors(save_path)
         _ = self._save_desc_json(save_path)
 

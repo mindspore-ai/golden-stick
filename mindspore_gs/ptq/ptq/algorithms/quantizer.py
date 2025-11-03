@@ -68,6 +68,10 @@ class Quantizer(Algorithm):
         # pylint: disable=unused-import
         import mindspore_gs.ptq.ptq.wrappers.mindformers
 
+    def load_mindone_plugin(self):
+        # pylint: disable=unused-import
+        import mindspore_gs.ptq.ptq.wrappers.mindone
+
     def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
 
         class Replacer(Processor):
