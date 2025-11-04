@@ -14,13 +14,15 @@
 # ============================================================================
 """PTQ algorithm."""
 from functools import partial
-from typing import List, Union, Tuple, Optional
+from typing import List, Union, Tuple, Optional, Callable
 from collections import OrderedDict
 import time
 import gc
 import os
 import copy
 import tqdm
+
+from datasets  import Dataset
 from mindspore import dtype, get_context, PYNATIVE_MODE
 from mindspore.nn import Cell
 from mindspore.nn.utils import no_init_parameters
@@ -71,6 +73,16 @@ class InputCatcher(Cell):
         self.kwargs.append(kwargs)
         raise GeneratorExit("already catch first layer inputs, do not need continue.")
 
+def convert_to_dataset(datasets):
+    """Convert non-Dataset data to Dataset"""
+    if isinstance(datasets, Dataset):
+        return datasets
+    if isinstance(datasets, (GeneratorDataset, RepeatDataset)):
+        samples = [sample['input_ids'].asnumpy() \
+            for sample in datasets.create_dict_iterator()]
+        return Dataset.from_dict({"input_ids": samples})
+    raise TypeError(f"Unsupported data type: {type(datasets)}. "
+                    "Please provide a Dataset, GeneratorDataset or RepeatDataset.")
 
 class PTQ(CompAlgo):
     """
@@ -163,8 +175,11 @@ class PTQ(CompAlgo):
         for algorithm in self.pipeline:
             algorithm.load_mindformers_plugin()
             self._target_layer_type += algorithm.target_layer_type()
-        from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
-        self.decoder_layer_types.append(LLamaDecodeLayer)
+        try:
+            from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
+            self.decoder_layer_types.append(LLamaDecodeLayer)
+        except ImportError:
+            pass
         try:
             from research.llama3_1.infer.transformer import ParallelTransformerLayer as LlamaParallelTransformerLayer
             from research.deepseek3.deepseek3_model_infer import DeepseekV3DecodeLayer
@@ -178,11 +193,26 @@ class PTQ(CompAlgo):
         except ImportError:
             pass
 
-        def generate(network, input_ids, helper=None):
-            if isinstance(helper, NetworkHelper):
-                return helper.generate(network, input_ids, do_sample=False, max_new_tokens=1)
-            return network.generate(input_ids, do_sample=False, max_new_tokens=1)
-        self._generate_func = generate
+    def set_ptq_config(self, **kwargs):
+        """set ptq config""" 
+        for key, value in kwargs.items():
+            if not hasattr(self._config, key):
+                raise AttributeError(f"'{type(self._config).__name__}' "
+                                     f"object has no attribute '{key}', "
+                                     "please check and try again.")
+            if not isinstance(value, type(getattr(self._config, key))):
+                raise TypeError(f"The type of value for '{key}' in PTQConfig "
+                                f"should be {type(getattr(self._config, key))}, "
+                                f"but got {type(value)}")
+            setattr(self._config, key, value)
+
+    def set_target_layer_type(self, target_layer_type: tuple):
+        """set target layer type"""
+        self._target_layer_type += target_layer_type
+
+    def set_generate_func(self, generate_func: Callable):
+        """set generate function"""
+        self._generate_func = generate_func
 
     def _get_decoder_layers(self, network: Cell):
         """
@@ -249,13 +279,13 @@ class PTQ(CompAlgo):
         if not isinstance(self.layer_policies, OrderedDict):
             raise TypeError(f'layer_policies should be an OrderedDict, bug got {type(self.layer_policies)}.')
         if any(not isinstance(key, str) for key in self.layer_policies.keys()):
-            raise TypeError(f'all key of layer_policies should be a string.')
+            raise TypeError('all key of layer_policies should be a string.')
         try:
             for key, config_ in self.layer_policies.items():
                 if config_:
                     re.compile(key)
                     if not isinstance(config_, PTQConfig):
-                        raise TypeError(f'The type of value in layer_policies should be PTQConfig,'
+                        raise TypeError('The type of value in layer_policies should be PTQConfig,'
                                         f'but got {type(config_)}')
                     if config_.mode != self._config.mode:
                         logger.warning(f'The mode={config_.mode} in {key} layer policy different from '
@@ -281,9 +311,9 @@ class PTQ(CompAlgo):
             raise ValueError("In QUANTIZE phase, please set mode=PYNATIVE_MODE.")
         if not datasets:
             raise ValueError("please provide dataset when use PTQ quant to quantize network.")
-        if not isinstance(datasets, (GeneratorDataset, RepeatDataset)):
-            raise TypeError("The type of dataset is not correct, suppose to <RepeatDataset>, "
-                            f"but got {type(datasets)}")
+        if not isinstance(datasets, Dataset):
+            raise RuntimeError(f"The type of dataset is not correct, suppose to {Dataset.__class__.__name__}, "
+                               f"but got {type(datasets)}")
         logger.info(f"Visible decoder layer types: {self.decoder_layer_types}. If decoder layer type of target network "
                     "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
         logger.info("Analysis network structure.")
@@ -328,9 +358,11 @@ class PTQ(CompAlgo):
                         processor.deploy(layer_name, layer)
                     network.update_parameters_name()
             return network
+
+        datasets = convert_to_dataset(datasets)
         self._check_apply_inputs(datasets)
         start_time = time.time()
-        logger.info(f"Catching inputs for first decoder layer with {datasets.get_dataset_size()} datasets samples.")
+        logger.info(f"Catching inputs for first decoder layer with {len(datasets)} datasets samples.")
         catcher, network = self._get_first_layer_input(network, datasets, network_helper)
         all_args = catcher.args
         all_kwargs = catcher.kwargs
@@ -409,13 +441,17 @@ class PTQ(CompAlgo):
         catcher.patch(self.decoder_layers[0][1])
         if not ds:
             raise ValueError("PTQ need dataset to calibrate, please provide dataset.")
-        total_count = ds.get_dataset_size()
+        total_count = len(ds)
         data_count = 1
-        for _, ds_item in enumerate(ds.create_dict_iterator()):
-            input_ids = ds_item['input_ids'].asnumpy()
+        for _, ds_item in enumerate(ds):
             logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
             try:
-                self._generate_func(network, input_ids, helper)
+                if isinstance(helper, NetworkHelper):
+                    return helper.generate(network, ds_item['input_ids'], do_sample=False, max_new_tokens=1)
+                if self._generate_func is None:
+                    return network.generate(**ds_item, do_sample=False, max_new_tokens=1)
+                # pylint: disable=not-callable
+                return self._generate_func(**ds_item)
             except GeneratorExit:
                 if hasattr(network, "block_mgr") and network.block_mgr:
                     network.block_mgr.clear_cache()

@@ -63,6 +63,7 @@ from mindspore_gs.ptq.models.distributed_parameter import DistributedParameter
 from mindspore_gs.ptq.processor import Processor
 from mindspore_gs.ptq.ptq.wrappers.mindformers.mcore_linear_wrapper import McoreLinearInferCell
 from mindspore_gs.ptq.models.safetensors_mgr import SafeTensorsMgr
+from mindspore_gs.common.utils import offload_network
 
 
 @BaseQuantForCausalLM.reg_model_hub("mindformers")
@@ -225,6 +226,68 @@ class MFModel(BaseQuantForCausalLMImpl):
         """
         return self.network.generate(input_ids, do_sample=False, max_new_tokens=max_new_tokens)
 
+    def calibrate(self, ptq_config, layers_policy, datasets, **kwargs):
+        """Calibrate and quantize the model.
+
+        This method implements the core quantization workflow including:
+        1. Setting up the PTQ algorithm with the provided configuration
+        2. Applying the quantization to the network
+        3. Performing calibration using the provided datasets
+        4. Managing timing and performance monitoring
+
+        Args:
+            ptq_config (PTQConfig): Configuration for post-training quantization.
+            layers_policy (dict): Policy for different layer quantization strategies.
+            datasets (Dataset): Calibration dataset for quantization.
+            **kwargs: Additional keyword arguments.
+                fake_quant (bool, optional): Whether to use fake quantization.
+                    Defaults to ``False``.
+
+        Example:
+            >>> # Typical usage pattern
+            >>> model.calibrate(
+            ...     ptq_config=ptq_config,
+            ...     layers_policy=layers_policy,
+            ...     datasets=calibration_dataset,
+            ...     fake_quant=False
+            ... )
+        """
+        logger.info("Use ptq algo to quant network and weight.")
+        net = self._network()
+        ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
+        # pylint: disable=protected-access
+        ptq = self._set_ptq_config(ptq, **kwargs)
+        ptq = self._load_mindformers_plugin(ptq)
+        quant_start = time.time()
+        logger.info('Quantize-ing network...')
+        start_time = time.time()
+        ptq.apply(net, datasets=datasets)
+        ptq.summary(net)
+        offload_network(net)
+        logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
+        start_time = time.time()
+        logger.info(f'Convert to real quantize cost time is {time.time() - start_time} s.')
+        logger.info(f'Quant Network cost total time is {time.time() - quant_start} s.')
+
+    def _set_ptq_config(self, ptq: PTQ, **kwargs):
+        """set ptq config"""
+        ptq.set_ptq_config(experimental=True)
+        ptq.set_ptq_config(**kwargs)
+        return ptq
+
+    def _load_mindformers_plugin(self, ptq: PTQ):
+        """load mindformers plugin"""
+        # set decoder layer types
+        transformer_layers = self._transformer_layers()
+        _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
+        # set target layer type and load mindformers wrappers
+        for algorithm in ptq.pipeline:
+            algorithm.load_mindformers_plugin()
+            ptq.set_target_layer_type(algorithm.target_layer_type())
+        # set generate function for getting first layer input
+        ptq.set_generate_func(self.forward)
+        return ptq
+
     def _network(self):
         """Get the underlying network instance.
 
@@ -295,7 +358,7 @@ class MFModel(BaseQuantForCausalLMImpl):
         ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
         # pylint: disable=protected-access
         ptq._config.experimental = True
-        ptq._config.use_fake_quant = True
+        ptq._config.fake_quant = True
         transformer_layers = self._transformer_layers()
         _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
         ptq.fake_quant(self.network)

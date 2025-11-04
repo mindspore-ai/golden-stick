@@ -110,7 +110,7 @@ class SimpleNet(nn.Cell):
             return self.linear(x, *args, **kwargs)
 
     def __init__(self, linear_type, dtype_str, foo_seq_length=1024):
-        super(SimpleNet, self).__init__()
+        super().__init__()
 
         dtype_map = {
             'float32': msdtype.float32,
@@ -176,7 +176,7 @@ def create_ptq(mode):
     ptq._config.skip_offload_in_processing = True
     ptq._config.algorithm_cache_path = {} # Disable cache for testing
     ptq._config.experimental = True
-    ptq._config.use_fake_quant = True
+    ptq._config.fake_quant = True
     ptq.decoder_layer_types.append(SimpleNet.DecoderCell)
     return ptq
 

@@ -86,7 +86,7 @@ class GptqDynamicQuantLinearCell(GptqWeightQuantLinearCell):
         self.weight_need_allgather = False
         self.h = ops.zeros((self.ic, self.ic), dtype=dtype.float32)
         if self.cfg.mode == PTQMode.QUANTIZE and not self.cfg.algo_args["desc_act"]:
-            raise ValueError(f"When use GPTQ Dynamic quant algorithm, desc_act in GPTQConfig must be True.")
+            raise ValueError("When use GPTQ Dynamic quant algorithm, desc_act in GPTQConfig must be True.")
 
     def _quant_info(self):
         res = super()._quant_info()
@@ -144,12 +144,12 @@ class GptqDynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
                                                                         self._transpose_b(), compute_type,
                                                                         is_gmm_mcore=is_gmm_mcore,
                                                                         experimental=True,
-                                                                        use_fake_quant=context.use_fake_quant)
+                                                                        fake_quant=context.fake_quant)
         self._set_act_dynamic_quant(dynamic_quant_op)
         del self.layer.weight
         self.layer.weight = None
         self.weight = q_weight
-        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type)) if context.use_fake_quant \
+        self.weight_scale = Parameter(w_qparam.scale.astype(compute_type)) if context.fake_quant \
             else qmm.weight_scale
         self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
         self.has_bias = self.layer.has_bias
