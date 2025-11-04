@@ -2,7 +2,7 @@
 
 # MindSpore Golden Stick
 
-#### MindSpore Golden Stick 是MindSpore开源社区的模型压缩工具，支持在昇腾硬件上将Hugging Face的权重进行量化，并在[vllm-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore)或[MindSpore Transformers](https://gitee.com/mindspore/mindformers)上进行部署。
+**MindSpore Golden Stick 是MindSpore开源社区的模型压缩工具，支持在昇腾硬件上将Hugging Face的权重进行量化，并在[vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore)或[MindSpore Transformers](https://gitee.com/mindspore/mindformers)上进行部署。**
 
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://gitee.com/mindspore/golden-stick)
 [![version](https://img.shields.io/badge/release-1.3.0-green)](https://gitee.com/mindspore/golden-stick/releases)
@@ -110,7 +110,7 @@ MindSpore Golden Stick（后面简称金箍棒）是MindSpore团队和华为诺�
 
 ### 模型部署
 
-金箍棒模型压缩得到的是Hugging Face格式的权重，推荐在[vllm-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore)或者[MindSpore Transformers](https://gitee.com/mindspore/mindformers)上进行部署，也可以尝试在Pytorch、ONNX Runtime、TensorRT等主流框架上进行部署。
+金箍棒模型压缩得到的是Hugging Face格式的权重，推荐在[vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore)或者[MindSpore Transformers](https://gitee.com/mindspore/mindformers)上进行部署，也可以尝试在Pytorch、ONNX Runtime、TensorRT等主流框架上进行部署。
 
 ## 社区
 

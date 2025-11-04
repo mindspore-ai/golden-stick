@@ -2,7 +2,7 @@
 
 # MindSpore Golden Stick
 
-#### MindSpore Golden Stick is a model compression tool for the MindSpore open source community, supporting quantization of Hugging Face weights on Ascend hardware and deployment on [vllm-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers).
+**MindSpore Golden Stick is a model compression tool for the MindSpore open source community, supporting quantization of Hugging Face weights on Ascend hardware and deployment on [vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers).**
 
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://gitee.com/mindspore/golden-stick)
 [![version](https://img.shields.io/badge/release-1.3.0-green)](https://gitee.com/mindspore/golden-stick/releases)
@@ -110,7 +110,7 @@ Take [Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quant
 
 ### Model Deployment
 
-The model compression results from Golden Stick are weights in Hugging Face format. It is recommended to deploy them on [vllm-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers). You can also try deploying them on mainstream frameworks such as PyTorch, ONNX Runtime, TensorRT, etc.
+The model compression results from Golden Stick are weights in Hugging Face format. It is recommended to deploy them on [vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers). You can also try deploying them on mainstream frameworks such as PyTorch, ONNX Runtime, TensorRT, etc.
 
 ## Community
 
