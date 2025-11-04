@@ -14,9 +14,9 @@
 # ============================================================================
 """fake quant wrapper cells for mindone."""
 
-
+import mindspore as ms
 from mindspore import nn, dtype as msdtype
-from mindspore import ops
+from mindspore import ops, mint
 
 from mindspore_gs.ptq.context import InnerPTQConfig
 
@@ -42,11 +42,7 @@ class SmoothQuant(nn.Cell):
         self.quant = Quant(dst_type)
 
     def construct(self, x, smooth_scale, scale, offset):
-        # FIXME hangangqiang2@huawei.com
-        # Theoretically, weights should be multiplied by scale, while activations should be divided by scale.
-        # However, during deployment, smooth_scale is inverted (reciprocal taken) after apply_scale_to_weight.
-        # Since weights have already been multiplied by scale, activations must still be multiplied by scale here.
-        x = x * smooth_scale
+        x = x / smooth_scale
         return self.quant(x, scale, offset)
 
 
@@ -84,7 +80,7 @@ class SmoothFakeQuant(nn.Cell):
     def construct(self, x, smooth_scale, scale, offset):
         x = self.quant(x, smooth_scale, scale, offset)
         x = self.de_quant(x, scale, offset)
-        x = x / smooth_scale
+        x = x * smooth_scale
         return x
 
 
@@ -145,13 +141,15 @@ class GMMDeQuant(nn.Cell):
 class FakeQuantLinearCell(nn.Cell):
     """FakeQuantLinearCell"""
     # pylint: disable=unused-argument
-    def __init__(self, layer_name, linear: nn.Dense, context, cfg: InnerPTQConfig):
+    def __init__(self, layer_name, linear: nn.Cell, context, cfg: InnerPTQConfig):
         super().__init__()
         self.layer_name = layer_name
         self.layer = linear
         self.context = context
         self.cfg = cfg
         self.compute_dtype = linear.weight.dtype
+        self.ic = linear.weight.shape[1]
+        self.output_size_per_partition = linear.weight.shape[0]
 
     def dequant_input(self, x, weight):
         """process input"""
@@ -161,7 +159,9 @@ class FakeQuantLinearCell(nn.Cell):
     def construct(self, x):
         """linear deploy construct"""
         x, weight = self.dequant_input(x, self.weight)
-
+        if isinstance(self.layer, mint.nn.Linear):
+            self.layer.weight = weight
+            return self.layer(x)
         x_shape = self.layer.shape_op(x)
         if len(x_shape) != 2:
             x = self.layer.reshape(x, (-1, x_shape[-1]))

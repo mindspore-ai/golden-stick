@@ -94,13 +94,29 @@ class Algorithm:
         """class name"""
         return cls.__name__
 
-    def process(self, decoder_layer_name: str, decoder_layer):
+    def process_mf(self, decoder_layer_name: str, decoder_layer):
         """process"""
         def transform_fn(cell_name, cell):
             logger.info(f"process {cell_name} in {self.class_name()}")
             cell.process()
 
         transform_network_inplace(decoder_layer, WrapperCell, transform_fn, decoder_layer_name)
+
+    def process(self, decoder_layer_name, decoder_layer):
+        """deploy"""
+        class MindOneProcessor(Processor):
+            """A network iterator for transform fq-network to quant-network."""
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if not isinstance(cell, WrapperCell):
+                    return cell, False
+                processed_cell = cell.process()
+                # for smooth/awq/clip algorithm, the process() method need return origin layer.
+                # then, we cann process for quant algorithm with the origin layer.
+                return_cell = cell if processed_cell is None else processed_cell
+                logger.info(f"convert {cell_name} to real-quant cell({type(return_cell)}).")
+                return return_cell, True
+
+        MindOneProcessor().process(decoder_layer, decoder_layer_name)
 
     def deploy(self, decoder_layer_name, decoder_layer):
         """deploy"""

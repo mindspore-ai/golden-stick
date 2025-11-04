@@ -153,14 +153,15 @@ class PTQ(CompAlgo):
             # pylint: disable=unused-import
             import mindformers
             self._load_mindformers_plugin()
-        except ImportError:
-            logger.info("mindformers package not found, skipping mindformers models import")
+        except ImportError as e:
+            logger.info(f"import package raise {e}, skipping mindformers models import.")
+
         try:
             # pylint: disable=unused-import
             import mindone
             self._load_mindone_plugin()
-        except ImportError:
-            logger.info("mindone package not found, skipping mindone models import")
+        except ImportError as e:
+            logger.info(f"import package raise {e}, skipping mindone models import.")
 
     def _append_algorithm(self, name, algorithm: Algorithm):
         logger.info(f"append {name} to pipeline.")
@@ -375,7 +376,6 @@ class PTQ(CompAlgo):
 
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()
-
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook(self._config.experimental))
                 # FIXME: 'always_use_fp_input_in_processer' is a temporary switch for fixing activation between
                 # layers. This branch may introduces error to the next layer, because previous processors in the
@@ -387,7 +387,7 @@ class PTQ(CompAlgo):
                 transform_network_inplace(layer, WrapperCell, lambda _, c: c.remove_hook(self._config.experimental))
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
-                processor.process(layer_name, layer)
+                processor.process_mf(layer_name, layer)
                 processor.deploy(layer_name, layer)
                 network.update_parameters_name()
                 gc.collect()
@@ -451,9 +451,8 @@ class PTQ(CompAlgo):
             for processor in self.pipeline:
                 processor.replace(layer_name, layer, search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
 
-                logger.info("Catching inputs of all Linear in decoder layer.")
+                logger.info(f"Catching inputs of all Linear in decoder layer. processor: {processor}")
                 start_time = time.time()
-
                 transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook(self._config.experimental))
                 # FIXME: 'always_use_fp_input_in_processer' is a temporary switch for fixing activation between
                 # layers. This branch may introduces error to the next layer, because previous processors in the
