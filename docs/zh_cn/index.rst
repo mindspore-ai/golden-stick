@@ -22,7 +22,7 @@ MindSpore Golden Stick基于MindSpore内置的模型压缩技术和组件化设�
 
 MindSpore Golden Stick提供了统一的模型压缩接口，支持训练后量化（PTQ）、量化感知训练（QAT）、模型剪枝等多种压缩技术，可以通过以下说明文档进行学习：
 
-当前金箍棒的工作主要聚焦在LLM网络和多模态理解网络的压缩上，主要使用训练后量化技术。QAT算法、剪枝算法主要针对CV网络，当前已经不在演进和维护。后续我们也可能规划一些针对LLM网络的QAT或者剪枝算法，也欢迎大家在社区贡献代码或者提交需求。
+当前金箍棒的工作主要聚焦在LLM网络和多模态理解网络的压缩上，主要使用训练后量化技术。QAT算法、剪枝算法主要针对CV网络，技术已经相对陈旧，当前已经不再演进和维护。后续我们也可能规划一些针对LLM网络的QAT或者剪枝算法，也欢迎大家在社区贡献代码或者提交需求。
 
 - `安装指南 <install.html>`_
 - `Transformers-Like API <ptq/mindspore_gs.ptq.AutoQuantForCausalLM.html>`_
@@ -108,6 +108,13 @@ MindSpore Golden Stick支持算法列表
   - `MindSpore Golden Stick Release Notes <RELEASE.html>`_
 
 ------------------------------------
+
+.. toctree::
+   :maxdepth: 1
+   :caption: 架构设计
+   :hidden:
+
+   design
 
 .. toctree::
    :maxdepth: 1

@@ -24,32 +24,6 @@ version=$1
 
 CUR_DIR=$(cd "$(dirname $0)"; pwd)
 
-# README.md
-sed -i '/^<div align="center">/d' ${CUR_DIR}/../README_CN.md
-sed -i '/\[\!\[python\]/d' ${CUR_DIR}/../README_CN.md
-sed -i '/\[\!\[version\]/d' ${CUR_DIR}/../README_CN.md
-sed -i '/\[\!\[license\]/d' ${CUR_DIR}/../README_CN.md
-sed -i '/^\[\*\*架构\*\*\](docs\/zh_cn\/design\.md)/d' ${CUR_DIR}/../README_CN.md
-sed -i 's/^\[English\](README\.md).*/[View English](\.\/README\.md)/' ${CUR_DIR}/../README_CN.md
-sed -i '/^<div align="left">/d' ${CUR_DIR}/../README_CN.md
-sed -i '1,/^[^[:space:]]*$/{ /^[[:space:]]*$/d; }' ${CUR_DIR}/../README_CN.md
-sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING_CN.md
-awk 'BEGIN{blank=0} /^[[:space:]]*$/ {blank++; if(blank==1) print; next} {blank=0; print}' ${CUR_DIR}/../README_CN.md > ${CUR_DIR}/../README_CN_temp.md 
-mv ${CUR_DIR}/../README_CN_temp.md ${CUR_DIR}/../README_CN.md
-
-sed -i '/^<div align="center">/d' ${CUR_DIR}/../README.md
-sed -i '/\[\!\[python\]/d' ${CUR_DIR}/../README.md
-sed -i '/\[\!\[version\]/d' ${CUR_DIR}/../README.md
-sed -i '/\[\!\[license\]/d' ${CUR_DIR}/../README.md
-sed -i '/^\[\*\*Architecture\*\*\](docs\/en\/design\.md)/d' ${CUR_DIR}/../README.md
-sed -i 's/^\[English\](README\.md).*/[查看中文](\.\/README_CN\.md)/' ${CUR_DIR}/../README.md
-sed -i '/^<div align="left">/d' ${CUR_DIR}/../README.md
-sed -i '1,/^[^[:space:]]*$/{ /^[[:space:]]*$/d; }' ${CUR_DIR}/../README.md
-sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING.md
-awk 'BEGIN{blank=0} /^[[:space:]]*$/ {blank++; if(blank==1) print; next} {blank=0; print}' ${CUR_DIR}/../README.md > ${CUR_DIR}/../README_temp.md 
-mv ${CUR_DIR}/../README_temp.md ${CUR_DIR}/../README.md
-
-
 # mindspore_gs/pruner/README.md
 sed -i "s/\.\/scop\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/zh-CN\/${version}\/pruner\/scop\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README_CN.md
 sed -i "s/\.\/scop\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/pruner\/scop\.html/g" ${CUR_DIR}/../mindspore_gs/pruner/README.md
@@ -75,3 +49,25 @@ sed -i "s/\.\.\/ptq\/README_CN\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/d
 sed -i "s/\.\/simulated_quantization\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/quantization\/simulated_quantization\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
 sed -i "s/\.\/slb\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/quantization\/slb\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
 sed -i "s/\.\.\/ptq\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
+
+# mindspore_gs/CONTRIBUTING.md
+sed -i "s#\[README\](./README.md)#\[README\](https://gitee.com/mindspore/golden-stick/tree/${version}/README.md)#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#\[README\](./README_CN.md)#\[README\](https://gitee.com/mindspore/golden-stick/tree/${version}/README_CN.md)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+
+sed -i "s#\[Architecture Design\](./docs/en/design\.md)#\[Architecture Design\]\(https://www.mindspore.cn/golden_stick/docs/en/${version}/design.html)#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#\[架构设计\](./docs/zh_cn/design\.md)#\[架构设计\]\(https://www.mindspore.cn/golden_stick/docs/zh-CN/${version}/design.html)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+
+sed -i "s#\[Quick Start\](./example)#\[Quick Start\](https://gitee.com/mindspore/golden-stick/tree/${version}/example/)#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#\[快速入门\](./example)#\[快速入门\](https://gitee.com/mindspore/golden-stick/tree/${version}/example/)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+
+sed -i "s#./docs/en/install.md#https://www.mindspore.cn/golden_stick/docs/en/${version}/install.html#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#./docs/zh_cn/install.md#https://www.mindspore.cn/golden_stick/docs/zh-CN/${version}/install.html#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+
+sed -i "s#./docs/en/design.md#https://www.mindspore.cn/golden_stick/docs/en/${version}/design.html#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#./docs/zh_cn/design.md#https://www.mindspore.cn/golden_stick/docs/zh-CN/${version}/design.html#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+
+sed -i "s#./scripts/pre_push/README.md#https://gitee.com/mindspore/golden-stick/tree/${version}/scripts/pre_push/README.md#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#./scripts/pre_push/README_CN.md#https://gitee.com/mindspore/golden-stick/tree/${version}/scripts/pre_push/README_CN.md#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+
+sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING_CN.md
+sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING.md

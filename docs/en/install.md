@@ -2,16 +2,14 @@
 
 [![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/blob/master/docs/en/install.md)
 
-[查看中文](../docs_zh_cn/install.md)
+[查看中文](../zh_cn/install.md)
 
 ## Environmental Restrictions
 
-The following table lists the environment required for installing, compiling and running MindSpore Golden Stick:
+The following lists the system environment required for installing, compiling and running MindSpore Golden Stick:
 
-| Software |  Version   |
-| :-----: | :-----: |
-| OS  | openEuler/Ubuntu/Linux |
-| Python  |  >=3.9, <3.12 |
+- OS: openEuler/Ubuntu/Linux
+- Python: >=3.9, <3.12
 
 > For other third-party dependencies, please refer to the [requirements file](https://gitee.com/mindspore/golden-stick/blob/master/requirements.txt).
 

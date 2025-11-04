@@ -25,7 +25,7 @@
 
 - 在[Gitee](https://gitee.com/mindspore/golden-stick)上fork代码仓。
 - 参见[README](./README_CN.md)和[安装说明](./docs/zh_cn/install.md)了解项目信息和构建说明。
-- 参考[快速入门](./example/)尝试使用将SmoothQuant应用于Qwen3-0.6B网络。
+- 参考[快速入门](./example)尝试使用将SmoothQuant应用于Qwen3-0.6B网络。
 - 参考[架构设计](./docs/zh_cn/design.md)了解项目架构，参考[wiki](https://gitee.com/mindspore/golden-stick/wikis)了解项目详细的软件设计。
 
 ## 贡献流程
@@ -36,7 +36,7 @@
 
 - 编码指南
 
-    MindSpore Golden Stick社区使用[Python PEP 8 编码风格](https://pep8.org/)。建议在IDE中安装以下插件，用于检查代码格式：[CppLint](https://github.com/cpplint/cpplint)、[CppCheck](http://cppcheck.sourceforge.net)、[CMakeLint](https://github.com/cmake-lint/cmake-lint)、[CodeSpell](https://github.com/codespell-project/codespell)、[Lizard](http://www.lizard.ws)、[ShellCheck](https://github.com/koalaman/shellcheck)和[PyLint](https://pylint.org)。
+    MindSpore Golden Stick社区使用[Python PEP 8 编码风格](https://pep8.org/)。建议在IDE中安装以下插件，用于检查代码格式：[CodeSpell](https://github.com/codespell-project/codespell)、[Lizard](http://www.lizard.ws)、[ShellCheck](https://github.com/koalaman/shellcheck)和[PyLint](https://pylint.org)。
 
 - 单元测试指南
 
@@ -57,7 +57,7 @@
 
 ### 本地代码自检
 
-在开发过程中，建议使用pre-push功能进行本地代码自检，可以在本地进行类似CI门禁上Code Check阶段的代码扫描，提高上库时跑门禁的成功率。使用方法请参见[pre-push快速指引](scripts/pre_push/README_CN.md)。
+在开发过程中，建议使用pre-push功能进行本地代码自检，可以在本地进行类似CI门禁上Code Check阶段的代码扫描，提高上库时跑门禁的成功率。使用方法请参见[pre-push快速指引](./scripts/pre_push/README_CN.md)。
 
 ### Fork-Pull开发模型
 

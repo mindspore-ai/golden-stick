@@ -2,16 +2,14 @@
 
 [![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/master/docs/zh_cn/install.md)
 
-[View English](../docs_en/install.md)
+[View English](../en/install.md)
 
 ## 环境限制
 
-下表列出了安装、编译和运行MindSpore Golden Stick所需的系统环境：
+下面列出了安装、编译和运行MindSpore Golden Stick所需的系统环境：
 
-| 软件名称 |  版本   |
-| :-----: | :-----: |
-| OS  | openEuler/Ubuntu/Linux |
-| Python  |  >=3.9, <3.12 |
+- 操作系统：openEuler/Ubuntu/Linux
+- Python：>=3.9, <3.12
 
 > 其他的三方依赖请参考[requirements文件](https://gitee.com/mindspore/golden-stick/blob/master/requirements.txt)。
 

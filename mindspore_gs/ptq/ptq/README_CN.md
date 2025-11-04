@@ -369,8 +369,9 @@ ptq_config = PTQConfig(weight_quant_dtype=msdtype.int8,  act_quant_dtype=None,  
 ## 示例
 
 量化通常分为两个阶段：
-1）第一个是量化校准阶段，解决量化权重从哪里来的问题，这一部分能力由金箍棒提供；
-2）第二个是量化部署阶段，解决量化权重如何高效得部署在生产环境的问题，这一部分能力由vllm-MindSpore Plugin、MindSpore Transformers或其他部署框架提供。
+
+1. 量化校准阶段，解决量化权重从哪里来的问题，这一部分能力由金箍棒提供；
+2. 量化部署阶段，解决量化权重如何高效地部署在生产环境的问题，这一部分能力由vLLM-MindSpore Plugin、MindSpore Transformers或其他部署框架提供。
 
 ### Qwen3-0.6B 混合精度量化
 
@@ -545,7 +546,7 @@ Qwen3-mix-quant
 
 #### 步骤3. 量化部署
 
-金箍棒生成的量化权重是Hugging Face社区格式，可以加载到 [vllm-MindSpore Plugin](https://www.mindspore.cn/vllm_mindspore/docs/zh-CN/master/user_guide/supported_features/quantization/quantization.html) 或者 [MindSpore Transformers](https://gitee.com/mindspore/mindformers/tree/master/configs/qwen3#%E6%8E%A8%E7%90%86%E6%A0%B7%E4%BE%8B) 中进行部署。
+金箍棒生成的量化权重是Hugging Face社区格式，可以加载到 [vLLM-MindSpore Plugin](https://www.mindspore.cn/vllm_mindspore/docs/zh-CN/master/user_guide/supported_features/quantization/quantization.html) 或者 [MindSpore Transformers](https://gitee.com/mindspore/mindformers/tree/master/configs/qwen3#%E6%8E%A8%E7%90%86%E6%A0%B7%E4%BE%8B) 中进行部署。
 
 需要注意的是，MindSpore Transformers量化推理流程要求权重的 `config.json` 中必须包含量化相关的配置，才能正常推理，所以需要用户手动修改该文件，添加如下配置：
 

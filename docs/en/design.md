@@ -1,33 +1,87 @@
-# Architecture
+# Architecture Design
 
-![MindSpore_GS_Architecture](./images/golden-stick-arch.png)
+## Golden Stick Architecture
 
-The architecture diagram is the overall picture of MindSpore Golden Stick, which includes the features that have been implemented in the current version and the capabilities planned in RoadMap. Please refer to release notes for available features in current version.
+We analyzed some [industry model compression framework practices](https://gitee.com/mindspore/golden-stick/wikis/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/%E9%87%91%E7%AE%8D%E6%A3%92%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3#%E4%B8%9A%E7%95%8C%E5%AE%9E%E8%B7%B5%E8%B0%83%E7%A0%94) and summarized some excellent characteristics:
 
-## Design Features
+- **Minimal Ease-of-Use**: Represented by LLM Compressor, deeply integrated with Transformers, providing **a minimal API design**. It has a gentle learning curve and excellent ease of use. Although algorithms are highly encapsulated, it rapidly tracks frontier algorithms in the **LLM domain**, meeting the needs of quick onboarding, deployment, and verification—an ideal choice for LLM users.
 
-In addition to providing rich model compression algorithms, an important design concept of MindSpore Golden Stick is try to provide users with the most unified and concise experience for a wide variety of model compression algorithms in the industry, and reduce the cost of algorithm application for users. MindSpore Golden Stick implements this philosophy through two initiatives:
+- **Fine-Grained Configuration**: Represented by DeepSpeed Compression, providing **finely configurable APIs**, which require a certain learning cost to understand the principles and parameters of compression algorithms. Its **rich and composable algorithm library** supports building compression pipelines like building blocks; the modular architecture facilitates integrating custom algorithms—more than a toolbox, it is a **research platform**.
 
-1. Unified algorithm interface design to reduce user application costs:
+- **Extreme Performance**: Taking TensorRT as an example; as a CUDA runtime rather than a dedicated model compression tool, it implements quantization and sparsity via a plugin mechanism (custom operators, passes, etc.), **delivering extreme inference performance on NVIDIA hardware**, widely used in production environments, but with a high technical threshold.
 
-   There are many types of model compression algorithms, such as quantization-aware training algorithms, pruning algorithms, matrix decomposition algorithms, knowledge distillation algorithms, etc. In each type of compression algorithm, there are also various specific algorithms, such as LSQ and PACT, which are both quantization-aware training algorithms. Different algorithms are often applied in different ways, which increases the learning cost for users to apply algorithms. MindSpore Golden Stick sorts out and abstracts the algorithm application process, and provides a set of unified algorithm application interfaces to minimize the learning cost of algorithm application. At the same time, this also facilitates the exploration of advanced technologies such as AMC, NAS and HAQ based on the algorithm ecology.
+Based on the above observations, we hope that Golden Stick is both an easy-to-use model compression tool and a research platform for algorithm researchers. We have defined several goals:
 
-2. Provide front-end network modification capabilities to reduce algorithm development costs：
+- **Easy-to-use Flexible APIs**: Multi-level APIs that balance ease of use and flexibility, lowering the usage barrier while retaining algorithm customization capabilities;
+- **Rich and Modular Algorithm Library**: Provides a rich set of compression algorithms and supports flexible composition;
+- **Highly Extensible Framework Architecture**: Facilitates the integration of custom algorithm modules, and combined with flexible APIs, helps build customized compression pipelines.
 
-   Model compression algorithms are often designed or optimized for specific network structures. For example, perceptual quantization algorithms often insert fake-quantization nodes on the Conv2d, Conv2d + BatchNorm2d, or Conv2d + BatchNorm2d + Relu structures in the network. MindSpore Golden Stick provides the ability to modify the front-end network through API. Based on this ability, algorithm developers can formulate general network transform rules to implement the algorithm logic without needing to implement the algorithm logic for each specific network. In addition, MindSpore Golden Stick also provides some debugging capabilities, including visualization tool, profiler tool, summary tool, aiming to help algorithm developers improve development and research efficiency, and help users find algorithms that meet their needs.
+![Golden Stick Architecture Diagram](images/arch.png)
 
-## General Process of Applying the MindSpore Golden Stick
+### API Design
 
-![workflow](images/workflow.png)
+Golden Stick provides multi-level API design:
 
-1. Compress Phase
+- **Level 0 Interface**: Similar to DeepSpeed Compression’s configuration-style API, offering rich configuration options for compression algorithms to support on-demand customization.
+- **Level 1 Interface**: Similar to Transformers’ concise API, supports rapid application of built-in compression algorithms, directly optimizing Transformers networks and Hugging Face weights.
 
-    Taking the quantization algorithm as an example, the compression phase mainly includes transforming the network into a fake-quantized network, quantization retraining or calibration, quantizing parameter statistics, quantizing weights, and transforming the network into a real quantized network.
+### Algorithm Pipeline
 
-2. Deplyment Phase
+- **Layered Architecture Design**: Adopts a four-layer architecture (Pipeline, AlgoModule, Wrappers, BaseQuantFuncs), supports customizing components at any level, reuses low-level capabilities, and accelerates experimentation with new algorithms.
+- **Chain-of-responsibility Pattern**: Pipeline and AlgoModule are designed based on the chain-of-responsibility pattern to achieve modularity; users can flexibly compose different AlgoModules to build customized compression pipelines.
 
-    The deployment phase is the process of inferring the compressed network in the deployment environment. Since MindSpore does not support serialization of the front-end network, the deployment also needs to call the corresponding algorithm interface to transform the network to load the compressed checkpoint file. The flow after loading the compressed checkpoint file is the same as the normal inference process.
+### Infrastructure
 
-> - For details about how to apply the MindSpore Golden Stick, see the detailed description and sample code in each algorithm section.
-> - For details about the "ms.export" step in the process, see [Exporting MINDIR Model](https://www.mindspore.cn/tutorials/en/master/beginner/save_load.html#saving-and-loading-mindir).
-> - For details about the "MindSpore infer" step in the process, see [MindSpore Inference Runtime](https://www.mindspore.cn/tutorials/en/master/model_infer/ms_infer/ms_infer_model_infer.html).
+#### Compatibility with Hugging Face Weights
+
+This section mainly discusses the implementation of Hugging Face compatibility related to post-training quantization.
+
+1. **Hugging Face Weight Loading**
+    - MindOne provides a Transformers-like interface and supports directly loading Hugging Face formatted weights;
+    - MindFormers provides a dedicated interface and supports building networks from Hugging Face weight files.
+
+2. **Hugging Face Quantized Weight Export**
+    - Merge TP-parallel weights into the Hugging Face format split by parameter names and save them as safetensors files;
+    - Generate the safetensors index file `index.json`;
+    - Update `config.json`, add quantization configuration information for the inference framework to construct quantization methods;
+    - Save the quantization description file for the inference framework to build quantized networks;
+    - Keep all other files in the original weight directory.
+
+#### Fake-Quantization Evaluation
+
+This section mainly discusses accuracy evaluation methods related to post-training quantization.
+
+Fake-Quantization Evaluation is an accuracy evaluation method that does not rely on an inference framework. Its core idea is to insert fake-quantization operators into a floating-point network, introducing quantization errors to simulate the real quantized inference process. This method can independently evaluate the accuracy loss caused by the quantization algorithm itself, excluding additional errors introduced by the inference framework or performance optimization features, which facilitates accuracy analysis.
+
+**Limitations**:
+
+1. **Algorithm Compatibility Limitation**: Some algorithms cannot be accurately simulated through fake-quantization. For example, FAQuant needs to introduce quantization error in the intermediate calculations of the FlashAttention fused operator; if the network uses the FlashAttention fused operator, fake-quantization evaluation cannot be performed.
+
+2. **Large Performance Overhead**: The inference performance of fake-quantization evaluation is significantly lower than normal inference. Especially for long-sequence inference scenarios such as CoT (Chain-of-Thought), evaluation is time-consuming.
+
+#### Mixed Strategy
+
+To balance the compression rate and accuracy, it is often necessary to adopt differentiated algorithm strategies based on the characteristics of different layers in the network.
+
+Golden Stick provides a two-level strategy configuration system:
+
+- **Network-Level Strategy**: A global compression strategy that takes effect on all algorithm-sensitive layers in the network;
+- **Layer-Level Strategy**: Configure dedicated compression strategies for specific layers matched via regular expressions; it has a higher priority than the network-level strategy.
+
+### Ascend Hardware Adaptation Layer
+
+- **Network Fusion Optimization**: Operator fusion is a fundamental but effective technique for inference optimization. Original Transformers networks are usually not fused. To ensure that the compressed network still has fusion capability, algorithm design needs to consider fusion modules in a unified manner. We abstract and encapsulate fusion capabilities via `NetworkFuser`, and design `StatisticMgr` to avoid repeated computation, improving overall efficiency.
+
+- **Operator Specification Adaptation**: Ascend hardware has specific requirements for certain operators (e.g., 8-bit full quantization requires both left and right matrices to be symmetrically quantized, and offsets need to be converted to bias). Golden Stick provides dedicated adaptation modules to ensure that quantized weights meet Ascend operator specifications.
+
+### Algorithm-Inference Decoupling
+
+Golden Stick adopts an architecture design that separates algorithms from inference:
+
+1. **Algorithm Independence**: Directly compress Transformers networks without relying on the network definitions in specific deployment frameworks (such as the vLLM-MindSpore Plugin);
+2. **Fake-Quantization Evaluation**: Supports accuracy evaluation independent of inference frameworks, facilitating validation of algorithm effectiveness;
+3. **Standardized Interface**: Uses the Hugging Face community weight format as the standard interface between algorithms and inference frameworks, enabling compress-once, deploy-everywhere.
+
+The decoupled algorithm–inference architecture improves the generality of the output quantized weights and reduces maintenance costs.
+
+**Deployment Verification**: Golden Stick’s quantized weights have been deployed and verified on the [vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) and [MindSpore Transformers](https://gitee.com/mindspore/mindformers). Based on the standardized design of the Hugging Face format, it is theoretically supported to attempt deployment on other inference frameworks.

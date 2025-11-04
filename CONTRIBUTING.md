@@ -26,7 +26,7 @@ For individual contributor, please refer to [ICLA online document](https://www.m
 
 - Fork the repository on [Gitee](https://gitee.com/mindspore/golden-stick).
 - Refer to [README](./README.md) and [Installation Guide](./docs/en/install.md) for project information and build instructions.
-- Refer to [Quick Start](./example/) to try applying SmoothQuant to the Qwen3-0.6B network.
+- Refer to [Quick Start](./example) to try applying SmoothQuant to the Qwen3-0.6B network.
 - Refer to [Architecture Design](./docs/en/design.md) to understand the project architecture, and refer to [wiki](https://gitee.com/mindspore/golden-stick/wikis) for detailed software design of the project.
 
 ## Contribution Workflow
@@ -37,7 +37,7 @@ Please follow this style to make MindSpore Golden Stick community easy to review
 
 - Coding Guidelines
 
-    The MindSpore Golden Stick community uses [Python PEP 8 Coding Style](https://pep8.org/). It is recommended to install the following plugins in your IDE for code format checking: [CppLint](https://github.com/cpplint/cpplint), [CppCheck](http://cppcheck.sourceforge.net), [CMakeLint](https://github.com/cmake-lint/cmake-lint), [CodeSpell](https://github.com/codespell-project/codespell), [Lizard](http://www.lizard.ws), [ShellCheck](https://github.com/koalaman/shellcheck), and [PyLint](https://pylint.org).
+    The MindSpore Golden Stick community uses [Python PEP 8 Coding Style](https://pep8.org/). It is recommended to install the following plugins in your IDE for code format checking: [CodeSpell](https://github.com/codespell-project/codespell), [Lizard](http://www.lizard.ws), [ShellCheck](https://github.com/koalaman/shellcheck), and [PyLint](https://pylint.org).
 
 - Unittest Guidelines
 
@@ -58,7 +58,7 @@ Please follow this style to make MindSpore Golden Stick community easy to review
 
 ### Local Code Self-Check
 
-During development, it is recommended to use the pre-push feature for local code self-check, which can perform code scanning similar to the Code Check phase in CI gates locally, improving the success rate when running gates during code submission. For usage instructions, please refer to [pre-push Quick Guide](scripts/pre_push/README.md).
+During development, it is recommended to use the pre-push feature for local code self-check, which can perform code scanning similar to the Code Check phase in CI gates locally, improving the success rate when running gates during code submission. For usage instructions, please refer to [pre-push Quick Guide](./scripts/pre_push/README.md).
 
 ### Fork-Pull Development Model
 
