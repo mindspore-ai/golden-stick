@@ -14,11 +14,11 @@
 
 <div align="left">
 
-MindSpore Golden Stick is a model compression tool jointly designed and developed by MindSpore team and Huawei Noah's Ark Lab. We have two main goals: on one hand, we aim to build model compression capabilities for the MindSpore open source ecosystem and provide simple and easy-to-use interfaces to help users improve the deployment efficiency of MindSpore networks; on the other hand, we aim to shield the complexity of frameworks and hardware, providing good extensibility and foundational capabilities for model compression algorithms.
+MindSpore Golden Stick is a model compression tool jointly designed and developed by MindSpore team and Huawei Noah's Ark Lab. We have two main goals: first, to be a model compression tool that provides concise interfaces and rich algorithm libraries to improve the deployment efficiency of MindSpore networks; second, to be an algorithm research platform with flexible configuration interfaces, modular algorithm libraries, and a framework that supports rapid customization, facilitating algorithm researchers to quickly practice innovation. Specifically:
 
-- **SoTA Algorithms:** The model compression algorithms in Golden Stick mainly come from two sources: one is the state-of-the-art algorithms from the industry, which we continuously follow up on in the MindSpore ecosystem; the other is innovative algorithms provided by Huawei's algorithm teams.
-- **Easy-to-use Interface:** Golden Stick provides Transformers-like interfaces and supports direct compression of Hugging Face community weights, with output weights that also conform to the Hugging Face community weight format.
-- **Layered Decoupling:** Golden Stick is committed to building an easy-to-use algorithm research platform. We have designed the framework with layered and modular architecture, which on one hand shields the complexity of frameworks and hardware, and on the other hand facilitates algorithm engineers to quickly innovate and experiment at different levels of algorithms.
+- **Multi-level APIs:** Provides different level APIs, offering both ease of use and flexibility, lowering the barrier to entry while retaining algorithm customization capabilities;
+- **Rich and Modular Algorithm Library:** Provides rich SoTA compression algorithms and supports flexible modular combinations;
+- **Highly Extensible Framework Architecture:** Layered decoupling that shields the complexity of hardware and frameworks, while supporting integration of custom algorithm components to build customized compression pipelines with flexible APIs.
 
 ## What's New🔥
 
