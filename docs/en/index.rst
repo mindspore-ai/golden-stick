@@ -111,6 +111,13 @@ Supported Algorithms in MindSpore Golden Stick
 
 .. toctree::
    :maxdepth: 1
+   :caption: Architecture Design
+   :hidden:
+
+   design
+
+.. toctree::
+   :maxdepth: 1
    :caption: Installation and Deployment
    :hidden:
 
