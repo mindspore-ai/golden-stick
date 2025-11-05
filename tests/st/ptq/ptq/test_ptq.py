@@ -45,7 +45,7 @@ class SwiGLU(nn.Cell):
     _size = 0
 
     def __init__(self):
-        super(SwiGLU, self).__init__()
+        super().__init__()
         self.size = SwiGLU._size
         self.silu = SiLU()
         self.split = SplitWithSize()
@@ -76,7 +76,7 @@ class SimpleSwiGLUNet(nn.Cell):
             return self.linear(*args, **kwargs)
 
     def __init__(self, foo_seq_length=1024):
-        super(SimpleSwiGLUNet, self).__init__()
+        super().__init__()
         self.hidden_act = SwiGLU
         self.foo_seq_length = foo_seq_length
         SwiGLU.set_size(512)
@@ -91,6 +91,11 @@ class SimpleSwiGLUNet(nn.Cell):
 
     # pylint: disable=unused-argument
     def generate(self, input_ids, do_sample=False, max_new_tokens=1):
+        try:
+            input_ids = np.array(input_ids)
+        except ValueError as e:
+            raise ValueError(str(e) + " Please check your inputs of model.generate(),"
+                                      " and make sure the inputs are padded to same length.") from e
         input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
         return self.construct(Tensor(input_ids, dtype=dtype.float16))
@@ -117,9 +122,10 @@ class SimpleGmmNet(nn.Cell):
             self.use_sequence_parallel = False
 
     def __init__(self, linear_type, foo_seq_length=1024):
-        super(SimpleGmmNet, self).__init__()
+        super().__init__()
         self.config = SimpleGmmNet.ParallelConfig()
         self.foo_seq_length = foo_seq_length
+        linear = None
         if linear_type == "ColumnParallelLinear":
             linear = ColumnParallelLinear(
                 foo_seq_length,
@@ -157,6 +163,11 @@ class SimpleGmmNet(nn.Cell):
 
     # pylint: disable=unused-argument
     def generate(self, input_ids, do_sample=False, max_new_tokens=1):
+        try:
+            input_ids = np.array(input_ids)
+        except ValueError as e:
+            raise ValueError(str(e) + " Please check your inputs of model.generate(),"
+                                      " and make sure the inputs are padded to same length.") from e
         input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
         return self.construct(Tensor(input_ids, dtype=dtype.bfloat16))
@@ -445,7 +456,7 @@ class SimpleNet(nn.Cell):
             return self.linear(*args, **kwargs)
 
     def __init__(self, foo_seq_length=1024):
-        super(SimpleNet, self).__init__()
+        super().__init__()
         self.foo_seq_length = foo_seq_length
         linear = Linear(in_channels=foo_seq_length, out_channels=foo_seq_length, weight_init="ones")
         self.decoder = SimpleNet.DecoderCell(linear)
@@ -456,6 +467,11 @@ class SimpleNet(nn.Cell):
 
     # pylint: disable=unused-argument
     def generate(self, input_ids, do_sample=False, max_new_tokens=1):
+        try:
+            input_ids = np.array(input_ids)
+        except ValueError as e:
+            raise ValueError(str(e) + " Please check your inputs of model.generate(),"
+                                      " and make sure the inputs are padded to same length.") from e
         input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
         return self.construct(Tensor(input_ids, dtype=dtype.float16))
@@ -498,6 +514,7 @@ def test_input_catcher(device):
     Description: Apply InputCatcher on SimpleNet and check if inputs being caught correctly.
     Expectation: Inputs being caught correctly.
     """
+    # pylint: disable=import-outside-toplevel
     from mindspore_gs.ptq.ptq.quant import InputCatcher
     os.environ['ENFORCE_EAGER'] = "true"
     context.set_context(mode=context.PYNATIVE_MODE, device_target=device, max_device_memory="8GB")
@@ -691,6 +708,7 @@ def test_context_mode_error():
     Description:set GRAPH mode to QUANTIZE when using PTQ alogrith to quant network.
     Expectation: Except ValueError.
     """
+    # pylint: disable=import-outside-toplevel
     from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
     config = PTQConfig(mode=PTQMode.QUANTIZE, act_quant_dtype=dtype.int8,
                        outliers_suppression=OutliersSuppressionType.SMOOTH)
@@ -702,8 +720,9 @@ def test_context_mode_error():
     set_context(mode=GRAPH_MODE, device_target='Ascend', jit_config={"jit_level": "O0", "infer_boost": "on"},
                 max_device_memory=helper.mf_config.context.max_device_memory)
     network = helper.create_network()
+    ds = create_foo_ds(1)
     with pytest.raises(ValueError, match="In QUANTIZE phase, please set mode=PYNATIVE_MODE."):
-        ptq.apply(network, helper)
+        ptq.apply(network, helper, ds)
 
 
 def quant_simplenet(non_decoder):
@@ -810,10 +829,9 @@ def test_ptq_llama2_predict_2stage_1p_run_level0(quant_algo):
         f"python {run_file} -m 1 -a {quant_algo} > test_ptq_{quant_algo}_predict_llama2_1p.log"
     )
     if return_code != 0:
-        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_1p.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
+        with open(f"./test_ptq_{quant_algo}_predict_llama2_1p.log", "r", encoding="utf-8") as log_file:
+            for line in log_file:
+                print(line, flush=True)
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
@@ -840,10 +858,9 @@ def test_ptq_llama2_predict_2stage_1p_run_leval1(quant_algo):
         f"python {run_file} -m 1 -a {quant_algo}"
     )
     if return_code != 0:
-        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
+        with open(f"./test_ptq_{quant_algo}_predict_llama2_1p_logs/worker_0.log", "r", encoding="utf-8") as log_file:
+            for line in log_file:
+                print(line, flush=True)
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
@@ -871,10 +888,9 @@ def test_ptq_llama2_predict_2stage_2p_run_level0(quant_algo):
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
-        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
+        with open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8") as log_file:
+            for line in log_file:
+                print(line, flush=True)
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)
@@ -902,10 +918,9 @@ def test_ptq_llama2_predict_2stage_2p_run_level1(quant_algo):
         f"python {run_file} -m 2 -a {quant_algo}"
     )
     if return_code != 0:
-        log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
+        with open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8") as log_file:
+            for line in log_file:
+                print(line, flush=True)
     os.system("ps -u | grep 'ptq_network_runner' | grep -v grep | awk -F ' ' '{print$2}' | xargs kill -9")
     os.system(f"kill -9 $(lsof -i:{port} | " + "awk '{print $2}')")
     time.sleep(1.0)

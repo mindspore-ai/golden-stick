@@ -122,7 +122,7 @@ class InnerPTQConfig(GSBaseConfig, PTQConfig):
     save_gmm_bias_in_quant_phase: bool = False
 
     experimental: bool = False
-    use_fake_quant: bool = False
+    fake_quant: bool = False
 
     dump_path: str = ""
     dumper: Dumper = Dumper()

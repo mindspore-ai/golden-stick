@@ -45,10 +45,7 @@ Examples:
 """
 
 import os
-import time
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.ptq import PTQ
-from mindspore_gs.common.utils import offload_network
 from .base_model import BaseQuantForCausalLM
 from .distributed_parameter import DistributedParameter
 
@@ -258,28 +255,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
             ...     fake_quant=False
             ... )
         """
-        logger.info("Use ptq algo to quant network and weight.")
-        net = self._network()
-        ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
-        # pylint: disable=protected-access
-        ptq._config.experimental = True
-        ptq._config.use_fake_quant = kwargs.get('fake_quant', False)
-        ptq._config.algorithm_cache_path = kwargs.get('algorithm_cache_path', {})
-        ptq._config.always_use_fp_input_in_processer = kwargs.get('always_use_fp_input_in_processer', False)
-        ptq._config.skip_offload_in_processing = kwargs.get('skip_offload_in_processing', False)
-
-        transformer_layers = self._transformer_layers()
-        _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
-        quant_start = time.time()
-        logger.info('Quantize-ing network...')
-        start_time = time.time()
-        ptq.apply(net, datasets=datasets)
-        ptq.summary(net)
-        offload_network(net)
-        logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
-        start_time = time.time()
-        logger.info(f'Convert to real quantize cost time is {time.time() - start_time} s.')
-        logger.info(f'Quant Network cost total time is {time.time() - quant_start} s.')
+        raise NotImplementedError
 
     def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):
         """Apply fake quantization to the model.
