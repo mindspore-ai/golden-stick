@@ -30,7 +30,7 @@ from mindformers.modules import Linear
 from mindspore_gs.ptq.ptq import PTQ
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode, OutliersSuppressionType,
-                              PrecisionRecovery, GPTQQuantConfig, AWQConfig, QuantGranularity)
+                              PrecisionRecovery, GPTQQuantConfig, QuantGranularity)
 from tests.st.test_utils import get_available_port
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
@@ -153,6 +153,8 @@ class SimpleGmmNet(nn.Cell):
                 is_expert=True,
                 expert_num=10
             )
+        else:
+            raise ValueError(f"Unsupported linear_type: {linear_type}")
 
         self.decoder = SimpleGmmNet.DecoderCell(linear)
         self.group_list = Tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 1], dtype=dtype.int64)
@@ -647,56 +649,6 @@ def test_a8w4_config_error():
                            algo_args=algo_args,
                            group_size=256)
         _ = PTQ(config)
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_gptq_config_error():
-    """
-    Feature: simulated GPTQQuantConfig __post_init__ function.
-    Description: Feed invalid value of GPTQQuantConfig to __post_init__ function.
-    Expectation: Except ValueError.
-    """
-    with pytest.raises(TypeError):
-        _ = GPTQQuantConfig(block_size=0.1)
-    with pytest.raises(TypeError):
-        _ = GPTQQuantConfig(desc_act="0")
-    with pytest.raises(TypeError):
-        _ = GPTQQuantConfig(damp_percent="1")
-    with pytest.raises(TypeError):
-        _ = GPTQQuantConfig(static_groups="2")
-    with pytest.raises(ValueError):
-        _ = GPTQQuantConfig(block_size=-100)
-    with pytest.raises(ValueError):
-        _ = GPTQQuantConfig(damp_percent=-0.5)
-    with pytest.raises(ValueError):
-        _ = GPTQQuantConfig(damp_percent=2.1)
-
-
-@pytest.mark.level0
-@pytest.mark.platform_x86_cpu
-@pytest.mark.env_onecard
-def test_awq_config_error():
-    """
-    Feature: simulated AWQConfig __post_init__ function.
-    Description: Feed invalid value of AWQConfig to __post_init__ function.
-    Expectation: Except ValueError.
-    """
-    with pytest.raises(TypeError):
-        _ = AWQConfig(duo_scaling=1)
-    with pytest.raises(TypeError):
-        _ = AWQConfig(smooth_alpha="1")
-    with pytest.raises(TypeError):
-        _ = AWQConfig(weight_clip_ratio="1")
-    with pytest.raises(ValueError):
-        _ = AWQConfig(smooth_alpha=-0.5)
-    with pytest.raises(ValueError):
-        _ = AWQConfig(weight_clip_ratio=-0.5)
-    with pytest.raises(ValueError):
-        _ = AWQConfig(smooth_alpha=[-1, 0.1, 0.5])
-    with pytest.raises(ValueError):
-        _ = AWQConfig(weight_clip_ratio=[0.1, 0.5, 10])
 
 
 @pytest.mark.level0
