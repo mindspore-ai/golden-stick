@@ -67,6 +67,10 @@ class MindOneModelHubPlugin(ModelHubPlugin):
         No quantization cells need to be specifically loaded for MindOne
         at this time.
         """
+        from mindspore_gs.ptq.quant_cells.mindone.linear_weight_quant_wrappers import WeightQuantLinearCell
+        from mindspore_gs.ptq.quant_cells.mindone.fake_quant_linear import FakeQuantA16WxWrapper
+        WeightQuantLinearCell.reg_self()
+        FakeQuantA16WxWrapper.reg_self()
 
     def create_model(self, pretrained) -> BaseQuantForCausalLM:
         """Create a model instance from a pretrained configuration.
