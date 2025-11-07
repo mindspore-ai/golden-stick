@@ -4,4 +4,7 @@
 [submodule "tests/mindformers"]
 	path = tests/mindformers
 	url = https://gitee.com/mindspore/mindformers.git
+[submodule "tests/mindone"]
+	path = tests/mindone
+	url = https://gitee.com/mindspore-lab/mindone.git
 
