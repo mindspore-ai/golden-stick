@@ -14,11 +14,11 @@
 # ============================================================================
 """fake quant wrapper cells for mindone."""
 
-import mindspore as ms
 from mindspore import nn, dtype as msdtype
-from mindspore import ops, mint
-
+from mindspore import ops, mint, Parameter
+import numpy as np
 from mindspore_gs.ptq.context import InnerPTQConfig
+from mindspore_gs.common.utils import offload_param
 
 
 class Quant(nn.Cell):
@@ -160,8 +160,10 @@ class FakeQuantLinearCell(nn.Cell):
         """linear deploy construct"""
         x, weight = self.dequant_input(x, self.weight)
         if isinstance(self.layer, mint.nn.Linear):
-            self.layer.weight = weight
-            return self.layer(x)
+            self.layer.weight = Parameter(weight)
+            res = self.layer(x)
+            offload_param(self.layer.weight)
+            return res
         x_shape = self.layer.shape_op(x)
         if len(x_shape) != 2:
             x = self.layer.reshape(x, (-1, x_shape[-1]))

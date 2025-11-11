@@ -24,6 +24,7 @@ from mindspore_gs.ptq.basic_quant_func import quant_tensor
 from mindspore_gs.ptq.ptq.algorithms.quantizer import Quantizer
 from mindspore_gs.ptq.utils import QuantType
 from mindspore_gs.ptq.ptq.wrapper_cell import Checker
+from mindspore_gs.common.utils import offload_param
 from .linear_wrapper import WrapperLinearCell
 
 class WeightQuantLinearCell(WrapperLinearCell):
@@ -65,7 +66,11 @@ class WeightQuantLinearCell(WrapperLinearCell):
         """quant"""
         self.cfg.dumper.dump_data(self.layer_name, "|weight_params|input0_weight", self.layer.weight)
         # quant weight
-        w_scale, w_zp, q_weight = quant_tensor(self.layer.weight, self.w_quant_min, self.w_quant_max,
+        if hasattr(self.layer, "smooth_scale"):
+            weight = self.layer.weight * self.layer.smooth_scale
+        else:
+            weight = self.layer.weight
+        w_scale, w_zp, q_weight = quant_tensor(weight, self.w_quant_min, self.w_quant_max,
                                                self.cfg.weight_narrow_range, self.cfg.weight_symmetric,
                                                self.cfg.weight_quant_granularity == QuantGranularity.PER_GROUP,
                                                self.cfg.group_size, self.cfg.weight_quant_dtype,
@@ -74,7 +79,9 @@ class WeightQuantLinearCell(WrapperLinearCell):
         if self.cfg.weight_quant_granularity == QuantGranularity.PER_CHANNEL:
             w_scale = np.squeeze(w_scale)
             w_zp = np.squeeze(w_zp)
-
+        offload_param(weight)
+        offload_param(self.layer.weight)
+        del weight
         del self.layer.weight
         self.layer.weight = None
         self.weight = Parameter(q_weight.astype(dtype=dtype.int8))

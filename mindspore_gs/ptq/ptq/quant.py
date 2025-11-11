@@ -528,7 +528,9 @@ class PTQ(CompAlgo):
                         inputs[key] = ms.Tensor(value)
                     if inputs[key].dtype == ms.int64:
                         inputs[key] = inputs[key].to(ms.int32)
-                network.generate(**inputs, max_new_tokens=1)
+                from transformers.generation.configuration_utils import GenerationConfig
+                generation_config = GenerationConfig(use_cache=False)
+                network.generate(**inputs, max_new_tokens=1, generation_config=generation_config)
             except GeneratorExit:
                 if hasattr(network, "block_mgr") and network.block_mgr:
                     network.block_mgr.clear_cache()

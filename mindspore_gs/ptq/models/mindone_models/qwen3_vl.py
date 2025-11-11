@@ -14,27 +14,27 @@
 # ============================================================================
 
 """
-GLM4v Quantized Model Implementation
+Qwen3_vl Quantized Model Implementation
 """
 
 import mindspore as ms
 from mindspore.nn.cell import Cell
+
 from mindspore_gs.ptq.models.mindone_models.mindone_model import MindOneModel
 from mindspore_gs.ptq.utils import QuantType
+from transformers.generation.configuration_utils import GenerationConfig
 
 
-
-@MindOneModel.reg_model('qwen3_moe')
-class Qwen3_MOE(MindOneModel):
-    """GLM4v Quantized Model Implementation
+@MindOneModel.reg_model('qwen3_vl')
+class Qwen3_vl(MindOneModel):
+    """Qwen3_vl Quantized Model Implementation
     """
     def __init__(self, model_path):
-        from mindone.transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeForCausalLM
-        self.network = Qwen3MoeForCausalLM.from_pretrained(
+        from mindone.transformers import Qwen3VLForConditionalGeneration
+        self.network = Qwen3VLForConditionalGeneration.from_pretrained(
             model_path,
             mindspore_dtype=ms.bfloat16,
             _attn_implementation="flash_attention_2",
-            use_cache=False,
             )
         self._original_sf_path = model_path
 
@@ -53,9 +53,8 @@ class Qwen3_MOE(MindOneModel):
         Returns:
             Generated output from the model.
         """
-        return self.network.generate(inputs, max_new_tokens=max_new_tokens,
-                                        use_cache=False,
-                                     do_sample=False)
+        generation_config = GenerationConfig(max_new_tokens=max_new_tokens, use_cache=False)
+        return self.network.generate(**inputs, do_sample=False, generation_config=generation_config)
 
     def _network(self):
         """Get the underlying network instance.
@@ -74,8 +73,8 @@ class Qwen3_MOE(MindOneModel):
         Returns:
             tuple[type]. Tuple containing TransformerLayer type.
         """
-        from mindone.transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeDecoderLayer
-        return [Qwen3MoeDecoderLayer]
+        from mindone.transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextDecoderLayer
+        return [Qwen3VLTextDecoderLayer]
 
     def _get_quant_type(self):
         """Get quantization type information for network parameters.
@@ -135,4 +134,3 @@ class Qwen3_MOE(MindOneModel):
             else:
                 desc_info[key] = QuantType.FLOAT.value
         return desc_info
-
