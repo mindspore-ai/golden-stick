@@ -24,62 +24,30 @@ from tqdm import tqdm
 from mindspore import load_checkpoint, load_param_into_net
 
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
-from mindspore_gs.ptq.models.safetensors_mgr import SafeTensorsMgr
+from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
+from mindspore_gs.ptq.basic_functions.safetensors_mgr import SafeTensorsMgr
 from mindspore_gs.ptq.ptq.quant import PTQ
-from mindspore_gs.ptq.models.distributed_parameter import DistributedParameter
+from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
 from mindspore_gs.common import BackendTarget
 from .param_processor import ParamProcessor
 
 
-@BaseQuantForCausalLM.reg_model_hub("mindone")
 class MindOneModel(BaseQuantForCausalLMImpl):
-    """MindOneModel base class for Quantization
-    """
-
+    """MindOneModel base class for Quantization"""
     _model_registry: dict[str, type] = {}
 
     @staticmethod
-    def _reg_model(name, model_clazz):
-        """Internal method to register a model implementation.
-
-        This method registers a specific model implementation in the
-        internal registry, preventing duplicate registrations.
-
-        Args:
-            name (str): Name/identifier for the model implementation.
-            model_clazz (type): The class implementing the model.
-
-        Raises:
-            RuntimeError: If a model with the same name is already registered.
-        """
+    def _reg_model(name, model_clazz: type[BaseQuantForCausalLM]):
         cur = MindOneModel._model_registry.get(name)
         if cur:
             raise RuntimeError(f"Duplicated model reg, name: {name}, already reg class: {cur}, "
                                f"current reg class:{model_clazz}")
-        logger.info(f"Register name {name} to model {model_clazz}")
+        logger.info(f"Register mindone model: name {name} to {model_clazz}")
         MindOneModel._model_registry[name] = model_clazz
 
     @staticmethod
     def reg_model(alias=None):
-        """Decorator for registering specific model implementations.
-
-        This decorator registers a class as a specific model implementation
-        that can be automatically discovered and instantiated.
-
-        Args:
-            alias (str, optional): Alternative name for the model.
-                If not provided, the class name will be used. Defaults to ``None``.
-
-        Returns:
-            function. Decorator function that registers the class.
-
-        Examples:
-            >>> @MindOneModel.reg_model('glm4v')
-            >>> class glm4v(MFModel):
-            >>>     pass
-        """
         def decorator(cls):
             """decorator"""
             register_key = alias if alias is not None else cls.__name__
@@ -87,16 +55,6 @@ class MindOneModel(BaseQuantForCausalLMImpl):
             return cls
 
         return decorator
-
-    @staticmethod
-    def get_model_registry():
-        """Get the registry of all registered mindformers models.
-
-        Returns:
-            dict[str, type]. Dictionary mapping mindformers model names to their
-                respective class implementations.
-        """
-        return MindOneModel._model_registry
 
     # pylint: disable=arguments-differ
     @classmethod
@@ -112,6 +70,7 @@ class MindOneModel(BaseQuantForCausalLMImpl):
         model_cls = MindOneModel._model_registry.get(model_name, None)
         if model_cls is None:
             raise ValueError(f"Not supported model_name: {model_name} from {model_path}")
+        logger.info(f"Create mindone model: {model_name} from pretrained {model_path} with {model_cls}")
         return model_cls(model_path)
 
     def _network(self):

@@ -37,10 +37,9 @@ Examples:
     >>> model.save_quantized("/path/to/save/location")
 """
 
-import os
 
-from mindspore_gs.common import logger
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
+from mindspore_gs.ptq.plugins import load_plugin
 
 
 class AutoQuantForCausalLM:
@@ -90,32 +89,5 @@ class AutoQuantForCausalLM:
             >>> # Automatically select DeepSeekV3 model implementation
             >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/deepseek_config.yaml")
         """
-        try:
-            if pretained.endswith(".yaml"):
-                model_hub = AutoQuantForCausalLM._load_mindformers_plugin()
-            elif os.path.isdir(pretained):
-                model_hub = AutoQuantForCausalLM._load_mindone_plugin()
-            else:
-                raise ValueError(f"Unsupported model type: {pretained}")
-            logger.info(f"Create model from {pretained}")
-            return model_hub.from_pretrained(pretained)
-        except ValueError as e:
-            raise ValueError(f"Create model from {pretained} failed, error: {e}") from e
-
-    @staticmethod
-    def _load_mindformers_plugin():
-        """_load_mindformers_plugin"""
-        try:
-            import mindspore_gs.ptq.models.mindformers_models
-        except ImportError as e:
-            raise ImportError(f"mindformers plugin load failed, error: {e}") from e
-        return BaseQuantForCausalLM.get_model_hub_registry().get("mindformers")
-
-    @staticmethod
-    def _load_mindone_plugin():
-        """_load_mindone_plugin"""
-        try:
-            import mindspore_gs.ptq.models.mindone_models
-        except ImportError as e:
-            raise ImportError(f"mindone plugin load failed, error: {e}") from e
-        return BaseQuantForCausalLM.get_model_hub_registry().get("mindone")
+        plugin = load_plugin(pretained)
+        return plugin.create_model(pretained)

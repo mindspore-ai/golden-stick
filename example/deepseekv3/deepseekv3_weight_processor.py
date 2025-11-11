@@ -26,7 +26,7 @@ import mindspore as ms
 from mindspore import dtype
 from mindspore.communication.management import get_rank
 from mindformers.parallel_core.inference.parallel_state import get_tensor_model_parallel_rank
-from mindspore_gs.ptq.basic_quant_func import np_int8data_unpack_to_int4_3d, convert_uint64_to_fp32
+from mindspore_gs.ptq.basic_functions.basic_quant_func import np_int8data_unpack_to_int4_3d, convert_uint64_to_fp32
 
 from weight_processor import BaseWeightProcessor, EPMethod
 
@@ -600,14 +600,14 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         # o_proj->wo
 
         # input_scale, input_zp no split
-        input_scale_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".input_scale"
+        input_scale_hf_name = f"model.layers.{layer_id}.self_attn.{name}.input_scale"
         input_scale_ms_name = self.quant_convert_weight_name(input_scale_hf_name)
         input_scale_ms_param, _ = self.get_safetensor_from_file(input_scale_hf_name, src_hf_dir, hf_weight_map)
         self.parameter_dict[input_scale_ms_name] = ms.Parameter(
             ms.from_numpy(input_scale_ms_param).astype(ms.bfloat16),
             name=input_scale_ms_name, requires_grad=False)
 
-        input_zp_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".input_offset"
+        input_zp_hf_name = f"model.layers.{layer_id}.self_attn.{name}.input_offset"
         input_zp_ms_name = self.quant_convert_weight_name(input_zp_hf_name)
         input_zp_ms_param, _ = self.get_safetensor_from_file(input_zp_hf_name, src_hf_dir, hf_weight_map)
         self.parameter_dict[input_zp_ms_name] = ms.Parameter(ms.from_numpy(input_zp_ms_param).astype(ms.int8),
@@ -615,13 +615,13 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                                                              requires_grad=False)
 
         if not is_trans_rope_weigh:
-            quant_bias_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".quant_bias"
+            quant_bias_hf_name = f"model.layers.{layer_id}.self_attn.{name}.quant_bias"
             quant_bias_ms_name = self.quant_convert_weight_name(quant_bias_hf_name)
             quant_bias_ms_param, _ = self.get_safetensor_from_file(quant_bias_hf_name, src_hf_dir, hf_weight_map)
             if name == "o_proj" and get_tensor_model_parallel_rank() != 0:
                 quant_bias_ms_param.fill(0)
 
-            dequant_scale_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".deq_scale"
+            dequant_scale_hf_name = f"model.layers.{layer_id}.self_attn.{name}.deq_scale"
             dequant_scale_ms_name = self.quant_convert_weight_name(dequant_scale_hf_name)
             dequant_scale_ms_param, _ = self.get_safetensor_from_file(dequant_scale_hf_name, src_hf_dir, hf_weight_map)
         else:
@@ -633,11 +633,11 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             rope_dim = qk_rope_head_dim + qk_nope_head_dim
             kv_head_dim = kv_lora_rank + qk_rope_head_dim
 
-            quant_bias_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".quant_bias"
+            quant_bias_hf_name = f"model.layers.{layer_id}.self_attn.{name}.quant_bias"
             quant_bias_ms_name = self.quant_convert_weight_name(quant_bias_hf_name)
             quant_bias_ms_param, _ = self.get_safetensor_from_file(quant_bias_hf_name, src_hf_dir, hf_weight_map)
 
-            dequant_scale_hf_name = f"model.layers.{layer_id}.self_attn." + name + ".deq_scale"
+            dequant_scale_hf_name = f"model.layers.{layer_id}.self_attn.{name}.deq_scale"
             dequant_scale_ms_name = self.quant_convert_weight_name(dequant_scale_hf_name)
             dequant_scale_ms_param, _ = self.get_safetensor_from_file(dequant_scale_hf_name, src_hf_dir, hf_weight_map)
 
@@ -1021,7 +1021,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
         layer = 0 if 'layers.' not in weight_name else int(weight_name[weight_name.find('layers.'):].split('.')[1])
         if layer < self.num_layers:
             return weight_name
-        mtp_prefix = f'mtp_model'
+        mtp_prefix = 'mtp_model'
         is_mtp_layer = 'tok_embeddings' not in weight_name and 'shared_head.' not in weight_name
         mtp_prefix = mtp_prefix if not is_mtp_layer else f'{mtp_prefix}.layer'
         is_decode_layer = "ffn" in weight_name or "attention" in weight_name or "feed_forward" in weight_name
@@ -1029,9 +1029,9 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
 
         weight_name = weight_name.replace(f'model.layers.{layer}', mtp_prefix)
         if "tok_embeddings" in weight_name:
-            weight_name = weight_name.replace(f'.weight', f'.embedding_weight')
+            weight_name = weight_name.replace('.weight', '.embedding_weight')
         if "shared_head." in weight_name:
-            weight_name = weight_name.replace(f'shared_head.', f'')
+            weight_name = weight_name.replace('shared_head.', '')
         return weight_name
 
     def infer_process_moe_routed_expert_ffn_weight(self, src_hf_dir, layer_id, hf_weight_map):
@@ -1620,10 +1620,10 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
     def infer_smooth_quant_get_value(self, param_name, src_hf_dir, hf_weight_map, no_need_split_layer):
         '''infer_smooth_quant_get_value'''
 
-        if any([name in param_name for name in no_need_split_layer]):
+        if any(name in param_name for name in no_need_split_layer):
             value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                      hf_weight_map)
-        elif any([name in param_name for name in [".l2q_proj."]]):
+        elif any(name in param_name for name in [".l2q_proj."]):
             if param_name.endswith(".weight") or "matmul" in param_name:
                 value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                          hf_weight_map, is_split_param=True,
@@ -1631,9 +1631,9 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             else:
                 value, _ = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                          hf_weight_map)
-        elif any([name in param_name for name in [".wo."]]):
+        elif any(name in param_name for name in [".wo."]):
             value = self.infer_smooth_quant_row_linear_split(param_name, src_hf_dir, hf_weight_map)
-        elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
+        elif any(name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]):
             value, _ = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
                                                      is_split_param=True, split_axis=0)
         elif "lm_head" in param_name:
@@ -1672,7 +1672,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             if "model.layers" in param_name and int(param_name.split('.')[2]) >= num_layers:
                 continue
 
-            if any([name in param_name for name in skip_layer]):
+            if any(name in param_name for name in skip_layer):
                 continue
 
             value = self.infer_smooth_quant_get_value(param_name, src_hf_dir, hf_weight_map, no_need_split_layer)
@@ -1701,23 +1701,23 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             if "model.layers" in param_name and int(param_name.split('.')[2]) >= num_layers:
                 continue
 
-            if any([name in param_name for name in no_need_split_layer]):
+            if any(name in param_name for name in no_need_split_layer):
                 value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                                hf_weight_map)
-            elif any([name in param_name for name in [".l2q_proj.", ".feed_forward.w_gate_hidden.",
-                                                      "shared_experts.w_gate_hidden"]]):
+            elif any(name in param_name for name in [".l2q_proj.", ".feed_forward.w_gate_hidden.",
+                                                      "shared_experts.w_gate_hidden"]):
                 value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                                hf_weight_map, is_split_param=True,
                                                                split_axis=1)
-            elif any([name in param_name for name in [".feed_forward.w2.quant_op.input_scale",
+            elif any(name in param_name for name in [".feed_forward.w2.quant_op.input_scale",
                                                       ".feed_forward.w2.quant_op.input_zp",
                                                       ".feed_forward.shared_experts.w2.quant_op.input_scale",
                                                       ".feed_forward.shared_experts.w2.quant_op.input_zp",
-                                                      ".wo."]]):
+                                                      ".wo."]):
                 value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                                hf_weight_map, is_split_param=True,
                                                                split_axis=0)
-            elif any([name in param_name for name in [".feed_forward.w2.", "shared_experts.w2"]]):
+            elif any(name in param_name for name in [".feed_forward.w2.", "shared_experts.w2"]):
                 value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                                hf_weight_map, is_split_param=True,
                                                                split_axis=1)
@@ -1733,7 +1733,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                 for experts_id in range(value.shape[0]):
                     value_list.append(self.split_weight_by_rank(value[experts_id, :, :], split_axis=0))
                 value = np.stack(value_list, axis=0)
-            elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
+            elif any(name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]):
                 value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
                                                                is_split_param=True, split_axis=0)
             elif "lm_head" in param_name:
@@ -1846,10 +1846,10 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
     def infer_a8w4_get_value(self, param_name, src_hf_dir, hf_weight_map, no_need_split_layer):
         '''infer_smooth_quant_get_value'''
 
-        if any([name in param_name for name in no_need_split_layer]):
+        if any(name in param_name for name in no_need_split_layer):
             value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                      hf_weight_map)
-        elif any([name in param_name for name in [".l2q_proj."]]):
+        elif any(name in param_name for name in [".l2q_proj."]):
             if param_name.endswith(".weight") or "matmul" in param_name:
                 value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                          hf_weight_map, is_split_param=True,
@@ -1857,13 +1857,13 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             else:
                 value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir,
                                                          hf_weight_map)
-        elif any([name in param_name for name in [".feed_forward.w2.", ".wo.", "shared_experts.w2"]]):
+        elif any(name in param_name for name in [".feed_forward.w2.", ".wo.", "shared_experts.w2"]):
             value = self.infer_smooth_quant_row_linear_split(param_name, src_hf_dir, hf_weight_map)
             is_int4 = False
         elif ".routed_experts.ffn.w2" in param_name:
             value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
                                                         is_split_param=True, split_axis=1)
-        elif any([name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]]):
+        elif any(name in param_name for name in ["lkv2kv_k_nope", "lkv2kv_v"]):
             value, is_int4 = self.get_safetensor_from_file(param_name, src_hf_dir, hf_weight_map,
                                                      is_split_param=True, split_axis=0)
         elif "lm_head" in param_name:
@@ -1902,7 +1902,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
             if "model.layers" in param_name and int(param_name.split('.')[2]) >= num_layers:
                 continue
 
-            if any([name in param_name for name in skip_layer]):
+            if any(name in param_name for name in skip_layer):
                 continue
 
             value, is_int4 = self.infer_a8w4_get_value(param_name, src_hf_dir, hf_weight_map, no_need_split_layer)
@@ -1940,7 +1940,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                     param_json_path = os.path.realpath(param_json_path)
                     if not param_json_path.startswith(src_hf_dir + os.sep):
                         raise ValueError(f"Path traversal detected: {param_json_path}")
-                    with open(param_json_path, "r") as fp:
+                    with open(param_json_path, "r", encoding='utf-8') as fp:
                         hf_weight_map = json.load(fp)['weight_map']
                     break
             elif file.endswith('_name_map.json'):
@@ -1949,7 +1949,7 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                 param_json_path = os.path.realpath(param_json_path)
                 if not param_json_path.startswith(src_hf_dir + os.sep):
                     raise ValueError(f"Path traversal detected: {param_json_path}")
-                with open(param_json_path, "r") as fp:
+                with open(param_json_path, "r", encoding='utf-8') as fp:
                     hf_weight_map = json.load(fp)
                     if hf_weight_map.get('weight_map'):
                         hf_weight_map = hf_weight_map['weight_map']
@@ -1989,6 +1989,6 @@ class DeepseekV3WeightProcessor(BaseWeightProcessor):
                 self.infer_convert_layer_weight(src_hf_dir, layer_id, hf_weight_map)
 
         param_not_load, ckpt_not_load = ms.load_param_into_net(self.network, self.parameter_dict)
-        print("param_not_load:{}, ckpt_not_load:{}".format(param_not_load, ckpt_not_load))
+        print(f"param_not_load:{param_not_load}, ckpt_not_load:{ckpt_not_load}")
         del self.parameter_dict
         gc.collect()

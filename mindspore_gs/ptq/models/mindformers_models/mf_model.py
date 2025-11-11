@@ -55,18 +55,17 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (RowParal
                                                                         QKVParallelLinear)
 from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (ColumnParallelGroupedLinear,
                                                                                 RowParallelGroupedLinear)
-from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
+from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQ
-from mindspore_gs.ptq.models.distributed_parameter import DistributedParameter
-from mindspore_gs.ptq.processor import Processor
-from mindspore_gs.ptq.ptq.wrappers.mindformers.mcore_linear_wrapper import McoreLinearInferCell
-from mindspore_gs.ptq.models.safetensors_mgr import SafeTensorsMgr
+from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
+from mindspore_gs.ptq.basic_functions.processor import Processor
+from mindspore_gs.ptq.quant_cells.mindformers.mcore_linear_wrapper import McoreLinearInferCell
+from mindspore_gs.ptq.basic_functions.safetensors_mgr import SafeTensorsMgr
 from mindspore_gs.common.utils import offload_network
 
 
-@BaseQuantForCausalLM.reg_model_hub("mindformers")
 class MFModel(BaseQuantForCausalLMImpl):
     """MindFormers Model Base Class for Quantization
 
@@ -92,49 +91,19 @@ class MFModel(BaseQuantForCausalLMImpl):
         >>> # Automatically selects the appropriate MindFormers implementation
         >>> model = AutoQuantForCausalLM.from_pretrained("/path/to/qwen3_config.yaml")
     """
-
     _model_registry: dict[str, type] = {}
 
     @staticmethod
-    def _reg_model(name, model_clazz):
-        """Internal method to register a model implementation.
-
-        This method registers a specific model implementation in the
-        internal registry, preventing duplicate registrations.
-
-        Args:
-            name (str): Name/identifier for the model implementation.
-            model_clazz (type): The class implementing the model.
-
-        Raises:
-            RuntimeError: If a model with the same name is already registered.
-        """
+    def _reg_model(name, model_clazz: type[BaseQuantForCausalLM]):
         cur = MFModel._model_registry.get(name)
         if cur:
             raise RuntimeError(f"Duplicated model reg, name: {name}, already reg class: {cur}, "
                                f"current reg class:{model_clazz}")
-        logger.info(f"Register name {name} to model {model_clazz}")
+        logger.info(f"Register mindformers model: name {name} to {model_clazz}")
         MFModel._model_registry[name] = model_clazz
 
     @staticmethod
     def reg_model(alias=None):
-        """Decorator for registering specific model implementations.
-
-        This decorator registers a class as a specific model implementation
-        that can be automatically discovered and instantiated.
-
-        Args:
-            alias (str, optional): Alternative name for the model.
-                If not provided, the class name will be used. Defaults to ``None``.
-
-        Returns:
-            function. Decorator function that registers the class.
-
-        Examples:
-            >>> @MFModel.reg_model('qwen3')
-            >>> class QWen3(MFModel):
-            >>>     pass
-        """
         def decorator(cls):
             """decorator"""
             register_key = alias if alias is not None else cls.__name__
@@ -143,21 +112,9 @@ class MFModel(BaseQuantForCausalLMImpl):
 
         return decorator
 
-    @staticmethod
-    def get_model_registry():
-        """Get the registry of all registered mindformers models.
-
-        Returns:
-            dict[str, type]. Dictionary mapping mindformers model names to their
-                respective class implementations.
-        """
-        return MFModel._model_registry
-
-    def _after_network_load_weights(self):
-        return
-
     def __init__(self, yaml_path):
-        """Initialize the MindFormers quantized model.
+        """
+        Initialize the MindFormers quantized model.
 
         This method initializes the model by loading the MindFormers
         configuration, building the execution context, and creating
@@ -181,7 +138,8 @@ class MFModel(BaseQuantForCausalLMImpl):
     # pylint: disable=arguments-differ
     @classmethod
     def from_pretrained(cls, yaml_path):
-        """Create a model instance from a pretrained configuration.
+        """
+        Create a model instance from a pretrained configuration.
 
         This method creates a model instance by loading the MindFormers
         configuration and selecting the appropriate specific model
@@ -202,7 +160,6 @@ class MFModel(BaseQuantForCausalLMImpl):
         if not yaml_path.endswith('.yaml'):
             raise ValueError(f"The {yaml_path} is not a yaml file, "
                              "please check the yaml path.")
-        logger.info('Creating mindformers network...', flush=True)
         config = MindFormerConfig(yaml_path)
         if not hasattr(config, 'trainer') or not hasattr(config.trainer, 'model_name'):
             raise ValueError(f"Not contain trainer.model_name in yaml-file: {yaml_path}")
@@ -210,6 +167,7 @@ class MFModel(BaseQuantForCausalLMImpl):
         model_cls = MFModel._model_registry.get(model_name, None)
         if model_cls is None:
             raise ValueError(f"Not supported model_name: {model_name} from yaml: {yaml_path}")
+        logger.info(f"Create mindformers model: {model_name} from yaml: {yaml_path} with {model_cls}")
         return model_cls(yaml_path)
 
     def _original_safetensors_path(self):
@@ -292,7 +250,6 @@ class MFModel(BaseQuantForCausalLMImpl):
         _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
         # set target layer type and load mindformers wrappers
         for algorithm in ptq.pipeline:
-            algorithm.load_mindformers_plugin()
             ptq.set_target_layer_type(algorithm.target_layer_type())
         # set generate function for getting first layer input
         ptq.set_generate_func(self.forward)
@@ -350,6 +307,9 @@ class MFModel(BaseQuantForCausalLMImpl):
             NotImplementedError: This method must be implemented by subclasses.
         """
         raise NotImplementedError
+
+    def _after_network_load_weights(self):
+        return
 
     def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):
         """Apply fake quantization to the model.

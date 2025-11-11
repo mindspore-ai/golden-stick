@@ -1,3 +1,33 @@
+# Copyright 2025 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+
+"""
+Test module for FA3 (Fused Attention 3) quantization functionality.
+
+This module contains comprehensive tests for FA3 quantization applied to DeepseekV3 models.
+It includes tests for:
+- FA3 quantization configuration and application
+- Model inference with quantized weights
+- Weight processing and conversion
+- Performance benchmarking of quantized models
+- Integration with MindSpore and MindFormers frameworks
+
+Note: FA3 quantization focuses on optimizing attention mechanisms and linear layers
+for improved inference performance while maintaining model accuracy.
+"""
+
 import argparse
 import json
 import os
@@ -37,7 +67,7 @@ from research.deepseek3.deepseek3_config import DeepseekV3Config
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFDSV3Helper
 from mindspore_gs.common import logger
 from mindspore_gs.datasets import get_datasets
-from mindspore_gs.ptq.fa3.fa3 import FA3Config, FA3
+from mindspore_gs.ptq.faquant.faquant import FA3Config, FA3
 
 from tests.st.test_utils import get_available_port
 from deepseekv3_weight_processor_fa3 import DeepseekV3WeightProcessor
@@ -244,9 +274,9 @@ def update_states_for_a8w8(json_path: Union[str, Path]) -> None:
     json_path = Path(json_path)
     bak_path = json_path.with_suffix(json_path.suffix + '.bak')
     assert bak_path.exists()
-    tmp = tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(json_path), suffix='.tmp')
-    shutil.copy(bak_path, tmp.name)
-    shutil.move(tmp.name, json_path)
+    with tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(json_path), suffix='.tmp') as tmp:
+        shutil.copy(bak_path, tmp.name)
+        shutil.move(tmp.name, json_path)
     data = load_json_fa3(json_path)
     data_filtered = {k: v for k, v in data.items() if 'FAQuant' not in str(v)}
     save_json_fa3(json_path, data_filtered)
@@ -258,16 +288,16 @@ def update_states_for_fa3(json_path: Union[str, Path]) -> None:
     json_path = Path(json_path)
     bak_path = json_path.with_suffix(json_path.suffix + '.bak')
     assert bak_path.exists()
-    tmp = tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(json_path), suffix='.tmp')
-    shutil.copy(bak_path, tmp.name)
-    shutil.move(tmp.name, json_path)
+    with tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(json_path), suffix='.tmp') as tmp:
+        shutil.copy(bak_path, tmp.name)
+        shutil.move(tmp.name, json_path)
     print(f"[INFO] The original fa3 configuration file has been restored using the backup file {bak_path}")
 
 def replace_fa3_params(model_path):
     """Configure the environmen for a8w8-fa3 infer."""
     para_file_path = os.path.join(model_path,
                                   "quant_model_weight_w8a8_dynamic.safetensors.index.json")
-    with open(para_file_path, "r") as f:
+    with open(para_file_path, "r", encoding='utf-8') as f:
         index = json.load(f)
     weight_map = index["weight_map"]
     file_to_params = {}
@@ -407,10 +437,10 @@ def test_fa3():
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     cal_datapath = os.path.join(cur_dir, "../../../data/calibrate-dataset/calibrate.jsonl")
     datasets = create_ds(helper, cal_datapath, "calibrate", tokenizer_=tokenizer)
-    logger.info(f"Create Network End.")
-    logger.info(f"Running FA3...")
+    logger.info("Create Network End.")
+    logger.info("Running FA3...")
     fa3.observe(network, helper, datasets)
-    logger.info(f"Running FA3 Calculate End.")
+    logger.info("Running FA3 Calculate End.")
     os.environ.pop('MS_JIT', None)
     os.environ.pop('ENFORCE_EAGER', None)
     set_context(use_legacy=False)
@@ -437,7 +467,7 @@ def invoke_parallel(entry_func, **entry_kwargs):
         for i in os.listdir('test_fa3_2p_logs'):
             if i.endswith('.log'):
                 filepath = os.path.join('test_fa3_2p_logs', i)
-                with open(filepath, 'r') as f:
+                with open(filepath, 'r', encoding='utf-8') as f:
                     print(f'===================={filepath}====================')
                     print(f.read())
     os.system(f'kill -9 $(lsof -i:{port} | ' + "awk '{print $2}')")

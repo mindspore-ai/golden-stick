@@ -22,7 +22,7 @@ from mindformers.modules.layers import Linear
 
 from mindspore_gs.common.gs_enum import BackendTarget
 from mindspore_gs.common import logger
-from mindspore_gs.ptq.basic_quant_func import get_quant_min_max, quant_tensor_data
+from mindspore_gs.ptq.basic_functions.basic_quant_func import get_quant_min_max, quant_tensor_data
 from mindspore_gs.quantization.layer_policy import PerChannelArgs
 from mindspore_gs.ptq.round_to_nearest.quant_cell import PTQCell
 from mindspore_gs.ptq.round_to_nearest.ptq_policy import PTQLayerPolicy
@@ -37,7 +37,7 @@ class LinearQuant(PTQCell):
     """Linear layer wrapper with min max"""
 
     def __init__(self, linear: Linear, policy: PTQLayerPolicy):
-        super(LinearQuant, self).__init__(linear, policy)
+        super().__init__(linear, policy)
         self._linear = linear
         rank = len(linear.weight.shape)
         self._weight_axis = rank - 2 if linear.matmul.transpose_b else rank - 1
@@ -87,7 +87,7 @@ class LinearQuant(PTQCell):
             logger.info(f"LinearQuant {self} is not quanted.")
             return
 
-        super(LinearQuant, self).convert(backend)
+        super().convert(backend)
         # quant weight to int8
         weight_qparams = self._weight_quantizer.quant_params()
         weight = self._linear.cast(self._linear.weight, self._cast_dtype)
@@ -117,7 +117,7 @@ class LinearQuant(PTQCell):
             self._output_quantizer = convert_to_dequant(input_qparams, weight_qparams)
             self._input_quantizer = convert_to_quant(input_qparams)
             self._quant_deployed = True
-            raise RuntimeError(f'current version not support all quantization, only for weight quantization')
+            raise RuntimeError("current version not support all quantization, only for weight quantization")
 
     # pylint: disable=W0221
     def construct(self, x):
@@ -155,10 +155,10 @@ class LinearDeploy(PTQCell):
     """Linear layer wrapper with min max"""
 
     def __init__(self, linear: Linear, policy: PTQLayerPolicy):
-        super(LinearDeploy, self).__init__(linear, policy)
+        super().__init__(linear, policy)
         self._converted = True
         if not isinstance(linear, Linear):
-            raise ValueError(f'only Linear cell is supported, but got {type(linear)}')
+            raise ValueError(f"only Linear cell is supported, but got {type(linear)}")
         self._linear = linear
 
         rank = len(linear.weight.shape)

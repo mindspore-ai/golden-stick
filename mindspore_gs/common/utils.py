@@ -32,27 +32,27 @@ def value_check(name, src, supported_type, value_choices=None):
         >>> value_check('my_var', my_var, str, ['my', 'var'])
     """
     if not isinstance(src, supported_type):
-        raise TypeError("Type of {} should be {} but got {}".format(name, str(supported_type), type(src)))
+        raise TypeError(f"Type of {name} should be {supported_type} but got {type(src)}")
 
     if value_choices is not None and value_choices:
         if src not in value_choices:
-            raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
+            raise ValueError(f"{src} is not in supported {name}: {value_choices}. Skip setting it.")
 
 
 def list_value_check(name, src, item_supported_type, value_choices=None):
     """Check if the given list object is the given supported type and in the given supported value.
     """
     if not isinstance(src, (list, tuple)):
-        raise TypeError("Type of {} should be a list but got {}".format(name, type(src)))
-    if any([not isinstance(i, item_supported_type) for i in src]):
-        raise TypeError("Type of item of {} should be one of {} but got {}".format(name, str(item_supported_type),
-                                                                                   [type(i) for i in src]))
+        raise TypeError(f"Type of {name} should be a list but got {type(src)}")
+    if any(not isinstance(i, item_supported_type) for i in src):
+        raise TypeError(f"Type of item of {name} should be one of {item_supported_type} "\
+                        f"but got {[type(i) for i in src]}")
     if value_choices is not None and not value_choices:
         if isinstance(src, str) and src not in value_choices:
-            raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
-        if isinstance(src, list) and all([isinstance(i, str) for i in src])\
-                and any([i not in value_choices for i in src]):
-            raise ValueError("{} is not in supported {}: {}. Skip setting it.".format(src, name, str(value_choices)))
+            raise ValueError(f"{src} is not in supported {name}: {value_choices}. Skip setting it.")
+        if isinstance(src, list) and all(isinstance(i, str) for i in src)\
+                and any(i not in value_choices for i in src):
+            raise ValueError(f"{src} is not in supported {name}: {value_choices}. Skip setting it.")
 
 
 def offload_param(param: Parameter):

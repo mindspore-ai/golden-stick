@@ -19,7 +19,7 @@ import numpy as np
 from mindspore import Tensor, dtype, Parameter
 
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq.basic_quant_func import np_int4data_pack_to_int8
+from mindspore_gs.ptq.basic_functions.basic_quant_func import np_int4data_pack_to_int8
 from mindspore_gs.ptq.utils import QuantType
 
 class ParamProcessor:

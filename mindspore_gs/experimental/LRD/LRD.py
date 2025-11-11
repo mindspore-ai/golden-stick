@@ -22,17 +22,17 @@ from mindspore.nn import Cell
 from mindspore.common.initializer import initializer
 from mindspore import Tensor
 from mindspore.ops import Svd
-import mindspore.nn as nn
+from mindspore import nn
 from mindformers.experimental.infer.core import RowParallelLinear, ColumnParallelLinear
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import value_check
-from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq.basic_functions.processor import Processor
 
 
 class DoubleMM(nn.Cell):
     """DoubleMM"""
     def __init__(self, w1, w2, transpose_b=True):
-        super(DoubleMM, self).__init__()
+        super().__init__()
         self.matmul = msops.MatMul(False, False)
         if transpose_b:
             self.weights_1 = Parameter(Tensor(w2.T))
@@ -72,7 +72,7 @@ class LRD:
                     w1 = Parameter(initializer('ones', (m, k), weight.dtype))
                     w2 = Parameter(initializer('ones', (k, n), weight.dtype))
                     return w1, w2
-                logger.info(f"Start LRD on weight.")
+                logger.info("Start LRD on weight.")
                 svd_op = Svd(full_matrices=True, compute_uv=True)
                 w = ms.ops.cast(weight, ms.float32)
                 start_time = time.time()
