@@ -69,7 +69,7 @@ MindSpore Golden Stick depends on MindSpore and MindSpore Transformers repositor
 
 After installing MindSpore and MindSpore Transformers, proceed to install MindSpore Golden Stick. You can use either pip installation or source code compilation installation.
 
-## Installing from pip Command
+### Installing from pip Command
 
 We maintain the [MindSpore Golden Stick project](https://pypi.org/project/mindspore-gs/) on PyPI, which can be installed directly using the pip command.
 
@@ -77,7 +77,7 @@ We maintain the [MindSpore Golden Stick project](https://pypi.org/project/mindsp
 pip install mindspore-gs
 ```
 
-## Installing from Source Code
+### Installing from Source Code
 
 Download the [source code](https://gitee.com/mindspore/golden-stick), then enter the `golden-stick` directory after downloading.
 
