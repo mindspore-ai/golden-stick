@@ -24,7 +24,7 @@ from mindspore_gs.quantization.ops.nn import Conv2dQuant, DenseQuant
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_lenet_apply():
     """

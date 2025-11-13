@@ -54,6 +54,7 @@ class SimpleNet(nn.Cell):
     Network with single linear to be quant
     """
     def __init__(self):
+        # pylint: disable=super-with-arguments
         super(SimpleNet, self).__init__()
         self.linear = Linear(in_channels=5, out_channels=6, weight_init="ones")
 
@@ -90,7 +91,7 @@ def test_nothing_to_apply_convert(device_target):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_apply_convert_error():
     """
@@ -266,6 +267,7 @@ class LinearsNet(nn.Cell):
     """
 
     def __init__(self):
+        # pylint: disable=super-with-arguments
         super(LinearsNet, self).__init__()
         self.linear1 = Linear(in_channels=5, out_channels=6)
         self.linear2 = Linear(in_channels=6, out_channels=5)

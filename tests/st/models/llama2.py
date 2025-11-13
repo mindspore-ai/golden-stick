@@ -16,7 +16,11 @@
 Create llama2 from mindformers.
 """
 
+import os
+import sys
 import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../mindformers")))
 from mindspore import Tensor, dtype
 from mindformers import LlamaForCausalLM, LlamaConfig
 

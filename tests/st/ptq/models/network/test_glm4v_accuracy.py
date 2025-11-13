@@ -27,7 +27,7 @@ from mindspore import dtype as msdtype
 from datasets import load_dataset
 
 # pylint: disable=wrong-import-position
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindone")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindone")))
 from mindone.transformers import AutoProcessor
 
 # pylint: disable=wrong-import-position
@@ -35,6 +35,9 @@ from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode)
 from mindspore_gs.ptq.models import AutoQuantForCausalLM
 from mindspore_gs.ptq.utils import QuantType
+
+import transformers
+print('transformers.__version__:', transformers.__version__)
 
 
 def convert_to_tensor(examples):
@@ -253,7 +256,7 @@ class GLM4vPTQTester:
     def get_golden(self) -> tuple[str, str]:
         """Get golden reference for comparison"""
         return "<think>Got it, let's describe the image. " + \
-               "First, the main subject is a cat, specifically a Pallas's cat,"
+               "First, the main subject is a cat-like animal, probably a Pallas's cat,"
 
 
 def run_glm4v_accuracy():

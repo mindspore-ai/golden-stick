@@ -18,6 +18,7 @@
 from collections import OrderedDict
 from typing import Optional
 import os
+import sys
 import time
 import json
 import shutil
@@ -29,6 +30,8 @@ import mindspore as ms
 from mindspore import dtype as msdtype
 from mindspore.communication import get_rank, get_group_size
 from mindspore.nn.utils import no_init_parameters
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 
 from mindformers import (AutoModel, MindFormerConfig,
                          build_context, build_parallel_config)
@@ -88,7 +91,7 @@ class DeepSeekV3Tester(PTQModelTester):
         if desc_json_path is None:
             logger.error("No quant description json file.")
             return False
-        with open(desc_json_path, "r") as fp:
+        with open(desc_json_path, "r", encoding='utf-8') as fp:
             desc_map = json.load(fp)
 
         def check(name, expect):
@@ -300,7 +303,7 @@ class DeepSeekV3Tester(PTQModelTester):
                 json.dump(data, file, ensure_ascii=False, indent=4)
         except Exception as e:
             raise RuntimeError("Found error when Modify description file."
-                               f"The details of error are {e}")
+                               f"The details of error are {e}") from e
 
     def unify_safetensors(self, float_ckpt_path, quant_ckpt_path,
                           unify_quant_ckpt_path):
@@ -322,6 +325,7 @@ class DeepSeekV3Tester(PTQModelTester):
         self._modify_description_file(quant_ckpt_path, unify_quant_ckpt_path)
 
     # pylint: disable=arguments-differ
+    # pylint: disable=arguments-renamed
     def forward_model(self, yaml_path_, ckpt_path_, question):
         """forward model"""
         os.environ['MS_ENABLE_INTERNAL_KERNELS'] = "on"
@@ -372,7 +376,7 @@ class DeepSeekV3Tester(PTQModelTester):
         """golden_accuracy"""
         question, answer = self.get_golden()
         result = question is not None and answer is not None, \
-                 f"Please implement get_golden before invoke golden_accuracy."
+                 "Please implement get_golden before invoke golden_accuracy."
 
         result = self.check_quant_description(unify_quant_ckpt_path_)
         if result:
@@ -396,7 +400,7 @@ def test_quant_deepseek():
     """
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     calibrate_config_path = os.path.join(cur_dir, "calibrate_deepseek3_671b.yaml")
-    q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant")
+    q_ckpt_path = os.path.join(cur_dir, "dsv3-quant")
     dataset_path = os.path.join(cur_dir, '/home/workspace/mindspore_dataset/ceval/dev')
     tester = DeepSeekV3Tester()
     tester.quant_model(calibrate_config_path, q_ckpt_path,
@@ -412,8 +416,8 @@ def test_unify_safetensor():
     """
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     float_ckpt_path = "/home/workspace/mindspore_dataset/weight/DeepSeek-R1-bf16"
-    q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant")
-    unify_q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant-unify")
+    q_ckpt_path = os.path.join(cur_dir, "dsv3-quant")
+    unify_q_ckpt_path = os.path.join(cur_dir, "dsv3-quant-unify")
     tester = DeepSeekV3Tester()
     tester.unify_safetensors(float_ckpt_path, q_ckpt_path,
                              unify_q_ckpt_path)
@@ -427,7 +431,7 @@ def test_eval_deepseek():
     """
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     infer_config_path = os.path.join(cur_dir, "predict_deepseek3_671b.yaml")
-    unify_q_ckpt_path = os.path.join(cur_dir, f"dsv3-quant-unify")
+    unify_q_ckpt_path = os.path.join(cur_dir, "dsv3-quant-unify")
     tester = DeepSeekV3Tester()
     tester.golden_accuracy(infer_config_path, unify_q_ckpt_path)
 

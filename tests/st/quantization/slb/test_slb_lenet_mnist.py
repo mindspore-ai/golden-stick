@@ -30,7 +30,7 @@ from mindspore_gs.quantization.slb.slb_quant import Conv2dSlbQuant
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
 @pytest.mark.parametrize("enable_bn_calibration", [True, False])
@@ -43,6 +43,7 @@ def test_lenet_apply(quant_bit, enable_bn_calibration):
 
     from ....models.research.cv.lenet.src.lenet import LeNet5
     network = LeNet5(10)
+    qat = None
     if quant_bit == "W4":
         qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": False,
                       "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
@@ -90,7 +91,7 @@ def test_lenet_apply(quant_bit, enable_bn_calibration):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_act_quant", [True, False])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
@@ -112,6 +113,7 @@ def test_lenet_convert(run_mode, enable_act_quant):
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(np.ones([1, 1, 32, 32]), mindspore.float32)
+    # pylint: disable=consider-using-f-string
     file_name = "./lenet_convert_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
     time.sleep(10)
@@ -138,6 +140,7 @@ def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
     network = LeNet5(10)
 
     # convert network to quantization aware network
+    qat = None
     if quant_bit == "W4":
         qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": False,
                       "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
@@ -186,6 +189,7 @@ def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
 
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval)
+    # pylint: disable=consider-using-f-string
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.95
 
@@ -258,6 +262,7 @@ def test_lenet_accuracy_bnoff_w1a8(quant_bit, enable_bn_calibration, run_mode):
     network = LeNet5(10)
 
     # convert network to quantization aware network
+    qat = None
     if quant_bit == "W4":
         qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": False,
                       "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
@@ -306,6 +311,7 @@ def test_lenet_accuracy_bnoff_w1a8(quant_bit, enable_bn_calibration, run_mode):
 
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval)
+    # pylint: disable=consider-using-f-string
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.95
 
@@ -332,6 +338,7 @@ def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
     network = LeNet5(10)
 
     # convert network to quantization aware network
+    qat = None
     if quant_bit == "W4":
         qat = SlbQAT({"quant_dtype": [QuantDtype.INT8, QuantDtype.INT4], "enable_act_quant": False,
                       "enable_bn_calibration": enable_bn_calibration, "epoch_size": 10,
@@ -380,5 +387,6 @@ def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
 
     print("============== Starting Testing ==============")
     acc = model.eval(ds_eval)
+    # pylint: disable=consider-using-f-string
     print("============== {} ==============".format(acc))
     assert acc['Accuracy'] > 0.95

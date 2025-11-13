@@ -25,7 +25,7 @@ class TestBaseQuantForCausalLM:
     """Test cases for BaseQuantForCausalLM class - normal interface cases."""
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_base_construct(self):
         """
@@ -39,7 +39,7 @@ class TestBaseQuantForCausalLM:
         assert isinstance(base_model, BaseQuantForCausalLM)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_abstract_method_from_pretrained(self):
         """
@@ -60,7 +60,7 @@ class TestBaseQuantForCausalLM:
         assert hasattr(BaseQuantForCausalLM.__dict__['from_pretrained'], '__func__')
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_abstract_method_forward(self):
         """
@@ -85,7 +85,7 @@ class TestBaseQuantForCausalLM:
         assert sig.parameters['max_new_tokens'].default == 1
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_abstract_method_calibrate(self):
         """
@@ -110,7 +110,7 @@ class TestBaseQuantForCausalLM:
         assert 'kwargs' in sig.parameters
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_abstract_method_save_quantized(self):
         """
@@ -132,7 +132,7 @@ class TestBaseQuantForCausalLM:
         assert 'save_path' in sig.parameters
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_abstract_method_fake_quant(self):
         """
@@ -158,7 +158,7 @@ class TestBaseQuantForCausalLM:
         assert sig.parameters['quant_safetensors_path'].default == ""
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_abstract_method_call_error(self):
         """
@@ -190,7 +190,7 @@ class TestBaseQuantForCausalLM:
             base_model.fake_quant(None, None)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_method_signatures_consistency(self):
         """
@@ -227,7 +227,7 @@ class TestBaseQuantForCausalLM:
         assert sig_fake_quant.parameters['quant_safetensors_path'].default == ""
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_concrete_implementation(self):
         """
@@ -278,7 +278,7 @@ class TestBaseQuantForCausalLM:
         assert isinstance(instance, BaseQuantForCausalLM)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_inheritance_system(self):
         """
@@ -345,7 +345,7 @@ class TestBaseQuantForCausalLM:
             incomplete.calibrate(None, None, None)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_partial_implementation_error(self):
         """

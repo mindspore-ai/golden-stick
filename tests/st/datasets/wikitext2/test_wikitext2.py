@@ -14,9 +14,12 @@
 # ============================================================================
 """test wikitext2 dataset."""
 import os.path
+import sys
 import math
 import pytest
 import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 from mindspore import context, Tensor
 from mindformers import LlamaTokenizer
 from mindspore_gs.datasets import create_wikitext_dataset

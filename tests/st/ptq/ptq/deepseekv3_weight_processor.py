@@ -17,11 +17,13 @@
 transform huggingface model to mindspore safetensor.
 """
 import os
+import sys
 import json
 import gc
 import numpy as np
 from tqdm import tqdm
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 import mindspore as ms
 from mindspore import dtype
 from mindspore.communication.management import get_rank, get_group_size

@@ -31,6 +31,7 @@ class NetToQuant(nn.Cell):
     """
 
     def __init__(self, num_channel=1):
+        # pylint: disable=super-with-arguments
         super(NetToQuant, self).__init__()
         self.conv = nn.Conv2d(num_channel, 6, 5, pad_mode='valid')
         self.bn = nn.BatchNorm2d(6)
@@ -42,7 +43,7 @@ class NetToQuant(nn.Cell):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("quant_bit", ["W4", "W2", "W1", "W4A8", "W2A8", "W1A8"])
 @pytest.mark.parametrize("enable_bn_calibration", [True, False])
@@ -90,7 +91,7 @@ def test_set_config(quant_bit, enable_bn_calibration):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_act_quant", [True, False])
 def test_convert(enable_act_quant):
@@ -117,7 +118,7 @@ def test_convert(enable_act_quant):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_weight_quant_dtype_type():
     """
@@ -133,7 +134,7 @@ def test_set_weight_quant_dtype_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_weight_quant_dtype_range():
     """
@@ -149,7 +150,7 @@ def test_set_weight_quant_dtype_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_act_quant_dtype_type():
     """
@@ -165,7 +166,7 @@ def test_set_act_quant_dtype_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_act_quant_dtype_range():
     """
@@ -180,7 +181,7 @@ def test_set_act_quant_dtype_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_enable_act_quant():
     """
@@ -195,7 +196,7 @@ def test_set_enable_act_quant():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_enable_bn_calibration():
     """
@@ -210,7 +211,7 @@ def test_set_enable_bn_calibration():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_epoch_size_type():
     """
@@ -225,7 +226,7 @@ def test_set_epoch_size_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_epoch_size_range():
     """
@@ -241,7 +242,7 @@ def test_set_epoch_size_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_has_trained_epoch_type():
     """
@@ -257,7 +258,7 @@ def test_set_has_trained_epoch_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_has_trained_epoch_range():
     """
@@ -273,7 +274,7 @@ def test_set_has_trained_epoch_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_start_val_type():
     """
@@ -288,7 +289,7 @@ def test_set_t_start_val_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_start_val_range():
     """
@@ -304,7 +305,7 @@ def test_set_t_start_val_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_start_time_type():
     """
@@ -320,7 +321,7 @@ def test_set_t_start_time_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_start_time_range():
     """
@@ -336,7 +337,7 @@ def test_set_t_start_time_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_end_time_type():
     """
@@ -352,7 +353,7 @@ def test_set_t_end_time_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_end_time_range():
     """
@@ -368,7 +369,7 @@ def test_set_t_end_time_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_factor_type():
     """
@@ -383,7 +384,7 @@ def test_set_t_factor_type():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_t_factor_range():
     """

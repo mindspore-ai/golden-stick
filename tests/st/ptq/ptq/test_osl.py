@@ -14,6 +14,7 @@
 # ============================================================================
 """Unit Tests for Outlier Suppression Lite"""
 import os
+import sys
 import argparse
 import json
 import pytest
@@ -24,6 +25,8 @@ from mindspore import ops as msops
 from mindspore import dtype as msdtype
 from mindspore import nn, Tensor
 from mindspore.dataset import GeneratorDataset
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 from mindformers.parallel_core.inference.tensor_parallel.mappings import scatter_to_model_parallel_region
 from mindformers.parallel_core.inference.parallel_state import (default_pgs, get_tensor_model_parallel_group,
                                                                 is_initialized)

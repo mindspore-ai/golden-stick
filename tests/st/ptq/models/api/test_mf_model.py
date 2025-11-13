@@ -20,8 +20,8 @@ import sys
 from unittest.mock import MagicMock
 import pytest
 
-from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
+from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel
 
 
 class DummyQuantModel(MFModel):
@@ -46,7 +46,7 @@ class TestMFModel:
         return DummyQuantModel()
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_from_pretrained_input_validation(self, model):
         """
@@ -62,7 +62,7 @@ class TestMFModel:
             model.from_pretrained(yaml_path)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_calibrate_input_validation(self, model):
         """

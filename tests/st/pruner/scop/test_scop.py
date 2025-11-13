@@ -19,7 +19,7 @@ from mindspore_gs.pruner.scop.scop_pruner import PrunerFtCompressAlgo
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_constructor():
     """
@@ -39,7 +39,7 @@ def test_constructor():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_constructor_error():
     """

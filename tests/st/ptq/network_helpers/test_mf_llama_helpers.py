@@ -16,8 +16,11 @@
 
 from typing import List
 import os
+import sys
 import pytest
 import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 
 from mindformers import MindFormerConfig, LlamaForCausalLM, LlamaTokenizer
 from mindspore_gs.ptq.network_helpers.mf_net_helpers import MFLlama2Helper
@@ -126,10 +129,9 @@ def test_mf_parallel_llama_net_helper_inputs_1p():
         f"pytest {cur_file}::test_mf_parallel_llama_net_helper_inputs"
     )
     if return_code != 0:
-        log_file = open("./test_mf_llama_helpers_1p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
+        with open("./test_mf_llama_helpers_1p_logs/worker_0.log", "r", encoding="utf-8") as log_file:
+            for line in log_file:
+                print(line, flush=True)
 
     assert return_code == 0
 
@@ -152,9 +154,8 @@ def test_mf_parallel_llama_net_helper_1p():
         f"pytest {cur_file}::test_mf_parallel_llama_net_helper"
     )
     if return_code != 0:
-        log_file = open("./test_mf_llama_helpers_1p_logs/worker_0.log", "r", encoding="utf-8")
-        for line in log_file:
-            print(line, flush=True)
-        log_file.close()
+        with open("./test_mf_llama_helpers_1p_logs/worker_0.log", "r", encoding="utf-8") as log_file:
+            for line in log_file:
+                print(line, flush=True)
 
     assert return_code == 0

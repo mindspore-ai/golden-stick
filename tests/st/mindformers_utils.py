@@ -15,7 +15,10 @@
 """util class about NetworkHelper"""
 
 import os
+import sys
 from typing import Union, List
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../mindformers")))
 
 import numpy as np
 from mindspore.dataset import GeneratorDataset
@@ -41,6 +44,7 @@ def set_config(config_path):
 class MFLlama2HelloNetworkHelper(MFLlama2Helper):
     """SimpleNetworkHelper"""
 
+    # pylint: disable=arguments-renamed
     def generate(self, mf_network, input_ids: Union[np.ndarray, List[int], List[List[int]]],
                  max_new_tokens=1, **kwargs):
         do_sample = self.mf_config.model.model_config.do_sample

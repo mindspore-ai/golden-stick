@@ -19,13 +19,14 @@ import sys
 import tempfile
 from unittest.mock import patch, MagicMock
 import pytest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 from mindspore_gs.ptq.plugins.mindformers_plugin import MFModelHubPlugin
 from mindspore_gs.ptq.models import BaseQuantForCausalLM
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_mf_model_hub_plugin_load():
     """
@@ -38,7 +39,7 @@ def test_mf_model_hub_plugin_load():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_mf_model_hub_plugin_load_models():
     """
@@ -52,7 +53,7 @@ def test_mf_model_hub_plugin_load_models():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_mf_model_hub_plugin_load_quant_cells():
     """
@@ -66,7 +67,7 @@ def test_mf_model_hub_plugin_load_quant_cells():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_mf_model_hub_plugin_create_model_valid_config():
     """
@@ -96,7 +97,7 @@ def test_mf_model_hub_plugin_create_model_valid_config():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_mf_model_hub_plugin_create_model_invalid_path():
     """
@@ -112,7 +113,7 @@ def test_mf_model_hub_plugin_create_model_invalid_path():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_mf_model_hub_plugin_create_model_invalid_yaml():
     """

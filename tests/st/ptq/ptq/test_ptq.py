@@ -551,7 +551,7 @@ def test_input_catcher(device):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_error():
     """
@@ -597,7 +597,7 @@ def test_ptq_config_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_a8w4_config_error():
     """

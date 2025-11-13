@@ -29,6 +29,7 @@ class SampleNet(nn.Cell):
 
     def __init__(self):
         """__init__"""
+        # pylint: disable=super-with-arguments
         super(SampleNet, self).__init__()
         self.inner_net = SampleNet.InnerNet()
 
@@ -38,7 +39,7 @@ class SampleNet(nn.Cell):
         return x
 
 
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_rewrite_log():
     """
@@ -51,4 +52,4 @@ def test_rewrite_log():
     with pytest.raises(RuntimeError) as err:
         _ = algo.apply(net)
     assert "For MindSpore Golden Stick, input network type 'SampleNet' "\
-           f"is not supported right now." in err.value.args[0]
+           "is not supported right now." in err.value.args[0]

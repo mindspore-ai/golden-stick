@@ -17,7 +17,15 @@
 echo "---------------- GoldenStick: build start ----------------"
 BASEPATH=$(cd "$(dirname $0)"; pwd)
 
-python3 setup.py bdist_wheel -d ${BASEPATH}/output
+# Get target backend from command line argument or environment variable, default to ascend
+TARGET=${1:-${GS_TARGET:-ascend}}
+if [ "${TARGET}" != "ascend" ] && [ "${TARGET}" != "gpu" ]; then
+    echo "Warning: Invalid target '${TARGET}', defaulting to 'ascend'"
+    TARGET="ascend"
+fi
+
+echo "Building for target: ${TARGET}"
+python3 setup.py bdist_wheel -d ${BASEPATH}/output --target=${TARGET}
 
 if [ ! -d "${BASEPATH}/output" ]; then
     echo "The directory ${BASEPATH}/output dose not exist."

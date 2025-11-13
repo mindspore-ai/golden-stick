@@ -24,13 +24,14 @@ from mindspore_gs import CompAlgo
 class ExampleAlgo(CompAlgo):
     """ExampleAlgo."""
 
+    # pylint: disable=arguments-differ
     def apply(self, network: Cell) -> Cell:
         """apply."""
         return network
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_comp_algo_error():
     """
@@ -41,6 +42,7 @@ def test_comp_algo_error():
 
     has_error = False
     try:
+        # pylint: disable=abstract-class-instantiated
         _ = CompAlgo()
         has_error = True
     except TypeError:
@@ -49,7 +51,7 @@ def test_comp_algo_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_callback():
     """
@@ -67,7 +69,7 @@ def test_callback():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_set_save_mindir():
     """
@@ -86,7 +88,7 @@ def test_set_save_mindir():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_set_save_mindir_path():
     """

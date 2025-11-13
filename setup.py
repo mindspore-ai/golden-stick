@@ -111,6 +111,107 @@ def version_from_file():
     raise ValueError(f"Version not found in {version_py_file}")
 
 
+def parse_requirements(file_path):
+    """
+    Parse requirements from a requirements file.
+
+    Args:
+        file_path (str): Path to the requirements file.
+
+    Returns:
+        list: List of requirement strings.
+    """
+    requirements = []
+    if not os.path.exists(file_path):
+        return requirements
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            # Skip empty lines and comments
+            if not line or line.startswith('#'):
+                continue
+            # Remove inline comments
+            if '#' in line:
+                line = line[:line.index('#')].strip()
+            if line:
+                requirements.append(line)
+    return requirements
+
+
+def get_target_platform():
+    """
+    Get target platform from multiple sources (in priority order):
+    1. Command line argument: --target=ascend/gpu
+    2. Environment variable: GS_TARGET
+    3. Default: ascend
+    
+    Returns:
+        str: Target platform name (ascend/gpu)
+    """
+    target = None
+
+    # Priority 1: Check command line arguments
+    # Support formats: --target=ascend, --target ascend, -t ascend
+    args_to_remove = []
+    for i, arg in enumerate(sys.argv):
+        if arg.startswith('--target='):
+            target = arg.split('=', 1)[1].lower()
+            args_to_remove.append(i)
+            break
+        if arg in ('--target', '-t') and i + 1 < len(sys.argv):
+            target = sys.argv[i + 1].lower()
+            args_to_remove.extend([i, i + 1])
+            break
+
+    # Remove processed arguments from sys.argv (in reverse order to maintain indices)
+    for i in sorted(args_to_remove, reverse=True):
+        sys.argv.pop(i)
+
+    # Priority 2: Check environment variable
+    if not target:
+        target = os.environ.get('GS_TARGET', '').lower()
+
+    # Priority 3: Default to ascend
+    if not target or target not in ('ascend', 'gpu'):
+        target = 'ascend'
+
+    return target
+
+
+def get_install_requires():
+    """
+    Read requirements file based on target platform.
+    
+    The target platform can be specified via:
+    1. Command line: python setup.py install --target=ascend
+    2. Environment variable: GS_TARGET=ascend
+    3. Default: ascend
+    
+    Returns:
+        list: List of requirement strings.
+    """
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Get target platform
+    target = get_target_platform()
+
+    # Map target to requirements file
+    target_to_file = {
+        'ascend': 'requirements/ascend.txt',
+        'gpu': 'requirements/gpu.txt',
+    }
+
+    req_file = os.path.join(current_dir, target_to_file[target])
+
+    # Parse and return requirements
+    requirements = parse_requirements(req_file)
+
+    return requirements
+
+
+# Get install_requires from requirements file based on environment variable
+install_requires = get_install_requires()
 version_num = version_from_file()
 date_str = time.strftime('%Y%m%d', time.localtime())
 version = f"{version_num}.dev{date_str}"
@@ -125,13 +226,7 @@ setup(
     url='https://www.mindspore.cn',
     packages=find_packages(include=['mindspore_gs*']),
     cmdclass={'build_py': BuildPy},
-    install_requires=[
-        'numpy >= 1.17.0',
-        'scipy >= 1.5.2',
-        'pyyaml>=6.0',
-        'matplotlib',
-        'prettytable',
-    ],
+    install_requires=install_requires,
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',

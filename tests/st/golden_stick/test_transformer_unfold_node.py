@@ -48,6 +48,7 @@ class ResidualBlock(nn.Cell):
                  out_channel,
                  stride=1):
         """init"""
+        # pylint: disable=super-with-arguments
         super(ResidualBlock, self).__init__()
         self.stride = stride
         channel = out_channel // self.expansion
@@ -72,6 +73,7 @@ class ResNetSimple(nn.Cell):
     """ResNetSimple"""
     def __init__(self):
         """init"""
+        # pylint: disable=super-with-arguments
         super(ResNetSimple, self).__init__(auto_prefix=True)
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, pad_mode='pad', weight_init="ones")
         self.bn1 = _bn(16)
@@ -101,7 +103,7 @@ class ResNetSimple(nn.Cell):
         return nn.SequentialCell(layers)
 
 
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unfold_nodes():
     """
