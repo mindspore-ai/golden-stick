@@ -68,7 +68,7 @@ class QWen3Tester(PTQModelTester):
         if desc_json_path is None:
             logger.error("No quant description json file.")
             return False
-        with open(desc_json_path, "r") as fp:
+        with open(desc_json_path, "r", encoding="utf-8") as fp:
             desc_map = json.load(fp)
 
         def check(name, expect):
@@ -127,6 +127,22 @@ class QWen3Tester(PTQModelTester):
             if not check(name, value):
                 return False
         logger.info("quant description test success.")
+        any_output_layer = any("output_layer." in k for k in desc_map.keys())
+        if any_output_layer:
+            logger.error("output_layer.* should be mapped to lm_head.* in description.")
+            return False
+
+        index_json_path = os.path.join(quant_ckpt_path, "model.safetensors.index.json")
+        if not os.path.exists(index_json_path):
+            logger.error("No safetensors index json file.")
+            return False
+        with open(index_json_path, "r", encoding="utf-8") as fp:
+            index_data = json.load(fp)
+        weight_map = index_data.get("weight_map", {})
+        any_output_layer_idx = any("output_layer." in k for k in weight_map.keys())
+        if any_output_layer_idx:
+            logger.error("output_layer.* found in safetensors index.")
+            return False
         return True
 
     def get_ds_acc_threshold(self) -> Optional[float]:
@@ -141,7 +157,7 @@ if __name__ == "__main__":
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     calibrate_config_path = os.path.join(cur_dir, "calibrate_qwen3.yaml")
     infer_config_path = os.path.join(cur_dir, "predict_qwen3.yaml")
-    q_ckpt_path = os.path.join(cur_dir, f"qwen3-quant")
+    q_ckpt_path = os.path.join(cur_dir, "qwen3-quant")
     dataset_path = os.path.join(cur_dir, '/home/workspace/mindspore_dataset/ceval/dev')
     tester = QWen3Tester()
     result = tester.dataset_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, dataset_path)

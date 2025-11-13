@@ -61,7 +61,7 @@ class QWen3MoE(QWen3):
         desc_info = {}
         param_dict = self.parameters_dict()
         for key, _ in param_dict.items():
-            if key in hf_results.keys():
+            if key in hf_results:
                 desc_info[key] = hf_results[key]
             else:
                 desc_info[key] = QuantType.FLOAT.value
@@ -78,6 +78,7 @@ class QWen3MoE(QWen3):
             ".self_attention.": ".self_attn.",
             "embedding.word_embeddings.": "model.embed_tokens.",
             "decoder.final_layernorm.": "model.norm.",
+            "output_layer.": "lm_head.",
             ".pre_mlp_layernorm.": ".post_attention_layernorm.",
             ".q_layernorm.": ".q_norm.",
             ".k_layernorm.": ".k_norm.",
