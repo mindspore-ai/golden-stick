@@ -30,14 +30,14 @@ from mindspore.dataset import GeneratorDataset, RepeatDataset
 from mindspore_gs.comp_algo import CompAlgo
 from mindspore_gs.common import logger
 from mindspore_gs.common.utils import offload_network, value_check
-from mindspore_gs.ptq.processor import transform_network_inplace
+from mindspore_gs.ptq.basic_functions.processor import transform_network_inplace
 from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, OutliersSuppressionType, PrecisionRecovery
 from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
 from mindspore_gs.ptq.network_helpers import NetworkHelper
-from mindspore_gs.ptq.ptq.wrapper_cell import WrapperCell, SearchInputs
-from mindspore_gs.ptq.processor import Processor
-from .algorithm import Algorithm
-from .algorithms import LinearSmoothQuant, LinearAutoSmoother, LinearClipper, Quantizer
+from mindspore_gs.ptq.quant_cells.quant_cell import QuantCell, SearchInputs
+from mindspore_gs.ptq.basic_functions.processor import Processor
+from mindspore_gs.ptq.algo_modules import AlgoModule
+from mindspore_gs.ptq.algo_modules import LinearSmoothQuant, LinearAutoSmoother, LinearClipper, Quantizer
 
 
 class InputCatcher(Cell):
@@ -147,7 +147,7 @@ class PTQ(CompAlgo):
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
         self._layer_policies_check()
-        self.pipeline: List[Algorithm] = []
+        self.pipeline: List[AlgoModule] = []
         self.decoder_layers: list[Cell] = []
         self.decoder_layer_types: list = []
         self.context_mode = get_context("mode")
@@ -155,9 +155,9 @@ class PTQ(CompAlgo):
         self._build_pipeline()
         self._load_mindformers_plugin()
 
-    def _append_algorithm(self, name, algorithm: Algorithm):
+    def _append_algorithm(self, name, algo_module: AlgoModule):
         logger.info(f"append {name} to pipeline.")
-        self.pipeline.append(algorithm)
+        self.pipeline.append(algo_module)
 
     def _build_pipeline(self):
         """build pipline"""
@@ -172,9 +172,13 @@ class PTQ(CompAlgo):
 
     def _load_mindformers_plugin(self):
         """_load_mindformers_plugin"""
-        for algorithm in self.pipeline:
-            algorithm.load_mindformers_plugin()
-            self._target_layer_type += algorithm.target_layer_type()
+        if not LinearSmoothQuant.linear_map or not LinearAutoSmoother.linear_map \
+            or not LinearClipper.linear_map or not Quantizer.layer_map:
+            from mindspore_gs.ptq.plugins import MFModelHubPlugin
+            # pylint: disable=protected-access
+            MFModelHubPlugin()._load_quant_cells()
+            for algorithm in self.pipeline:
+                self._target_layer_type += algorithm.target_layer_type()
         try:
             from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
             self.decoder_layer_types.append(LLamaDecodeLayer)
@@ -382,7 +386,7 @@ class PTQ(CompAlgo):
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()
 
-                transform_network_inplace(layer, WrapperCell, lambda _, cell: cell.add_hook(self._config.experimental))
+                transform_network_inplace(layer, QuantCell, lambda _, cell: cell.add_hook(self._config.experimental))
                 # FIXME: 'always_use_fp_input_in_processer' is a temporary switch for fixing activation between
                 # layers. This branch may introduces error to the next layer, because previous processors in the
                 # pipeline changes the layer, and thus, gives a inaccurate output. Set the switch to True to
@@ -390,7 +394,7 @@ class PTQ(CompAlgo):
                 catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs, do_update= \
                     len(self.decoder_layers) > 1 and not self._config.always_use_fp_input_in_processer)
 
-                transform_network_inplace(layer, WrapperCell, lambda _, c: c.remove_hook(self._config.experimental))
+                transform_network_inplace(layer, QuantCell, lambda _, c: c.remove_hook(self._config.experimental))
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
                 processor.process(layer_name, layer)

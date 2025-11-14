@@ -44,10 +44,11 @@ Examples:
     >>>         pass
 """
 
+
 import os
 from mindspore_gs.common import logger
+from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
 from .base_model import BaseQuantForCausalLM
-from .distributed_parameter import DistributedParameter
 
 
 class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):

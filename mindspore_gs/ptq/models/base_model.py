@@ -44,8 +44,6 @@ Examples:
     >>>         pass
 """
 
-from mindspore_gs.common import logger
-
 
 class BaseQuantForCausalLM:
     """Base Class for Causal Language Model Quantization
@@ -66,68 +64,6 @@ class BaseQuantForCausalLM:
         >>> class MyCustomQuantModel(BaseQuantForCausalLM):
         >>>     pass
     """
-
-    _model_hub_registry: dict[str, type] = {}
-
-    @staticmethod
-    def _reg_model_hub(name, model_clazz):
-        """Internal method to register a model hub implementation.
-
-        This method registers a model hub implementation in the internal
-        registry. It prevents duplicate registrations and logs registration
-        events for debugging purposes.
-
-        Args:
-            name (str): The name/identifier for the model hub.
-            model_clazz (type): The class implementing the model hub.
-
-        Raises:
-            RuntimeError: If a model hub with the same name is already registered.
-        """
-        cur = BaseQuantForCausalLM._model_hub_registry.get(name)
-        if cur:
-            raise RuntimeError(f"Duplicated model-hub reg, name: {name}, already reg class: {cur}, "
-                               f"current reg class:{model_clazz}")
-        logger.info(f"Register name {name} to model {model_clazz}")
-        BaseQuantForCausalLM._model_hub_registry[name] = model_clazz
-
-    @staticmethod
-    def reg_model_hub(alias=None):
-        """Decorator for registering model hub implementations.
-
-        This decorator registers a class as a model hub implementation,
-        making it available for automatic detection and selection.
-
-        Args:
-            alias (str, optional): Alternative name for the model hub.
-                If not provided, the class name will be used. Defaults to ``None``.
-
-        Returns:
-            function. Decorator function that registers the class.
-
-        Examples:
-            >>> @BaseQuantForCausalLM.reg_model_hub("qwen3")
-            >>> class QWen3QuantModel(BaseQuantForCausalLM):
-            >>>     pass
-        """
-        def decorator(cls):
-            """decorator"""
-            register_key = alias if alias is not None else cls.__name__
-            BaseQuantForCausalLM._reg_model_hub(register_key, cls)
-            return cls
-
-        return decorator
-
-    @staticmethod
-    def get_model_hub_registry():
-        """Get the registry of all registered model hubs.
-
-        Returns:
-            dict[str, type]. Dictionary mapping model hub names to their
-                respective class implementations.
-        """
-        return BaseQuantForCausalLM._model_hub_registry
-
     @classmethod
     def from_pretrained(cls, **kwargs):
         """Create a model instance from pretrained weights.

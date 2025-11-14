@@ -45,8 +45,7 @@ Example:
 """
 
 from mindspore.nn.cell import Cell
-from mindspore_gs.ptq.models.mindformers_models.mf_model import (MFModel,
-                                                                 MFModelEnableSafeTensors)
+from mindspore_gs.ptq.models.mindformers_models.mf_model import MFModel, MFModelEnableSafeTensors
 from mindspore_gs.ptq.models.mindformers_models.param_processor import (QKVParamProcessor,
                                                                         FFNParamProcessor)
 from mindspore_gs.ptq.utils import QuantType
@@ -175,7 +174,7 @@ class QWen3(MFModelEnableSafeTensors):
         desc_info = {}
         param_dict = self.parameters_dict()
         for key, _ in param_dict.items():
-            if key in hf_results.keys():
+            if key in hf_results:
                 desc_info[key] = hf_results[key]
             else:
                 desc_info[key] = QuantType.FLOAT.value

@@ -35,7 +35,7 @@ from mindspore_gs.common.numpy_quant_common import NumpyQuantOps
 from mindspore_gs.common import logger
 from mindspore_gs.ptq import PTQMode
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.basic_quant_func import (
+from mindspore_gs.ptq.basic_functions.basic_quant_func import (
     np_int4data_pack_to_int8,
     np_int4data_pack_to_int8_3d,
     convert_fp32_to_int64,

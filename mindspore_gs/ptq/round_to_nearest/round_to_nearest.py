@@ -29,7 +29,7 @@ from mindspore_gs.common import logger
 from mindspore_gs import CompAlgo
 from mindspore_gs.quantization.net_policy import NetPolicy
 from mindspore_gs.ptq.round_to_nearest.quant_cell import PTQCell
-from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq.basic_functions.processor import Processor
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.ptq_config import PTQConfig, PTQMode, QuantGranularity, OutliersSuppressionType
 from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
@@ -64,7 +64,7 @@ class RoundToNearest(CompAlgo):
     """
 
     def __init__(self, config=None):
-        super(RoundToNearest, self).__init__()
+        super().__init__()
         if config is not None:
             if not isinstance(config, PTQConfig):
                 raise TypeError(f'Shall init RTN with PTQConfig, bug got {type(config)}')
@@ -116,7 +116,7 @@ class RoundToNearest(CompAlgo):
         if not isinstance(value, list) and not isinstance(value, tuple):
             value = [value]
         elif len(value) > 2:
-            raise ValueError("input `{}` len should be less than 3".format(name))
+            raise ValueError(f"input `{name}` len should be less than 3")
         return value
 
     # pylint: disable=arguments-differ

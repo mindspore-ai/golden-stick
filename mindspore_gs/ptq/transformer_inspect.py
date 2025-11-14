@@ -22,7 +22,7 @@ from collections import OrderedDict
 from mindspore.nn import Cell
 
 from mindspore_gs.common.utils import value_check
-from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq.basic_functions.processor import Processor
 from mindspore_gs.common.name_prefix_tree import NameTree
 
 

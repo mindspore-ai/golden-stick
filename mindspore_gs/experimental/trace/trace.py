@@ -23,7 +23,7 @@ from typing import Tuple, List, Any
 from mindspore.nn import Cell
 import mindspore.ops.functional as F
 from mindspore import context
-from mindspore_gs.ptq.processor import Processor
+from mindspore_gs.ptq.basic_functions.processor import Processor
 from mindspore_gs.common import logger
 from mindspore_gs.experimental.trace.llama2 import create_llama
 

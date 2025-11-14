@@ -21,7 +21,7 @@ from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
 from mindspore.nn import Cell
 from mindspore import dtype as mstype
-from mindspore_gs.ptq.basic_quant_func import get_quant_min_max, cal_quantization_params
+from mindspore_gs.ptq.basic_functions.basic_quant_func import get_quant_min_max, cal_quantization_params
 
 
 class FakeQuantizer(Cell):
@@ -168,7 +168,7 @@ class MinMaxPerLayer(LinearFakeQuantizer):
     """Static minmax by layer"""
 
     def __init__(self, symmetric=True, narrow_range=False, quant_dtype=mstype.int8, strategy=None):
-        super(MinMaxPerLayer, self).__init__()
+        super().__init__()
         self._symmetric = symmetric
         self._narrow_range = narrow_range
         self._quant_dtype = quant_dtype
@@ -238,11 +238,11 @@ class MinMaxPerLayer(LinearFakeQuantizer):
         return False
 
     def __repr__(self):
-        fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={})"\
-            .format(self.float_min.name, self.float_min.shape, self.float_min.dtype, self.float_min.requires_grad)
-        fmaxrepr = "float_max: (name={}, shape={}, dtype={}, requires_grad={})"\
-            .format(self.float_max.name, self.float_max.shape, self.float_max.dtype, self.float_max.requires_grad)
-        res = "MinMaxPerLayer<{}, {}>".format(fminrepr, fmaxrepr)
+        fminrepr = f"float_min: (name={self.float_min.name}, shape={self.float_min.shape}, " \
+                   f"dtype={self.float_min.dtype}, requires_grad={self.float_min.requires_grad})"
+        fmaxrepr = f"float_max: (name={self.float_max.name}, shape={self.float_max.shape}, " \
+                   f"dtype={self.float_max.dtype}, requires_grad={self.float_max.requires_grad})"
+        res = f"MinMaxPerLayer<{fminrepr}, {fmaxrepr}>"
         return res
 
 
@@ -251,7 +251,7 @@ class MinMaxPerChannel(LinearFakeQuantizer):
 
     def __init__(self, axis, output_channel, data_rank, symmetric=True, narrow_range=False, quant_dtype=mstype.int8,
                  strategy=None):
-        super(MinMaxPerChannel, self).__init__()
+        super().__init__()
         self._symmetric = symmetric
         self._narrow_range = narrow_range
         self._quant_dtype = quant_dtype
@@ -341,9 +341,9 @@ class MinMaxPerChannel(LinearFakeQuantizer):
         return self.axis
 
     def __repr__(self):
-        fminrepr = "float_min: (name={}, shape={}, dtype={}, requires_grad={})"\
-            .format(self.float_min.name, self.float_min.shape, self.float_min.dtype, self.float_min.requires_grad)
-        fmaxrepr = "float_max: (name={}, shape={}, dtype={}, requires_grad={})"\
-            .format(self.float_max.name, self.float_max.shape, self.float_max.dtype, self.float_max.requires_grad)
-        res = "MinMaxPerChannel<{}, {}>".format(fminrepr, fmaxrepr)
+        fminrepr = f"float_min: (name={self.float_min.name}, shape={self.float_min.shape}, " \
+                   f"dtype={self.float_min.dtype}, requires_grad={self.float_min.requires_grad})"
+        fmaxrepr = f"float_max: (name={self.float_max.name}, shape={self.float_max.shape}, " \
+                   f"dtype={self.float_max.dtype}, requires_grad={self.float_max.requires_grad})"
+        res = f"MinMaxPerChannel<{fminrepr}, {fmaxrepr}>"
         return res
