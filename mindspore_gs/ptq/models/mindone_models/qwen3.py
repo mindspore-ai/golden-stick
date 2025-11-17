@@ -19,18 +19,18 @@ GLM4v Quantized Model Implementation
 
 import mindspore as ms
 from mindspore.nn.cell import Cell
+from mindone.transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
+
 from mindspore_gs.ptq.models.mindone_models.mindone_model import MindOneModel
 from mindspore_gs.ptq.utils import QuantType
 
 
-
-@MindOneModel.reg_model('qwen3_moe')
-class Qwen3_MOE(MindOneModel):
+@MindOneModel.reg_model('qwen3')
+class Qwen3(MindOneModel):
     """GLM4v Quantized Model Implementation
     """
     def __init__(self, model_path):
-        from mindone.transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeForCausalLM
-        self.network = Qwen3MoeForCausalLM.from_pretrained(
+        self.network = Qwen3ForCausalLM.from_pretrained(
             model_path,
             mindspore_dtype=ms.bfloat16,
             _attn_implementation="flash_attention_2",
@@ -54,7 +54,7 @@ class Qwen3_MOE(MindOneModel):
             Generated output from the model.
         """
         return self.network.generate(inputs, max_new_tokens=max_new_tokens,
-                                        use_cache=False,
+                                     use_cache=False,
                                      do_sample=False)
 
     def _network(self):
@@ -74,8 +74,8 @@ class Qwen3_MOE(MindOneModel):
         Returns:
             tuple[type]. Tuple containing TransformerLayer type.
         """
-        from mindone.transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeDecoderLayer
-        return [Qwen3MoeDecoderLayer]
+        from mindone.transformers.models.qwen3.modeling_qwen3  import Qwen3DecoderLayer
+        return [Qwen3DecoderLayer]
 
     def _get_quant_type(self):
         """Get quantization type information for network parameters.

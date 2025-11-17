@@ -29,7 +29,6 @@ from mindspore_gs.ptq.ptq.wrapper_cell import Checker
 from mindspore_gs.ptq.utils import QuantType
 
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
-from .deploy import correction_into_bias
 
 
 class AllQuantLinearCell(WeightQuantLinearCell):
@@ -60,8 +59,12 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         """quant"""
         # quant weight
         super().quant()
+        if hasattr(self.layer, "smooth_scale"):
+            cat_samples = self.cat_samples / self.layer.smooth_scale
+        else:
+            cat_samples = self.cat_samples
         # quant activation
-        x_scale, x_zp, _ = quant_tensor(self.cat_samples, self.x_quant_min, self.x_quant_max,
+        x_scale, x_zp, _ = quant_tensor(cat_samples, self.x_quant_min, self.x_quant_max,
                                         self.cfg.act_narrow_range, self.cfg.act_symmetric,
                                         self.cfg.act_quant_granularity == QuantGranularity.PER_GROUP,
                                         self.cfg.group_size,
@@ -71,10 +74,7 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         self.input_offset = Parameter(Tensor(x_zp, dtype=dtype.int32))
 
         if hasattr(self.layer, "smooth_scale"):
-            print("hasattr(self.layer, smooth_scale", flush=True)
             self.smooth_scale = self.layer.smooth_scale
-            print("x_scale:", x_scale, "x_zp:", x_zp, " self.smooth_scale:", self.smooth_scale.shape, flush=True)
-        print("w_scale:", self.weight_scale.shape, " q_weight:", self.weight.shape, flush=True)
         self.deq_scale = Parameter(Tensor(self._get_dequant_scale(self.input_scale.asnumpy(),
                                                                   self.weight_scale.asnumpy()),
                                                                   dtype=self.compute_type))
@@ -88,25 +88,15 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
         return dequant_scale
 
-    def post_process_param_for_deploy(self):
-        if self.context.backend == BackendTarget.ASCEND:
-            quant_bias = correction_into_bias(self.weight, self.input_scale, self.input_offset, self.weight_scale,
-                                              self.transpose_b, self.compute_type)
-            self.quant_bias = Parameter(quant_bias)
-        else:
-            raise ValueError(f"Not supported backend: {self.context.backend}.")
-
     def quant_type_dict(self):
         """quant_type_dict"""
         quant_type = {
-            # self.smooth_scale.name: QuantType.W8A8.value,
             self.weight_scale.name: QuantType.W8A8.value,
             self.weight_offset.name: QuantType.W8A8.value,
             self.weight.name: QuantType.W8A8.value,
             self.input_scale.name: QuantType.W8A8.value,
             self.input_offset.name: QuantType.W8A8.value,
             self.deq_scale.name: QuantType.W8A8.value,
-            # self.quant_bias.name: QuantType.W8A8.value,
         }
         if hasattr(self.layer, "smooth_scale"):
             quant_type.update({self.smooth_scale.name: QuantType.W8A8.value})

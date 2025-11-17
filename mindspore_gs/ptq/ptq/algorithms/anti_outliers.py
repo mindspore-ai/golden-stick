@@ -15,6 +15,7 @@
 """anti-outliers algorithm."""
 from typing import Tuple
 
+from mindspore import mint
 from mindspore.nn import Cell
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.processor import Processor
@@ -167,6 +168,19 @@ class LinearAutoSmoother(LinearSmoother):
 
     linear_map = {}
     fake_quant_linear_map = {}
+    qkv_ffn_map = {}
+
+    @staticmethod
+    def reg_qkv_ffn_map(layer_type, quant_layer_type, checker: Checker):
+        """reg_fake_quant_layer_map"""
+        print("LinearAutoSmoother reg_qkv_ffn_map:", flush=True)
+        if not issubclass(quant_layer_type, WrapperCell):
+            raise RuntimeError(f"Quantize linear type should be a subclass of {id(WrapperCell)}, "
+                               f"but got {quant_layer_type}.")
+        if not LinearAutoSmoother.qkv_ffn_map.get(layer_type):
+            LinearAutoSmoother.qkv_ffn_map[layer_type] = [(checker, quant_layer_type)]
+        else:
+            LinearAutoSmoother.qkv_ffn_map[layer_type].append((checker, quant_layer_type))
 
     def target_layer_type(self) -> tuple:
         return tuple(self.linear_map.keys())
@@ -194,6 +208,17 @@ class LinearAutoSmoother(LinearSmoother):
             return checker_wrapper[1]
         return None
 
+    def get_qkv_ffn_wrapper_layer(self, layer_type, config: InnerPTQConfig):
+        """get wrapper layer"""
+        wrappers = LinearAutoSmoother.qkv_ffn_map.get(layer_type)
+        if not wrappers:
+            return None
+        for checker_wrapper in wrappers:
+            if not checker_wrapper[0].check(config):
+                continue
+            return checker_wrapper[1]
+        return None
+
     # pylint: disable=arguments-differ
     def replace(self, decoder_layer_name: str, decoder_layer, search_inputs: SearchInputs = None, **kwargs):
         """infer_and_cache"""
@@ -201,10 +226,38 @@ class LinearAutoSmoother(LinearSmoother):
         search_args = search_inputs.layer_args if search_inputs else None
         search_kwargs = search_inputs.layer_kwargs if search_inputs else None
 
+        class DeocodeWalker(Processor):
+            def __init__(self):
+                self.qkv_weight = []
+                self.ffn_weight = []
+                self.qkv_cell = {}
+                self.ffn_cell = {}
+
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                if "q_proj" in cell_name:
+                    self.q = cell
+                if "q_proj" in cell_name or "k_proj" in cell_name or "v_proj" in cell_name:
+                    self.qkv_cell[cell_name.split('.')[-1]] = cell
+                    self.qkv_weight.append(cell.weight)
+                    return cell, True
+                if "gate_proj" in cell_name or "up_proj" in cell_name:
+                    self.ffn_cell[cell_name.split('.')[-1]] = cell
+                    self.ffn_weight.append(cell.weight)
+                    return cell, True
+                return cell, False
+
+        walker = DeocodeWalker()
+        walker.process(decoder_layer)
+        qkv_concat_weight = mint.cat(walker.qkv_weight)
+        ffn_concat_weight = mint.cat(walker.ffn_weight)
         class Replacer(Processor):
             """Replacer"""
-            def __init__(self, algorithm):
+            def __init__(self, algorithm, qkv_concat_weight, ffn_concat_weight, qkv_cell_map, ffn_cell_map):
                 self.handler = algorithm
+                self.qkv_concat_weight = qkv_concat_weight
+                self.ffn_concat_weight = ffn_concat_weight
+                self.qkv_cell_map = qkv_cell_map
+                self.ffn_cell_map = ffn_cell_map
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
                 if not LinearAutoSmoother.linear_map.get(type(cell)):
@@ -225,10 +278,40 @@ class LinearAutoSmoother(LinearSmoother):
                 if not issubclass(wrapper_cell_type, WrapperCell):
                     raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
                                        f"a subclass of {WrapperCell}.")
-                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
-                                                 decoder_layer=search_layer, layer_args=search_args,
-                                                 layer_kwargs=search_kwargs)
+                if "q_proj" in cell_name or "k_proj" in cell_name or "v_proj" in cell_name:
+                    wrapper_cell_type = self.handler.get_qkv_ffn_wrapper_layer("qkv", layer_policy)
+                    if not wrapper_cell_type:
+                        return cell, False
+                    if not issubclass(wrapper_cell_type, WrapperCell):
+                        raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
+                                        f"a subclass of {WrapperCell}.")
+                    wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config,
+                                                     cfg=layer_policy,
+                                                     concat_weight=self.qkv_concat_weight,
+                                                     concat_linear_map=self.qkv_cell_map,
+                                                     decoder_layer=search_layer,
+                                                     layer_args=search_args,
+                                                     layer_kwargs=search_kwargs)
+                elif "gate_proj" in cell_name or "up_proj" in cell_name:
+                    wrapper_cell_type = self.handler.get_qkv_ffn_wrapper_layer("ffn", layer_policy)
+                    if not wrapper_cell_type:
+                        return cell, False
+                    if not issubclass(wrapper_cell_type, WrapperCell):
+                        raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
+                                        f"a subclass of {WrapperCell}.")
+                    wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config,
+                                                     cfg=layer_policy,
+                                                     concat_weight=self.ffn_concat_weight,
+                                                     concat_linear_map=self.ffn_cell_map,
+                                                     decoder_layer=search_layer,
+                                                     layer_args=search_args,
+                                                     layer_kwargs=search_kwargs)
+                else:
+                    wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy,
+                                                     decoder_layer=search_layer, layer_args=search_args,
+                                                     layer_kwargs=search_kwargs)
                 logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
                 return wrapper_cell, True
 
-        Replacer(self).process(decoder_layer, decoder_layer_name)
+        Replacer(self, qkv_concat_weight, ffn_concat_weight, walker.qkv_cell, walker.ffn_cell).process(decoder_layer,
+                                                                                                       decoder_layer_name)

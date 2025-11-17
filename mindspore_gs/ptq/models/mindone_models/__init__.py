@@ -20,3 +20,5 @@ MindOne Models Package
 from .mindone_model import MindOneModel
 from .glm4v import GLM4v
 from .qwen3_moe import Qwen3_MOE
+from .qwen3 import Qwen3
+from .qwen3_vl import Qwen3_vl
