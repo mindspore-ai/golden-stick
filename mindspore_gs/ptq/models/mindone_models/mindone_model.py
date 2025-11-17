@@ -17,6 +17,7 @@
 Mindone Quantization Model Base Class
 """
 import os
+import time
 import json
 from tqdm import tqdm
 
@@ -30,6 +31,7 @@ from mindspore_gs.ptq.basic_functions.safetensors_mgr import SafeTensorsMgr
 from mindspore_gs.ptq.ptq.quant import PTQ
 from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
 from mindspore_gs.common import BackendTarget
+from mindspore_gs.common.utils import offload_network
 from .param_processor import ParamProcessor
 
 
@@ -164,11 +166,23 @@ class MindOneModel(BaseQuantForCausalLMImpl):
             ...     fake_quant=False
             ... )
         """
-        return
+        logger.info("Use ptq algo to quant network and weight.")
+        net = self._network()
+        ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
+
+        quant_start = time.time()
+        logger.info('Quantize-ing network...')
+        start_time = time.time()
+        ptq.apply(self, datasets=datasets, framework="mindone")
+        ptq.summary(net)
+        offload_network(net)
+        logger.info(f'Apply PTQ cost time is {time.time() - start_time} s.')
+        start_time = time.time()
+        logger.info(f'Convert to real quantize cost time is {time.time() - start_time} s.')
+        logger.info(f'Quant Network cost total time is {time.time() - quant_start} s.')
 
     def _set_ptq_config(self, ptq: PTQ, **kwargs):
         """set ptq config"""
-        ptq.set_ptq_config(experimental=True)
         ptq.set_ptq_config(**kwargs)
         return ptq
 

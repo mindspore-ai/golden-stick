@@ -34,7 +34,6 @@ class GLM4v(MindOneModel):
             model_path,
             mindspore_dtype=ms.bfloat16,
             _attn_implementation="flash_attention_2",
-            use_cache=False,
             )
         self._original_sf_path = model_path
 
@@ -53,8 +52,10 @@ class GLM4v(MindOneModel):
         Returns:
             Generated output from the model.
         """
-        return self.network.generate(**inputs, max_new_tokens=max_new_tokens,
-                                     do_sample=False)
+        return self.network.generate(**inputs,
+                                     max_new_tokens=max_new_tokens,
+                                     do_sample=False,
+                                     use_cache=False)
 
     def _network(self):
         """Get the underlying network instance.

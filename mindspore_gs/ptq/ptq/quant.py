@@ -38,6 +38,7 @@ from mindspore_gs.ptq.quant_cells.quant_cell import QuantCell, SearchInputs
 from mindspore_gs.ptq.basic_functions.processor import Processor
 from mindspore_gs.ptq.algo_modules import AlgoModule
 from mindspore_gs.ptq.algo_modules import LinearSmoothQuant, LinearAutoSmoother, LinearClipper, Quantizer
+from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 
 
 class InputCatcher(Cell):
@@ -172,13 +173,16 @@ class PTQ(CompAlgo):
 
     def _load_mindformers_plugin(self):
         """_load_mindformers_plugin"""
-        if not LinearSmoothQuant.linear_map or not LinearAutoSmoother.linear_map \
-            or not LinearClipper.linear_map or not Quantizer.layer_map:
-            from mindspore_gs.ptq.plugins import MFModelHubPlugin
-            # pylint: disable=protected-access
-            MFModelHubPlugin()._load_quant_cells()
-            for algorithm in self.pipeline:
-                self._target_layer_type += algorithm.target_layer_type()
+        try:
+            if not LinearSmoothQuant.linear_map or not LinearAutoSmoother.linear_map \
+                or not LinearClipper.linear_map or not Quantizer.layer_map:
+                from mindspore_gs.ptq.plugins import MFModelHubPlugin
+                # pylint: disable=protected-access
+                MFModelHubPlugin()._load_quant_cells()
+                for algorithm in self.pipeline:
+                    self._target_layer_type += algorithm.target_layer_type()
+        except ImportError:
+            pass
         try:
             from mindformers.models.llama.llama_transformer import LLamaDecodeLayer
             self.decoder_layer_types.append(LLamaDecodeLayer)
@@ -294,12 +298,12 @@ class PTQ(CompAlgo):
                     if config_.mode != self._config.mode:
                         logger.warning(f'The mode={config_.mode} in {key} layer policy different from '
                                        f'mode={self._config.mode} in network policy, PTQ algorithm use network policy '
-                                       f'mode to quant.')
+                                       'mode to quant.')
                         config_.mode = self._config.mode
                     if config_.backend != self._config.backend:
                         logger.warning(f'The backend={config_.backend} in {key} layer policy different from '
                                        f'backend={self._config.backend} in network policy, PTQ algorithm use network '
-                                       f'policy backend to quant.')
+                                       'policy backend to quant.')
                         config_.backend = self._config.backend
                     self.layer_policies[key] = InnerPTQConfig().inner_config(config_, approach=PTQApproach.PTQ)
                     PTQ._ptq_config_check(self.layer_policies[key])
@@ -322,8 +326,7 @@ class PTQ(CompAlgo):
                     "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
         logger.info("Analysis network structure.")
 
-    # pylint: disable=arguments-differ
-    # pylint: disable=unused-argument
+
     def apply(self, network: Cell,
               network_helper: NetworkHelper = None,
               datasets=None, **kwargs) -> Cell:
@@ -342,6 +345,20 @@ class PTQ(CompAlgo):
             RuntimeError: If PTQ is not well inited.
             TypeError: If input `network` is not a Cell.
             ValueError: If input datasets is None.
+        """
+        framework = kwargs.get('framework', "mindformers")
+        if framework == "mindone":
+            return self.apply_mindone(network, datasets, **kwargs)
+        if framework == "mindformers":
+            return self.apply_mindformers(network, network_helper, datasets, **kwargs)
+        raise ValueError(f"Invalid framework: {framework}. Please use 'mindone' or 'mindformers'.")
+
+    # pylint: disable=unused-argument
+    def apply_mindformers(self, network: Cell,
+              network_helper: NetworkHelper = None,
+              datasets=None, **kwargs) -> Cell:
+        """
+        Define how to add fake quantizer to `network` for mindformers framework.
         """
         def catch_layer_output(layer, input_args, input_kwargs, output_args, output_kwargs, do_update=True):
             for index, (args, kwargs) in enumerate(zip(input_args, input_kwargs)):
@@ -367,7 +384,7 @@ class PTQ(CompAlgo):
         self._check_apply_inputs(datasets)
         start_time = time.time()
         logger.info(f"Catching inputs for first decoder layer with {len(datasets)} datasets samples.")
-        catcher, network = self._get_first_layer_input(network, datasets, network_helper)
+        catcher, network = self._get_mf_first_layer_input(network, datasets, network_helper)
         all_args = catcher.args
         all_kwargs = catcher.kwargs
         logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
@@ -409,6 +426,73 @@ class PTQ(CompAlgo):
             logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
+    # pylint: disable=unused-argument
+    def apply_mindone(self, model: BaseQuantForCausalLM,
+              datasets=None, **kwargs) -> Cell:
+        """
+        Define how to add fake quantizer to `model` for mindone framework.
+        """
+        def catch_layer_output(layer, input_args, input_kwargs, output_args, output_kwargs, do_update=True):
+            for index, (args, kwargs) in enumerate(zip(input_args, input_kwargs)):
+                output = layer(*args, **kwargs)
+                if do_update:
+                    if "hidden_states" in all_kwargs[index]:
+                        output_kwargs[index]["hidden_states"] = output[0] if isinstance(output, tuple) else output
+                    else:
+                        output_args[index][0] = output[0] if isinstance(output, tuple) else output
+        self._config.update_comm_info()
+
+        # get transformer layers from model
+        # pylint: disable=protected-access
+        transformer_layers = model._transformer_layers()
+        _ = [self.decoder_layer_types.append(layer) for layer in transformer_layers]
+        self._get_decoder_layers(model.network)
+
+        # set target layer type
+        for algo in self.pipeline:
+            self.set_target_layer_type(algo.target_layer_type())
+
+        # convert datasets to Dataset
+        datasets = convert_to_dataset(datasets)
+        self._check_apply_inputs(datasets)
+
+        start_time = time.time()
+        logger.info("Catching inputs for first decoder layer with "
+                    f"{len(datasets)} datasets samples.")
+        catcher, network = self._get_mo_first_layer_input(model, datasets)
+        all_args = catcher.args
+        all_kwargs = catcher.kwargs
+        logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
+        start_time = time.time()
+        logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
+        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ..."):
+            logger.info(f"Quantize {i}th decoder layer.")
+            layer_name, layer = self.decoder_layers[i]
+            cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
+            catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs,
+                                do_update=len(self.decoder_layers) > 1)
+            for processor in self.pipeline:
+                processor.replace(layer_name, layer, search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
+
+                logger.info("Catching inputs of all Linear in decoder layer.")
+                start_time = time.time()
+
+                transform_network_inplace(layer, QuantCell, lambda _, cell: cell.add_hook())
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs, do_update=False)
+                transform_network_inplace(layer, QuantCell, lambda _, c: c.remove_hook())
+                logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
+
+                processor.process(layer_name, layer)
+                network.update_parameters_name()
+                gc.collect()
+            if self._config.reflash_inputs_after_each_processor:
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs)
+            start_time = time.time()
+            offload_network(layer)
+            gc.collect()
+            logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
+        return network
+
     def fake_quant(self, network):
         """Apply fake quantization to the model.
 
@@ -439,8 +523,8 @@ class PTQ(CompAlgo):
                 network.update_parameters_name()
         return network
 
-    def _get_first_layer_input(self, network: Cell, ds=None, helper=None):
-        """get first layer input"""
+    def _get_mf_first_layer_input(self, network: Cell, ds=None, helper=None):
+        """get mindformers first layer input"""
         catcher = InputCatcher()
         catcher.patch(self.decoder_layers[0][1])
         if not ds:
@@ -463,6 +547,27 @@ class PTQ(CompAlgo):
         catcher.recover()
         offload_network(network)
         return catcher, network
+
+    def _get_mo_first_layer_input(self, model: BaseQuantForCausalLM, ds=None):
+        """get mindone first layer input"""
+        catcher = InputCatcher()
+        catcher.patch(self.decoder_layers[0][1])
+        if not ds:
+            raise ValueError("PTQ need dataset to calibrate, please provide dataset.")
+        total_count = len(ds)
+        data_count = 1
+        for _, ds_item in enumerate(ds):
+            logger.info(f"Calibrating: dataset count: {data_count}/{total_count}")
+            try:
+                # pylint: disable=not-callable
+                return model.forward(ds_item)
+            except GeneratorExit:
+                if hasattr(model.network, "block_mgr") and model.network.block_mgr:
+                    model.network.block_mgr.clear_cache()
+            data_count += 1
+        catcher.recover()
+        offload_network(model.network)
+        return catcher, model.network
 
     def convert(self, net_opt: Cell, ckpt_path="") -> Cell:
         """
