@@ -113,6 +113,21 @@ class MFModelHubPlugin(ModelHubPlugin):
         FakeQuantW8A8DynamicGroupWrapper.reg_self()
         FakeQuantW4A8DynamicGroupWrapper.reg_self()
 
+    def _load_algo_modules(self):
+        """Load MindFormers algorithm modules.
+        
+        This method imports and registers all supported algorithm modules
+        for MindFormers models.
+        """
+        from mindspore_gs.ptq.algo_modules.mindformers.anti_outliers import LinearSmoothQuant, LinearAutoSmoother
+        from mindspore_gs.ptq.algo_modules.clipper import LinearClipper
+        from mindspore_gs.ptq.algo_modules.quantizer import Quantizer
+
+        LinearSmoothQuant.reg_self()
+        LinearAutoSmoother.reg_self()
+        LinearClipper.reg_self()
+        Quantizer.reg_self()
+
     # pylint: disable=arguments-renamed
     def create_model(self, yaml_path) -> BaseQuantForCausalLM:
         """Create a model instance from a pretrained configuration.

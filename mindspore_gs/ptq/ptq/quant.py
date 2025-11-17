@@ -36,8 +36,6 @@ from mindspore_gs.ptq.context import InnerPTQConfig, PTQApproach
 from mindspore_gs.ptq.network_helpers import NetworkHelper
 from mindspore_gs.ptq.quant_cells.quant_cell import QuantCell, SearchInputs
 from mindspore_gs.ptq.basic_functions.processor import Processor
-from mindspore_gs.ptq.algo_modules import AlgoModule
-from mindspore_gs.ptq.algo_modules import LinearSmoothQuant, LinearAutoSmoother, LinearClipper, Quantizer
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 
 
@@ -130,6 +128,9 @@ class PTQ(CompAlgo):
         >>> ptq.summary(quant_net)
     """
 
+    pipeline: List = []
+    target_layer_type: tuple = ()
+
     def __init__(self, config: Union[dict, PTQConfig] = None, layer_policies=None):
         super().__init__()
         if config is not None:
@@ -148,36 +149,17 @@ class PTQ(CompAlgo):
         logger.info(f"Config for PTQ: {self._config}")
         PTQ._ptq_config_check(self._config)
         self._layer_policies_check()
-        self.pipeline: List[AlgoModule] = []
         self.decoder_layers: list[Cell] = []
         self.decoder_layer_types: list = []
         self.context_mode = get_context("mode")
-        self._target_layer_type = ()
-        self._build_pipeline()
-
-    def _append_algorithm(self, name, algo_module: AlgoModule):
-        logger.info(f"append {name} to pipeline.")
-        self.pipeline.append(algo_module)
-
-    def _build_pipeline(self):
-        """build pipline"""
-        smoothquant = LinearSmoothQuant(self._config, self.layer_policies)
-        clipper = LinearClipper(self._config, self.layer_policies)
-        awq = LinearAutoSmoother(self._config, self.layer_policies)
-        quantizer = Quantizer(self._config, self.layer_policies)
-        self._append_algorithm('LinearSmoothQuant', smoothquant)
-        self._append_algorithm('LinearAutoSmoother', awq)
-        self._append_algorithm('LinearClipper', clipper)
-        self._append_algorithm('Quantizer', quantizer)
 
     def _load_mindformers_plugin(self):
         """_load_mindformers_plugin"""
         try:
-            if not LinearSmoothQuant.linear_map or not LinearAutoSmoother.linear_map \
-                or not LinearClipper.linear_map or not Quantizer.layer_map:
-                from mindspore_gs.ptq.plugins import MFModelHubPlugin
-                # pylint: disable=protected-access
-                MFModelHubPlugin()._load_quant_cells()
+            from mindspore_gs.ptq.plugins import MFModelHubPlugin
+            # pylint: disable=protected-access
+            MFModelHubPlugin()._load_quant_cells()
+            MFModelHubPlugin()._load_algo_modules()
         except ImportError:
             pass
         try:
@@ -225,10 +207,6 @@ class PTQ(CompAlgo):
                                 f"should be {type(getattr(self._config, key))}, "
                                 f"but got {type(value)}")
             setattr(self._config, key, value)
-
-    def _set_target_layer_type(self, target_layer_type: tuple):
-        """set target layer type"""
-        self._target_layer_type += target_layer_type
 
     def set_generate_func(self, generate_func: Callable):
         """Set generate function for getting first layer input.
@@ -349,7 +327,6 @@ class PTQ(CompAlgo):
                     "not in list, please modify PTQ.decoder_layer_types before invoking apply method.")
         logger.info("Analysis network structure.")
 
-
     def apply(self, network: Cell,
               network_helper: NetworkHelper = None,
               datasets=None, **kwargs) -> Cell:
@@ -401,7 +378,8 @@ class PTQ(CompAlgo):
         if self._config.mode == PTQMode.DEPLOY:
             for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ Deploy..."):
                 layer_name, layer = self.decoder_layers[i]
-                for processor in self.pipeline:
+                for processor in PTQ.pipeline:
+                    processor = processor(self._config, self.layer_policies)
                     with no_init_parameters():
                         processor.replace(layer_name, layer)
                         processor.deploy(layer_name, layer)
@@ -425,7 +403,8 @@ class PTQ(CompAlgo):
             if self._config.always_use_fp_input_in_processer:
                 catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs,
                                    do_update=len(self.decoder_layers) > 1)
-            for processor in self.pipeline:
+            for processor in PTQ.pipeline:
+                processor = processor(self._config, self.layer_policies)
                 processor.replace(layer_name, layer, search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
 
                 logger.info("Catching inputs of all Linear in decoder layer.")
@@ -494,8 +473,9 @@ class PTQ(CompAlgo):
             cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
             catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs,
                                 do_update=len(self.decoder_layers) > 1)
-            for processor in self.pipeline:
-                processor.replace(layer_name, layer, search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
+            for processor in PTQ.pipeline:
+                processor = processor(self._config, self.layer_policies)
+                processor.replace(layer_name, layer)
 
                 logger.info("Catching inputs of all Linear in decoder layer.")
                 start_time = time.time()
@@ -505,7 +485,8 @@ class PTQ(CompAlgo):
                 transform_network_inplace(layer, QuantCell, lambda _, c: c.remove_hook())
                 logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
 
-                processor.process(layer_name, layer)
+                processor.process(layer_name, layer, quant_model=model,
+                                  search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
                 network.update_parameters_name()
                 gc.collect()
             if self._config.reflash_inputs_after_each_processor:
@@ -538,7 +519,8 @@ class PTQ(CompAlgo):
         self._get_decoder_layers(network)
         for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ FakeQuant..."):
             layer_name, layer = self.decoder_layers[i]
-            for processor in self.pipeline:
+            for processor in PTQ.pipeline:
+                processor = processor(self._config, self.layer_policies)
                 processor.set_fake_quant()
                 with no_init_parameters():
                     processor.replace(layer_name, layer)
@@ -608,10 +590,7 @@ class PTQ(CompAlgo):
         return net_opt
 
     def _summary_target_layer_type(self) -> tuple:
-        # set target layer type
-        for algo in self.pipeline:
-            self._set_target_layer_type(algo.target_layer_type())
-        return self._target_layer_type
+        return PTQ.target_layer_type
 
     def _summary_layer(self, layer_name, layer: Cell) -> Optional[str]:
         info = self._config.layer_quant_info_collect.get(layer_name)

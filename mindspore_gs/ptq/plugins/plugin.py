@@ -43,6 +43,7 @@ class ModelHubPlugin:
         plugin = cls()
         plugin._load_models()
         plugin._load_quant_cells()
+        plugin._load_algo_modules()
         return plugin
 
     def create_model(self, pretrained) -> BaseQuantForCausalLM:
@@ -85,3 +86,14 @@ class ModelHubPlugin:
             NotImplementedError: This method must be implemented by subclasses.
         """
         raise NotImplementedError("_load_quant_cells method not implemented")
+
+    def _load_algo_modules(self):
+        """Load algorithm modules for the plugin.
+        
+        This internal method should be implemented by subclasses to import
+        and register the specific algorithm modules supported by this plugin.
+        
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
+        raise NotImplementedError("_load_algo_modules method not implemented")

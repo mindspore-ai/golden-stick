@@ -17,10 +17,11 @@ from typing import Tuple
 
 from mindspore.nn import Cell
 from mindspore_gs.common import logger
+from mindspore_gs.ptq.ptq.quant import PTQ
 from mindspore_gs.ptq.basic_functions.processor import Processor
 from mindspore_gs.ptq.context import InnerPTQConfig, OutliersSuppressionType
 from mindspore_gs.ptq.quant_cells.quant_cell import QuantCell, Checker, SearchInputs
-from .algo_module import AlgoModule
+from mindspore_gs.ptq.algo_modules.algo_module import AlgoModule
 
 
 class LinearSmoother(AlgoModule):
@@ -34,6 +35,17 @@ class LinearSmoothQuant(LinearSmoother):
 
     linear_map = {}
     fake_quant_linear_map = {}
+
+    @staticmethod
+    def reg_self():
+        """register self"""
+        # Check if already registered to avoid duplicate registration
+        if LinearSmoothQuant not in PTQ.pipeline:
+            PTQ.pipeline.append(LinearSmoothQuant)
+        # Add layer types that are not already in target_layer_type
+        new_layer_types = tuple(set(LinearSmoothQuant.linear_map.keys()) - set(PTQ.target_layer_type))
+        if new_layer_types:
+            PTQ.target_layer_type += new_layer_types
 
     def target_layer_type(self) -> tuple:
         return tuple(self.linear_map.keys())
@@ -73,6 +85,7 @@ class LinearSmoothQuant(LinearSmoother):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                """process cell"""
                 if not self.handler.is_fake_quant and not LinearSmoothQuant.linear_map.get(type(cell)):
                     return cell, False
                 if self.handler.is_fake_quant and not LinearSmoothQuant.fake_quant_linear_map.get(type(cell)):
@@ -138,6 +151,7 @@ class LinearAWQ(LinearSmoother):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                """process cell"""
                 layer_policy = self.handler.get_layer_policy(cell_name)
                 if not layer_policy or layer_policy.outliers_suppression != OutliersSuppressionType.AWQ:
                     return cell, False
@@ -163,6 +177,17 @@ class LinearAutoSmoother(LinearSmoother):
 
     linear_map = {}
     fake_quant_linear_map = {}
+
+    @staticmethod
+    def reg_self():
+        """register self"""
+        # Check if already registered to avoid duplicate registration
+        if LinearAutoSmoother not in PTQ.pipeline:
+            PTQ.pipeline.append(LinearAutoSmoother)
+        # Add layer types that are not already in target_layer_type
+        new_layer_types = tuple(set(LinearAutoSmoother.linear_map.keys()) - set(PTQ.target_layer_type))
+        if new_layer_types:
+            PTQ.target_layer_type += new_layer_types
 
     def target_layer_type(self) -> tuple:
         return tuple(self.linear_map.keys())
@@ -205,6 +230,7 @@ class LinearAutoSmoother(LinearSmoother):
                 self.handler = algorithm
 
             def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                """process cell"""
                 if not LinearAutoSmoother.linear_map.get(type(cell)):
                     return cell, False
                 layer_policy = self.handler.get_layer_policy(cell_name)

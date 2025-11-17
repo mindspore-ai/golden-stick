@@ -19,10 +19,13 @@ Mindone Quantization Model Base Class
 import os
 import time
 import json
+from typing import List
+from dataclasses import dataclass, field
 from tqdm import tqdm
 
 
 from mindspore import load_checkpoint, load_param_into_net
+from mindspore.nn import Cell
 
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
@@ -31,8 +34,47 @@ from mindspore_gs.ptq.basic_functions.safetensors_mgr import SafeTensorsMgr
 from mindspore_gs.ptq.ptq.quant import PTQ
 from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.common.utils import offload_network
+from mindspore_gs.common.utils import offload_network, value_check, list_value_check
 from .param_processor import ParamProcessor
+
+
+@dataclass
+class SmoothLayerInfo:
+    """Data class for storing layer information used in smooth quantization.
+    
+    This class represents a pair of layers (previous layer and current layer(s))
+    that need to be processed together during smooth quantization algorithms
+    such as SmoothQuant, OSL (Outlier Suppression Lite), etc.
+    
+    Attributes:
+        prev_layer (Cell): The layer that comes before the current layer(s).
+        
+        curr_layer (List[Cell]): A list of current layer(s) that will be scaled up.
+    
+    Note:
+        During the quantization process, a 'smooth_scale' field may be added
+        to instances of this class (or its dictionary representation) to store
+        the computed scaling factors.
+    
+    Example:
+        >>> from mindspore_gs.ptq.models.mindone_models.mindone_model import SmoothLayerInfo
+        >>> 
+        >>> # Example: QKV projection with input layernorm
+        >>> layer_info = SmoothLayerInfo(
+        ...     prev_layer=input_layernorm,
+        ...     curr_layer=[q_proj, k_proj, v_proj]
+        ... )
+    
+    Raises:
+        TypeError: If `prev_layer` is not a Cell instance.
+        TypeError: If `curr_layer` is not a list of Cell instances.
+    """
+    prev_layer: Cell = None
+    curr_layer: List[Cell] = field(default_factory=list)
+
+    def __post_init__(self):
+        value_check('prev_layer', self.prev_layer, Cell)
+        list_value_check('curr_layer', self.curr_layer, Cell)
 
 
 class MindOneModel(BaseQuantForCausalLMImpl):
@@ -270,5 +312,19 @@ class MindOneModel(BaseQuantForCausalLMImpl):
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.
+        """
+        raise NotImplementedError
+
+    def get_layers_for_smooth(self, decoder_layer) -> List[SmoothLayerInfo]:
+        """Get layers for search.
+        This method returns a list of layers that should be used for search.
+        
+        Args:
+            layer (Cell): The layer to get layers for search.
+        
+        Returns:
+            list[SmoothLayerInfo]. List of layers for search. Each layer is a SmoothLayerInfo with the following keys:
+                - prev_layer (Cell): The layer before the current layer.
+                - curr_layer (List[Cell]): The current layer.
         """
         raise NotImplementedError
