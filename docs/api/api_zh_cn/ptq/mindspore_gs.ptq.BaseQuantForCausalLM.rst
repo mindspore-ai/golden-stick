@@ -70,27 +70,6 @@ mindspore_gs.ptq.BaseQuantForCausalLM
         异常：
             - **NotImplementedError** - 子类必须实现此方法。
 
-    .. py:method:: get_model_hub_registry()
-        :staticmethod:
-
-        获取已注册的模型框架注册表。
-
-        返回：
-            `dict[str, type]` - 字典，将模型框架名称映射到它们各自的类实现。
-
-    .. py:method:: reg_model_hub(alias=None)
-        :staticmethod:
-
-        注册模型框架装饰器。
-
-        该装饰器将类注册为模型框架实现，使其可用于自动检测和选择。
-
-        参数：
-            - **alias** (str, 可选) - 模型框架别名，如果未提供，将使用类名。默认为 ``None``。
-
-        返回：
-            function - 注册类的装饰器函数。
-
     .. py:method:: save_quantized(save_path)
 
         保存量化模型到磁盘。

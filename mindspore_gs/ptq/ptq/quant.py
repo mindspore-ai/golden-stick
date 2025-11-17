@@ -154,7 +154,6 @@ class PTQ(CompAlgo):
         self.context_mode = get_context("mode")
         self._target_layer_type = ()
         self._build_pipeline()
-        self._load_mindformers_plugin()
 
     def _append_algorithm(self, name, algo_module: AlgoModule):
         logger.info(f"append {name} to pipeline.")
@@ -179,8 +178,6 @@ class PTQ(CompAlgo):
                 from mindspore_gs.ptq.plugins import MFModelHubPlugin
                 # pylint: disable=protected-access
                 MFModelHubPlugin()._load_quant_cells()
-                for algorithm in self.pipeline:
-                    self._target_layer_type += algorithm.target_layer_type()
         except ImportError:
             pass
         try:
@@ -202,7 +199,22 @@ class PTQ(CompAlgo):
             pass
 
     def set_ptq_config(self, **kwargs):
-        """set ptq config""" 
+        """Set PTQ config.
+        
+        .. note::
+            This is an internal API method, not intended for external use.
+            It is used internally by model implementations (e.g., MindOneModel, MFModel)
+            to configure PTQ settings. External users should use the PTQConfig
+            passed to the PTQ constructor instead.
+
+        Args:
+            **kwargs: Configuration parameters to set. Each key should be a valid
+                attribute of PTQConfig.
+        
+        Raises:
+            AttributeError: If any key in kwargs is not a valid PTQConfig attribute.
+            TypeError: If the type of any value doesn't match the expected type.
+        """
         for key, value in kwargs.items():
             if not hasattr(self._config, key):
                 raise AttributeError(f"'{type(self._config).__name__}' "
@@ -214,12 +226,23 @@ class PTQ(CompAlgo):
                                 f"but got {type(value)}")
             setattr(self._config, key, value)
 
-    def set_target_layer_type(self, target_layer_type: tuple):
+    def _set_target_layer_type(self, target_layer_type: tuple):
         """set target layer type"""
         self._target_layer_type += target_layer_type
 
     def set_generate_func(self, generate_func: Callable):
-        """set generate function"""
+        """Set generate function for getting first layer input.
+        
+        .. note::
+            This is an internal API method, not intended for external use.
+            It is used internally by model implementations (e.g., MFModel)
+            to set the generate function for capturing first layer inputs during calibration.
+            External users should not need to call this method directly.
+        
+        Args:
+            generate_func (Callable): The function to use for generating inputs.
+                This function should accept dataset items and return model outputs.
+        """
         self._generate_func = generate_func
 
     def _get_decoder_layers(self, network: Cell):
@@ -348,13 +371,13 @@ class PTQ(CompAlgo):
         """
         framework = kwargs.get('framework', "mindformers")
         if framework == "mindone":
-            return self.apply_mindone(network, datasets, **kwargs)
+            return self._apply_mindone(network, datasets, **kwargs)
         if framework == "mindformers":
-            return self.apply_mindformers(network, network_helper, datasets, **kwargs)
+            return self._apply_mindformers(network, network_helper, datasets, **kwargs)
         raise ValueError(f"Invalid framework: {framework}. Please use 'mindone' or 'mindformers'.")
 
     # pylint: disable=unused-argument
-    def apply_mindformers(self, network: Cell,
+    def _apply_mindformers(self, network: Cell,
               network_helper: NetworkHelper = None,
               datasets=None, **kwargs) -> Cell:
         """
@@ -368,6 +391,11 @@ class PTQ(CompAlgo):
                         output_kwargs[index]["hidden_states"] = output[0] if isinstance(output, tuple) else output
                     else:
                         output_args[index][0] = output[0] if isinstance(output, tuple) else output
+        # FIXME: This is a temporary solution to load mindformers plugin when experimental is False.
+        # This should be removed after the research network from mindformers is not supported by PTQ. -- @yyyyrf
+        if not self._config.experimental:
+            self._load_mindformers_plugin()
+
         self._config.update_comm_info()
         self._get_decoder_layers(network)
         if self._config.mode == PTQMode.DEPLOY:
@@ -427,7 +455,7 @@ class PTQ(CompAlgo):
         return network
 
     # pylint: disable=unused-argument
-    def apply_mindone(self, model: BaseQuantForCausalLM,
+    def _apply_mindone(self, model: BaseQuantForCausalLM,
               datasets=None, **kwargs) -> Cell:
         """
         Define how to add fake quantizer to `model` for mindone framework.
@@ -444,13 +472,8 @@ class PTQ(CompAlgo):
 
         # get transformer layers from model
         # pylint: disable=protected-access
-        transformer_layers = model._transformer_layers()
-        _ = [self.decoder_layer_types.append(layer) for layer in transformer_layers]
+        _ = [self.decoder_layer_types.append(layer) for layer in model._transformer_layers()]
         self._get_decoder_layers(model.network)
-
-        # set target layer type
-        for algo in self.pipeline:
-            self.set_target_layer_type(algo.target_layer_type())
 
         # convert datasets to Dataset
         datasets = convert_to_dataset(datasets)
@@ -585,6 +608,9 @@ class PTQ(CompAlgo):
         return net_opt
 
     def _summary_target_layer_type(self) -> tuple:
+        # set target layer type
+        for algo in self.pipeline:
+            self._set_target_layer_type(algo.target_layer_type())
         return self._target_layer_type
 
     def _summary_layer(self, layer_name, layer: Cell) -> Optional[str]:

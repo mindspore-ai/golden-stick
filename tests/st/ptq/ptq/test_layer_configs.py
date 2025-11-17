@@ -34,7 +34,7 @@ from mindformers.modules.layers import Linear
 class Attention(nn.Cell):
     """Attention"""
     def __init__(self, k, n):
-        super(Attention, self).__init__()
+        super().__init__()
         self.q = Linear(k, n)
         self.k = Linear(k, n)
         self.v = Linear(k, n)
@@ -49,7 +49,7 @@ class Attention(nn.Cell):
 class FeedForward(nn.Cell):
     """FeedForward"""
     def __init__(self, k, n):
-        super(FeedForward, self).__init__()
+        super().__init__()
         self.w1 = Linear(k, n)
         self.w2 = Linear(k, n)
         self.w3 = Linear(k, n)
@@ -64,7 +64,7 @@ class FeedForward(nn.Cell):
 class DecoderLayer(nn.Cell):
     """DecoderLayer"""
     def __init__(self, is_moe=False):
-        super(DecoderLayer, self).__init__()
+        super().__init__()
         self.attention = Attention(128, 128)
         if is_moe:
             self.moe = FeedForward(128, 128)
@@ -79,7 +79,7 @@ class DecoderLayer(nn.Cell):
 class Network(nn.Cell):
     """Network"""
     def __init__(self):
-        super(Network, self).__init__()
+        super().__init__()
         self.layers = nn.CellList()
         for _ in range(3):
             layer = DecoderLayer()
@@ -143,7 +143,6 @@ def test_empty_summary():
     ptq.decoder_layer_types.append(DecoderLayer)
     ptq.summary(net)
     assert isinstance(ptq._config.layer_quant_info_collect, dict) and not ptq._config.layer_quant_info_collect
-    assert ptq._target_layer_type
 
 
 @pytest.mark.level0
@@ -194,6 +193,7 @@ def test_quant_summary():
     assert ptq._config.layer_quant_info_collect['network.layers.0.ffn.w1'] == 'W8-per_channel-A8-per_token'
     assert ptq._config.layer_quant_info_collect['network.layers.4.moe.w1'] == 'AWQ-wclip-W4-per_group'
     assert 'network.layers.5.moe.w2' not in ptq._config.layer_quant_info_collect
+    assert ptq._target_layer_type
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training

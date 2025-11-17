@@ -248,9 +248,6 @@ class MFModel(BaseQuantForCausalLMImpl):
         # set decoder layer types
         transformer_layers = self._transformer_layers()
         _ = [ptq.decoder_layer_types.append(layer) for layer in transformer_layers]
-        # set target layer type and load mindformers wrappers
-        for algorithm in ptq.pipeline:
-            ptq.set_target_layer_type(algorithm.target_layer_type())
         # set generate function for getting first layer input
         ptq.set_generate_func(self.forward)
         return ptq
