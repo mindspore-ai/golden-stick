@@ -1,0 +1,61 @@
+# The CODEOWNERS file is used to define the maintainer of a specific file or directory in the code repository.
+# Its main purpose is to automatically request designated maintainer to conduct code review in Pull Request (PR),
+# in order to clarify code ownership, improve code quality, and accelerate the review process.
+
+# The lines starting with # are comments.
+# Each line corresponds to a specified file or directory and maintainer by @ splitting.
+# The rules are applied from top to bottom, and the last matching rule will take effect.
+
+# If the file in PR does not match rule, the default maintainer @hangangqiang will be designated to conduct code review.
+* @hangangqiang
+.* @hangangqiang
+
+# The maintainers of examples/.
+/examples/ @hangangqiang @yyyyrf
+
+# The maintainers of mindspore_gs/.
+/mindspore_gs/ @hangangqiang
+/mindspore_gs/ptq/ @hangangqiang @yyyyrf @ccsszz
+
+# The maintainers of tests/.
+/tests/ @hangangqiang @liningl @yyyyrf
+
+# The maintainers of docs/.
+/docs/ @gemini524
+/mindspore_gs/ghost/README.md @gemini524
+/mindspore_gs/ghost/README_CN.md @gemini524
+/mindspore_gs/pruner/README.md @gemini524
+/mindspore_gs/pruner/README_CN.md @gemini524
+/mindspore_gs/pruner/heads/lrp/README.md @gemini524
+/mindspore_gs/pruner/scop/README.md @gemini524
+/mindspore_gs/pruner/scop/README_CN.md @gemini524
+/mindspore_gs/pruner/uni_pruning/README.md @gemini524
+/mindspore_gs/pruner/uni_pruning/README_CN.md @gemini524
+/mindspore_gs/ptq/README.md @gemini524
+/mindspore_gs/ptq/README_CN.md @gemini524
+/mindspore_gs/ptq/ptq/README.md @gemini524
+/mindspore_gs/ptq/ptq/README_CN.md @gemini524
+/mindspore_gs/ptq/round_to_nearest/README.md @gemini524
+/mindspore_gs/ptq/round_to_nearest/README_CN.md @gemini524
+/mindspore_gs/quantization/simulated_quantization/README.md @gemini524
+/mindspore_gs/quantization/simulated_quantization/README_CN.md @gemini524
+/mindspore_gs/quantization/slb/README.md @gemini524
+/mindspore_gs/quantization/slb/README_CN.md @gemini524
+/README.md @hangangqiang @gemini524
+/README_CN.md @hangangqiang @gemini524
+/RELEASE.md @hangangqiang @gemini524
+/RELEASE_CN.md @hangangqiang @gemini524
+/CONTRIBUTING.md @gemini524
+/CONTRIBUTING_CN.md @gemini524
+
+# The maintainers of others
+/.gitee/ @hangangqiang
+/.jenkins/ @hangangqiang
+/.jenkins/test/ @hangangqiang @yyyyrf
+/scripts/ @hangangqiang
+/tools/ @hangangqiang
+/requirements.txt  @hangangqiang @yyyyrf
+/setup.py  @hangangqiang @yyyyrf
+/build.sh @hangangqiang @yyyyrf
+/LICENSE @hangangqiang
+/CODEOWNERS @hangangqiang
