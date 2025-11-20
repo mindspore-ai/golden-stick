@@ -84,7 +84,7 @@ class WeightProcessor:
             stop = (self.rank_id + 1) * split_size
             split_data = np_data[:, :, start:stop]
         else:
-            raise ValueError("split_axis:{} is not supported.".format(split_axis))
+            raise ValueError(f"split_axis:{split_axis} is not supported.")
         self.handled_keys.append(hf_param_name)
         return split_data, qint4
 
@@ -102,7 +102,7 @@ class WeightProcessor:
             stop = (self.rank_id + 1) * split_size
             split_data = weight[:, start:stop]
         else:
-            raise ValueError("axis:{} is not supported.".format(axis))
+            raise ValueError(f"axis:{axis} is not supported.")
         return split_data
 
     def _get_split_set(self, name, split_axis=-1):
@@ -139,8 +139,10 @@ class WeightProcessor:
             self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight", 1)
             self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight_scale", -1)
             self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.experts.{i}.linear_fc2.weight_offset", -1)
-        mlpnorm_key = f"model.decoder.layers.{layer_id}.pre_mlp_layernorm.weight"
-        self._get_split_set(mlpnorm_key, -1)
+        pre_mlpnorm_key = f"model.decoder.layers.{layer_id}.pre_mlp_layernorm.weight"
+        self._get_split_set(pre_mlpnorm_key, -1)
+        post_mlpnorm_key = f"model.decoder.layers.{layer_id}.post_mlp_layernorm.weight"
+        self._get_split_set(post_mlpnorm_key, -1)
         router_bias = f"model.decoder.layers.{layer_id}.mlp.router.expert_bias"
         self._get_split_set(router_bias, -1)
         router_weight = f"model.decoder.layers.{layer_id}.mlp.router.weight"
@@ -197,8 +199,10 @@ class WeightProcessor:
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.bias", -1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_scale", -1)
         self._get_split_set(f"model.decoder.layers.{layer_id}.mlp.linear_fc2.weight_offset", -1)
-        mlpnorm_key = f"model.decoder.layers.{layer_id}.pre_mlp_layernorm.weight"
-        self._get_split_set(mlpnorm_key, -1)
+        pre_mlpnorm_key = f"model.decoder.layers.{layer_id}.pre_mlp_layernorm.weight"
+        self._get_split_set(pre_mlpnorm_key, -1)
+        post_mlpnorm_key = f"model.decoder.layers.{layer_id}.post_mlp_layernorm.weight"
+        self._get_split_set(post_mlpnorm_key, -1)
 
     def _split_attention_weight(self, layer_id):
         """_split_attention_weight"""
@@ -256,6 +260,8 @@ class WeightProcessor:
 
         inputnorm_key = f"model.decoder.layers.{layer_id}.input_layernorm.weight"
         self._get_split_set(inputnorm_key, -1)
+        post_attn_norm = f"model.decoder.layers.{layer_id}.post_self_attn_layernorm.weight"
+        self._get_split_set(post_attn_norm, -1)
         qnorm_key = f"model.decoder.layers.{layer_id}.self_attention.q_layernorm.weight"
         self._get_split_set(qnorm_key, -1)
         knorm_key = f"model.decoder.layers.{layer_id}.self_attention.k_layernorm.weight"
@@ -619,8 +625,8 @@ class WeightProcessor:
         """_del_experts_weight"""
         experts_dict = {k: v for k, v in self.parameter_dict.items()
                         if ".mlp.experts." in k}
-        is_fc1_quant = any([".linear_fc1.weight_scale" in k for k in experts_dict.keys()])
-        is_fc2_quant = any([".linear_fc2.weight_scale" in k for k in experts_dict.keys()])
+        is_fc1_quant = any(".linear_fc1.weight_scale" in k for k in experts_dict)
+        is_fc2_quant = any(".linear_fc2.weight_scale" in k for k in experts_dict)
         def process(root, name_prefix):
             """Iterate the whole network and call callback function `process_cell`."""
             if root is None:
@@ -643,14 +649,14 @@ class WeightProcessor:
 
         index_json_path = os.path.join(src_hf_dir, 'model.safetensors.index.json')
         if not os.path.exists(index_json_path):
-            raise RuntimeError(f"Not found index json file: 'model.safetensors.index.json'")
-        with open(index_json_path, "r") as fp:
+            raise RuntimeError(f"Not found index json file: {index_json_path}")
+        with open(index_json_path, "r", encoding="utf-8") as fp:
             self._param_map = json.load(fp)['weight_map']
 
         config_json_path = os.path.join(src_hf_dir, 'config.json')
-        if not os.path.exists(index_json_path):
-            raise RuntimeError(f"Not found config json file: 'config.json'")
-        with open(config_json_path, "r") as fp:
+        if not os.path.exists(config_json_path):
+            raise RuntimeError(f"Not found config json file: {config_json_path}")
+        with open(config_json_path, "r", encoding="utf-8") as fp:
             self.config = json.load(fp)
         if 'num_layers' in self.config:
             self.num_layers = self.config['num_layers']

@@ -191,6 +191,7 @@ class QWen3(MFModelEnableSafeTensors):
             ".self_attention.": ".self_attn.",
             "embedding.word_embeddings.": "model.embed_tokens.",
             "decoder.final_layernorm.": "model.norm.",
+            "output_layer.": "lm_head.",
             ".pre_mlp_layernorm.": ".post_attention_layernorm.",
             ".q_layernorm.": ".q_norm.",
             ".k_layernorm.": ".k_norm.",

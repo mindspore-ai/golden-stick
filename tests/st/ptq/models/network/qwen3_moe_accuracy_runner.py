@@ -78,7 +78,7 @@ class QWen3MoETester(PTQModelTester):
         if desc_json_path is None:
             logger.error("No quant description json file.")
             return False
-        with open(desc_json_path, "r") as fp:
+        with open(desc_json_path, "r", encoding="utf-8") as fp:
             desc_map = json.load(fp)
 
         def check(name, expect):
@@ -140,6 +140,30 @@ class QWen3MoETester(PTQModelTester):
             if not check(name, value):
                 return False
         logger.info("quant description test success.")
+        any_lm_head = any(k.startswith("lm_head.") for k in desc_map.keys())
+        if not any_lm_head:
+            logger.error("lm_head.* not found in quantization description.")
+            return False
+        any_output_layer = any("output_layer." in k for k in desc_map.keys())
+        if any_output_layer:
+            logger.error("output_layer.* should be mapped to lm_head.* in description.")
+            return False
+
+        index_json_path = os.path.join(quant_ckpt_path, "model.safetensors.index.json")
+        if not os.path.exists(index_json_path):
+            logger.error("No safetensors index json file.")
+            return False
+        with open(index_json_path, "r", encoding="utf-8") as fp:
+            index_data = json.load(fp)
+        weight_map = index_data.get("weight_map", {})
+        any_lm_head_idx = any(k.startswith("lm_head.") for k in weight_map.keys())
+        if not any_lm_head_idx:
+            logger.error("lm_head.* not found in safetensors index.")
+            return False
+        any_output_layer_idx = any("output_layer." in k for k in weight_map.keys())
+        if any_output_layer_idx:
+            logger.error("output_layer.* found in safetensors index.")
+            return False
         return True
 
     def get_golden(self) -> tuple[str, str]:
@@ -154,7 +178,7 @@ if __name__ == "__main__":
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     calibrate_config_path = os.path.join(cur_dir, "calibrate_qwen3_moe.yaml")
     infer_config_path = os.path.join(cur_dir, "predict_qwen3_moe.yaml")
-    q_ckpt_path = os.path.join(cur_dir, f"qwen3-moe-quant")
+    q_ckpt_path = os.path.join(cur_dir, "qwen3-moe-quant")
     dataset_path = os.path.join(cur_dir, '/home/workspace/mindspore_dataset/ceval/dev')
     tester = QWen3MoETester()
     result = tester.golden_accuracy(calibrate_config_path, infer_config_path, q_ckpt_path, dataset_path)
