@@ -16,18 +16,22 @@
 
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_all_quant_wrappers import AllQuantLinearCell
+from .linear_dynamic_quant_wrappers import DynamicQuantLinearCell
 
 from .linear_smooth_wrappers import SmoothQuantLinearCell
 from .linear_smooth_wrappers import OSLSmoothQuantLinearCell
 
 from .fake_quant_linear import FakeQuantA16WxWrapper
 from .fake_quant_linear import FakeQuantW8A8Wrapper
+from .fake_quant_linear import FakeQuantW8A8DynamicWrapper
 
 __all__ = [
     "WeightQuantLinearCell",
     "AllQuantLinearCell",
+    "DynamicQuantLinearCell",
     "SmoothQuantLinearCell",
     "OSLSmoothQuantLinearCell",
     "FakeQuantA16WxWrapper",
     "FakeQuantW8A8Wrapper",
+    "FakeQuantW8A8DynamicWrapper",
 ]

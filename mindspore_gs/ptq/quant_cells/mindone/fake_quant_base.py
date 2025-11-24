@@ -99,7 +99,7 @@ class DynamicQuant(nn.Cell):
         x_min = ops.min(x, axis=1)[0]
         x_max = ops.maximum(ops.abs(x_max), ops.abs(x_min))
         scale = ops.mul(x_max, 2) / (127 + 128)
-        scale = ops.reshape(scale, (-1, 1))
+        scale = ops.reshape(scale, (-1,))
         x = x / scale
         x = ops.round(x)
         x = ops.clip(x, -128., 127.)

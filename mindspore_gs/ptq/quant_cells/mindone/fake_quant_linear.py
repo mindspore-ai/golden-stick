@@ -14,7 +14,7 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 
-
+from mindspore import ops as msops
 from mindspore import nn, Parameter, dtype, mint
 from mindspore.common.initializer import initializer
 
@@ -25,7 +25,8 @@ from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
 from mindspore_gs.ptq.quant_cells.quant_cell import QuantCell
 from .fake_quant_base import (FakeQuantLinearCell,
                               DeQuant,
-                              FakeQuant)
+                              FakeQuant,
+                              DynamicFakeQuant)
 
 
 class FakeQuantA16WxWrapper(QuantCell):
@@ -132,4 +133,59 @@ class FakeQuantW8A8LinearCell(FakeQuantLinearCell):
         weight_offset = self.weight_offset.reshape((-1, 1))
         weight = self.de_quant(weight, weight_scale, weight_offset)
         x = self.fake_quant(x, self.input_scale, self.input_offset)
+        return x, weight
+
+class FakeQuantW8A8DynamicWrapper(QuantCell):
+    """FakeQuantW8A8DynamicWrapper"""
+    @staticmethod
+    def reg_self():
+        """reg_self"""
+        class FakeQuantChecker(Checker):
+            def check(self, config: InnerPTQConfig):
+                return config.weight_quant_dtype == dtype.int8 and config.act_quant_dtype == dtype.int8 and \
+                       config.act_quant_granularity is QuantGranularity.PER_TOKEN
+
+        Quantizer.reg_fake_quant_layer_map(nn.Dense, FakeQuantW8A8DynamicWrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(mint.nn.Linear, FakeQuantW8A8DynamicWrapper, FakeQuantChecker())
+
+    def _quant_info(self) -> str:
+        return 'FakeQuant'
+
+    def add_hook(self, experimental=False):
+        pass
+
+    def remove_hook(self, experimental=False):
+        pass
+
+    def deploy(self):
+        return FakeQuantW8A8DynamicLinearCell(self.layer_name, self.layer, self.context, self.cfg)
+
+
+class FakeQuantW8A8DynamicLinearCell(FakeQuantLinearCell):
+    """FakeQuantW8A8DynamicLinearCell"""
+    # pylint: disable=unused-argument
+    def __init__(self, layer_name, linear: nn.Cell, context, cfg: InnerPTQConfig):
+        super().__init__(layer_name, linear, context, cfg)
+        self.weight_scale = Parameter(initializer("ones", (linear.weight.shape[0],), self.compute_dtype))
+        self.weight_offset = Parameter(initializer("zeros", (linear.weight.shape[0],), dtype.int32))
+        self.weight = Parameter(initializer("zeros", linear.weight.shape, dtype.int8))
+        if linear.has_bias:
+            self.bias = Parameter(initializer("zeros", (linear.weight.shape[0],), self.compute_dtype))
+        self.fake_quant = DynamicFakeQuant(dtype.int8, self.compute_dtype)
+        self.de_quant = DeQuant(self.compute_dtype)
+
+        self.layer.weight = None
+        if linear.has_bias:
+            self.layer.bias = None
+
+    def dequant_input(self, x, weight):
+        """process input"""
+        # for moe matmul in the mindone, x shape may be(0, ic)
+        if x.shape[0] == 0:
+            x = msops.cast(x, self.compute_dtype)
+        else:
+            x = self.fake_quant(x)
+        weight_scale = self.weight_scale.reshape((-1, 1))
+        weight_offset = self.weight_offset.reshape((-1, 1))
+        weight = self.de_quant(weight, weight_scale, weight_offset)
         return x, weight
