@@ -58,6 +58,7 @@ from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
 from mindspore_gs.common import logger
+from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ
 from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
 from mindspore_gs.ptq.basic_functions.processor import Processor
@@ -531,7 +532,7 @@ class MFModelEnableSafeTensors(MFModel):
             hf_param_dict[self._convert_param_names_to_hf(name)] = param
         return hf_param_dict
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
         """Save the quantized model in SafeTensors format.
 
         This method saves the quantized model parameters and metadata
@@ -539,15 +540,20 @@ class MFModelEnableSafeTensors(MFModel):
 
         Args:
             save_path (str): Path where the quantized model should be saved.
+            backend (BackendTarget, optional): Target backend for the saved model.
+                Defaults to ``BackendTarget.ASCEND``.
         """
-        super().save_quantized(save_path)
+        if backend != BackendTarget.ASCEND:
+            raise ValueError("Only support save quantized model for ASCEND backend "
+                             "when enable SafeTensors format in mindformers models.")
+        super().save_quantized(save_path, backend=backend)
         sf_mgr = SafeTensorsMgr()
         sf_mgr.save(self._original_sf_path,
                     save_path,
                     self.parameters_dict(),
-                    self.get_description_file(self._network()))
+                    self._get_description_file(self._network()))
 
-    def get_description_file(self, network):
+    def _get_description_file(self, network):
         """Get the description file for quantization information.
 
         This is an abstract method that must be implemented by derived classes.
@@ -751,13 +757,18 @@ class MFModelNotEnableSafeTensors(MFModel):
         param_dict, _ = self._process_params_dict_before_save(param_dict)
         return param_dict
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
         """Save the quantized model to checkpoint files.
 
         Args:
             save_path (str): Path where the quantized model should be saved.
+            backend (BackendTarget, optional): Target backend for the saved model.
+                Defaults to ``BackendTarget.ASCEND``.
         """
-        super().save_quantized(save_path)
+        if backend != BackendTarget.ASCEND:
+            raise ValueError("Only support save quantized model for ASCEND backend "
+                             "when not enable SafeTensors format in mindformers models.")
+        super().save_quantized(save_path, backend)
         self._save_safetenors(save_path)
         _ = self._save_desc_json(save_path)
 
@@ -795,7 +806,7 @@ class MFModelNotEnableSafeTensors(MFModel):
         """
         start = time.time()
         logger.info("Saving describle json file...", flush=True)
-        desc_info = self.get_description_file(self._network())
+        desc_info = self._get_description_file(self._network())
         save_json_path = os.path.join(save_path, "quantization_description.json")
         os.makedirs(save_path, exist_ok=True)
         with open(save_json_path, "w", encoding="utf-8") as f:
@@ -804,7 +815,7 @@ class MFModelNotEnableSafeTensors(MFModel):
         logger.info(f'Save describle json cost time is {time.time() - start} s.')
         return save_json_path
 
-    def get_description_file(self, network):
+    def _get_description_file(self, network):
         """Get the description file for quantization information.
 
         This is an abstract method that must be implemented by derived classes.

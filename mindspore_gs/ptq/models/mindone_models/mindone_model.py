@@ -23,9 +23,8 @@ from typing import List
 from dataclasses import dataclass, field
 from tqdm import tqdm
 
-
+from mindspore.nn.cell import Cell
 from mindspore import load_checkpoint, load_param_into_net
-from mindspore.nn import Cell
 
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
@@ -33,6 +32,7 @@ from mindspore_gs.ptq.models.base_model_impl import BaseQuantForCausalLMImpl
 from mindspore_gs.ptq.basic_functions.safetensors_mgr import SafeTensorsMgr
 from mindspore_gs.ptq.ptq.quant import PTQ
 from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
+from mindspore_gs.ptq.utils import QuantType
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.common.utils import offload_network, value_check, list_value_check
 from .param_processor import ParamProcessor
@@ -159,13 +159,13 @@ class MindOneModel(BaseQuantForCausalLMImpl):
                                          backend=BackendTarget.ASCEND):
         """Process parameter dictionary before saving.
         """
-        param_processor = ParamProcessor(backend, quantization_desc)
-        param_dict = param_processor.deploy(param_dict)
+        param_processor = ParamProcessor(backend)
+        param_dict = param_processor.process_param_dict(param_dict, quantization_desc)
         return param_dict
 
     def parameters_dict(self, scope="", backend=BackendTarget.ASCEND):
         param_dict = self.network.parameters_dict()
-        quantization_desc = self.get_description_file()
+        quantization_desc = self._get_description_file()
         param_dict = self._process_params_dict_before_save(quantization_desc,
                                                            param_dict,
                                                            backend)
@@ -228,18 +228,20 @@ class MindOneModel(BaseQuantForCausalLMImpl):
         ptq.set_ptq_config(**kwargs)
         return ptq
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
         """Save the quantized model to checkpoint files.
 
         Args:
             save_path (str): Path where the quantized model should be saved.
+            backend (BackendTarget, optional): Target backend for the saved model.
+                Defaults to ``BackendTarget.ASCEND``.
         """
-        super().save_quantized(save_path)
+        super().save_quantized(save_path, backend)
         sf_mgr = SafeTensorsMgr()
         sf_mgr.save(self._original_sf_path,
                     save_path,
-                    self.parameters_dict(backend=BackendTarget.ASCEND),
-                    self.get_description_file())
+                    self.parameters_dict(backend=backend),
+                    self._process_param_desc(backend=backend))
 
     def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):
         """Apply fake quantization to the model.
@@ -296,35 +298,167 @@ class MindOneModel(BaseQuantForCausalLMImpl):
         logger.info(f"CKPT has but not in network: {ckpt_not_load}", flush=True)
 
     # pylint: disable=W0221
-    def get_description_file(self):
-        """Obtain the description of quantization type for each parameter.
+    def _get_quant_type(self):
+        """Get quantization type information for network parameters.
 
-        This method generates a description file that maps each network
-        parameter to its quantization type (e.g., W8A8, W4A8_DYNAMIC).
-        This information is useful for understanding the quantization
-        characteristics of different parts of the model.
+        This method analyzes the network to determine the quantization
+        type for each parameter, such as W8A8 or W4A8_DYNAMIC.
+
+        Args:
+            network (Cell): The network to analyze for quantization types.
+
+        Returns:
+            dict. Dictionary mapping parameter names to their quantization types.
+
+        Raises:
+            TypeError: If the input network is not a Cell instance.
+        """
+        if not isinstance(self.network, Cell):
+            raise TypeError(f"Input network should be a Cell, but got: {type(Cell)}.")
+        results = {}
+        def process(root: Cell, name_prefix):
+            """Iterate the whole network and call callback function `process_cell`."""
+            if root is None:
+                return
+            for name, cell in root.name_cells().items():
+                full_cell_name = f"{name_prefix}.{name}"
+                if not hasattr(cell, "quant_type_dict"):
+                    process(cell, full_cell_name)
+                    continue
+                info = cell.quant_type_dict()
+                results.update(info)
+        process(self.network, 'network')
+        return results
+
+    # pylint: disable=W0221
+    def _get_description_file(self):
+        """Obtain the description of quantization type for network parameters.
+
+        This method generates a comprehensive description of the
+        quantization type for each parameter in each layer of the network.
+        The description includes information such as W8A8 or W4A8_DYNAMIC
+        for each parameter.
 
         Args:
             network (Cell): The network to analyze for quantization descriptions.
 
         Returns:
-            Description of quantization types for network parameters.
-
-        Raises:
-            NotImplementedError: This method must be implemented by subclasses.
+            dict. Dictionary mapping parameter names to their quantization
+                type descriptions.
         """
-        raise NotImplementedError
+        results = self._get_quant_type()
+        param_dict = self.network.parameters_dict()
 
-    def get_layers_for_smooth(self, decoder_layer) -> List[SmoothLayerInfo]:
-        """Get layers for search.
-        This method returns a list of layers that should be used for search.
+        desc_info = {}
+        for key in param_dict:
+            if key in results:
+                desc_info[key] = results[key]
+            else:
+                desc_info[key] = QuantType.FLOAT.value
+        return desc_info
+
+    def _process_param_desc(self, backend=BackendTarget.ASCEND):
+        """process param description."""
+        param_processor = ParamProcessor(backend)
+        param_desc = param_processor.process_param_desc(self._get_description_file())
+        return param_desc
+
+    def get_layers_for_smooth(self, decoder_layer: Cell) -> List[SmoothLayerInfo]:
+        """Get layer pairs for smooth quantization algorithms.
+        
+        This method identifies and returns a list of layer pairs within a decoder layer
+        that need to be processed together during smooth quantization algorithms such as
+        SmoothQuant, OSL (Outlier Suppression Lite), etc.
+        
+        Each returned `SmoothLayerInfo` represents a pair of layers where:
+        - The `prev_layer` (previous layer) will have its output scaled down
+        - The `curr_layer` (current layer(s)) will have their weights scaled up
+        
+        This scaling operation helps to reduce quantization errors by balancing the
+        dynamic ranges between layers.
         
         Args:
-            layer (Cell): The layer to get layers for search.
+            decoder_layer (Cell): A single transformer decoder layer instance from the model.
+                This should be an instance of the model's decoder layer class (e.g.,
+                `Glm4vTextDecoderLayer`, `Qwen3DecoderLayer`). The method will extract
+                layer pairs from this decoder layer for smooth quantization processing.
         
         Returns:
-            list[SmoothLayerInfo]. List of layers for search. Each layer is a SmoothLayerInfo with the following keys:
-                - prev_layer (Cell): The layer before the current layer.
-                - curr_layer (List[Cell]): The current layer.
+            List[SmoothLayerInfo]: A list of `SmoothLayerInfo` objects, each representing
+                a layer pair to be processed for smooth quantization. The list typically
+                includes pairs for:
+                
+                - **Attention layers**: 
+                  - QKV projection: `prev_layer=input_layernorm`, `curr_layer=[q_proj, k_proj, v_proj]`
+                  - Output projection: `prev_layer=v_proj`, `curr_layer=[o_proj]`
+                
+                - **MLP layers**:
+                  - Gate/Up projection: `prev_layer=post_attention_layernorm`, `curr_layer=[gate_proj, up_proj]`
+                  - Down projection: `prev_layer=up_proj` (or `gate_up_proj`), `curr_layer=[down_proj]`
+                
+                Each `SmoothLayerInfo` contains:
+                    - `prev_layer` (Cell): The previous layer whose output will be scaled down.
+                        Typically a normalization layer (e.g., `input_layernorm`, 
+                        `post_attention_layernorm`) or a projection layer.
+                    - `curr_layer` (List[Cell]): A list of one or more current layers whose
+                        weights will be scaled up.
+        
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses to provide
+                model-specific layer pair definitions.
+            TypeError: If `decoder_layer` is not a `Cell` instance.
+            ValueError: If the layer structure in `decoder_layer` does not match the expected
+                model architecture.
+        
+        Example:
+            >>> # In a subclass implementation (e.g., GLM4v)
+            >>> def get_layers_for_smooth(self, decoder_layer):
+            ...     layers_info = []
+            ...     # Attention QKV projection
+            ...     layers_info.append(
+            ...         SmoothLayerInfo(
+            ...             prev_layer=decoder_layer.input_layernorm,
+            ...             curr_layer=[
+            ...                 decoder_layer.self_attn.q_proj,
+            ...                 decoder_layer.self_attn.k_proj,
+            ...                 decoder_layer.self_attn.v_proj
+            ...             ]
+            ...         )
+            ...     )
+            ...     # Attention output projection
+            ...     layers_info.append(
+            ...         SmoothLayerInfo(
+            ...             prev_layer=decoder_layer.self_attn.v_proj,
+            ...             curr_layer=[decoder_layer.self_attn.o_proj]
+            ...         )
+            ...     )
+            ...     return layers_info
+        
+        Note:
+            - The order of `SmoothLayerInfo` objects in the returned list matters, as
+              smooth quantization algorithms typically process them sequentially.
+            - The `prev_layer` and `curr_layer` must be actual layer instances from
+              the `decoder_layer`, not copies or references to other layers.
+            - During the quantization process, a `smooth_scale` field may be dynamically
+              added to each `SmoothLayerInfo` to store the computed scaling factors.
         """
         raise NotImplementedError
+
+    def _get_gqa_info(self, model_path):
+        """Get GQA information from config file."""
+        config_path = os.path.join(model_path, 'config.json')
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            text_config = config.get('text_config', None)
+            if text_config is None:
+                text_config = config
+            num_attention_heads = text_config.get('num_attention_heads', None)
+            num_key_value_heads = text_config.get('num_key_value_heads', None)
+            if num_attention_heads is None or num_key_value_heads is None:
+                raise ValueError(f"num_attention_heads or num_key_value_heads is not found in {config_path}.")
+            return num_attention_heads, num_key_value_heads
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Config file not found at {config_path}.") from e
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to decode JSON from {config_path}.") from e

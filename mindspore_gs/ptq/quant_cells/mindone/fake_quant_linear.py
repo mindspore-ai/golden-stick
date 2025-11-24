@@ -40,6 +40,7 @@ class FakeQuantA16WxWrapper(QuantCell):
                         and config.precision_recovery == PrecisionRecovery.NONE)
 
         Quantizer.reg_fake_quant_layer_map(nn.Dense, FakeQuantA16WxWrapper, FakeQuantChecker())
+        Quantizer.reg_fake_quant_layer_map(mint.nn.Linear, FakeQuantA16WxWrapper, FakeQuantChecker())
 
     def _quant_info(self) -> str:
         if self.cfg.weight_quant_dtype == dtype.int8:

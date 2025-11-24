@@ -18,6 +18,7 @@ import inspect
 
 import pytest
 
+from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 
 
@@ -248,7 +249,7 @@ class TestBaseQuantForCausalLM:
             def calibrate(self, ptq_config, layers_policy, datasets, **kwargs):
                 return "calibrate_result"
 
-            def save_quantized(self, save_path):
+            def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
                 return "save_result"
 
             def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):
@@ -303,7 +304,7 @@ class TestBaseQuantForCausalLM:
             def calibrate(self, ptq_config, layers_policy, datasets, **kwargs):
                 return "sub_calibrate_result"
 
-            def save_quantized(self, save_path):
+            def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
                 return "sub_save_result"
 
             def fake_quant(self, ptq_config, layers_policy, quant_safetensors_path: str = ""):

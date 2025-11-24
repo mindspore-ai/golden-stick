@@ -15,6 +15,8 @@
 """ptq wrapper cells for mindone."""
 
 import numpy as np
+
+from mindspore import mint
 from mindspore import nn, Parameter, Tensor, dtype
 from mindspore import ops as msops
 
@@ -39,6 +41,7 @@ class WeightQuantLinearCell(WrapperLinearCell):
                         and config.precision_recovery == PrecisionRecovery.NONE)
 
         Quantizer.reg_layer_map(nn.Dense, WeightQuantLinearCell, A16WxChecker())
+        Quantizer.reg_layer_map(mint.nn.Linear, WeightQuantLinearCell, A16WxChecker())
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)

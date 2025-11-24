@@ -143,7 +143,7 @@ class QWen3(MFModelEnableSafeTensors):
         process(network, 'network')
         return results
 
-    def get_description_file(self, network):
+    def _get_description_file(self, network):
         """Obtain the description of quantization type for network parameters.
 
         This method generates a comprehensive description of the

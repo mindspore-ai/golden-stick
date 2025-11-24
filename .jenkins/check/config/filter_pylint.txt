@@ -80,6 +80,7 @@
 "golden-stick/mindspore_gs/ptq/quant_cells/mindformers/linear_smooth_wrappers.py"                        "super-with-arguments"
 "golden-stick/mindspore_gs/ptq/faquant/faquant.py"                                                       "import-outside-toplevel"
 "golden-stick/mindspore_gs/ptq/models/mindone_models/glm4v.py"                                           "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/models/mindone_models/qwen3.py"                                           "import-outside-toplevel"
 "golden-stick/mindspore_gs/ptq/plugins/mindformers_plugin.py"                                            "import-outside-toplevel"
 "golden-stick/mindspore_gs/ptq/plugins/mindone_plugin.py"                                                "import-outside-toplevel"
 "golden-stick/mindspore_gs/ptq/quant_cells/mindformers/kvcache_quant_wrappers.py"                        "import-outside-toplevel"

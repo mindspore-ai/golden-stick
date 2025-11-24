@@ -15,6 +15,7 @@
 """ptq wrapper cells for mindformers."""
 
 from mindspore import nn
+from mindspore import mint
 from mindspore import ops as msops
 
 from mindspore_gs.ptq.ptq_config import OutliersSuppressionType
@@ -36,6 +37,7 @@ class SmoothQuantLinearCell(WrapperLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.SMOOTH
 
         SmoothQuantSmoother.reg_layer_map(nn.Dense, SmoothQuantLinearCell, SmoothQuantChecker())
+        SmoothQuantSmoother.reg_layer_map(mint.nn.Linear, SmoothQuantLinearCell, SmoothQuantChecker())
 
     def _quant_info(self):
         """_quant_info"""
@@ -53,6 +55,7 @@ class OSLSmoothQuantLinearCell(WrapperLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE
 
         OSLSmoother.reg_layer_map(nn.Dense, OSLSmoothQuantLinearCell, OSLChecker())
+        OSLSmoother.reg_layer_map(mint.nn.Linear, OSLSmoothQuantLinearCell, OSLChecker())
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)

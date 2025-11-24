@@ -45,6 +45,9 @@ Examples:
 """
 
 
+from mindspore_gs.common import BackendTarget
+
+
 class BaseQuantForCausalLM:
     """Base Class for Causal Language Model Quantization
 
@@ -119,7 +122,7 @@ class BaseQuantForCausalLM:
         """
         raise NotImplementedError
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
         """Save the quantized model to disk.
 
         This is an abstract method that must be implemented by derived classes.
@@ -127,6 +130,8 @@ class BaseQuantForCausalLM:
 
         Args:
             save_path (str): Path where the quantized model should be saved.
+            backend (BackendTarget, optional): Target backend for the saved model.
+                Defaults to ``BackendTarget.ASCEND``.
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.
