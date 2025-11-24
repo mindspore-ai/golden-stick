@@ -16,6 +16,8 @@
 import os
 import sys
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
+
 import pytest
 from mindspore import nn, dtype, context
 from mindspore_gs.ptq import RoundToNearest as RTN
@@ -24,7 +26,7 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_constructor():
     """
@@ -47,7 +49,7 @@ def test_constructor():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_constructor_error():
     """
@@ -66,7 +68,7 @@ def test_constructor_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_convert_error():
     """
@@ -90,7 +92,7 @@ def test_convert_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_error():
     """

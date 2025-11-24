@@ -14,15 +14,17 @@
 # ============================================================================
 """test NetworkAnalyser."""
 
-
+import os
+import sys
 import pytest
 from mindspore_gs.ptq.transformer_inspect import TransformerInspect, LayerType
 
-from .llama2 import llama2
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
+from tests.st.models.llama2 import llama2
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_parse_noqkvconcat_network():
     """
@@ -63,7 +65,7 @@ def test_parse_noqkvconcat_network():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_parse_qkvconcat_network():
     """

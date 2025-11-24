@@ -25,16 +25,19 @@ MindFormers-dependent behaviors are stubbed via load_plugin patching.
 """
 
 import os
+import sys
 import shutil
 import tempfile
 import inspect
 from unittest.mock import patch
 import pytest
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 from mindspore_gs.ptq.models.auto_model import AutoQuantForCausalLM
 from mindspore_gs.ptq.models.base_model import BaseQuantForCausalLM
 
 
+# pylint: disable=abstract-method
 class DummyModel(BaseQuantForCausalLM):
     """Minimal dummy model used for UT validation."""
 
@@ -58,7 +61,7 @@ class TestAutoQuantForCausalLM:
             shutil.rmtree(self.work_dir)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_yaml_path_returns_model(self):
         """YAML input returns a BaseQuantForCausalLM instance via plugin stub."""
@@ -81,7 +84,7 @@ class TestAutoQuantForCausalLM:
             assert model.tag == "yaml"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_dir_path_returns_model(self):
         """Directory input returns a model instance via plugin stub."""
@@ -100,7 +103,7 @@ class TestAutoQuantForCausalLM:
             assert model.tag == "dir"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_invalid_path_raises_value_error(self):
         """Invalid path triggers ValueError from load_plugin selection."""
@@ -110,7 +113,7 @@ class TestAutoQuantForCausalLM:
                 AutoQuantForCausalLM.from_pretrained(invalid_path)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_non_string_input_raises_value_error(self):
         """Non-string input triggers ValueError from load_plugin selection."""
@@ -119,7 +122,7 @@ class TestAutoQuantForCausalLM:
                 AutoQuantForCausalLM.from_pretrained(123)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_plugin_none_raises_attribute_error(self):
         """Plugin returns None causing AttributeError on attribute access."""
@@ -130,7 +133,7 @@ class TestAutoQuantForCausalLM:
                 AutoQuantForCausalLM.from_pretrained(self.yaml_path)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_create_model_value_error_propagates(self):
         """ValueError raised by plugin.create_model is propagated."""
@@ -142,7 +145,7 @@ class TestAutoQuantForCausalLM:
                 AutoQuantForCausalLM.from_pretrained(self.yaml_path)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_create_model_runtime_error_propagates(self):
         """RuntimeError raised by plugin.create_model is propagated."""
@@ -154,7 +157,7 @@ class TestAutoQuantForCausalLM:
                 AutoQuantForCausalLM.from_pretrained(self.yaml_path)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_argument_passthrough(self):
         """Complex path is passed through unchanged to plugin.create_model."""
@@ -175,7 +178,7 @@ class TestAutoQuantForCausalLM:
             assert captured['path'] == weird_path
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_static_method_signature(self):
         """from_pretrained is a static method accepting a single argument."""
@@ -185,7 +188,7 @@ class TestAutoQuantForCausalLM:
         assert len(sig.parameters) == 1
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_empty_string_input(self):
         """Empty string input yields ValueError from load_plugin selection."""
@@ -194,7 +197,7 @@ class TestAutoQuantForCausalLM:
                 AutoQuantForCausalLM.from_pretrained("")
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_long_path_string(self):
         """Long YAML path is accepted and passed through to plugin stub."""

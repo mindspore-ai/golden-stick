@@ -1,0 +1,5 @@
+# for ut/st
+pytest >= 1.6.0
+
+# for mindone
+transformers == 4.53.0

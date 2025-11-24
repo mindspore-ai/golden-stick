@@ -34,7 +34,7 @@ train_log_rpath = os.path.join("golden_stick", "scripts", "train", "log")
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_lenet_apply():
     """
@@ -72,7 +72,7 @@ def test_lenet_apply():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_fusion", [True, False])
 def test_lenet_convert(enable_fusion):
@@ -151,6 +151,7 @@ def test_gpu_continue_train():
     model_path = utils.train_network(ori_model_path, model_name, "test_gpu_continue_train", config_name,
                                      "quantization/simqat", "run_standalone_train_gpu.sh", config, "mnist", 700,
                                      train_log_rpath=train_log_rpath)
+    # pylint: disable=consider-using-f-string
     ckpt_file = os.path.join(cur_path, "checkpoint_lenet-1_1875_{}.ckpt".format("test_gpu_continue_train"))
     try:
         utils.copy_file(os.path.join(model_path, "golden_stick", "scripts", "train/ckpt/checkpoint_lenet-1_1875.ckpt"),
@@ -158,8 +159,10 @@ def test_gpu_continue_train():
     except ValueError:
         log_path = os.path.join(model_path, train_log_rpath)
         if os.path.exists(log_path):
+            # pylint: disable=consider-using-f-string
             os.system("cat {}".format(log_path))
         else:
+            # pylint: disable=consider-using-f-string
             os.system("echo {}".format("No train log file exist: " + log_path))
         assert False
     assert os.path.exists(ckpt_file)
@@ -195,7 +198,7 @@ def test_gpu_pre_train():
                                        "checkpoint_lenet-1_1875.ckpt")):
         log_path = os.path.join(model_path, train_log_rpath)
         if os.path.exists(log_path):
-            os.system("cat {}".format(log_path))
+            os.system(f"cat {log_path}")
         else:
-            os.system("echo {}".format("No train log file exist: " + log_path))
+            os.system(f"echo No train log file exist: {log_path}")
         assert False

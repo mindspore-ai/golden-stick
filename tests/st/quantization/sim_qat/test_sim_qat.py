@@ -31,7 +31,7 @@ from tests.st.test_utils import qat_config_compare
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_constructor():
     """
@@ -62,7 +62,7 @@ def test_constructor():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_constructor_error():
     """
@@ -165,7 +165,7 @@ def test_constructor_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_bn_fold():
     """
@@ -182,7 +182,7 @@ def test_set_bn_fold():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_bn_fold_type_error():
     """
@@ -202,6 +202,7 @@ class NetToQuant(nn.Cell):
     """
 
     def __init__(self):
+        # pylint: disable=super-with-arguments
         super(NetToQuant, self).__init__()
         self.conv = nn.Conv2d(5, 6, 5, pad_mode='valid')
 
@@ -211,7 +212,7 @@ class NetToQuant(nn.Cell):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_apply():
     """
@@ -246,7 +247,7 @@ def test_apply():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_convert():
     """
@@ -267,7 +268,7 @@ def test_convert():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_convert_error():
     """

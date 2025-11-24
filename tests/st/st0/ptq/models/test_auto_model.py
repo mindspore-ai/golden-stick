@@ -21,9 +21,8 @@ import tempfile
 from unittest.mock import patch
 import pytest
 
-from mindspore_gs.ptq.models.auto_model import AutoQuantForCausalLM
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
+from mindspore_gs.ptq.models.auto_model import AutoQuantForCausalLM
 
 
 
@@ -41,7 +40,7 @@ class TestAutoQuantForCausalLM:
             shutil.rmtree(self.work_dir)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_from_pretrained_normal_yaml_path(self):
         """

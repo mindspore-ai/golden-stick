@@ -21,7 +21,7 @@ from mindspore_gs.pruner.ops import MaskedDense
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_maskeddense_init():
     """
@@ -58,7 +58,7 @@ def test_maskeddense_init():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_maskeddense_init_error():
     """

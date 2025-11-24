@@ -26,7 +26,7 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
 def test_resnet(run_mode):
@@ -60,7 +60,7 @@ def test_resnet(run_mode):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
 def test_callback(run_mode):
@@ -138,5 +138,6 @@ def test_resnet_convert(run_mode):
         for layer in start.keys():
             if layer == 'conv1':
                 filters_pruned = start[layer].weight.asnumpy().shape[0]
+    # pylint: disable=possibly-used-before-assignment
     assert filters - filters_pruned == 4
     print("============== test resnet convert uni pruning success ==============")

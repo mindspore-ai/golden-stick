@@ -17,7 +17,9 @@
 
 import argparse
 import os
+import sys
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../mindformers")))
 from mindspore import context
 from mindspore import dtype as mstype
 
@@ -34,6 +36,7 @@ def add_rmsnorm_quant_fusion_test(approach):
     """test_add_rmsnorm_quant_fusion"""
     cur_dir, _ = os.path.split(os.path.abspath(__file__))
     tokenizer_path = os.path.join(cur_dir, "/home/workspace/mindspore_vocab/llama2/llama2-tokenizer.model")
+    helper = None
     if approach == "smooth-quant":
         w8a8_config_path = "../../data/test_llama2/predict_llama2_13b_fp16_910b_1p_common_config.yaml"
         w8a8_config_path = os.path.join(cur_dir, w8a8_config_path)

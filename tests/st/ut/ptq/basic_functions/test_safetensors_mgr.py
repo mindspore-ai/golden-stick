@@ -134,7 +134,7 @@ class TestSafeTensorsMgr:
                 f"Mapped file {mapped_file} should exist for parameter {param_name}"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_default_construct(self):
         """
@@ -151,7 +151,7 @@ class TestSafeTensorsMgr:
         assert not hasattr(mgr, 'barrier'), "barrier should not be created in single machine mode"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_custom_file_limit_construct(self):
         """
@@ -167,7 +167,7 @@ class TestSafeTensorsMgr:
         assert not hasattr(mgr_custom, 'barrier'), "barrier should not exist in single machine mode"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_save_basic(self):
         """
@@ -233,7 +233,7 @@ class TestSafeTensorsMgr:
         self._verify_safetensors_content(dis_params_dict, index_data["weight_map"])
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_save_empty_parameters(self):
         """
@@ -263,7 +263,7 @@ class TestSafeTensorsMgr:
             "weight_map should be empty for empty parameters"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_save_path_creation(self):
         """
@@ -292,7 +292,7 @@ class TestSafeTensorsMgr:
             "index.json should be created in the new directory"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_param_type_error_original_path(self):
         """
@@ -310,7 +310,7 @@ class TestSafeTensorsMgr:
                      dis_params_dict=dis_params_dict, quant_desc_info=quant_desc_info)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_param_type_error_save_path(self):
         """
@@ -328,7 +328,7 @@ class TestSafeTensorsMgr:
                      dis_params_dict=dis_params_dict, quant_desc_info=quant_desc_info)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_param_type_error_original_path_list(self):
         """
@@ -346,7 +346,7 @@ class TestSafeTensorsMgr:
                      dis_params_dict=dis_params_dict, quant_desc_info=quant_desc_info)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_path_not_exists_error(self):
         """
@@ -366,7 +366,7 @@ class TestSafeTensorsMgr:
         assert "Source path does not exist" in str(exc_info.value) or "does not exist" in str(exc_info.value)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_path_not_directory_error(self):
         """
@@ -390,7 +390,7 @@ class TestSafeTensorsMgr:
         assert "not a directory" in str(exc_info.value).lower() or "NotADirectoryError" in str(exc_info.value)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_save_invalid_dis_params_dict_string(self):
         """
@@ -407,7 +407,7 @@ class TestSafeTensorsMgr:
                      dis_params_dict="not_a_dict", quant_desc_info=quant_desc_info)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_save_invalid_dis_params_dict_list(self):
         """
@@ -424,7 +424,7 @@ class TestSafeTensorsMgr:
                      dis_params_dict=[], quant_desc_info=quant_desc_info)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_file_sharding(self):
         """
@@ -525,7 +525,7 @@ class TestSafeTensorsMgr:
         self._verify_safetensors_content(dis_params_dict, index_data["weight_map"])
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_weight_map_mapping(self):
         """
@@ -588,7 +588,7 @@ class TestSafeTensorsMgr:
                     f"Parameter {param_name} should be in file {mapped_file}"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_quantization_description_save(self):
         """
@@ -639,7 +639,7 @@ class TestSafeTensorsMgr:
         assert "model_info" in saved_quant_desc, "model_info should be preserved"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_copy_original_files(self):
         """
@@ -731,7 +731,7 @@ class TestSafeTensorsMgr:
         assert original_text == copied_text, "README file content should be identical"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_copy_original_files_empty_directory(self):
         """
@@ -761,7 +761,7 @@ class TestSafeTensorsMgr:
         assert not copied_files, "No files should be copied from empty directory"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_copy_original_files_subdirectories(self):
         """
@@ -806,7 +806,7 @@ class TestSafeTensorsMgr:
         assert not os.path.exists(subdir_path), "Subdirectories should not be copied"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_copy_original_files_various_extensions(self):
         """
@@ -881,7 +881,7 @@ class TestSafeTensorsMgr:
             "JSON file content should be identical"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_distributed_mode_construct(self):
         """
@@ -906,7 +906,7 @@ class TestSafeTensorsMgr:
                     assert mgr.barrier == mock_barrier, "barrier should be created"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_distributed_save(self):
         """
@@ -944,7 +944,7 @@ class TestSafeTensorsMgr:
                     # Note: In _tp_merge, barrier is called for each parameter, plus once at the end
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_distributed_save_non_zero_rank(self):
         """
@@ -980,7 +980,7 @@ class TestSafeTensorsMgr:
                         "barrier should be called even for non-zero rank"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_file_permission_error(self):
         """
@@ -1014,7 +1014,7 @@ class TestSafeTensorsMgr:
                 pass
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_distributed_communication_error(self):
         """
@@ -1042,7 +1042,7 @@ class TestSafeTensorsMgr:
                         "barrier" in str(exc_info.value).lower()
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_distributed_communication_error_tp_merge(self):
         """
@@ -1075,7 +1075,7 @@ class TestSafeTensorsMgr:
                         "TP merge" in str(exc_info.value)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_file_sharding_trigger_split(self):
         """
@@ -1138,7 +1138,7 @@ class TestSafeTensorsMgr:
             "Number of files should match total count"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_runtime_error_handling(self):
         """

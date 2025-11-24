@@ -23,7 +23,7 @@ from mindspore_gs.common.name_prefix_tree import NameTree
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 class TestNameTree(unittest.TestCase):
     """TestNameTree"""
@@ -31,7 +31,7 @@ class TestNameTree(unittest.TestCase):
         self.tree = NameTree()
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_add_name(self):
         """
@@ -48,7 +48,7 @@ class TestNameTree(unittest.TestCase):
             self.tree.add_name("a.b.c", 5)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_get_sibling_leaf_nodes(self):
         """
@@ -78,7 +78,7 @@ class TestNameTree(unittest.TestCase):
         self.assertEqual(self.tree.get_sibling_leaf_nodes("nonexistent.node"), [])
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_get_sibling_leaf_nodes_normal_case(self):
         """
@@ -105,7 +105,7 @@ class TestNameTree(unittest.TestCase):
         nodes = self.tree.get_sibling_leaf_nodes("a.e.g", level=1)
         assert len(nodes) == 1
         assert nodes[0].name == "a.e.f"
-        assert self.tree.get_sibling_leaf_nodes("h.i.j", level=1) == []
+        assert not self.tree.get_sibling_leaf_nodes("h.i.j", level=1)
 
         # Test with level=2
         nodes = self.tree.get_sibling_leaf_nodes("a.b.c", level=2)
@@ -128,7 +128,7 @@ class TestNameTree(unittest.TestCase):
         assert nodes[0].name in ["a.b.c", "a.b.d", "a.e.f"]
         assert nodes[1].name in ["a.b.c", "a.b.d", "a.e.f"]
         assert nodes[2].name in ["a.b.c", "a.b.d", "a.e.f"]
-        assert self.tree.get_sibling_leaf_nodes("h.i.j", level=2) == []
+        assert not self.tree.get_sibling_leaf_nodes("h.i.j", level=2)
 
         # Test with level=3
         nodes = self.tree.get_sibling_leaf_nodes("a.b.c", level=3)
@@ -167,7 +167,7 @@ class TestNameTree(unittest.TestCase):
         assert nodes[3].name in ["a.b.c", "a.b.d", "a.e.f", "a.e.g"]
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_get_sibling_leaf_nodes_level_zero(self):
         """
@@ -178,10 +178,10 @@ class TestNameTree(unittest.TestCase):
         self.tree.add_name("a.b.c", 1)
         self.tree.add_name("a.b.d", 2)
 
-        assert self.tree.get_sibling_leaf_nodes("a.b.c", level=0) == []
+        assert not self.tree.get_sibling_leaf_nodes("a.b.c", level=0)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_get_sibling_leaf_nodes_level_exceeds_tree_depth(self):
         """
@@ -192,10 +192,10 @@ class TestNameTree(unittest.TestCase):
         self.tree.add_name("a.b.c", 1)
         self.tree.add_name("a.b.d", 2)
 
-        assert self.tree.get_sibling_leaf_nodes("a.b.c", level=4) == []
+        assert not self.tree.get_sibling_leaf_nodes("a.b.c", level=4)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_get_sibling_leaf_nodes_node_not_found(self):
         """
@@ -205,10 +205,10 @@ class TestNameTree(unittest.TestCase):
         """
         self.tree.add_name("a.b.c", 1)
 
-        assert self.tree.get_sibling_leaf_nodes("a.b.d", level=1) == []
+        assert not self.tree.get_sibling_leaf_nodes("a.b.d", level=1)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_get_sibling_leaf_nodes_non_leaf_node(self):
         """
@@ -224,7 +224,7 @@ class TestNameTree(unittest.TestCase):
             self.tree.get_sibling_leaf_nodes("a.b", level=1)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_empty_tree(self):
         """
@@ -236,7 +236,7 @@ class TestNameTree(unittest.TestCase):
         self.assertEqual(self.tree.find_leafs_with_keywords(["a"]), [])
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_single_node(self):
         """
@@ -251,7 +251,7 @@ class TestNameTree(unittest.TestCase):
         assert nodes[0].name == "single.node"
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_generate_dot(self):
         """
@@ -274,7 +274,7 @@ class TestNameTree(unittest.TestCase):
         shutil.rmtree("output")
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_find_names_with_keywords(self):
         """
@@ -302,7 +302,7 @@ class TestNameTree(unittest.TestCase):
         self.assertEqual(result, [])
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_find_names_with_keywords_and_blacklist(self):
         """
@@ -329,7 +329,7 @@ class TestNameTree(unittest.TestCase):
         self.assertEqual(result, [])
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_find_leafs_with_prefix(self):
         """
@@ -351,14 +351,14 @@ class TestNameTree(unittest.TestCase):
         assert len(result) == 2
         assert result[0].name == "layer1.conv.bias"
         assert result[1].name == "layer1.conv.weight"
-        print(f"Test 1 Passed")
+        print("Test 1 Passed")
 
         # Test 2: Prefix exists but has no matching nodes
         prefix = "layer1.linear"
         expected = []
         result = self.tree.find_leafs_with_prefix(prefix)
         assert result == expected, f"Test 2 Failed: Expected {expected}, got {result}"
-        print(f"Test 2 Passed")
+        print("Test 2 Passed")
 
         # Test 3: Prefix is the root node
         prefix = "network"
@@ -370,20 +370,20 @@ class TestNameTree(unittest.TestCase):
         assert results[3].name == "layer2.conv.weight"
         assert results[4].name == "layer2.norm.bias"
         assert results[5].name == "layer3.fc.weight"
-        print(f"Test 3 Passed")
+        print("Test 3 Passed")
 
         # Test 4: Prefix is a leaf node
         prefix = "layer1.conv.weight"
         result = self.tree.find_leafs_with_prefix(prefix)
         assert result[0].name == prefix, f"Test 4 Failed: Expected {prefix}, got {result}"
-        print(f"Test 4 Passed")
+        print("Test 4 Passed")
 
         # Test 5: Prefix does not exist
         prefix = "layer4"
         expected = []
         result = self.tree.find_leafs_with_prefix(prefix)
         assert result == expected, f"Test 5 Failed: Expected {expected}, got {result}"
-        print(f"Test 5 Passed")
+        print("Test 5 Passed")
 
         # Test 6: Prefix is an intermediate node
         prefix = "layer2"
@@ -392,7 +392,7 @@ class TestNameTree(unittest.TestCase):
         assert len(result) == 2
         assert result[0].name == "layer2.conv.weight"
         assert result[1].name == "layer2.norm.bias"
-        print(f"Test 6 Passed")
+        print("Test 6 Passed")
 
         print("All tests passed!")
 

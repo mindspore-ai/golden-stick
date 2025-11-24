@@ -88,7 +88,7 @@ def test_resnet(quant_bit, enable_bn_calibration, run_mode):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("enable_act_quant", [True, False])
 @pytest.mark.parametrize("run_mode", [context.GRAPH_MODE, context.PYNATIVE_MODE])
@@ -112,6 +112,7 @@ def test_resnet_convert(run_mode, enable_act_quant):
     new_network = qat.apply(network)
     new_network = qat.convert(new_network)
     data_in = mindspore.Tensor(np.ones([1, 3, 32, 32]), mindspore.float32)
+    # pylint: disable=consider-using-f-string
     file_name = "./resnet_convert_{}_{}.mindir".format(run_mode, enable_act_quant)
     mindspore.export(new_network, data_in, file_name=file_name, file_format="MINDIR")
     time.sleep(10)
@@ -289,6 +290,7 @@ def test_resnet_accuracy_graph_bnon(quant_bit, enable_bn_calibration):
     print("============== End Training ==============")
     expect_avg_step_loss = 2.5
     avg_step_loss = np.mean(np.array(monitor.losses))
+    # pylint: disable=consider-using-f-string
     print("average step loss:{}".format(avg_step_loss))
     assert avg_step_loss <= expect_avg_step_loss
 
@@ -327,6 +329,7 @@ def test_resnet_accuracy_graph_bnoff(quant_bit, enable_bn_calibration):
     print("============== End Training ==============")
     expect_avg_step_loss = 2.5
     avg_step_loss = np.mean(np.array(monitor.losses))
+    # pylint: disable=consider-using-f-string
     print("average step loss:{}".format(avg_step_loss))
     assert avg_step_loss <= expect_avg_step_loss
 
@@ -358,5 +361,6 @@ def test_resnet_accuracy_pynative(quant_bit, enable_bn_calibration):
     print("============== End Training ==============")
     expect_avg_step_loss = 4.5
     avg_step_loss = np.mean(np.array(monitor.losses))
+    # pylint: disable=consider-using-f-string
     print("average step loss:{}".format(avg_step_loss))
     assert avg_step_loss <= expect_avg_step_loss

@@ -5,8 +5,4 @@ matplotlib
 prettytable
 datasets
 mindspore == 2.7.1
-mindformers == 1.7.0
-
-
-# for ut/st
-pytest >= 1.6.0
+mindone

@@ -23,12 +23,14 @@ should not contain any 'output_layer.*' keys.
 """
 
 import os
+import sys
 import json
 import tempfile
 
 from unittest.mock import patch
 import pytest
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../mindformers")))
 import mindspore as ms
 from mindspore import Parameter, Tensor, nn
 

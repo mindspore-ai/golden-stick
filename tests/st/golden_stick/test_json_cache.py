@@ -26,7 +26,7 @@ from mindspore_gs.common.json_cache import JSONCache
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 class TestJSONCache(unittest.TestCase):
     """TestJSONCache"""
@@ -35,6 +35,7 @@ class TestJSONCache(unittest.TestCase):
         JSONCache._instance = None
         JSONCache._filepath = None
         JSONCache._empty_path_warned = False
+        # pylint: disable=consider-using-with
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_file = os.path.join(self.temp_dir.name, 'test_cache.json')
 
@@ -43,7 +44,7 @@ class TestJSONCache(unittest.TestCase):
         self.temp_dir.cleanup()
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_singleton_same_path(self):
         """
@@ -56,7 +57,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertIs(cache1, cache2)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     @patch.object(logger, 'warning')
     def test_empty_filepath_warning(self, mock_warning):
@@ -74,7 +75,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertEqual(mock_warning.call_count, 1)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_put_and_get(self):
         """
@@ -89,7 +90,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertEqual(cache.size, 1)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_overwrite_existing_key(self):
         """
@@ -103,7 +104,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertEqual(cache.get("pressure"), 1020.0)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_get_nonexistent_key(self):
         """
@@ -116,7 +117,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertNotIn("humidity", cache)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_persistence(self):
         """
@@ -132,7 +133,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertEqual(new_cache.get("key1"), 1.23)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_corrupted_file_handling(self):
         """
@@ -140,14 +141,14 @@ class TestJSONCache(unittest.TestCase):
         Description: test_corrupted_file_handling.
         Expectation: test_corrupted_file_handling.
         """
-        with open(self.test_file, 'w') as f:
+        with open(self.test_file, 'w', encoding='utf-8') as f:
             f.write("{invalid_json")
 
         cache = JSONCache(self.test_file)
         self.assertEqual(cache.size, 0)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_invalid_key_type(self):
         """
@@ -160,7 +161,7 @@ class TestJSONCache(unittest.TestCase):
             cache.put(123, 45.6)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_invalid_value_type(self):
         """
@@ -173,7 +174,7 @@ class TestJSONCache(unittest.TestCase):
             cache.put("valid_key", "not_a_number")
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_directory_creation(self):
         """
@@ -187,7 +188,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.dirname(nested_path)))
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_empty_filepath_no_persistence(self):
         """
@@ -202,7 +203,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertFalse(os.path.exists(""))
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_size_property(self):
         """
@@ -219,7 +220,7 @@ class TestJSONCache(unittest.TestCase):
         self.assertEqual(cache.size, 2)
 
     @pytest.mark.level0
-    @pytest.mark.platform_x86_cpu
+    @pytest.mark.platform_arm_ascend910b_training
     @pytest.mark.env_onecard
     def test_file_not_exists(self):
         """

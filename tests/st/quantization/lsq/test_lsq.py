@@ -25,7 +25,7 @@ from mindspore_gs.quantization.ops.nn import Conv2dQuant
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_construct():
     """
@@ -53,7 +53,7 @@ def test_construct():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_bn_fold():
     """
@@ -73,7 +73,7 @@ def test_set_bn_fold():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_one_conv_fold():
     """
@@ -93,7 +93,7 @@ def test_set_one_conv_fold():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_act_quant_delay():
     """
@@ -117,7 +117,7 @@ def test_set_act_quant_delay():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_weight_quant_delay():
     """
@@ -141,7 +141,7 @@ def test_set_weight_quant_delay():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_act_per_channel():
     """
@@ -165,7 +165,7 @@ def test_set_act_per_channel():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_weight_per_channel():
     """
@@ -185,7 +185,7 @@ def test_set_weight_per_channel():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_act_quant_dtype():
     """
@@ -209,7 +209,7 @@ def test_set_act_quant_dtype():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_weight_quant_dtype():
     """
@@ -233,7 +233,7 @@ def test_set_weight_quant_dtype():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_act_symmetric():
     """
@@ -257,7 +257,7 @@ def test_set_act_symmetric():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_weight_symmetric():
     """
@@ -281,7 +281,7 @@ def test_set_weight_symmetric():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_act_narrow_range():
     """
@@ -305,7 +305,7 @@ def test_set_act_narrow_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_weight_narrow_range():
     """
@@ -329,7 +329,7 @@ def test_set_weight_narrow_range():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_freeze_bn():
     """
@@ -353,7 +353,7 @@ def test_set_freeze_bn():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_set_enable_fusion():
     """
@@ -378,6 +378,7 @@ class NetToQuant(nn.Cell):
     """
 
     def __init__(self):
+        # pylint: disable=super-with-arguments
         super(NetToQuant, self).__init__()
         self.conv = nn.Conv2d(5, 7, 3, pad_mode='valid')
 
@@ -387,7 +388,7 @@ class NetToQuant(nn.Cell):
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_apply():
     """

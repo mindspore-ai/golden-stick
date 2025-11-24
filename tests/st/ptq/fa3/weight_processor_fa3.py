@@ -18,8 +18,11 @@ transform huggingface safetensor.
 """
 
 import os
+import sys
 from enum import Enum
 from safetensors import safe_open
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mindformers")))
 from mindspore.communication.management import get_rank, get_group_size
 from mindformers.parallel_core.inference.utils import get_tp_world_size
 from mindformers.parallel_core.inference.parallel_state import get_data_parallel_world_size
@@ -86,6 +89,7 @@ class BaseWeightProcessor:
 
     def get_moe_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map,
                                      is_split_param=False, split_axis=0):
+        """get_moe_safetensor_from_file"""
         safetensor_file = hf_weight_map[hf_param_name]
         filename = os.path.join(src_hf_dir, safetensor_file)
         sf_file = self.get_file_handles(filename)
@@ -109,7 +113,7 @@ class BaseWeightProcessor:
             stop = (self.moe_tp_rank_id + 1) * split_size
             split_data = np_data[:, start:stop]
         else:
-            raise ValueError("split_axis:{} is not supported.".format(split_axis))
+            raise ValueError(f"split_axis:{split_axis} is not supported.")
         return split_data, qint4
 
     def get_routed_safetensor_3_dim(self, hf_param_name, src_hf_dir, hf_weight_map, split_ep=False,
@@ -142,7 +146,7 @@ class BaseWeightProcessor:
             stop = (self.moe_tp_rank_id + 1) * split_size
             split_data = np_data[self.ep_start:self.ep_stop, :, start:stop] if split_ep else np_data[:, :, start:stop]
         else:
-            raise ValueError("tp_axis:{} is not supported.".format(tp_axis))
+            raise ValueError(f"tp_axis:{tp_axis} is not supported.")
         return split_data, qint4
 
     def get_routed_safetensor_2_dim(self, hf_param_name, src_hf_dir, hf_weight_map, split_ep=False,
@@ -170,11 +174,12 @@ class BaseWeightProcessor:
             stop = (self.moe_tp_rank_id + 1) * split_size
             split_data = np_data[self.ep_start:self.ep_stop, start:stop] if split_ep else np_data[:, start:stop]
         else:
-            raise ValueError("split_tp is True but tp_axis:{} is not supported.".format(tp_axis))
+            raise ValueError(f"split_tp is True but tp_axis:{tp_axis} is not supported.")
         return split_data, qint4
 
     def get_safetensor_from_file(self, hf_param_name, src_hf_dir, hf_weight_map, is_split_param=False, split_axis=0,
                                  split_num=-1, rank_id=-1):
+        """get_safetensor_from_file"""
         rank_id = rank_id if rank_id != -1 else self.tp_rank_id
         split_num = split_num if split_num != -1 else self.tp_group_size
         safetensor_file = hf_weight_map[hf_param_name]
@@ -205,10 +210,11 @@ class BaseWeightProcessor:
             stop = (rank_id + 1) * split_size
             split_data = np_data[:, :, start:stop]
         else:
-            raise ValueError("split_axis:{} is not supported.".format(split_axis))
+            raise ValueError(f"split_axis:{split_axis} is not supported.")
         return split_data, qint4
 
     def split_weight_by_rank(self, weight, split_axis=0):
+        """split_weight_by_rank"""
         if self.tp_group_size == 1:
             return weight
 
@@ -224,7 +230,7 @@ class BaseWeightProcessor:
             stop = (self.tp_rank_id + 1) * split_size
             split_data = weight[:, start:stop]
         else:
-            raise ValueError("split_axis:{} is not supported.".format(split_axis))
+            raise ValueError(f"split_axis:{split_axis} is not supported.")
         return split_data
 
     def load_safetensors_shard(self, src_hf_dir):

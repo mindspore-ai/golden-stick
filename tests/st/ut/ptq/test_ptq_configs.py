@@ -30,7 +30,7 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_basic_construct():
     """
@@ -69,7 +69,7 @@ def test_ptq_config_basic_construct():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_mode_config():
     """
@@ -98,7 +98,7 @@ def test_ptq_config_mode_config():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_quant_dtype_config():
     """
@@ -159,7 +159,7 @@ def test_ptq_config_quant_dtype_config():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_quant_granularity_config():
     """
@@ -209,7 +209,7 @@ def test_ptq_config_quant_granularity_config():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_algo_config():
     """
@@ -263,7 +263,7 @@ def test_ptq_config_algo_config():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_gptq_quant_config_construct():
     """
@@ -296,7 +296,7 @@ def test_gptq_quant_config_construct():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_smooth_quant_config_construct():
     """
@@ -324,7 +324,7 @@ def test_smooth_quant_config_construct():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_awq_config_construct():
     """
@@ -364,7 +364,7 @@ def test_awq_config_construct():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_inner_ptq_config_convert():
     """
@@ -428,7 +428,7 @@ def test_inner_ptq_config_convert():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_param_type_error():
     """
@@ -480,7 +480,7 @@ def test_ptq_config_param_type_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_param_value_error():
     """
@@ -556,7 +556,7 @@ def test_ptq_config_param_value_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_ptq_config_param_conflict():
     """
@@ -631,7 +631,7 @@ def test_ptq_config_param_conflict():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_gptq_quant_config_param_error():
     """
@@ -675,7 +675,7 @@ def test_gptq_quant_config_param_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_smooth_quant_config_param_error():
     """
@@ -695,7 +695,7 @@ def test_smooth_quant_config_param_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_awq_config_param_error():
     """
@@ -741,7 +741,7 @@ def test_awq_config_param_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_inner_ptq_config_param_error():
     """
@@ -800,7 +800,7 @@ def test_inner_ptq_config_param_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_enum_type_conversion_error():
     """
@@ -830,7 +830,7 @@ def test_enum_type_conversion_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_algo_args_incompatible():
     """
@@ -845,7 +845,7 @@ def test_algo_args_incompatible():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_config_convert():
     """
@@ -927,7 +927,7 @@ def test_config_convert():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_config_merge():
     """
@@ -974,7 +974,7 @@ def test_config_merge():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_config_validation():
     """
@@ -1025,7 +1025,7 @@ def test_config_validation():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_enum_type_string_conversion():
     """
@@ -1073,7 +1073,7 @@ def test_enum_type_string_conversion():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_config_default_values():
     """
@@ -1147,7 +1147,7 @@ def test_config_default_values():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_inner_ptq_config_yaml_dump_and_load():
     """
@@ -1191,7 +1191,7 @@ def test_inner_ptq_config_yaml_dump_and_load():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
 def test_inner_ptq_config_yaml_parse_unparse():
     """

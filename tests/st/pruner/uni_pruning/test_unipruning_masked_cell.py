@@ -21,7 +21,7 @@ from mindspore_gs.pruner.uni_pruning.unipruning_masked_layer import UniPruningMa
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskedconv2d_init():
     """
@@ -58,7 +58,7 @@ def test_unipruningmaskedconv2d_init():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskedconv2d_init_error():
     """
@@ -94,7 +94,7 @@ def test_unipruningmaskedconv2d_init_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskedconv2d_set_in_mask():
     """
@@ -118,7 +118,7 @@ def test_unipruningmaskedconv2d_set_in_mask():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskedconv2d_set_out_mask():
     """
@@ -142,7 +142,7 @@ def test_unipruningmaskedconv2d_set_out_mask():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskedconv2d_zeroing():
     """
@@ -166,7 +166,7 @@ def test_unipruningmaskedconv2d_zeroing():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskedconv2d_prune():
     """
@@ -186,7 +186,7 @@ def test_unipruningmaskedconv2d_prune():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskeddense_init():
     """
@@ -223,7 +223,7 @@ def test_unipruningmaskeddense_init():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskeddense_init_error():
     """
@@ -259,7 +259,7 @@ def test_unipruningmaskeddense_init_error():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskeddense_set_in_mask():
     """
@@ -283,7 +283,7 @@ def test_unipruningmaskeddense_set_in_mask():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskeddense_set_out_mask():
     """
@@ -307,7 +307,7 @@ def test_unipruningmaskeddense_set_out_mask():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskeddense_zeroing():
     """
@@ -331,7 +331,7 @@ def test_unipruningmaskeddense_zeroing():
 
 
 @pytest.mark.level0
-@pytest.mark.platform_x86_cpu
+@pytest.mark.platform_x86_gpu_training
 @pytest.mark.env_onecard
 def test_unipruningmaskeddense_prune():
     """
