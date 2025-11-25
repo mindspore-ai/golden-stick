@@ -13,8 +13,5 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick SmoothQuant Algorithm
+MindSpore golden stick Sequence Compress Algorithms
 """
-
-from .ra_config import RAConfig, RAMode
-from .razor_attention import RazorAttention

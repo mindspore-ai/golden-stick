@@ -13,5 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """
-MindSpore golden stick PTQ Algorithms
+MindSpore golden stick Razor Attention Algorithm
 """
+
+from .ra_config import RAConfig, RAMode
+from .razor_attention import RazorAttention
