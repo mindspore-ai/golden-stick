@@ -152,6 +152,7 @@ class FakeQuantLinearCell(nn.Cell):
         self.context = context
         self.cfg = cfg
         self.compute_dtype = linear.weight.dtype
+        self.dense = ops.Dense()
 
     def dequant_input(self, x, weight):
         """process input"""
@@ -162,15 +163,7 @@ class FakeQuantLinearCell(nn.Cell):
         """linear deploy construct"""
         x, weight = self.dequant_input(x, self.weight)
 
-        x_shape = self.layer.shape_op(x)
-        if len(x_shape) != 2:
-            x = self.layer.reshape(x, (-1, x_shape[-1]))
-        x = self.layer.matmul(x, weight)
+        bias = None
         if self.layer.has_bias:
-            x = self.layer.bias_add(x, self.bias)
-        if self.layer.activation_flag:
-            x = self.layer.activation(x)
-        if len(x_shape) != 2:
-            out_shape = x_shape[:-1] + (ops.shape(x)[-1],)
-            x = self.layer.reshape(x, out_shape)
-        return x
+            bias = self.bias
+        return self.dense(x, weight, bias)

@@ -68,9 +68,37 @@ class MindOneModelHubPlugin(ModelHubPlugin):
         at this time.
         """
         from mindspore_gs.ptq.quant_cells.mindone.linear_weight_quant_wrappers import WeightQuantLinearCell
+        from mindspore_gs.ptq.quant_cells.mindone.linear_all_quant_wrappers import AllQuantLinearCell
+
+        from mindspore_gs.ptq.quant_cells.mindone.linear_smooth_wrappers import SmoothQuantLinearCell
+        from mindspore_gs.ptq.quant_cells.mindone.linear_smooth_wrappers import OSLSmoothQuantLinearCell
+
         from mindspore_gs.ptq.quant_cells.mindone.fake_quant_linear import FakeQuantA16WxWrapper
+        from mindspore_gs.ptq.quant_cells.mindone.fake_quant_linear import FakeQuantW8A8Wrapper
+
         WeightQuantLinearCell.reg_self()
+        AllQuantLinearCell.reg_self()
+
+        SmoothQuantLinearCell.reg_self()
+        OSLSmoothQuantLinearCell.reg_self()
+
         FakeQuantA16WxWrapper.reg_self()
+        FakeQuantW8A8Wrapper.reg_self()
+
+    def _load_algo_modules(self):
+        """Load MindOne algorithm modules.
+        
+        This method is currently not implemented for MindOne models as
+        they use the same algorithm modules as MindFormers models.
+        """
+        from mindspore_gs.ptq.algo_modules.mindone.anti_outliers import SmoothQuantSmoother, OSLSmoother
+        from mindspore_gs.ptq.algo_modules.clipper import LinearClipper
+        from mindspore_gs.ptq.algo_modules.quantizer import Quantizer
+
+        SmoothQuantSmoother.reg_self()
+        OSLSmoother.reg_self()
+        LinearClipper.reg_self()
+        Quantizer.reg_self()
 
     def create_model(self, pretrained) -> BaseQuantForCausalLM:
         """Create a model instance from a pretrained configuration.

@@ -12,22 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Wrapper cells for PTQ for MindOne."""
+"""MindFormers algorithm modules."""
 
-from .linear_weight_quant_wrappers import WeightQuantLinearCell
-from .linear_all_quant_wrappers import AllQuantLinearCell
+from .anti_outliers import LinearSmoothQuant, LinearAutoSmoother
 
-from .linear_smooth_wrappers import SmoothQuantLinearCell
-from .linear_smooth_wrappers import OSLSmoothQuantLinearCell
-
-from .fake_quant_linear import FakeQuantA16WxWrapper
-from .fake_quant_linear import FakeQuantW8A8Wrapper
-
-__all__ = [
-    "WeightQuantLinearCell",
-    "AllQuantLinearCell",
-    "SmoothQuantLinearCell",
-    "OSLSmoothQuantLinearCell",
-    "FakeQuantA16WxWrapper",
-    "FakeQuantW8A8Wrapper",
-]
+__all__ = ["LinearSmoothQuant", "LinearAutoSmoother"]

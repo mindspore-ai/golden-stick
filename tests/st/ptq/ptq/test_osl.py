@@ -38,6 +38,7 @@ from mindformers.parallel_core.inference.tensor_parallel.layers import (
 from mindformers.parallel_core.transformer_config import TransformerConfig
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode, OutliersSuppressionType
+from mindspore_gs.ptq.plugins import MFModelHubPlugin
 
 ms.set_context(pynative_synchronize=True)
 
@@ -240,6 +241,9 @@ def infer_net(linear_type, dtype):
 
 def _test_simple_net(linear_type, dtype):
     """Test procedure: Quantize and evaluate one SimpleNet with one Decoder layer, including one given linear cell."""
+    # pylint: disable=protected-access
+    MFModelHubPlugin()._load_quant_cells()
+    MFModelHubPlugin()._load_algo_modules()
     fpoutput = quant_net(linear_type, dtype)
     qoutput = infer_net(linear_type, dtype)
     os.remove(get_save_file_name('osl-quant.ckpt'))

@@ -17,11 +17,14 @@
 GLM4v Quantized Model Implementation
 """
 
+import os
+import json
+
 import mindspore as ms
 from mindspore.nn.cell import Cell
 from mindone.transformers import Glm4vForConditionalGeneration
 
-from mindspore_gs.ptq.models.mindone_models.mindone_model import MindOneModel
+from mindspore_gs.ptq.models.mindone_models.mindone_model import MindOneModel, SmoothLayerInfo
 from mindspore_gs.ptq.utils import QuantType
 
 
@@ -36,6 +39,72 @@ class GLM4v(MindOneModel):
             _attn_implementation="flash_attention_2",
             )
         self._original_sf_path = model_path
+        self.num_attention_heads, self.num_key_value_heads = self._get_gqa_info(model_path)
+        self.is_gqa = self.num_key_value_heads != self.num_attention_heads
+
+    def _get_gqa_info(self, model_path):
+        """Get GQA information from config file."""
+        config_path = os.path.join(model_path, 'config.json')
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            text_config = config.get('text_config', None)
+            if text_config is None:
+                text_config = config
+            num_attention_heads = text_config.get('num_attention_heads', None)
+            num_key_value_heads = text_config.get('num_key_value_heads', None)
+            if num_attention_heads is None or num_key_value_heads is None:
+                raise ValueError(f"num_attention_heads or num_key_value_heads is not found in {config_path}.")
+            return num_attention_heads, num_key_value_heads
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Config file not found at {config_path}.") from e
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to decode JSON from {config_path}.") from e
+
+    def get_layers_for_smooth(self, decoder_layer):
+        """Get layers for search.
+        This method returns a list of layers that should be used for search.
+        
+        Args:
+            layer (Cell): The layer to get layers for search.
+        
+        Returns:
+            list[SmoothLayerInfo]. List of layers for search. Each layer is a SmoothLayerInfo with the following keys:
+                - prev_layer (Cell): The layer before the current layer.
+                - curr_layer (List[Cell]): The current layer.
+        """
+        layers_info = []
+        # attention
+        layers_info.append(
+        SmoothLayerInfo(
+            prev_layer=decoder_layer.input_layernorm,
+            curr_layer=[decoder_layer.self_attn.q_proj,
+                        decoder_layer.self_attn.k_proj,
+                        decoder_layer.self_attn.v_proj],
+            )
+        )
+
+        layers_info.append(
+            SmoothLayerInfo(
+                prev_layer=decoder_layer.self_attn.v_proj,
+                curr_layer=[decoder_layer.self_attn.o_proj],
+            )
+        )
+        # mlp
+        layers_info.append(
+            SmoothLayerInfo(
+                prev_layer=decoder_layer.post_attention_layernorm,
+                curr_layer=[decoder_layer.mlp.gate_up_proj],
+            )
+        )
+
+        layers_info.append(
+            SmoothLayerInfo(
+                prev_layer=decoder_layer.mlp.gate_up_proj,
+                curr_layer=[decoder_layer.mlp.down_proj],
+            )
+        )
+        return layers_info
 
     # pylint: disable=W0237
     def forward(self, inputs, max_new_tokens=1):

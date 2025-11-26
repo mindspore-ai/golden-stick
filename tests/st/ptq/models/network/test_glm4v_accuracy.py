@@ -33,6 +33,7 @@ from mindone.transformers import AutoProcessor
 # pylint: disable=wrong-import-position
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode)
+from mindspore_gs.ptq.ptq_config import OutliersSuppressionType
 from mindspore_gs.ptq.models import AutoQuantForCausalLM
 from mindspore_gs.ptq.utils import QuantType
 
@@ -70,7 +71,14 @@ class GLM4vPTQTester:
         cfg = PTQConfig(mode=mode, backend=backend,
                         weight_quant_dtype=msdtype.int8,
                         opname_blacklist=['lm_head', 'visual'])
-        layer_policies = OrderedDict()
+        osl_a8w8 = PTQConfig(mode=mode, backend=backend,
+                             act_quant_dtype=msdtype.int8,
+                             weight_quant_dtype=msdtype.int8,
+                             outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
+                             opname_blacklist=['lm_head', 'visual'])
+        layer_policies = OrderedDict({r'.*\.self_attn.*': cfg,
+                                      r'.*\.mlp.*': osl_a8w8,
+                                      'not match': cfg})
         return cfg, layer_policies
 
     def preprocess_and_tokenizer(self, example):
@@ -240,8 +248,8 @@ class GLM4vPTQTester:
             'model.language_model.layers.0.self_attn.q_proj.weight': QuantType.W8A16.value,
             'model.language_model.layers.1.self_attn.k_proj.weight_scale': QuantType.W8A16.value,
             'model.language_model.layers.2.self_attn.v_proj.weight_offset': QuantType.W8A16.value,
-            'model.language_model.layers.3.mlp.gate_up_proj.weight': QuantType.W8A16.value,
-            'model.language_model.layers.4.mlp.down_proj.weight_scale': QuantType.W8A16.value,
+            'model.language_model.layers.3.mlp.gate_up_proj.weight': QuantType.W8A8.value,
+            'model.language_model.layers.4.mlp.down_proj.weight_scale': QuantType.W8A8.value,
         }
         for name, value in check_map.items():
             if not check(name, value):
@@ -256,7 +264,7 @@ class GLM4vPTQTester:
     def get_golden(self) -> tuple[str, str]:
         """Get golden reference for comparison"""
         return "<think>Got it, let's describe the image. " + \
-               "First, the main subject is a cat-like animal, probably a Pallas's cat,"
+               "First, the main subject is a small cat-like animal, maybe a Pallas cat or"
 
 
 def run_glm4v_accuracy():

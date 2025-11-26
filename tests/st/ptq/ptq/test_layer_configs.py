@@ -193,7 +193,7 @@ def test_quant_summary():
     assert ptq._config.layer_quant_info_collect['network.layers.0.ffn.w1'] == 'W8-per_channel-A8-per_token'
     assert ptq._config.layer_quant_info_collect['network.layers.4.moe.w1'] == 'AWQ-wclip-W4-per_group'
     assert 'network.layers.5.moe.w2' not in ptq._config.layer_quant_info_collect
-    assert ptq._target_layer_type
+    assert ptq.target_layer_type
 
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training

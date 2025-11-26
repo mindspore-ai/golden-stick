@@ -18,6 +18,7 @@ from typing import Tuple
 from mindspore.nn import Cell
 from mindspore import dtype as msdtype
 from mindspore_gs.common import logger
+from mindspore_gs.ptq.ptq.quant import PTQ
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.quant_cells.quant_cell import QuantCell, Checker
 from mindspore_gs.ptq.basic_functions.processor import Processor
@@ -29,6 +30,17 @@ class Quantizer(AlgoModule):
 
     layer_map = {}
     fake_quant_layer_map = {}
+
+    @staticmethod
+    def reg_self():
+        """register self"""
+        # Check if already registered to avoid duplicate registration
+        if Quantizer not in PTQ.pipeline:
+            PTQ.pipeline.append(Quantizer)
+        # Add layer types that are not already in target_layer_type
+        new_layer_types = tuple(set(Quantizer.layer_map.keys()) - set(PTQ.target_layer_type))
+        if new_layer_types:
+            PTQ.target_layer_type += new_layer_types
 
     def target_layer_type(self) -> tuple:
         return tuple(self.layer_map.keys())

@@ -236,9 +236,6 @@ def quant_tensor_data(tensor: Tensor, scale, zero_point, quant_min, quant_max, d
         raise ValueError("`scale` and `zero_point` should have the same shape.")
     if scale.shape[0] < 0:
         raise ValueError("`scale` and `zero_point` shape should be greater than zero.")
-    if tensor.shape[data_axis] != scale.shape[data_axis]:
-        raise ValueError(f"Dim({tensor.shape[data_axis]}) of `data`'s `data_axis`({data_axis}) should be equal to "
-                         f"`scale`'s shape({scale.shape}[0]).")
     if data_axis >= len(tensor.shape):
         raise ValueError("`data_axis` out of range of `data`'s shape.")
 

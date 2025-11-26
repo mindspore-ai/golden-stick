@@ -90,7 +90,8 @@ class AlgoModule:
         """class name"""
         return cls.__name__
 
-    def process(self, decoder_layer_name: str, decoder_layer):
+    # pylint: disable=unused-argument
+    def process(self, decoder_layer_name: str, decoder_layer, **kwargs):
         """process"""
         def transform_fn(cell_name, cell):
             logger.info(f"process {cell_name} in {self.class_name()}")
