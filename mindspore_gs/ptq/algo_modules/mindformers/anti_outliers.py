@@ -42,6 +42,7 @@ class LinearSmoothQuant(LinearSmoother):
         # Check if already registered to avoid duplicate registration
         if LinearSmoothQuant not in PTQ.pipeline:
             PTQ.pipeline.append(LinearSmoothQuant)
+        logger.info(f"Register algo_module {LinearSmoothQuant} to {PTQ.__name__} pipeline.")
         # Add layer types that are not already in target_layer_type
         new_layer_types = tuple(set(LinearSmoothQuant.linear_map.keys()) - set(PTQ.target_layer_type))
         if new_layer_types:
@@ -184,6 +185,7 @@ class LinearAutoSmoother(LinearSmoother):
         # Check if already registered to avoid duplicate registration
         if LinearAutoSmoother not in PTQ.pipeline:
             PTQ.pipeline.append(LinearAutoSmoother)
+        logger.info(f"Register algo_module {LinearAutoSmoother} to {PTQ.__name__} pipeline.")
         # Add layer types that are not already in target_layer_type
         new_layer_types = tuple(set(LinearAutoSmoother.linear_map.keys()) - set(PTQ.target_layer_type))
         if new_layer_types:

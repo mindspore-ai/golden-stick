@@ -50,10 +50,10 @@ class LinearSmoother(AlgoModule):
                 continue
             self.is_gqa_wo_layer = (quant_model.num_attention_heads != quant_model.num_key_value_heads \
                  and '.o_proj' in layer_info.curr_layer[0].layer_name)
-            self.weight_max = self._get_weight_stats(layer_info,
+            self.weight_stats = self._get_weight_stats(layer_info,
                                                      quant_model.num_attention_heads,
                                                      quant_model.num_key_value_heads)
-            self.act_max = self._get_act_stats(layer_info,
+            self.act_stats = self._get_act_stats(layer_info,
                                                quant_model.num_attention_heads,
                                                quant_model.num_key_value_heads)
             smooth_scale = self._compute_smooth_scale(decoder_layer_name=decoder_layer_name,
@@ -155,11 +155,11 @@ class LinearSmoother(AlgoModule):
         """_compute_smooth_scale"""
         raise NotImplementedError
 
-    def _calculate_smooth_scale(self, act_max, weight_max, ratio,
+    def _calculate_smooth_scale(self, act_stats, weight_stats, ratio,
                                 num_attention_heads, num_key_value_heads):
         """_calculate_smooth_scale"""
-        act_max_pow = msops.pow(act_max, ratio)
-        weight_max_pow = msops.pow(weight_max, 1 - ratio)
+        act_max_pow = msops.pow(act_stats, ratio)
+        weight_max_pow = msops.pow(weight_stats, 1 - ratio)
         smooth_scale = msops.div(act_max_pow, weight_max_pow).clamp(1e-5)
         # set 0 or nan to 1.0 to avoid quantization error
         smooth_scale[act_max_pow == 0] = 1.0
@@ -270,6 +270,7 @@ class SmoothQuantSmoother(LinearSmoother):
         # Check if already registered to avoid duplicate registration
         if SmoothQuantSmoother not in PTQ.pipeline:
             PTQ.pipeline.append(SmoothQuantSmoother)
+        logger.info(f"Register algo_module {SmoothQuantSmoother} to {PTQ.__name__} pipeline.")
         # Add layer types that are not already in target_layer_type
         new_layer_types = tuple(set(SmoothQuantSmoother.linear_map.keys()) - set(PTQ.target_layer_type))
         if new_layer_types:
@@ -343,15 +344,15 @@ class SmoothQuantSmoother(LinearSmoother):
         num_key_value_heads = kwargs.get('num_key_value_heads', None)
         if num_key_value_heads is None:
             raise ValueError("SmoothQuantSmoother: when compute smooth scale num_key_value_heads is required.")
-        return self._calculate_smooth_scale(self.act_max,
-                                            self.weight_max,
+        return self._calculate_smooth_scale(self.act_stats,
+                                            self.weight_stats,
                                             ratio=0.5,
                                             num_attention_heads=num_attention_heads,
                                             num_key_value_heads=num_key_value_heads)
 
 
 class OSLSmoother(LinearSmoother):
-    """LinearAutoSmoother"""
+    """Outlier Suppression Lite smoother"""
 
     linear_map = {}
     fake_quant_linear_map = {}
@@ -362,6 +363,7 @@ class OSLSmoother(LinearSmoother):
         # Check if already registered to avoid duplicate registration
         if OSLSmoother not in PTQ.pipeline:
             PTQ.pipeline.append(OSLSmoother)
+        logger.info(f"Register algo_module {OSLSmoother} to {PTQ.__name__} pipeline.")
         # Add layer types that are not already in target_layer_type
         new_layer_types = tuple(set(OSLSmoother.linear_map.keys()) - set(PTQ.target_layer_type))
         if new_layer_types:
@@ -468,7 +470,7 @@ class OSLSmoother(LinearSmoother):
         best_scale = 0
         best_error = float("inf")
         for ratio in smooth_alpha:
-            scales = self._calculate_smooth_scale(self.act_max, self.weight_max, ratio,
+            scales = self._calculate_smooth_scale(self.act_stats, self.weight_stats, ratio,
                                                   num_attention_heads, num_key_value_heads)
             for layer in layer_info.curr_layer:
                 layer.quant_forward = True
@@ -491,6 +493,252 @@ class OSLSmoother(LinearSmoother):
                         f"is {{{best_scale.shape}, {best_scale.dtype}}}")
         else:
             logger.info(f"OSLSmoother: best scale alpha {best_ratio}, "
+                        f"best_scale of Layer({decoder_layer_name}): {best_scale}")
+        if best_ratio == -1:
+            raise ValueError(f"best_ratio=-1 is not correct, please check history of loss: {history}.")
+        return best_scale, best_ratio
+
+    def _module_forward(self, decoder_layer, search_inputs):
+        """_module_forward"""
+        results = []
+        for args, kwargs in zip(search_inputs.layer_args, search_inputs.layer_kwargs):
+            results.append(decoder_layer(*args, **kwargs))
+        return results
+
+    def _loss(self, preds, grounds):
+        total_loss = 0
+        for pred, ground in zip(preds, grounds):
+            ground = msops.cast(ground[0], msdtype.float32)
+            pred = msops.cast(pred[0], msdtype.float32)
+            total_loss += float(msops.mse_loss(ground, pred, reduction='mean'))
+        return total_loss / len(grounds)
+
+
+class AWQSmoother(LinearSmoother):
+    """AWQ smoother"""
+
+    linear_map = {}
+    fake_quant_linear_map = {}
+
+    @staticmethod
+    def reg_self():
+        """register self"""
+        # Check if already registered to avoid duplicate registration
+        if AWQSmoother not in PTQ.pipeline:
+            PTQ.pipeline.append(AWQSmoother)
+        logger.info(f"Register algo_module {AWQSmoother} to {PTQ.__name__} pipeline.")
+        # Add layer types that are not already in target_layer_type
+        new_layer_types = tuple(set(AWQSmoother.linear_map.keys()) - set(PTQ.target_layer_type))
+        if new_layer_types:
+            PTQ.target_layer_type += new_layer_types
+
+    def target_layer_type(self) -> tuple:
+        return tuple(self.linear_map.keys())
+
+    @staticmethod
+    def reg_layer_map(layer_type, quant_layer_type, checker: Checker):
+        """register layer map"""
+        if not issubclass(quant_layer_type, QuantCell):
+            raise RuntimeError(f"Quantize linear type should be a subclass of {id(QuantCell)}, "
+                               f"but got {quant_layer_type}.")
+        logger.info(f"Register quant_cell {layer_type} with {quant_layer_type} " \
+                    f"to AWQSmoother, checker: {checker}")
+        if not AWQSmoother.linear_map.get(layer_type):
+            AWQSmoother.linear_map[layer_type] = [(checker, quant_layer_type)]
+        else:
+            AWQSmoother.linear_map[layer_type].append((checker, quant_layer_type))
+
+    def get_wrapper_layer(self, layer_type, config: InnerPTQConfig):
+        """get wrapper layer"""
+        wrappers = AWQSmoother.linear_map.get(layer_type) if not self.is_fake_quant else \
+            AWQSmoother.fake_quant_linear_map.get(layer_type)
+        if not wrappers:
+            return None
+        for checker_wrapper in wrappers:
+            if not checker_wrapper[0].check(config):
+                continue
+            return checker_wrapper[1]
+        return None
+
+    def replace(self, decoder_layer_name: str, decoder_layer, **kwargs):
+        """infer_and_cache"""
+
+        class Replacer(Processor):
+            """Replacer"""
+            def __init__(self, algorithm):
+                self.handler = algorithm
+
+            def process_cell(self, cell_name: str, cell: Cell) -> Tuple[Cell, bool]:
+                """process cell"""
+                if not AWQSmoother.linear_map.get(type(cell)):
+                    return cell, False
+                layer_policy = self.handler.get_layer_policy(cell_name)
+                if (not layer_policy or
+                        layer_policy.outliers_suppression != OutliersSuppressionType.AWQ):
+                    return cell, False
+                if any(opname in cell_name for opname in layer_policy.opname_blacklist):
+                    logger.info(f"{cell_name} is in blacklist, keep not being suppressed.")
+                    return cell, False
+                logger.debug(f"{cell_name} layer policy: {layer_policy}.")
+                wrapper_cell_type = self.handler.get_wrapper_layer(type(cell), layer_policy)
+                if not wrapper_cell_type:
+                    return cell, False
+                if not issubclass(wrapper_cell_type, QuantCell):
+                    raise RuntimeError(f"Registered wrapper cell for {type(cell)} is {wrapper_cell_type} which is not "
+                                       f"a subclass of {QuantCell}.")
+                wrapper_cell = wrapper_cell_type(cell_name, cell, context=self.handler.net_config, cfg=layer_policy)
+                logger.info(f"Replacing {cell_name} with cell {wrapper_cell_type}.")
+                return wrapper_cell, True
+
+        Replacer(self).process(decoder_layer, decoder_layer_name)
+
+    def _compute_smooth_scale(self, **kwargs):
+        """_compute_smooth_scale"""
+        decoder_layer_name = kwargs.get('decoder_layer_name', None)
+        if decoder_layer_name is None:
+            raise ValueError("OSLSmoother: when compute smooth scale decoder_layer_name is required.")
+        decoder_layer = kwargs.get('decoder_layer', None)
+        if decoder_layer is None:
+            raise ValueError("OSLSmoother: when compute smooth scale decoder_layer is required.")
+        layer_info = kwargs.get('layer_info', None)
+        if layer_info is None:
+            raise ValueError("OSLSmoother: when compute smooth scale layer_info is required.")
+        search_inputs = kwargs.get('search_inputs', None)
+        if search_inputs is None:
+            raise ValueError("OSLSmoother: when compute smooth scale search_inputs is required.")
+        num_attention_heads = kwargs.get('num_attention_heads', None)
+        if num_attention_heads is None:
+            raise ValueError("OSLSmoother: when compute smooth scale num_attention_heads is required.")
+        num_key_value_heads = kwargs.get('num_key_value_heads', None)
+        if num_key_value_heads is None:
+            raise ValueError("OSLSmoother: when compute smooth scale num_key_value_heads is required.")
+        best_scale, _ = self._search_best_ratio(decoder_layer_name,
+                                                decoder_layer,
+                                                layer_info,
+                                                search_inputs,
+                                                num_attention_heads,
+                                                num_key_value_heads)
+        return best_scale
+
+    def _get_weight_stats(self, layer_info, num_attention_heads, num_key_value_heads):
+        """_get_weight_stats"""
+        # get current layers weight concat
+        weight = []
+        for layer in layer_info.curr_layer:
+            weight.append(layer.layer.weight)
+        weight = msops.concat(weight, axis=0)
+
+        layer_policy = self.get_layer_policy(layer_info.curr_layer[0].layer_name)
+        group_size = layer_policy.group_size
+        org_shape = weight.shape
+        if group_size > 0:
+            weight = weight.reshape(-1, group_size)
+        w_max = msops.max(msops.abs(weight), -1, keepdims=True)[0] + 1e-6
+        weight = msops.abs(weight) / w_max.reshape(-1, 1)
+        weight = weight.reshape(org_shape)
+
+        if self.is_gqa_wo_layer:
+            w_mean = self._get_weight_stats_for_gqa(weight, num_attention_heads, num_key_value_heads)
+        else:
+            w_mean = msops.mean(weight, axis=0)
+
+        logger.info(f"AWQSmoother: weight_mean of Layer({layer_info.curr_layer[0].layer_name}) "
+                    f"is {{{w_mean.shape}, {w_mean.dtype}}}")
+        return w_mean
+
+    def _get_act_stats(self, layer_info, num_attention_heads, num_key_value_heads):
+        """_get_act_stats"""
+        act = layer_info.curr_layer[0].cat_samples
+
+        if self.is_gqa_wo_layer:
+            x_mean = self._get_act_stats_for_gqa(act, num_attention_heads, num_key_value_heads)
+        else:
+            x_mean = msops.mean(msops.abs(act), axis=0)
+        logger.info(f"AWQSmoother: act_mean of Layer({layer_info.curr_layer[0].layer_name}) "
+                    f"is {{{x_mean.shape}, {x_mean.dtype}}}")
+        return x_mean
+
+    def _get_weight_stats_for_gqa(self, weight, num_attention_heads, num_key_value_heads):
+        """_get_weight_stats_for_gqa"""
+        num_groups = num_attention_heads // num_key_value_heads
+        weight = weight.reshape(weight.shape[0], num_key_value_heads, num_groups, -1)
+
+        w_mean = msops.mean(msops.mean(weight, axis=0), axis=1).reshape(-1,)
+        return w_mean
+
+    def _get_act_stats_for_gqa(self, act, num_attention_heads, num_key_value_heads):
+        """_get_act_stats_for_gqa"""
+        num_groups = num_attention_heads // num_key_value_heads
+        act = act.reshape(act.shape[0], num_key_value_heads, num_groups, -1)
+
+        x_mean = msops.mean(msops.mean(msops.abs(act), axis=0), axis=1).reshape(-1,)
+        return x_mean
+
+    # pylint: disable=arguments-differ
+    def _calculate_smooth_scale(self, act_stats, weight_stats, ratio,
+                                num_attention_heads, num_key_value_heads, layer_info):
+        """_calculate_smooth_scale"""
+        layer_policy = self.get_layer_policy(layer_info.curr_layer[0].layer_name)
+        is_duo_scaling = layer_policy.algo_args.get("duo_scaling", True)
+        if is_duo_scaling:
+            x_pow = msops.pow(act_stats, ratio)
+            w_pow = msops.pow(weight_stats, 1 - ratio) + 1e-4
+            smooth_scale = (x_pow / w_pow).clamp(min=1e-4)
+        else:
+            smooth_scale = msops.pow(act_stats, ratio).clamp(1e-4).reshape(-1)
+
+        smooth_scale[msops.isnan(smooth_scale.astype(msdtype.float32))] = 1
+        minmax_norm = msops.sqrt(msops.max(smooth_scale)[0] * msops.min(smooth_scale)[0])
+        smooth_scale = smooth_scale / minmax_norm
+        smooth_scale[act_stats == 0] = 1
+        smooth_scale[weight_stats == 0] = 1
+
+        if self.is_gqa_wo_layer:
+            smooth_scale = self._expand_scales_for_gqa_curr_layer(smooth_scale,
+                                                                  num_attention_heads,
+                                                                  num_key_value_heads)
+        return smooth_scale
+
+    def _search_best_ratio(self, decoder_layer_name, decoder_layer, layer_info, search_inputs,
+                           num_attention_heads, num_key_value_heads):
+        """_search_best_ratio"""
+        fp_output = self._module_forward(decoder_layer, search_inputs)
+        layer_policy = self.get_layer_policy(decoder_layer_name)
+        smooth_alpha = layer_policy.algo_args.get('smooth_alpha', [i/20 for i in range(20)])
+        # when GQA with o_proj layer, need expand smooth scale for curr_layer
+
+        history = []
+        best_ratio = -1
+        best_scale = 0
+        best_error = float("inf")
+        for ratio in smooth_alpha:
+            scales = self._calculate_smooth_scale(self.act_stats,
+                                                  self.weight_stats,
+                                                  ratio,
+                                                  num_attention_heads,
+                                                  num_key_value_heads,
+                                                  layer_info)
+            for layer in layer_info.curr_layer:
+                layer.quant_forward = True
+                layer.set_smooth_scale(scales)
+            # calculate pseudo output
+            pseudo_output = self._module_forward(decoder_layer, search_inputs)
+            for layer in layer_info.curr_layer:
+                layer.quant_forward = False
+            loss = self._loss(pseudo_output, fp_output)
+            logger.info(f"AWQSmoother: search scale alpha {ratio}, "
+                        f"scale loss of Layer({decoder_layer_name}): {loss}")
+            history.append(loss)
+            if loss < best_error:
+                best_error = loss
+                best_ratio = ratio
+                best_scale = scales
+        if isinstance(best_scale, Tensor):
+            logger.info(f"AWQSmoother: best scale alpha {best_ratio}, "
+                        f"best_scale of Layer({decoder_layer_name}) "
+                        f"is {{{best_scale.shape}, {best_scale.dtype}}}")
+        else:
+            logger.info(f"AWQSmoother: best scale alpha {best_ratio}, "
                         f"best_scale of Layer({decoder_layer_name}): {best_scale}")
         if best_ratio == -1:
             raise ValueError(f"best_ratio=-1 is not correct, please check history of loss: {history}.")

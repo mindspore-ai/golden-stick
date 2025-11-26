@@ -15,5 +15,6 @@
 """MindFormers algorithm modules."""
 
 from .anti_outliers import LinearSmoothQuant, LinearAutoSmoother
+from .clipper import LinearClipper
 
-__all__ = ["LinearSmoothQuant", "LinearAutoSmoother"]
+__all__ = ["LinearSmoothQuant", "LinearAutoSmoother", "LinearClipper"]

@@ -74,6 +74,9 @@ class MindOneModelHubPlugin(ModelHubPlugin):
 
         from mindspore_gs.ptq.quant_cells.mindone.linear_smooth_wrappers import SmoothQuantLinearCell
         from mindspore_gs.ptq.quant_cells.mindone.linear_smooth_wrappers import OSLSmoothQuantLinearCell
+        from mindspore_gs.ptq.quant_cells.mindone.linear_smooth_wrappers import AWQSmoothQuantLinearCell
+
+        from mindspore_gs.ptq.quant_cells.mindone.linear_clip_wrappers import ClipLinearCell
 
         from mindspore_gs.ptq.quant_cells.mindone.fake_quant_linear import FakeQuantA16WxWrapper
         from mindspore_gs.ptq.quant_cells.mindone.fake_quant_linear import FakeQuantW8A8Wrapper
@@ -85,6 +88,9 @@ class MindOneModelHubPlugin(ModelHubPlugin):
 
         SmoothQuantLinearCell.reg_self()
         OSLSmoothQuantLinearCell.reg_self()
+        AWQSmoothQuantLinearCell.reg_self()
+
+        ClipLinearCell.reg_self()
 
         FakeQuantA16WxWrapper.reg_self()
         FakeQuantW8A8Wrapper.reg_self()
@@ -96,12 +102,15 @@ class MindOneModelHubPlugin(ModelHubPlugin):
         This method is currently not implemented for MindOne models as
         they use the same algorithm modules as MindFormers models.
         """
-        from mindspore_gs.ptq.algo_modules.mindone.anti_outliers import SmoothQuantSmoother, OSLSmoother
-        from mindspore_gs.ptq.algo_modules.clipper import LinearClipper
+        from mindspore_gs.ptq.algo_modules.mindone.anti_outliers import (SmoothQuantSmoother,
+                                                                         OSLSmoother,
+                                                                         AWQSmoother)
+        from mindspore_gs.ptq.algo_modules.mindone.clipper import LinearClipper
         from mindspore_gs.ptq.algo_modules.quantizer import Quantizer
 
         SmoothQuantSmoother.reg_self()
         OSLSmoother.reg_self()
+        AWQSmoother.reg_self()
         LinearClipper.reg_self()
         Quantizer.reg_self()
 

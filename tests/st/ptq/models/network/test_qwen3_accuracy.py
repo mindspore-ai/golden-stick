@@ -75,13 +75,16 @@ class Qwen3PTQTester:
                             act_quant_dtype=msdtype.int8,
                             act_quant_granularity=QuantGranularity.PER_TOKEN,
                             opname_blacklist=["lm_head."])
-        a16w8 = PTQConfig(mode=mode, backend=backend,
-                          weight_quant_dtype=msdtype.int8,
-                          opname_blacklist=["lm_head."])
+        awq_a16w4 = PTQConfig(mode=mode, backend=backend,
+                              weight_quant_dtype=msdtype.qint4x2,
+                              group_size=128,
+                              outliers_suppression= OutliersSuppressionType.AWQ,
+                              weight_quant_granularity=QuantGranularity.PER_GROUP,
+                              opname_blacklist=["lm_head."])
         layer_policies = OrderedDict({r'.*\.self_attn*': cfg,
                                       r'.*\.mlp\.gate_proj.*': a8dynw8,
                                       r'.*\.mlp\.up_proj.*': a8dynw8,
-                                      r'.*\.mlp\.down_proj.*': a16w8,
+                                      r'.*\.mlp\.down_proj.*': awq_a16w4,
                                       'not match': cfg})
         return cfg, layer_policies
 
@@ -220,7 +223,7 @@ class Qwen3PTQTester:
             'model.layers.0.self_attn.o_proj.weight': QuantType.W8A8.value,
             'model.layers.0.mlp.gate_proj.weight': QuantType.W8A8_DYNAMIC.value,
             'model.layers.0.mlp.up_proj.weight': QuantType.W8A8_DYNAMIC.value,
-            'model.layers.0.mlp.down_proj.weight': QuantType.W8A16.value,
+            'model.layers.0.mlp.down_proj.weight': QuantType.W4A16.value,
         }
         for name, value in check_map.items():
             if not check(name, value):
@@ -230,7 +233,7 @@ class Qwen3PTQTester:
 
     def get_ds_acc_threshold(self) -> Optional[float]:
         """Get accuracy threshold for distributed training"""
-        return 0.53
+        return 0.54
 
 
 def run_qwen3_accuracy():

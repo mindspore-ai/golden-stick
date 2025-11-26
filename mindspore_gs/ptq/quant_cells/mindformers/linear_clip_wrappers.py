@@ -32,7 +32,7 @@ from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.algo_modules import LinearClipper
+from mindspore_gs.ptq.algo_modules.mindformers import LinearClipper
 from mindspore_gs.ptq.quant_cells.quant_cell import Checker
 from mindspore_gs.ptq.basic_functions.basic_quant_func import quant_tensor
 from mindspore_gs.ptq.ptq.hal import ParallelType

@@ -14,6 +14,7 @@
 # ============================================================================
 """MindOne algorithm modules."""
 
-from .anti_outliers import SmoothQuantSmoother, OSLSmoother
+from .anti_outliers import SmoothQuantSmoother, OSLSmoother, AWQSmoother
+from .clipper import LinearClipper
 
-__all__ = ["SmoothQuantSmoother", "OSLSmoother"]
+__all__ = ["SmoothQuantSmoother", "OSLSmoother", "AWQSmoother", "LinearClipper"]
