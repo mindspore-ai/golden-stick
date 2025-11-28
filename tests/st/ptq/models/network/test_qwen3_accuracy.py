@@ -33,7 +33,7 @@ from transformers import AutoTokenizer
 # pylint: disable=wrong-import-position
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq import (PTQConfig, PTQMode)
-from mindspore_gs.ptq.ptq_config import OutliersSuppressionType
+from mindspore_gs.ptq.ptq_config import OutliersSuppressionType, QuantGranularity
 from mindspore_gs.ptq.models import AutoQuantForCausalLM
 from mindspore_gs.ptq.utils import QuantType
 
@@ -70,11 +70,18 @@ class Qwen3PTQTester:
                             act_quant_dtype=msdtype.int8,
                             outliers_suppression= OutliersSuppressionType.SMOOTH,
                             opname_blacklist=["lm_head."])
+        a8dynw8 = PTQConfig(mode=mode, backend=backend,
+                            weight_quant_dtype=msdtype.int8,
+                            act_quant_dtype=msdtype.int8,
+                            act_quant_granularity=QuantGranularity.PER_TOKEN,
+                            opname_blacklist=["lm_head."])
         a16w8 = PTQConfig(mode=mode, backend=backend,
                           weight_quant_dtype=msdtype.int8,
                           opname_blacklist=["lm_head."])
         layer_policies = OrderedDict({r'.*\.self_attn*': cfg,
-                                      r'.*\.mlp.*': a16w8,
+                                      r'.*\.mlp\.gate_proj.*': a8dynw8,
+                                      r'.*\.mlp\.up_proj.*': a8dynw8,
+                                      r'.*\.mlp\.down_proj.*': a16w8,
                                       'not match': cfg})
         return cfg, layer_policies
 
@@ -211,7 +218,9 @@ class Qwen3PTQTester:
             'model.layers.0.self_attn.k_proj.input_scale': QuantType.W8A8.value,
             'model.layers.0.self_attn.v_proj.weight_offset': QuantType.W8A8.value,
             'model.layers.0.self_attn.o_proj.weight': QuantType.W8A8.value,
-            'model.layers.0.mlp.gate_proj.weight': QuantType.W8A16.value,
+            'model.layers.0.mlp.gate_proj.weight': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.0.mlp.up_proj.weight': QuantType.W8A8_DYNAMIC.value,
+            'model.layers.0.mlp.down_proj.weight': QuantType.W8A16.value,
         }
         for name, value in check_map.items():
             if not check(name, value):
@@ -221,7 +230,7 @@ class Qwen3PTQTester:
 
     def get_ds_acc_threshold(self) -> Optional[float]:
         """Get accuracy threshold for distributed training"""
-        return 0.49
+        return 0.53
 
 
 def run_qwen3_accuracy():
