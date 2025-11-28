@@ -62,18 +62,24 @@ class ClipLinearCell(WrapperLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            LinearClipper.reg_layer_map(TC2ColumnParallelLinear, ClipLinearCell, AutoClipChecker())
-            LinearClipper.reg_layer_map(TC2RowParallelLinear, ClipLinearCell, AutoClipChecker())
-            LinearClipper.reg_layer_map(LlamaColumnParallelLinear, ClipLinearCell, AutoClipChecker())
-            LinearClipper.reg_layer_map(LlamaRowParallelLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(DSColumnParallelLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(DSRowParallelLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(ColumnParallelGroupLinear, ClipLinearCell, AutoClipChecker())
             LinearClipper.reg_layer_map(RowParallelGroupLinear, ClipLinearCell, AutoClipChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearClipper.reg_layer_map(LlamaColumnParallelLinear, ClipLinearCell, AutoClipChecker())
+            LinearClipper.reg_layer_map(LlamaRowParallelLinear, ClipLinearCell, AutoClipChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            LinearClipper.reg_layer_map(TC2ColumnParallelLinear, ClipLinearCell, AutoClipChecker())
+            LinearClipper.reg_layer_map(TC2RowParallelLinear, ClipLinearCell, AutoClipChecker())
         except ImportError:
             pass
 
@@ -94,17 +100,23 @@ class ClipLinearCell(WrapperLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
+            type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
+            type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
+        except ImportError:
+            pass
+        try:
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
+        except ImportError:
+            pass
+        try:
             from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
             from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
             type_map[TC2ColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
-            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
             type_map[TC2RowParallelLinear] = ParallelType.ROW_PARALLEL
         except ImportError:
             pass
@@ -239,7 +251,7 @@ class ClipLinearCell(WrapperLinearCell):
 
     def process(self):
         """process"""
-        super(ClipLinearCell, self).process()
+        super().process()
         org_shape = self._layer.weight.shape
         if len(org_shape) == 3:
             if self._transpose_b():
