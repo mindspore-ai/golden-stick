@@ -69,18 +69,24 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            Quantizer.reg_layer_map(TC2ColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(TC2RowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(LlamaColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(LlamaRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(DSRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            Quantizer.reg_layer_map(LlamaColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(LlamaRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            Quantizer.reg_layer_map(TC2ColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(TC2RowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
 
