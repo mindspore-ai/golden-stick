@@ -14,24 +14,24 @@
 # ============================================================================
 
 """
-GLM4v Quantized Model Implementation
+Qwen3 Quantized Model Implementation
 """
 
 import mindspore as ms
-from mindone.transformers import Glm4vForConditionalGeneration
+from mindone.transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
 
 from mindspore_gs.ptq.models.mindone_models.mindone_model import MindOneModel, SmoothLayerInfo
 
 
-@MindOneModel.reg_model('glm4v')
-class GLM4v(MindOneModel):
-    """GLM4v Quantized Model Implementation
-    """
+@MindOneModel.reg_model('qwen3')
+class Qwen3(MindOneModel):
+    """Qwen3 Quantized Model Implementation"""
     def __init__(self, model_path):
-        self.network = Glm4vForConditionalGeneration.from_pretrained(
+        self.network = Qwen3ForCausalLM.from_pretrained(
             model_path,
             mindspore_dtype=ms.bfloat16,
             _attn_implementation="flash_attention_2",
+            use_cache=False,
             )
         self._original_sf_path = model_path
         self.num_attention_heads, self.num_key_value_heads = self._get_gqa_info(model_path)
@@ -45,9 +45,9 @@ class GLM4v(MindOneModel):
             layer (Cell): The layer to get layers for search.
         
         Returns:
-            list[SmoothLayerInfo]. List of layers for search. Each layer is a SmoothLayerInfo with the following keys:
+            list[dict]. List of layers for search. Each layer is a dictionary with the following keys:
                 - prev_layer (Cell): The layer before the current layer.
-                - curr_layer (List[Cell]): The current layer.
+                - curr_layer (Cell): The current layer.
         """
         layers_info = []
         # attention
@@ -70,13 +70,14 @@ class GLM4v(MindOneModel):
         layers_info.append(
             SmoothLayerInfo(
                 prev_layer=decoder_layer.post_attention_layernorm,
-                curr_layer=[decoder_layer.mlp.gate_up_proj],
+                curr_layer=[decoder_layer.mlp.gate_proj,
+                            decoder_layer.mlp.up_proj],
             )
         )
 
         layers_info.append(
             SmoothLayerInfo(
-                prev_layer=decoder_layer.mlp.gate_up_proj,
+                prev_layer=decoder_layer.mlp.up_proj,
                 curr_layer=[decoder_layer.mlp.down_proj],
             )
         )
@@ -86,7 +87,7 @@ class GLM4v(MindOneModel):
     def forward(self, inputs, max_new_tokens=1):
         """Perform forward pass through the model.
 
-        This method delegates to the underlying MindOne network's
+        This method delegates to the underlying Mindone network's
         generate method for inference.
 
         Args:
@@ -99,8 +100,8 @@ class GLM4v(MindOneModel):
         """
         return self.network.generate(**inputs,
                                      max_new_tokens=max_new_tokens,
-                                     do_sample=False,
-                                     use_cache=False)
+                                     use_cache=False,
+                                     do_sample=False)
 
     def _network(self):
         """Get the underlying network instance.
@@ -119,5 +120,5 @@ class GLM4v(MindOneModel):
         Returns:
             tuple[type]. Tuple containing TransformerLayer type.
         """
-        from mindone.transformers.models.glm4v.modeling_glm4v import Glm4vTextDecoderLayer
-        return [Glm4vTextDecoderLayer]
+        from mindone.transformers.models.qwen3.modeling_qwen3  import Qwen3DecoderLayer
+        return [Qwen3DecoderLayer]

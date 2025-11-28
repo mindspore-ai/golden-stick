@@ -53,7 +53,7 @@ class DummyQuantModel(MindOneModel):
         """Return mock forward result."""
         return {"output": "mock_output"}
 
-    def get_description_file(self):
+    def _get_description_file(self):
         """Return mock quantization description."""
         return {
             "layer.0.weight": "W8A8",

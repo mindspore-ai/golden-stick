@@ -70,7 +70,7 @@ mindspore_gs.ptq.BaseQuantForCausalLM
         异常：
             - **NotImplementedError** - 子类必须实现此方法。
 
-    .. py:method:: save_quantized(save_path)
+    .. py:method:: save_quantized(save_path, backend=BackendTarget.ASCEND)
 
         保存量化模型到磁盘。
 
@@ -78,6 +78,7 @@ mindspore_gs.ptq.BaseQuantForCausalLM
 
         参数：
             - **save_path** (str) - 应保存量化模型的路径。
+            - **backend** (BackendTarget, 可选) - 指定保存模型的后端目标，默认为 ``BackendTarget.ASCEND``。
 
         异常：
             - **NotImplementedError** - 子类必须实现此方法。

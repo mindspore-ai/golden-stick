@@ -27,6 +27,7 @@ from mindspore_gs.ptq.models.mindformers_models.param_processor import (
     MLAParamProcessor, MoeParamProcessor, FFNParamProcessor)
 from mindspore_gs.ptq.utils import QuantType
 from mindspore_gs.common import logger
+from mindspore_gs.common import BackendTarget
 
 
 @MFModel.reg_model('deepseek_v3')
@@ -130,7 +131,7 @@ class DeepSeekV3(MFModelEnableSafeTensors):
         process(network, 'network')
         return results
 
-    def get_description_file(self, network):
+    def _get_description_file(self, network):
         """
         Obtain the description of quantization type for each parameter in each layer of the network.
         Such as W8A8 or W8A8_DYNAMIC.
@@ -144,8 +145,11 @@ class DeepSeekV3(MFModelEnableSafeTensors):
         desc_info = dict((key, quant_types.get(key, QuantType.FLOAT.value)) for key in param_dict)
         return desc_info
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
         """save_pretrained"""
+        if backend != BackendTarget.ASCEND:
+            raise ValueError("Only support save quantized model for ASCEND backend "
+                             "when not enable SafeTensors format in mindformers models.")
         _ = self._save_desc_json(save_path)
         self._save_safetenors(save_path)
 
@@ -169,7 +173,7 @@ class DeepSeekV3(MFModelEnableSafeTensors):
         """_save_desc_json"""
         start = time.time()
         logger.info("Saving describle json file...", flush=True)
-        desc_info = self.get_description_file(self._network())
+        desc_info = self._get_description_file(self._network())
         save_json_path = os.path.join(save_path, "quantization_description.json")
         os.makedirs(save_path, exist_ok=True)
         with open(save_json_path, "w", encoding="utf-8") as f:

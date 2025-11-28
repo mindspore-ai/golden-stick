@@ -60,7 +60,7 @@ class Telechat2(MFModelEnableSafeTensors):
         process(network, 'network')
         return results
 
-    def get_description_file(self, network):
+    def _get_description_file(self, network):
         """
         Obtain the description of quantization type for each parameter in each layer of the network.
         Such as W8A8 or W4A8_DYNAMIC

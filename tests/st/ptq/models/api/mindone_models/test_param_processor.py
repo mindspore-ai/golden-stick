@@ -59,9 +59,9 @@ class TestParamProcessor:
         Description: Test deploy method with BackendTarget.NONE.
         Expectation: Should return original param_dict without modification.
         """
-        processor = ParamProcessor(BackendTarget.NONE, self.sample_quant_desc)
+        processor = ParamProcessor(BackendTarget.NONE)
 
-        result = processor.deploy(self.sample_param_dict)
+        result = processor.process_param_dict(self.sample_param_dict, self.sample_quant_desc)
 
         # Should return the same dictionary (reference equality)
         assert result is self.sample_param_dict
@@ -80,10 +80,10 @@ class TestParamProcessor:
         # Create a mock unsupported backend
         unsupported_backend = MagicMock()
 
-        processor = ParamProcessor(unsupported_backend, self.sample_quant_desc)
+        processor = ParamProcessor(unsupported_backend)
 
         with pytest.raises(ValueError, match="Unsupported backend"):
-            processor.deploy(self.sample_param_dict)
+            processor.process_param_dict(self.sample_param_dict, self.sample_quant_desc)
 
     @pytest.mark.level0
     @pytest.mark.platform_arm_ascend910b_training
@@ -94,14 +94,14 @@ class TestParamProcessor:
         Description: Test deploy method processes W4Ax quantized weight parameters.
         Expectation: Should process weight parameters ending with .weight.
         """
-        processor = ParamProcessor(BackendTarget.ASCEND, self.sample_quant_desc)
-        result = processor.deploy(self.sample_param_dict)
+        processor = ParamProcessor(BackendTarget.ASCEND)
+        result = processor.process_param_dict(self.sample_param_dict, self.sample_quant_desc)
 
         # Verify result is modified
         layer_0_weight = result["layer.0.weight"]
         assert isinstance(layer_0_weight, Parameter)
         assert layer_0_weight.dtype == dtype.qint4x2
-        assert layer_0_weight.shape == (1, 2)
+        assert layer_0_weight.shape == (2, 1)
 
         layer_0_weight_scale = result["layer.0.weight_scale"]
         assert isinstance(layer_0_weight_scale, Parameter)
@@ -116,4 +116,61 @@ class TestParamProcessor:
         layer_2_weight = result["layer.2.weight"]
         assert isinstance(layer_2_weight, Parameter)
         assert layer_2_weight.dtype == dtype.qint4x2
-        assert layer_2_weight.shape == (1, 2)
+        assert layer_2_weight.shape == (2, 1)
+
+    @pytest.mark.level0
+    @pytest.mark.platform_arm_ascend910b_training
+    @pytest.mark.env_onecard
+    def test_static_a8wx_process_param(self):
+        """
+        Feature: StaticA8WXParamProcessor process_param.
+        Description: Test process_param method processes all required parameters.
+        Expectation: Should call all processing methods and update param_dict correctly.
+        """
+        param_dict = {
+            "layer.0.input_scale": Parameter(Tensor(np.array([0.1]), dtype=dtype.float32)),
+            "layer.0.input_offset": Parameter(Tensor(np.array([1]), dtype=dtype.int8)),
+            "layer.0.weight": Parameter(Tensor(np.array([[1, 2], [3, 4]]), dtype=dtype.int8)),
+            "layer.0.weight_scale": Parameter(Tensor(np.array([0.3, 0.4]), dtype=dtype.float32)),
+            "layer.0.weight_offset": Parameter(Tensor(np.array([0.5, 0.6]), dtype=dtype.int8)),
+        }
+
+        quant_desc = {
+            "layer.0.weight": QuantType.W8A8.value,
+            "layer.0.input_scale": QuantType.W8A8.value,
+            "layer.0.input_offset": QuantType.W8A8.value,
+            "layer.0.weight_scale": QuantType.W8A8.value,
+            "layer.0.weight_offset": QuantType.W8A8.value,
+        }
+        processor = ParamProcessor(BackendTarget.ASCEND)
+        param_dict = processor.process_param_dict(param_dict, quant_desc)
+        quant_desc = processor.process_param_desc(quant_desc)
+
+        # Check that deq_scale and quant_bias is computed
+        assert "layer.0.deq_scale" in param_dict
+        assert "layer.0.quant_bias" in param_dict
+
+        assert "layer.0.deq_scale" in quant_desc
+        assert "layer.0.quant_bias" in quant_desc
+        assert quant_desc["layer.0.deq_scale"] == QuantType.W8A8.value
+        assert quant_desc["layer.0.quant_bias"] == QuantType.W8A8.value
+
+        # check deq_scale
+        assert isinstance(param_dict["layer.0.deq_scale"], Parameter)
+        assert param_dict["layer.0.deq_scale"].dtype == dtype.float32
+        expected_deq_scale = np.array([0.1 * 0.3, 0.1 * 0.4])
+        assert np.allclose(param_dict["layer.0.deq_scale"].asnumpy(), expected_deq_scale)
+
+        # check quant_bias
+        assert isinstance(param_dict["layer.0.quant_bias"], Parameter)
+        assert param_dict["layer.0.quant_bias"].dtype == dtype.int32
+        expected_quant_bias = [-3, -7]
+        assert np.allclose(param_dict["layer.0.quant_bias"].asnumpy(), expected_quant_bias)
+
+        # check input_scale and input_offset
+        assert isinstance(param_dict["layer.0.input_scale"], Parameter)
+        assert param_dict["layer.0.input_scale"].dtype == dtype.float32
+        assert isinstance(param_dict["layer.0.input_offset"], Parameter)
+        assert param_dict["layer.0.input_offset"].dtype == dtype.int8
+        assert param_dict["layer.0.input_scale"].shape == (2,)
+        assert param_dict["layer.0.input_offset"].shape == (2,)

@@ -91,7 +91,7 @@ class LinearSmoother(AlgoModule):
             weight_max = msops.maximum(msops.abs(msops.max(weight, 0)[0]),
                                        msops.abs(msops.min(weight, 0)[0]))
 
-        logger.info(f"OSLSmoother: weight_max of Layer({layer_info.curr_layer[0].layer_name}) "
+        logger.info(f"weight_max of Layer({layer_info.curr_layer[0].layer_name}) "
                     f"is {{{weight_max.shape}, {weight_max.dtype}}}")
         return weight_max
 
@@ -106,7 +106,7 @@ class LinearSmoother(AlgoModule):
                 msops.abs(msops.max(act, 0)[0]),
                 msops.abs(msops.min(act, 0)[0]),
             )
-        logger.info(f"OSLSmoother: act_max of Layer({layer_info.curr_layer[0].layer_name}) "
+        logger.info(f"act_max of Layer({layer_info.curr_layer[0].layer_name}) "
                     f"is {{{act_max.shape}, {act_max.dtype}}}")
         return act_max
 

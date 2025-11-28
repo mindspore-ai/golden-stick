@@ -14,8 +14,7 @@
 # ============================================================================
 """ptq wrapper cells for mindone."""
 
-import numpy as np
-
+from mindspore import mint
 from mindspore import nn, Parameter, Tensor, dtype
 from mindspore import ops as msops
 
@@ -41,6 +40,7 @@ class AllQuantLinearCell(WeightQuantLinearCell):
                        config.act_quant_granularity is QuantGranularity.PER_TENSOR
 
         Quantizer.reg_layer_map(nn.Dense, AllQuantLinearCell, A8W8Checker())
+        Quantizer.reg_layer_map(mint.nn.Linear, AllQuantLinearCell, A8W8Checker())
 
     def __init__(self, linear_name, linear, context, cfg: InnerPTQConfig, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
@@ -66,18 +66,9 @@ class AllQuantLinearCell(WeightQuantLinearCell):
         self.input_scale = Parameter(Tensor(x_scale, self.compute_type))
         self.input_offset = Parameter(Tensor(x_zp, dtype=dtype.int32))
 
-        self.deq_scale = Parameter(Tensor(self._get_dequant_scale(self.input_scale.asnumpy(),
-                                                                  self.weight_scale.asnumpy()),
-                                                                  dtype=self.compute_type))
-
         self.cfg.dumper.dump_data(self.layer_name, "|activation_params|input0_activation_inputs", self.cat_samples)
         self.cfg.dumper.dump_data(self.layer_name, "|activation_params|output0_activation_scale", x_scale)
         self.cfg.dumper.dump_data(self.layer_name, "|activation_params|output1_activation_zp", x_zp)
-
-    def _get_dequant_scale(self, input_scale, weight_scale):
-        """_get_dequant_scale"""
-        dequant_scale = input_scale.astype(np.float32) * weight_scale.astype(np.float32)
-        return dequant_scale
 
     def quant_type_dict(self):
         """quant_type_dict"""
@@ -87,7 +78,6 @@ class AllQuantLinearCell(WeightQuantLinearCell):
             self.weight.name: QuantType.W8A8.value,
             self.input_scale.name: QuantType.W8A8.value,
             self.input_offset.name: QuantType.W8A8.value,
-            self.deq_scale.name: QuantType.W8A8.value,
         }
         if self.has_bias:
             quant_type.update({self.bias.name: QuantType.W8A8.value})

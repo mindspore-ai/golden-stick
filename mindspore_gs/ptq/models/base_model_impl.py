@@ -47,6 +47,7 @@ Examples:
 
 import os
 from mindspore_gs.common import logger
+from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.basic_functions.distributed_parameter import DistributedParameter
 from .base_model import BaseQuantForCausalLM
 
@@ -119,7 +120,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
         """
         raise NotImplementedError
 
-    def save_quantized(self, save_path):
+    def save_quantized(self, save_path, backend=BackendTarget.ASCEND):
         """Save the quantized model to disk.
 
         This is an abstract method that must be implemented by derived classes.
@@ -127,6 +128,8 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
 
         Args:
             save_path (str): Path where the quantized model should be saved.
+            backend (BackendTarget, optional): Target backend for the saved model.
+                Defaults to ``BackendTarget.ASCEND``.
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.
@@ -161,7 +164,7 @@ class BaseQuantForCausalLMImpl(BaseQuantForCausalLM):
                 return f"{'0' * (length - 1)}{index}"
         raise RuntimeError(f"index should be smaller than {10^length}, but got {index}.")
 
-    def get_description_file(self, network):
+    def _get_description_file(self, network):
         """Obtain the description of quantization type for each parameter.
 
         This method generates a description file that maps each network

@@ -168,7 +168,7 @@ class GLM4vPTQTester:
         model.calibrate(cfg, layers_policy, datasets=ds)
 
         print(f"Save quantized model to {self.output_dir}")
-        model.save_quantized(self.output_dir)
+        model.save_quantized(self.output_dir, backend=BackendTarget.NONE)
 
     def evaluate_model(self):
         """Evaluate quantized GLM4v model"""
