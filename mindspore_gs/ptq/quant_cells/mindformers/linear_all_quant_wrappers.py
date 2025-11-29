@@ -66,18 +66,24 @@ class AllQuantLinearCell(WeightQuantLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            Quantizer.reg_layer_map(TC2ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
-            Quantizer.reg_layer_map(TC2RowParallelLinear, AllQuantLinearCell, A8W8Checker())
-            Quantizer.reg_layer_map(LlamaColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
-            Quantizer.reg_layer_map(LlamaRowParallelLinear, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(DSRowParallelLinear, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, AllQuantLinearCell, A8W8Checker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            Quantizer.reg_layer_map(LlamaColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(LlamaRowParallelLinear, AllQuantLinearCell, A8W8Checker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            Quantizer.reg_layer_map(TC2ColumnParallelLinear, AllQuantLinearCell, A8W8Checker())
+            Quantizer.reg_layer_map(TC2RowParallelLinear, AllQuantLinearCell, A8W8Checker())
         except ImportError:
             pass
 

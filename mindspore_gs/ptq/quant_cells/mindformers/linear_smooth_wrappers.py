@@ -72,17 +72,23 @@ class SmoothLinearCell(WrapperLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
+            type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
+            type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
+        except ImportError:
+            pass
+        try:
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
+        except ImportError:
+            pass
+        try:
             from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
             from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
             type_map[TC2ColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
-            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
             type_map[TC2RowParallelLinear] = ParallelType.ROW_PARALLEL
         except ImportError:
             pass
@@ -324,18 +330,24 @@ class AWQLinearCell(SmoothLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            LinearSmoothQuant.reg_layer_map(TC2ColumnParallelLinear, AWQLinearCell, AWQChecker())
-            LinearSmoothQuant.reg_layer_map(TC2RowParallelLinear, AWQLinearCell, AWQChecker())
-            LinearSmoothQuant.reg_layer_map(LlamaColumnParallelLinear, AWQLinearCell, AWQChecker())
-            LinearSmoothQuant.reg_layer_map(LlamaRowParallelLinear, AWQLinearCell, AWQChecker())
             LinearSmoothQuant.reg_layer_map(DSColumnParallelLinear, AWQLinearCell, AWQChecker())
             LinearSmoothQuant.reg_layer_map(DSRowParallelLinear, AWQLinearCell, AWQChecker())
             LinearSmoothQuant.reg_layer_map(ColumnParallelGroupLinear, AWQLinearCell, AWQChecker())
             LinearSmoothQuant.reg_layer_map(RowParallelGroupLinear, AWQLinearCell, AWQChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearSmoothQuant.reg_layer_map(LlamaColumnParallelLinear, AWQLinearCell, AWQChecker())
+            LinearSmoothQuant.reg_layer_map(LlamaRowParallelLinear, AWQLinearCell, AWQChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            LinearSmoothQuant.reg_layer_map(TC2ColumnParallelLinear, AWQLinearCell, AWQChecker())
+            LinearSmoothQuant.reg_layer_map(TC2RowParallelLinear, AWQLinearCell, AWQChecker())
         except ImportError:
             pass
 
@@ -434,18 +446,6 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                             SearchOutlierSuppressionLiteChecker())
-            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                             SearchOutlierSuppressionLiteChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                             SearchOutlierSuppressionLiteChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
-                                             SearchOutlierSuppressionLiteChecker())
             LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
                                              SearchOutlierSuppressionLiteChecker())
             LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
@@ -454,6 +454,25 @@ class SearchOutlierSuppressionLiteLinearCell(SmoothQuantLinearCell):
                                              SearchOutlierSuppressionLiteChecker())
             LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, SearchOutlierSuppressionLiteLinearCell,
                                              SearchOutlierSuppressionLiteChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, SearchOutlierSuppressionLiteLinearCell,
+                                             SearchOutlierSuppressionLiteChecker())
+
         except ImportError:
             pass
 
@@ -707,18 +726,24 @@ class AWQSmoothLinearCell(AWQLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
             LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, AWQSmoothLinearCell, AWQSmoothChecker())
             LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, AWQSmoothLinearCell, AWQSmoothChecker())
         except ImportError:
             pass
 
@@ -970,18 +995,6 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                             OutlierSuppressionPlusSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                             OutlierSuppressionPlusSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                             OutlierSuppressionPlusSmoothChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
-                                             OutlierSuppressionPlusSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
                                              OutlierSuppressionPlusSmoothChecker())
             LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
@@ -989,6 +1002,24 @@ class OutlierSuppressionPlusSmoothLinearCell(SearchOutlierSuppressionLiteLinearC
             LinearAutoSmoother.reg_layer_map(ColumnParallelGroupLinear, OutlierSuppressionPlusSmoothLinearCell,
                                              OutlierSuppressionPlusSmoothChecker())
             LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
+                                             OutlierSuppressionPlusSmoothChecker())
+            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, OutlierSuppressionPlusSmoothLinearCell,
                                              OutlierSuppressionPlusSmoothChecker())
         except ImportError:
             pass
@@ -1227,18 +1258,6 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, OutlierSuppressionPlusLinearCell,
-                                             OutlierSuppressionPlusChecker())
-            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, OutlierSuppressionPlusLinearCell,
-                                             OutlierSuppressionPlusChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, OutlierSuppressionPlusLinearCell,
-                                             OutlierSuppressionPlusChecker())
-            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, OutlierSuppressionPlusLinearCell,
-                                             OutlierSuppressionPlusChecker())
             LinearAutoSmoother.reg_layer_map(DSColumnParallelLinear, OutlierSuppressionPlusLinearCell,
                                              OutlierSuppressionPlusChecker())
             LinearAutoSmoother.reg_layer_map(DSRowParallelLinear, OutlierSuppressionPlusLinearCell,
@@ -1247,6 +1266,25 @@ class OutlierSuppressionPlusLinearCell(AWQSmoothLinearCell):
                                              OutlierSuppressionPlusChecker())
             LinearAutoSmoother.reg_layer_map(RowParallelGroupLinear, OutlierSuppressionPlusLinearCell,
                                              OutlierSuppressionPlusChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            LinearAutoSmoother.reg_layer_map(LlamaColumnParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(LlamaRowParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            LinearAutoSmoother.reg_layer_map(TC2ColumnParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+            LinearAutoSmoother.reg_layer_map(TC2RowParallelLinear, OutlierSuppressionPlusLinearCell,
+                                             OutlierSuppressionPlusChecker())
+
         except ImportError:
             pass
 
