@@ -633,6 +633,207 @@ def test_ptq_config_param_conflict():
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
+def test_ptq_config_unsupported_granularity_combinations():
+    """
+    Feature: PTQConfig unsupported granularity combinations.
+    Description: Test unsupported granularity combination scenarios.
+    Expectation: Raise ValueError exception for unsupported combinations.
+    """
+    # ========== Unsupported A8W8 granularity combinations ==========
+
+    # A8W8-pertensor/pergroup not supported (A8W8 must use PER_CHANNEL for weight)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TENSOR,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64
+        )
+
+    # A8W8-pertensor/pergroup not supported (with SMOOTH)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TENSOR,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64,
+            outliers_suppression=OutliersSuppressionType.SMOOTH
+        )
+
+    # A8W8-pertensor/pergroup not supported (with AWQ)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TENSOR,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64,
+            outliers_suppression=OutliersSuppressionType.AWQ,
+            algo_args=AWQConfig()
+        )
+
+    # A8W8-pertoken/pergroup not supported (A8W8 must use PER_CHANNEL for weight)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TOKEN,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64
+        )
+
+    # A8W8-pertoken/pergroup not supported (with SMOOTH)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TOKEN,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64,
+            outliers_suppression=OutliersSuppressionType.SMOOTH
+        )
+
+    # A8W8-pertoken/pergroup not supported (with AWQ)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TOKEN,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64,
+            outliers_suppression=OutliersSuppressionType.AWQ,
+            algo_args=AWQConfig()
+        )
+
+    # Note: A8W8-pertensor/perchannel with AWQ and A8W8-pertoken/perchannel with AWQ
+    # are checked in PTQ class, not in PTQConfig constructor.
+    # These tests should be in test_ptq.py, not here.
+
+    # ========== A8W4 granularity combinations not supported ==========
+
+    # A8perchannelW4pergroup does not support GPTQ
+    with pytest.raises(ValueError):
+        gptq_config = GPTQQuantConfig(desc_act=True, static_groups=True)
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_CHANNEL,
+            weight_quant_dtype=msdtype.qint4x2,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64,
+            precision_recovery=PrecisionRecovery.GPTQ,
+            algo_args=gptq_config
+        )
+
+    # A8pergroupW4pergroup does not support GPTQ
+    with pytest.raises(ValueError):
+        gptq_config = GPTQQuantConfig(desc_act=True, static_groups=True)
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_GROUP,
+            weight_quant_dtype=msdtype.qint4x2,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64,
+            precision_recovery=PrecisionRecovery.GPTQ,
+            algo_args=gptq_config
+        )
+
+    # ========== Other granularity combinations not supported ==========
+
+    # C8-pergroup not supported
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            kvcache_quant_dtype=msdtype.int8,
+            kvcache_quant_granularity=QuantGranularity.PER_GROUP
+        )
+
+    # A16W8-pertensor not supported
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_TENSOR
+        )
+
+    # A16W8-pertoken not supported
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_TOKEN
+        )
+
+    # A16W4-pertensor not supported
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            weight_quant_dtype=msdtype.qint4x2,
+            weight_quant_granularity=QuantGranularity.PER_TENSOR
+        )
+
+    # A16W4-pertoken not supported
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            weight_quant_dtype=msdtype.qint4x2,
+            weight_quant_granularity=QuantGranularity.PER_TOKEN
+        )
+
+    # A8W8-perchannel/pertoken not supported (act_quant_granularity=PER_CHANNEL not supported)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_CHANNEL,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_TOKEN
+        )
+
+    # A8W8-pergroup/pertensor not supported (act_quant_granularity=PER_GROUP not supported)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_GROUP,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_TENSOR
+        )
+
+    # A8W8-pertensor/pertoken not supported (weight_quant_granularity=PER_TOKEN not supported)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TENSOR,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_TOKEN
+        )
+
+    # A8W8-pertensor/pertensor not supported (weight_quant_granularity=PER_TENSOR not supported)
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TENSOR,
+            weight_quant_dtype=msdtype.int8,
+            weight_quant_granularity=QuantGranularity.PER_TENSOR
+        )
+
+    # C8-pertensor not supported
+    with pytest.raises(ValueError):
+        _ = PTQConfig(
+            kvcache_quant_dtype=msdtype.int8,
+            kvcache_quant_granularity=QuantGranularity.PER_TENSOR
+        )
+
+    # A8pertokenW4pergroup requires GPTQ configuration (already covered in test_ptq_config_param_conflict)
+    # Verify the case without GPTQ configuration
+    with pytest.raises(ValueError, match="A8W4 quantization only support GPTQ precision_recovery"):
+        _ = PTQConfig(
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TOKEN,
+            weight_quant_dtype=msdtype.qint4x2,
+            weight_quant_granularity=QuantGranularity.PER_GROUP,
+            group_size=64
+        )
+
+
+@pytest.mark.level0
+@pytest.mark.platform_arm_ascend910b_training
+@pytest.mark.env_onecard
 def test_gptq_quant_config_param_error():
     """
     Feature: GPTQQuantConfig parameter validation error
