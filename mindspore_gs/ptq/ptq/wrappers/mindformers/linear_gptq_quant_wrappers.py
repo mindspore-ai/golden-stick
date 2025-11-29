@@ -69,18 +69,24 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
-            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
-            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
-            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
-            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
-            Quantizer.reg_layer_map(TC2ColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(TC2RowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(LlamaColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(LlamaRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(DSColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(DSRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(ColumnParallelGroupLinear, GptqWeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(RowParallelGroupLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
+        try:
+            from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
+            from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            Quantizer.reg_layer_map(LlamaColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(LlamaRowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
+        try:
+            from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
+            from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
+            Quantizer.reg_layer_map(TC2ColumnParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(TC2RowParallelLinear, GptqWeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
 
@@ -132,20 +138,20 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
 
     def _hessian_compute(self):
         """compute Hessian Matrix"""
-        for i in range(len(self.samples)):
-            if len(self.samples[i].shape) == 1 or len(self.samples[i].shape) == 3:
-                self.samples[i] = self.samples[i].reshape((-1, self.samples[i].shape[-1]))
+        for sample in self.samples:
+            if len(sample.shape) == 1 or len(sample.shape) == 3:
+                sample = sample.reshape((-1, sample.shape[-1]))
             sqe = self.nsamples / (self.nsamples + 1)
             self.nsamples += 1
             sqr = math.sqrt(2 / self.nsamples)
-            self.samples[i] = sqr * self.samples[i]
+            sample = sqr * sample
             self.h *= sqe
             if self.weight_need_allgather:
-                inp = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(self.samples[i].transpose(1, 0))
+                inp = msops.AllGather(group=GlobalComm.WORLD_COMM_GROUP)(sample.transpose(1, 0))
                 inp = Tensor(inp.transpose(1, 0), dtype=dtype.float32)
                 self.h += msops.matmul(inp.transpose(1, 0), inp)
             else:
-                samples = self.samples[i].astype(dtype.float32)
+                samples = sample.astype(dtype.float32)
                 self.h += msops.matmul(samples.transpose(1, 0), samples)
         self.cfg.dumper.dump_data(self.layer_name, "|hessian_matrix|input0_activation_inputs",
                                   msops.cat(tuple(self.samples), axis=0))

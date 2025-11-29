@@ -72,6 +72,12 @@
 "golden-stick/mindspore_gs/common/json_cache.py"                                                         "unused-argument"
 "golden-stick/mindspore_gs/common/logger.py"                                                             "unused-argument"
 "golden-stick/mindspore_gs/ptq/transformer_inspect.py"                                                   "unidiomatic-typecheck"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_all_quant_wrappers.py"                    "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_clip_wrappers.py"                         "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_dynamic_quant_wrappers.py"                "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_gptq_quant_wrappers.py"                   "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_smooth_wrappers.py"                       "import-outside-toplevel"
+"golden-stick/mindspore_gs/ptq/ptq/wrappers/mindformers/linear_weight_quant_wrappers.py"                 "import-outside-toplevel"
 
 # tests
 "golden-stick/tests/st/loss_monitor.py"                                                                  "unused-argument"
@@ -129,3 +135,4 @@
 "golden-stick/mindspore_gs/ghost/__init__.py"                     "wrong-import-position"
 "golden-stick/mindspore_gs/pruner/__init__.py"                    "wrong-import-position"
 "golden-stick/mindspore_gs/quantization/__init__.py"              "wrong-import-position"
+"golden-stick/mindspore_gs/version.py"                            "import-outside-toplevel"

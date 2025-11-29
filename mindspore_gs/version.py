@@ -15,7 +15,7 @@
 """Define version of MindSpore Golden Stick and check version matching between MindSpore and MindSpore Golden Stick."""
 
 # pylint: disable=C0111
-__version__ = '1.3.0'
+__version__ = '1.3.1'
 
 
 __checked__ = False
@@ -67,11 +67,12 @@ def mindspore_version_check():
             break
 
     if not match:
-        logger.warning("Current version of MindSpore is not compatible with MindSpore Golden Stick. Some functions "
-                       "might not work or even raise error. Please install MindSpore version == {}. For more details "
-                       "about dependency setting, please check the instructions at MindSpore official website "
+        logger.warning("Current version of MindSpore is not compatible with MindSpore Golden Stick. "
+                       "Some functions might not work or even raise error. Please install MindSpore "
+                       f"version == {required_mindspore_verisions}. For more details about dependency "
+                       "setting, please check the instructions at MindSpore official website "
                        "https://www.mindspore.cn/install or check the README.md at "
-                       "https://gitee.com/mindspore/golden-stick".format(required_mindspore_verisions))
+                       "https://gitee.com/mindspore/golden-stick")
         warning_countdown = 2
         for i in range(warning_countdown, 0, -1):
             logger.warning(f"Please pay attention to the above warning, countdown: {i}")

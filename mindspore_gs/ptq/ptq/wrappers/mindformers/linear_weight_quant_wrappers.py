@@ -67,18 +67,24 @@ class WeightQuantLinearCell(WrapperLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            Quantizer.reg_layer_map(ColumnParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(DSColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(DSRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
+        try:
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            Quantizer.reg_layer_map(LlamaColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
+            Quantizer.reg_layer_map(LlamaRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
+        except ImportError:
+            pass
+        try:
             from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
             from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
             Quantizer.reg_layer_map(TC2ColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
             Quantizer.reg_layer_map(TC2RowParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(LlamaColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(LlamaRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(DSColumnParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(DSRowParallelLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(ColumnParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
-            Quantizer.reg_layer_map(RowParallelGroupLinear, WeightQuantLinearCell, A16WxChecker())
         except ImportError:
             pass
 
@@ -97,18 +103,24 @@ class WeightQuantLinearCell(WrapperLinearCell):
             from research.deepseek3.moe import (ColumnParallelGroupLinear, RowParallelGroupLinear)
             from research.deepseek3.infer.layers import ColumnParallelLinear as DSColumnParallelLinear
             from research.deepseek3.infer.layers import RowParallelLinear as DSRowParallelLinear
+            type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
+            type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
+            type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
+        except ImportError:
+            pass
+        try:
             from research.llama3_1.infer.layers import ColumnParallelLinear as LlamaColumnParallelLinear
             from research.llama3_1.infer.layers import RowParallelLinear as LlamaRowParallelLinear
+            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
+            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
+        except ImportError:
+            pass
+        try:
             from research.telechat2.infer.layers import ColumnParallelLinear as TC2ColumnParallelLinear
             from research.telechat2.infer.layers import RowParallelLinear as TC2RowParallelLinear
             type_map[TC2ColumnParallelLinear] = ParallelType.COL_PARALLEL
             type_map[TC2RowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[LlamaColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[DSColumnParallelLinear] = ParallelType.COL_PARALLEL
-            type_map[ColumnParallelGroupLinear] = ParallelType.COL_PARALLEL
-            type_map[LlamaRowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[DSRowParallelLinear] = ParallelType.ROW_PARALLEL
-            type_map[RowParallelGroupLinear] = ParallelType.ROW_PARALLEL
         except ImportError:
             pass
         self.parallel_type = type_map.get(type(self.layer), None)
@@ -261,6 +273,7 @@ class WeightQuantMcoreLinearInferCell(McoreLinearInferCell):
 
     def quant_type_dict(self):
         """quant_type_dict"""
+        type_ = None
         if self.cfg.weight_quant_dtype == dtype.int8:
             type_ = QuantType.W8A16.value
         elif self.cfg.weight_quant_dtype == dtype.qint4x2:
