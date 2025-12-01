@@ -153,8 +153,10 @@ class FakeQuantW8A8DynamicWrapper(QuantCell):
         """reg_self"""
         class FakeQuantChecker(Checker):
             def check(self, config: InnerPTQConfig):
-                return config.weight_quant_dtype == dtype.int8 and config.act_quant_dtype == dtype.int8 and \
-                       config.act_quant_granularity is QuantGranularity.PER_TOKEN
+                weight_support_dtype = [dtype.int8, dtype.qint4x2]
+                return config.weight_quant_dtype in weight_support_dtype and \
+                    config.act_quant_dtype == dtype.int8 and \
+                        config.act_quant_granularity is QuantGranularity.PER_TOKEN
 
         Quantizer.reg_fake_quant_layer_map(nn.Dense, FakeQuantW8A8DynamicWrapper, FakeQuantChecker())
         Quantizer.reg_fake_quant_layer_map(mint.nn.Linear, FakeQuantW8A8DynamicWrapper, FakeQuantChecker())
