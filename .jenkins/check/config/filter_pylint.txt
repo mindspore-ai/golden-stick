@@ -2,6 +2,7 @@
 "golden-stick/mindspore_gs/comp_algo.py"                                                                                 "unused-argument"
 "golden-stick/mindspore_gs/comp_algo.py"                                                                                 "assignment-from-none"
 "golden-stick/mindspore_gs/net_transform.py"                                                                             "protected-access"
+"golden-stick/mindspore_gs/version.py"                                                                                   "import-outside-toplevel"
 
 # example
 "golden-stick/example/deepseekv3/infer.py"                                                                               "line-too-long"
