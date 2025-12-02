@@ -14,14 +14,14 @@
 # ============================================================================
 """ptq wrapper cells for mindformers."""
 
-from mindspore import ops as msops
 from mindspore import nn, Parameter, dtype, mint
+from mindspore import ops as msops
 from mindspore.common.initializer import initializer
 
 from mindspore_gs.ptq.quant_cells.quant_cell import Checker
 from mindspore_gs.ptq.algo_modules import Quantizer
 from mindspore_gs.ptq.context import InnerPTQConfig
-from mindspore_gs.ptq.ptq_config import PrecisionRecovery, QuantGranularity
+from mindspore_gs.ptq.ptq_config import QuantGranularity
 from mindspore_gs.ptq.quant_cells.quant_cell import QuantCell
 from .fake_quant_base import (FakeQuantLinearCell,
                               DeQuant,
@@ -37,8 +37,7 @@ class FakeQuantA16WxWrapper(QuantCell):
         class FakeQuantChecker(Checker):
             def check(self, config: InnerPTQConfig):
                 support_dtype = [dtype.int8, dtype.qint4x2]
-                return (config.weight_quant_dtype in support_dtype and config.act_quant_dtype is None
-                        and config.precision_recovery == PrecisionRecovery.NONE)
+                return config.weight_quant_dtype in support_dtype and config.act_quant_dtype is None
 
         Quantizer.reg_fake_quant_layer_map(nn.Dense, FakeQuantA16WxWrapper, FakeQuantChecker())
         Quantizer.reg_fake_quant_layer_map(mint.nn.Linear, FakeQuantA16WxWrapper, FakeQuantChecker())
@@ -64,11 +63,19 @@ class FakeQuantA16WxLinearCell(FakeQuantLinearCell):
     """FakeQuantA16WxLinearCell"""
     def __init__(self, layer_name, linear: nn.Cell, context, cfg: InnerPTQConfig):
         super().__init__(layer_name, linear, context, cfg)
-        self.weight = Parameter(initializer("zeros", linear.weight.shape, self.cfg.weight_quant_dtype))
-        self.weight_scale = Parameter(initializer("ones", (linear.weight.shape[0],), self.compute_dtype))
-        self.weight_offset = Parameter(initializer("zeros", (linear.weight.shape[0],), dtype.int32))
+        self.group_size = cfg.group_size
+        self.weight = Parameter(initializer("zeros", linear.weight.shape, dtype.int8))
         if linear.has_bias:
             self.bias = Parameter(initializer("zeros", (linear.weight.shape[0],), self.compute_dtype))
+        if self.group_size > 0:
+            output_channels, input_channels = linear.weight.shape
+            self.weight_scale = Parameter(initializer("ones", (input_channels // self.group_size, output_channels),
+                                                      self.compute_dtype))
+            self.weight_offset = Parameter(initializer("zeros", (input_channels // self.group_size, output_channels),
+                                                       dtype.int32))
+        else:
+            self.weight_scale = Parameter(initializer("ones", (linear.weight.shape[0],), self.compute_dtype))
+            self.weight_offset = Parameter(initializer("zeros", (linear.weight.shape[0],), dtype.int32))
 
         self.de_quant = DeQuant(self.compute_dtype)
         self.layer.weight = None
@@ -77,8 +84,12 @@ class FakeQuantA16WxLinearCell(FakeQuantLinearCell):
 
     def dequant_input(self, x, weight):
         """process input"""
-        weight_scale = self.weight_scale.reshape((-1, 1))
-        weight_offset = self.weight_offset.reshape((-1, 1))
+        if self.group_size > 0:
+            weight_scale = msops.repeat_elements(self.weight_scale, rep=self.group_size, axis=0).T
+            weight_offset = msops.repeat_elements(self.weight_offset, rep=self.group_size, axis=0).T
+        else:
+            weight_scale = self.weight_scale.reshape((-1, 1))
+            weight_offset = self.weight_offset.reshape((-1, 1))
         weight = self.de_quant(weight, weight_scale, weight_offset)
         return x, weight
 

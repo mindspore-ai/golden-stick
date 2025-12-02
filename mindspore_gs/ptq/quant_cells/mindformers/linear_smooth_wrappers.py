@@ -44,7 +44,7 @@ from mindspore_gs.ptq.ptq_config import PTQMode, OutliersSuppressionType, QuantG
 from mindspore_gs.ptq.context import InnerPTQConfig
 from mindspore_gs.ptq.ptq.hal import (SmoothMatmul, SmoothMatmulForDeploy, OutlierSuppressionPlusMatmulForDeploy,
                                       OutlierSuppressionPlusSmoothMatmulForDeploy, OutlierSuppressionPlusSmoothMatmul)
-from mindspore_gs.ptq.algo_modules import LinearSmoothQuant, LinearAutoSmoother
+from mindspore_gs.ptq.algo_modules.mindformers import LinearSmoothQuant, LinearAutoSmoother
 from mindspore_gs.ptq.quant_cells.quant_cell import Checker, SearchInputs
 from mindspore_gs.ptq.basic_functions.basic_quant_func import quant_tensor
 from mindspore_gs.ptq.ptq.hal import ParallelType

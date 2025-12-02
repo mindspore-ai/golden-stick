@@ -20,6 +20,9 @@ from .linear_dynamic_quant_wrappers import DynamicQuantLinearCell
 
 from .linear_smooth_wrappers import SmoothQuantLinearCell
 from .linear_smooth_wrappers import OSLSmoothQuantLinearCell
+from .linear_smooth_wrappers import AWQSmoothQuantLinearCell
+
+from .linear_clip_wrappers import ClipLinearCell
 
 from .fake_quant_linear import FakeQuantA16WxWrapper
 from .fake_quant_linear import FakeQuantW8A8Wrapper
@@ -31,6 +34,8 @@ __all__ = [
     "DynamicQuantLinearCell",
     "SmoothQuantLinearCell",
     "OSLSmoothQuantLinearCell",
+    "AWQSmoothQuantLinearCell",
+    "ClipLinearCell",
     "FakeQuantA16WxWrapper",
     "FakeQuantW8A8Wrapper",
     "FakeQuantW8A8DynamicWrapper",

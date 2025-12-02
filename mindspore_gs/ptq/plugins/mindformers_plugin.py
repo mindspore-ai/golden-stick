@@ -120,7 +120,7 @@ class MFModelHubPlugin(ModelHubPlugin):
         for MindFormers models.
         """
         from mindspore_gs.ptq.algo_modules.mindformers.anti_outliers import LinearSmoothQuant, LinearAutoSmoother
-        from mindspore_gs.ptq.algo_modules.clipper import LinearClipper
+        from mindspore_gs.ptq.algo_modules.mindformers.clipper import LinearClipper
         from mindspore_gs.ptq.algo_modules.quantizer import Quantizer
 
         LinearSmoothQuant.reg_self()
