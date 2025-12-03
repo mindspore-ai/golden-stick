@@ -17,6 +17,7 @@
 from .linear_weight_quant_wrappers import WeightQuantLinearCell
 from .linear_all_quant_wrappers import AllQuantLinearCell
 from .linear_dynamic_quant_wrappers import DynamicQuantLinearCell
+from .linear_gptq_quant_wrappers import GptqWeightQuantLinearCell
 
 from .linear_smooth_wrappers import SmoothQuantLinearCell
 from .linear_smooth_wrappers import OSLSmoothQuantLinearCell
@@ -32,6 +33,7 @@ __all__ = [
     "WeightQuantLinearCell",
     "AllQuantLinearCell",
     "DynamicQuantLinearCell",
+    "GptqWeightQuantLinearCell",
     "SmoothQuantLinearCell",
     "OSLSmoothQuantLinearCell",
     "AWQSmoothQuantLinearCell",

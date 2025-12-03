@@ -71,6 +71,7 @@ class MindOneModelHubPlugin(ModelHubPlugin):
         from mindspore_gs.ptq.quant_cells.mindone.linear_weight_quant_wrappers import WeightQuantLinearCell
         from mindspore_gs.ptq.quant_cells.mindone.linear_all_quant_wrappers import AllQuantLinearCell
         from mindspore_gs.ptq.quant_cells.mindone.linear_dynamic_quant_wrappers import DynamicQuantLinearCell
+        from mindspore_gs.ptq.quant_cells.mindone.linear_gptq_quant_wrappers import GptqWeightQuantLinearCell
 
         from mindspore_gs.ptq.quant_cells.mindone.linear_smooth_wrappers import SmoothQuantLinearCell
         from mindspore_gs.ptq.quant_cells.mindone.linear_smooth_wrappers import OSLSmoothQuantLinearCell
@@ -85,6 +86,7 @@ class MindOneModelHubPlugin(ModelHubPlugin):
         WeightQuantLinearCell.reg_self()
         AllQuantLinearCell.reg_self()
         DynamicQuantLinearCell.reg_self()
+        GptqWeightQuantLinearCell.reg_self()
 
         SmoothQuantLinearCell.reg_self()
         OSLSmoothQuantLinearCell.reg_self()

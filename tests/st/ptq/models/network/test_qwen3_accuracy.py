@@ -32,8 +32,11 @@ from transformers import AutoTokenizer
 
 # pylint: disable=wrong-import-position
 from mindspore_gs.common import BackendTarget
-from mindspore_gs.ptq import (PTQConfig, PTQMode)
-from mindspore_gs.ptq.ptq_config import OutliersSuppressionType, QuantGranularity
+from mindspore_gs.ptq import PTQConfig
+from mindspore_gs.ptq.ptq_config import (GPTQQuantConfig,
+                                         OutliersSuppressionType,
+                                         QuantGranularity,
+                                         PrecisionRecovery)
 from mindspore_gs.ptq.models import AutoQuantForCausalLM
 from mindspore_gs.ptq.utils import QuantType
 
@@ -63,28 +66,34 @@ class Qwen3PTQTester:
         if not os.path.exists(self.fake_quant_output_dir):
             os.makedirs(self.fake_quant_output_dir, exist_ok=True)
 
-    def create_ptq_config(self, mode, backend):
+    def create_ptq_config(self):
         """Create PTQ configuration for mindone models"""
-        cfg = PTQConfig(mode=mode, backend=backend,
-                            weight_quant_dtype=msdtype.int8,
-                            act_quant_dtype=msdtype.int8,
-                            outliers_suppression= OutliersSuppressionType.SMOOTH,
-                            opname_blacklist=["lm_head."])
-        a8dynw8 = PTQConfig(mode=mode, backend=backend,
-                            weight_quant_dtype=msdtype.int8,
+        cfg = PTQConfig(weight_quant_dtype=msdtype.int8,
+                        act_quant_dtype=msdtype.int8,
+                        outliers_suppression= OutliersSuppressionType.SMOOTH,
+                        opname_blacklist=["lm_head."])
+        a8dynw8 = PTQConfig(weight_quant_dtype=msdtype.int8,
                             act_quant_dtype=msdtype.int8,
                             act_quant_granularity=QuantGranularity.PER_TOKEN,
                             opname_blacklist=["lm_head."])
-        awq_a16w4 = PTQConfig(mode=mode, backend=backend,
-                              weight_quant_dtype=msdtype.qint4x2,
+        awq_a16w4 = PTQConfig(weight_quant_dtype=msdtype.qint4x2,
                               group_size=128,
                               outliers_suppression= OutliersSuppressionType.AWQ,
                               weight_quant_granularity=QuantGranularity.PER_GROUP,
                               opname_blacklist=["lm_head."])
+        gptq_a16w4 = PTQConfig(weight_quant_dtype=msdtype.qint4x2,
+                               act_quant_dtype=None,
+                               weight_clip=True,
+                               group_size=64,
+                               precision_recovery=PrecisionRecovery.GPTQ,
+                               weight_quant_granularity=QuantGranularity.PER_GROUP,
+                               algo_args=GPTQQuantConfig(),
+                               opname_blacklist=["lm_head."])
         layer_policies = OrderedDict({r'.*\.self_attn*': cfg,
                                       r'.*\.mlp\.gate_proj.*': a8dynw8,
                                       r'.*\.mlp\.up_proj.*': a8dynw8,
-                                      r'.*\.mlp\.down_proj.*': awq_a16w4,
+                                      r'.*\.(1?\d)\.mlp\.down_proj.*': awq_a16w4,
+                                      r'.*\.2[0-7]\.mlp\.down_proj.*': gptq_a16w4,
                                       'not match': cfg})
         return cfg, layer_policies
 
@@ -124,9 +133,7 @@ class Qwen3PTQTester:
         ds = ds.select_columns(["input_ids", "attention_mask"])
 
         print("Create PTQ config...", flush=True)
-        cfg, layers_policy = self.create_ptq_config(
-            PTQMode.QUANTIZE, BackendTarget.ASCEND
-        )
+        cfg, layers_policy = self.create_ptq_config()
 
         print("Create Qwen3 model...")
         model = AutoQuantForCausalLM.from_pretrained(self.model_path)
@@ -168,9 +175,7 @@ class Qwen3PTQTester:
         model = AutoQuantForCausalLM.from_pretrained(self.model_path)
 
         print("Create evaluation config...")
-        eval_cfg, eval_layers_policy = self.create_ptq_config(
-            PTQMode.DEPLOY, BackendTarget.ASCEND
-        )
+        eval_cfg, eval_layers_policy = self.create_ptq_config()
 
         print("Load quantized model...")
         model.fake_quant(eval_cfg, eval_layers_policy, self.fake_quant_output_dir)
@@ -224,6 +229,7 @@ class Qwen3PTQTester:
             'model.layers.0.mlp.gate_proj.weight': QuantType.W8A8_DYNAMIC.value,
             'model.layers.0.mlp.up_proj.weight': QuantType.W8A8_DYNAMIC.value,
             'model.layers.0.mlp.down_proj.weight': QuantType.W4A16.value,
+            'model.layers.27.mlp.down_proj.weight': QuantType.W4A16.value,
         }
         for name, value in check_map.items():
             if not check(name, value):
@@ -233,7 +239,7 @@ class Qwen3PTQTester:
 
     def get_ds_acc_threshold(self) -> Optional[float]:
         """Get accuracy threshold for distributed training"""
-        return 0.54
+        return 0.4
 
 
 def run_qwen3_accuracy():

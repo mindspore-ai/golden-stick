@@ -26,7 +26,6 @@ class WrapperLinearCell(QuantCell, abc.ABC):
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)
         self.transpose_b = True
-        self.cfg = cfg
 
     # pylint: disable=arguments-differ
     def add_hook(self):
