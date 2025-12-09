@@ -121,7 +121,7 @@ class MindOneModel(BaseQuantForCausalLMImpl):
         """Get the underlying network instance.
 
         Returns:
-            The underlying MindFormers network instance.
+            The underlying MindOne network instance.
         """
         return self.network
 

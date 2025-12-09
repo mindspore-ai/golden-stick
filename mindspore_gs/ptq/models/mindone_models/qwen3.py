@@ -103,14 +103,6 @@ class Qwen3(MindOneModel):
                                      use_cache=False,
                                      do_sample=False)
 
-    def _network(self):
-        """Get the underlying network instance.
-
-        Returns:
-            The underlying MindOne network instance.
-        """
-        return self.network
-
     def _transformer_layers(self) -> tuple[type]:
         """Get the transformer layer types for quantization.
 

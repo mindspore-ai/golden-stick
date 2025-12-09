@@ -13,82 +13,25 @@
 # limitations under the License.
 # ============================================================================
 """Run mixed precision network PTQ test with configurable parameters via args"""
-import argparse
 import os
 from collections import OrderedDict
 
 import numpy as np
 import mindspore as ms
-from mindspore import Tensor, dtype as msdtype
-from mindspore.dataset import GeneratorDataset
+from mindspore import dtype as msdtype
 
-from linear_specs_loader import load_linear_specs_from_config
-from layer_policies_loader import create_layer_policies
-from mixed_precision_network import create_mixed_precision_network
 from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
 from mindspore_gs.ptq.ptq_config import (
     QuantGranularity, PrecisionRecovery, GPTQQuantConfig
 )
 
-
-def create_test_input(hidden_size):
-    """Create fixed test input with shape (10, hidden_size), data range [-1, 1]"""
-    np.random.seed(42)
-    data = np.zeros((10, hidden_size), dtype=np.float32)
-    for i in range(10):
-        for j in range(hidden_size):
-            value = ((i * 1000 + j) % 2000 - 1000) / 1000.0
-            data[i, j] = value
-
-    return Tensor(data, dtype=msdtype.float32)
-
-
-def create_linear_ds(batch_size, seq_length, repeat=1, is_parallel=False):
-    """Create linear dataset with fixed deterministic values, data range [-1, 1]"""
-    class LinearIterable:
-        """Iterable dataset for linear layers with fixed deterministic values"""
-        def __init__(self, batch_size, seq_length, repeat=1, is_parallel=False):
-            self.index = 0
-            self.data = []
-            for i in range(repeat):
-                if not is_parallel:
-                    data = np.zeros((batch_size, seq_length), dtype=np.float16)
-                    for b in range(batch_size):
-                        for s in range(seq_length):
-                            value = ((i * 10000 + b * 1000 + s) % 2000 - 1000) / 1000.0
-                            data[b, s] = value
-                    self.data.append(data)
-                else:
-                    data = np.zeros((batch_size, 1, seq_length), dtype=np.float16)
-                    for b in range(batch_size):
-                        for s in range(seq_length):
-                            value = ((i * 10000 + b * 1000 + s) % 2000 - 1000) / 1000.0
-                            data[b, 0, s] = value
-                    self.data.append(data)
-
-        def __next__(self):
-            if self.index >= len(self.data):
-                raise StopIteration
-            item = (self.data[self.index],)
-            self.index += 1
-            return item
-
-        def __iter__(self):
-            self.index = 0
-            return self
-
-        def __len__(self):
-            return len(self.data)
-
-    return GeneratorDataset(
-        source=LinearIterable(batch_size, seq_length, repeat, is_parallel),
-        column_names=["input_ids"])
-
-
-def get_save_file_name(save_name):
-    """Get the save file name"""
-    return save_name
+from layer_policies_loader import create_layer_policies_for_mindformers
+from mixed_precision_network import create_mixed_precision_network
+from tests.st.st0.ptq.networks.custom.linear_info_loader import load_linear_info_from_config
+from tests.st.st0.ptq.networks.custom.common_utils import (
+    create_test_input, create_linear_ds, get_save_file_name)
+from tests.st.precision_utils import PrecisionChecker # pylint: disable=wrong-import-position
 
 
 def quant_net(hidden_size, num_experts, linear_specs):
@@ -135,7 +78,7 @@ def quant_net(hidden_size, num_experts, linear_specs):
         act_quant_granularity=QuantGranularity.PER_TOKEN,
     )
 
-    layer_policies = create_layer_policies(linear_specs)
+    layer_policies = create_layer_policies_for_mindformers(linear_specs)
 
     ptq = PTQ(config=base_config, layer_policies=layer_policies)
     # pylint: disable=protected-access
@@ -155,6 +98,7 @@ def quant_net(hidden_size, num_experts, linear_specs):
 
     network = ptq.apply(network, datasets=dataset)
     network = ptq.convert(network)
+    ptq.summary(network)
     ms.save_checkpoint(network.parameters_dict(), get_save_file_name('mixed_precision_quant.ckpt'),
                        choice_func=lambda x: all(i not in x for i in ['key_cache', 'value_cache', 'float_weight']))
     return fp_outputs_dict
@@ -200,7 +144,7 @@ def infer_net(hidden_size, num_experts, linear_specs):
         act_quant_granularity=QuantGranularity.PER_TOKEN,
     )
 
-    quant_layer_policies = create_layer_policies(linear_specs)
+    quant_layer_policies = create_layer_policies_for_mindformers(linear_specs)
     layer_policies = OrderedDict()
     for key, config in quant_layer_policies.items():
         algo_args = config.algo_args
@@ -256,21 +200,19 @@ def infer_net(hidden_size, num_experts, linear_specs):
 
 def main():
     """Main function to run mixed precision PTQ test"""
-    parser = argparse.ArgumentParser(description='Run mixed precision network PTQ test')
-    parser.add_argument('--output_path', type=str, required=True, help='Output path for results (npz file)')
-    args = parser.parse_args()
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(curr_dir, 'linear_specs_config.yaml')
+    model_config, precision_thd, linear_specs= load_linear_info_from_config(config_path=config_path)
 
-    hidden_size = 512
-    num_experts = 2
-
-    linear_specs = load_linear_specs_from_config(hidden_size=hidden_size, num_experts=num_experts)
-
-    fp_outputs_dict = quant_net(hidden_size, num_experts, linear_specs)
-    qoutputs_dict = infer_net(hidden_size, num_experts, linear_specs)
+    fp_outputs_dict = quant_net(model_config['hidden_size'],
+                                model_config['num_local_experts'],
+                                linear_specs)
+    qoutputs_dict = infer_net(model_config['hidden_size'],
+                              model_config['num_local_experts'],
+                              linear_specs)
 
     # Save outputs to npz file
-    output_dict = {}
-    for layer_idx in range(len(linear_specs)):
+    for layer_idx, linear_spec in enumerate(linear_specs):
         fp_output = fp_outputs_dict[layer_idx]
         qoutput = qoutputs_dict[layer_idx]
 
@@ -280,10 +222,17 @@ def main():
         fp_output_np = fp_output_np.astype(np.float32)
         qoutput_np = qoutput_np.astype(np.float32)
 
-        output_dict[f'layer_{layer_idx}_fp'] = fp_output_np
-        output_dict[f'layer_{layer_idx}_quant'] = qoutput_np
+        key = (linear_spec.linear_type,
+               linear_spec.compute_dtype,
+               linear_spec.quant_policy)
+        checker = PrecisionChecker(cos_sim_thd=precision_thd[key]['cos_sim_thd'],
+                                   l1_norm_thd=precision_thd[key]['l1_norm_thd'],
+                                   kl_dvg_thd=precision_thd[key]['kl_dvg_thd'])
+        succeed = checker.check_precision(fp_output_np, qoutput_np)
 
-    np.savez(args.output_path, **output_dict)
+        layer_info = f" {layer_idx}-{key[0]}-{key[1]}-{key[2]}"
+        assert succeed, f"layer {layer_info} check failed!"
+        print(f"Precision check for layer {layer_info} passed!")
 
     # Clean up checkpoint file
     ckpt_file = get_save_file_name('mixed_precision_quant.ckpt')

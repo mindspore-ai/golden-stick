@@ -177,8 +177,8 @@ class GptqWeightQuantLinearCell(WeightQuantLinearCell):
             self.group_zero.append(zero)
             self.group_scale = msops.cat(self.group_scale)
             self.group_zero = msops.cat(self.group_zero)
-            self.group_scale = msops.squeeze(self.group_scale) if not self.is_moe else self.group_scale
-            self.group_zero = msops.squeeze(self.group_zero) if not self.is_moe else self.group_zero
+            self.group_scale = msops.squeeze(self.group_scale)
+            self.group_zero = msops.squeeze(self.group_zero)
         else:
             self.group_scale = msops.cat(self.group_scale)
             self.group_zero = msops.cat(self.group_zero)
