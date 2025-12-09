@@ -44,14 +44,14 @@ layer_types:
       ffn_hidden_size: "${hidden_size}"
     
   - name: "ColumnParallelGroupedLinear"
-    strategies_per_dtype: 2
+    strategies_per_dtype: 0
     params:
       input_size: "${hidden_size}"
       output_size: "${hidden_size}"
       num_local_experts: "${num_experts}"
     
   - name: "RowParallelGroupedLinear"
-    strategies_per_dtype: 2
+    strategies_per_dtype: 0
     params:
       input_size: "${hidden_size}"
       output_size: "${hidden_size}"
