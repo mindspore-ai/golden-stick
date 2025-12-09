@@ -212,7 +212,9 @@ class LinearSmoother(AlgoModule):
         new_weight[-scale_len:, ...] = msops.mul(new_weight[-scale_len:, ...], smooth_scale)
         layer.weight.set_data(new_weight)
         if hasattr(layer, 'bias') and layer.bias is not None:
-            layer.bias = msops.mul(layer.bias, smooth_scale.squeeze())
+            new_bias = layer.bias.clone()
+            new_bias[-scale_len:] = msops.mul(new_bias[-scale_len:], smooth_scale.squeeze())
+            layer.bias.set_data(new_bias)
 
     def _apply_smooth_scale_to_curr_layer(self, layer: Cell, smooth_scale: Tensor):
         """_apply_smooth_scale_to_curr_layer"""

@@ -448,53 +448,68 @@ class PTQ(CompAlgo):
                     else:
                         output_args[index][0] = output[0] if isinstance(output, tuple) else output
         self._config.update_comm_info()
-
-        # get transformer layers from model
-        # pylint: disable=protected-access
-        _ = [self.decoder_layer_types.append(layer) for layer in model._transformer_layers()]
-        self._get_decoder_layers(model.network)
-
         # convert datasets to Dataset
         datasets = convert_to_dataset(datasets)
         self._check_apply_inputs(datasets)
+        catchers = {}
+        network = None
 
-        start_time = time.time()
-        logger.info("Catching inputs for first decoder layer with "
-                    f"{len(datasets)} datasets samples.")
-        catcher, network = self._get_mo_first_layer_input(model, datasets)
-        all_args = catcher.args
-        all_kwargs = catcher.kwargs
-        logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
-        start_time = time.time()
-        logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
-        for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ..."):
-            logger.info(f"Quantize {i}th decoder layer.")
-            layer_name, layer = self.decoder_layers[i]
-            cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
-            catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs,
-                                do_update=len(self.decoder_layers) > 1)
-            for processor in PTQ.pipeline:
-                processor = processor(self._config, self.layer_policies)
-                processor.replace(layer_name, layer)
-
-                logger.info("Catching inputs of all Linear in decoder layer.")
-                start_time = time.time()
-
-                transform_network_inplace(layer, QuantCell, lambda _, cell: cell.add_hook())
-                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs, do_update=False)
-                transform_network_inplace(layer, QuantCell, lambda _, c: c.remove_hook())
-                logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
-
-                processor.process(layer_name, layer, quant_model=model,
-                                  search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
-                network.update_parameters_name()
-                gc.collect()
-            if self._config.reflash_inputs_after_each_processor:
-                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs)
+        # catch input for different layer, eg: Qwen3VLTextDecoderLayer, Qwen3VLVisionBlock
+        # pylint: disable=protected-access
+        for layer in model._transformer_layers():
+            self.decoder_layer_types.clear()
+            self.decoder_layer_types.append(layer)
+            self._get_decoder_layers(model.network)
             start_time = time.time()
-            offload_network(layer)
-            gc.collect()
-            logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
+            logger.info("Catching inputs for first decoder layer with "
+                        f"{len(datasets)} datasets samples.")
+            catcher, network = self._get_mo_first_layer_input(model, datasets)
+            catchers[layer] = catcher
+
+        # get transformer layers from model
+        # pylint: disable=protected-access
+        for layer in model._transformer_layers():
+            self.decoder_layer_types.clear()
+            self.decoder_layer_types.append(layer)
+            self._get_decoder_layers(model.network)
+
+            start_time = time.time()
+            logger.info("Catching inputs for first decoder layer with "
+                        f"{len(datasets)} datasets samples.")
+            catcher = catchers[layer]
+            all_args = catcher.args
+            all_kwargs = catcher.kwargs
+            logger.info(f"_get_first_layer_input time cost {time.time() - start_time}")
+            start_time = time.time()
+            logger.info(f"get_decoder_layers time cost {time.time() - start_time}")
+            for i in tqdm.tqdm(range(len(self.decoder_layers)), desc="Running PTQ..."):
+                logger.info(f"Quantize {i}th decoder layer.")
+                layer_name, layer = self.decoder_layers[i]
+                cur_args, cur_kwargs = copy.deepcopy(all_args), copy.deepcopy(all_kwargs)
+                catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs,
+                                    do_update=len(self.decoder_layers) > 1)
+                for processor in PTQ.pipeline:
+                    processor = processor(self._config, self.layer_policies)
+                    processor.replace(layer_name, layer)
+
+                    logger.info("Catching inputs of all Linear in decoder layer.")
+                    start_time = time.time()
+
+                    transform_network_inplace(layer, QuantCell, lambda _, cell: cell.add_hook())
+                    catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs, do_update=False)
+                    transform_network_inplace(layer, QuantCell, lambda _, c: c.remove_hook())
+                    logger.info(f"{i}th layer output refresh time cost {time.time() - start_time}")
+
+                    processor.process(layer_name, layer, quant_model=model,
+                                    search_inputs=SearchInputs(layer, cur_args, cur_kwargs))
+                    network.update_parameters_name()
+                    gc.collect()
+                if self._config.reflash_inputs_after_each_processor:
+                    catch_layer_output(layer, cur_args, cur_kwargs, all_args, all_kwargs)
+                start_time = time.time()
+                offload_network(layer)
+                gc.collect()
+                logger.info(f"{i}th layer offload network time cost {time.time() - start_time}")
         return network
 
     def fake_quant(self, network):
