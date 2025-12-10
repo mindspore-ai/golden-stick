@@ -123,7 +123,7 @@ class MindOneModel(BaseQuantForCausalLMImpl):
         Returns:
             The underlying MindFormers network instance.
         """
-        raise NotImplementedError
+        return self.network
 
     def _transformer_layers(self) -> tuple[type]:
         """Get the transformer layer types for quantization.
@@ -211,7 +211,7 @@ class MindOneModel(BaseQuantForCausalLMImpl):
         logger.info("Use ptq algo to quant network and weight.")
         net = self._network()
         ptq = PTQ(config=ptq_config, layer_policies=layers_policy)
-
+        ptq = self._set_ptq_config(ptq, **kwargs)
         quant_start = time.time()
         logger.info('Quantize-ing network...')
         start_time = time.time()

@@ -58,6 +58,7 @@ class MindOneModelHubPlugin(ModelHubPlugin):
         # pylint: disable=unused-import
         from mindspore_gs.ptq.models.mindone_models.glm4v import GLM4v
         from mindspore_gs.ptq.models.mindone_models.qwen3 import Qwen3
+        from mindspore_gs.ptq.models.mindone_models.qwen3_vl import Qwen3VL
 
     def _load_quant_cells(self):
         """Load MindOne quantization cell implementations.

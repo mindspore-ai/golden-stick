@@ -73,18 +73,10 @@ class TestMixedPrecisionPTQ:
         self.infer(output_file_path=output_file_path, show_logs=show_logs)
         output = np.load(output_file_path)
 
-        excluded_layers = {9, 13, 21, 22}
-
         checker = PrecisionChecker(cos_sim_thd=0.99, l1_norm_thd=0.01, kl_dvg_thd=0.005)
         succeed = True
         for key in output:
             if key.endswith('_quant'):
-                # Extract layer index from key like 'layer_21_quant'
-                layer_idx = int(key.split('_')[1])
-                if layer_idx in excluded_layers:
-                    print(f"Skip precision check for {key} (excluded layer {layer_idx})", flush=True)
-                    continue
-
                 fp_key = key.replace('_quant', '_fp')
                 if fp_key not in output:
                     raise ValueError(f"Key {fp_key} not found in output for quant key {key}")

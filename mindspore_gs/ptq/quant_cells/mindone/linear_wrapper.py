@@ -62,7 +62,7 @@ class WrapperLinearCell(QuantCell, abc.ABC):
     # pylint: disable=arguments-differ
     def remove_hook(self):
         """remove_hook"""
-        matmul = self.layer.matmul
+        matmul = self.layer.matmul if hasattr(self.layer, "matmul") else self.layer.dense
         if isinstance(matmul, msops.MatMul):
             matmul.__class__ = msops.MatMul
         elif isinstance(matmul, msops.Dense):
