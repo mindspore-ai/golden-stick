@@ -15,23 +15,28 @@
 """Quantize."""
 import copy
 from typing import Optional
-from mindspore.rewrite import Node
+
 from mindspore.nn import Cell
-from .net_policy import NetPolicy
-from .layer_policy import LayerPolicy, LAYER_POLICY_KEY
-from .transformer import Transformer
-from ..comp_algo import CompAlgo
-from ..net_transform import NetTransformer
-from .quant_cell import QuantCell
+
+from mindspore_gs.comp_algo import CompAlgo
+from mindspore_gs.net_transform import NetTransformer
+from mindspore_gs.quantization.layer_policy import LayerPolicy, LAYER_POLICY_KEY
+from mindspore_gs.quantization.net_policy import NetPolicy
+from mindspore_gs.quantization.quant_cell import QuantCell
+from mindspore_gs.quantization.rewrite import Node
+from mindspore_gs.quantization.transformer import Transformer
 
 
 class QuantizationAwareTraining(CompAlgo):
     """
     Derived class of `CompAlgo`. Base class of QAT-algorithm.
+    
+    This class provides the framework for quantization-aware training algorithms,
+    including layer policy propagation and redundant fake quantizer reduction.
     """
 
     def __init__(self, config=None):
-        super(QuantizationAwareTraining, self).__init__(config)
+        super().__init__(config)
         self._qat_policy = None
         self._custom_transforms = None
         self._custom_layer_policy_map = None
@@ -110,7 +115,7 @@ class QuantizationAwareTraining(CompAlgo):
         """
 
         transformers: [Transformer] = self._qat_policy.get_transformers()
-        if isinstance(self._custom_transforms, list):
+        if self._custom_transforms is not None and isinstance(self._custom_transforms, list):
             for transform in self._custom_transforms:
                 if isinstance(transform, Transformer):
                     transformers.append(transform)
@@ -157,6 +162,7 @@ class QuantizationAwareTraining(CompAlgo):
 
         Args:
             network (Cell): Network to be quantized.
+            kwargs (Dict): Extensible parameter for subclasses (not used in current implementation).
 
         Returns:
             Quantized network.

@@ -36,6 +36,15 @@
 "golden-stick/mindspore_gs/quantization/converter.py"                                                                    "protected-access"
 "golden-stick/mindspore_gs/quantization/quant_utils.py"                                                                  "protected-access"
 
+"golden-stick/mindspore_gs/quantization/rewrite/api/node.py"                                                             "protected-access"
+"golden-stick/mindspore_gs/quantization/rewrite/node.py"                                                                 "protected-access"
+"golden-stick/mindspore_gs/quantization/rewrite/symbol_tree.py"                                                          "protected-access"
+"golden-stick/mindspore_gs/quantization/rewrite/parser_register.py"                                                      "protected-access"
+"golden-stick/mindspore_gs/quantization/rewrite/api/pattern_engine.py"                                                   "protected-access"
+"golden-stick/mindspore_gs/quantization/rewrite/parsers/for_parser.py"                                                   "eval-used"
+"golden-stick/mindspore_gs/quantization/rewrite/symbol_tree.py"                                                          "inconsistent-return-statements"
+"golden-stick/mindspore_gs/quantization/rewrite/parsers/if_parser.py"                                                    "eval-used"
+
 # SimQAT
 "golden-stick/mindspore_gs/quantization/simulated_quantization/simulated_quantization_transforms.py"                     "unused-argument"
 "golden-stick/mindspore_gs/quantization/simulated_quantization/simulated_quantization_aware_training.py"                 "line-too-long"
@@ -112,7 +121,6 @@
 "golden-stick/tests/st/quantization/sim_qat/ops/test_fake_quant_perlayer_aot.py"                         "unused-argument"
 "golden-stick/tests/st/quantization/sim_qat/ops/test_minmax_update_perchannel_aot.py"                    "unused-argument"
 "golden-stick/tests/st/quantization/sim_qat/ops/test_minmax_update_perlayer_aot.py"                      "unused-argument"
-"golden-stick/example/ptq/round_to_nearest/networks/network.py"                                          "unused-argument"
 "golden-stick/tests/st/golden_stick/test_json_cache.py"                                                  "protected-access"
 "golden-stick/tests/st/golden_stick/test_transformer_inspect.py"                                         "len-as-condition"
 "golden-stick/tests/st/ptq/models/ptq_qwen3_runner.py"                                                   "wrong-import-position"

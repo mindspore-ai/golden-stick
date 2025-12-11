@@ -14,7 +14,7 @@
 # ============================================================================
 """RTNNetPolicy."""
 
-from mindspore.rewrite import PatternEngine
+from mindspore_gs.quantization.rewrite import PatternEngine
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.round_to_nearest.ptq_policy import PTQNetPolicy
 from mindspore_gs.ptq.context import InnerPTQConfig

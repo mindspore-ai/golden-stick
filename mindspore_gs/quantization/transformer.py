@@ -14,7 +14,7 @@
 # ============================================================================
 """Transformer."""
 from typing import List, Union
-from mindspore.rewrite import PatternEngine, PatternNode, Node, SymbolTree
+from mindspore_gs.quantization.rewrite import PatternEngine, PatternNode, Node, SymbolTree
 from .layer_policy import LayerPolicy, LAYER_POLICY_KEY
 
 
@@ -77,7 +77,7 @@ class Transformer(PatternEngine):
                     continue
                 node_policy.set_input_not_insert_fq(i)
 
-    def apply(self, symbol_tree: SymbolTree) -> bool:
+    def apply(self, symbol_tree: SymbolTree) -> bool:  # pylint: disable=arguments-renamed
         """transform origin net for quantization algorithm"""
         root: Node = symbol_tree.get_return_node()
         # IR match

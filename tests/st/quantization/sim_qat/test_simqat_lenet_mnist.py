@@ -29,7 +29,7 @@ from tests.st import test_utils as utils
 cur_path = os.path.dirname(os.path.abspath(__file__))
 model_name = "lenet"
 config_name = "lenet_mnist_config.yaml"
-ori_model_path = os.path.join(cur_path, "../../../../tests/models/research/cv/")
+ori_model_path = os.path.join(cur_path, "../../../../tests/models/official/cv/")
 train_log_rpath = os.path.join("golden_stick", "scripts", "train", "log")
 
 
@@ -43,7 +43,7 @@ def test_lenet_apply():
     Expectation: apply success and structure of network as expect.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.lenet import LeNet5
     network = LeNet5(10)
     qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900]})
     new_network = qat.apply(network)
@@ -82,7 +82,7 @@ def test_lenet_convert(enable_fusion):
     Expectation: convert success and export MindIR to specified path.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.lenet import LeNet5
     network = LeNet5(10)
     qat = SimQAT({"per_channel": [False, True], "symmetric": [False, True], "quant_delay": [900, 900],
                   "enable_fusion": enable_fusion})
