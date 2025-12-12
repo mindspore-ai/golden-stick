@@ -21,6 +21,7 @@ import gc
 import os
 import copy
 import tqdm
+import numpy as np
 
 from datasets  import Dataset
 from mindspore import dtype, get_context, PYNATIVE_MODE
@@ -79,7 +80,10 @@ def convert_to_dataset(datasets):
     if isinstance(datasets, (GeneratorDataset, RepeatDataset)):
         samples = [sample['input_ids'].asnumpy() \
             for sample in datasets.create_dict_iterator()]
-        return Dataset.from_dict({"input_ids": samples})
+        datasets = Dataset.from_dict({"input_ids": samples})
+        datasets.set_transform(lambda examples:
+                               {"input_ids": np.array(examples["input_ids"])})
+        return datasets
     raise TypeError(f"Unsupported data type: {type(datasets)}. "
                     "Please provide a Dataset, GeneratorDataset or RepeatDataset.")
 
