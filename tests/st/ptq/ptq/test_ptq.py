@@ -91,11 +91,6 @@ class SimpleSwiGLUNet(nn.Cell):
 
     # pylint: disable=unused-argument
     def generate(self, input_ids, do_sample=False, max_new_tokens=1):
-        try:
-            input_ids = np.array(input_ids)
-        except ValueError as e:
-            raise ValueError(str(e) + " Please check your inputs of model.generate(),"
-                                      " and make sure the inputs are padded to same length.") from e
         input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
         return self.construct(Tensor(input_ids, dtype=dtype.float16))
@@ -165,11 +160,6 @@ class SimpleGmmNet(nn.Cell):
 
     # pylint: disable=unused-argument
     def generate(self, input_ids, do_sample=False, max_new_tokens=1):
-        try:
-            input_ids = np.array(input_ids)
-        except ValueError as e:
-            raise ValueError(str(e) + " Please check your inputs of model.generate(),"
-                                      " and make sure the inputs are padded to same length.") from e
         input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
         return self.construct(Tensor(input_ids, dtype=dtype.bfloat16))
@@ -469,11 +459,6 @@ class SimpleNet(nn.Cell):
 
     # pylint: disable=unused-argument
     def generate(self, input_ids, do_sample=False, max_new_tokens=1):
-        try:
-            input_ids = np.array(input_ids)
-        except ValueError as e:
-            raise ValueError(str(e) + " Please check your inputs of model.generate(),"
-                                      " and make sure the inputs are padded to same length.") from e
         input_ids = np.pad(input_ids, ((0, 0), (0, self.foo_seq_length - input_ids.shape[1])), 'constant',
                            constant_values=0)
         return self.construct(Tensor(input_ids, dtype=dtype.float16))
