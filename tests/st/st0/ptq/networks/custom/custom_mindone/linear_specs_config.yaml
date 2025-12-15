@@ -1,0 +1,361 @@
+# LinearSpec configuration for mixed precision network
+# Linear: 2 types nn.Dense and mint.nn.Linear
+# data types: float16, bfloat16, float32
+# quant_policy: a16w4pc_awq, a16w4pg_awq, a16w4pc_gptq, a16w4pg_gptq,
+#               a16w8pc, a8ptknw8pc, a8ptnsw8pc_smoothquant,
+#               a8ptknw8pc_smoothquant, a8ptnsw8pc_osl, a8ptknw8pc_osl,
+#               a8ptknw8pc
+# Total: 66 layers
+# All linear should have the same input_size because those linears share the same input
+
+
+# model configuration
+model_config:
+  input_size: 512
+  output_size: 512
+
+
+# default precision threshold:
+default_precision:
+  cos_sim_thd: 0.999
+  l1_norm_thd: 0.01
+  kl_dvg_thd: 0.01
+
+
+# Layer type configurations
+layer_types:
+# nn.Dense compute_dtype: float16
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a16w4pc_awq"
+    
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a16w4pg_awq"
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a16w4pc_gptq"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a16w4pg_gptq"
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a16w8pc"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_smoothquant"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_smoothquant"   
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_osl"
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc"  
+
+# nn.Dense compute_dtype: bfloat16
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pc_awq"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pg_awq"  
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pc_gptq"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pg_gptq" 
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w8pc"  
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc" 
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_smoothquant" 
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_smoothquant"   
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_osl"  
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_osl"   
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"   
+
+# nn.Dense compute_dtype: float32
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a16w4pc_awq"  
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a16w4pg_awq"   
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a16w4pc_gptq"  
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a16w4pg_gptq"  
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a16w8pc"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_smoothquant"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_smoothquant"    
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "nn.Dense"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_osl"
+
+  - name: "nn.Dense"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+# mint.nn.Linear compute_dtype: float16
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a16w4pc_awq"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a16w4pg_awq"     
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a16w4pc_gptq"   
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a16w4pg_gptq"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a16w8pc"  
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_smoothquant"  
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_smoothquant"   
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_osl"  
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_osl"   
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc"  
+
+# mint.nn.Linear compute_dtype: bfloat16
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pc_awq"   
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pg_awq"      
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pc_gptq"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w4pg_gptq"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a16w8pc"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_smoothquant"   
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_osl" 
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"    
+
+# mint.nn.Linear compute_dtype: float32
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a16w4pc_awq"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a16w4pg_awq"  
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a16w4pc_gptq"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a16w4pg_gptq"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a16w8pc"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_smoothquant"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "mint.nn.Linear"
+    has_bias: False
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_osl"   
+
+  - name: "mint.nn.Linear"
+    has_bias: True
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"

@@ -127,6 +127,7 @@ class AWQSmoothQuantLinearCell(WrapperLinearCell):
                 return config.outliers_suppression == OutliersSuppressionType.AWQ
 
         AWQSmoother.reg_layer_map(nn.Dense, AWQSmoothQuantLinearCell, AWQChecker())
+        AWQSmoother.reg_layer_map(mint.nn.Linear, AWQSmoothQuantLinearCell, AWQChecker())
 
     def __init__(self, linear_name, linear, context, cfg, **kwargs):
         super().__init__(linear_name, linear, context, cfg, **kwargs)

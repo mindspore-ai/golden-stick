@@ -21,7 +21,7 @@ from mindspore import nn, Tensor, dtype as msdtype
 from mindspore import ops as msops
 import mindspore.ops.operations as P
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../mindformers")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../../mindformers")))
 # pylint: disable=wrong-import-position
 from mindformers.parallel_core.inference.tensor_parallel.layers import (
     ColumnParallelLinear,
@@ -41,53 +41,7 @@ from mindformers.parallel_core.inference.parallel_state import (
 )
 from mindformers.parallel_core.transformer_config import TransformerConfig
 
-
-class LinearSpec:
-    """Specification for linear layers"""
-
-    def __init__(self, linear_type, compute_dtype, param_dtype_str,
-                 input_size=None, output_size=None, hidden_size=None,
-                 bias=False, gather_output=False, transpose_b=True,
-                 num_local_experts=None,
-                 head_size=None, total_num_heads=None, total_num_kv_heads=None,
-                 ffn_hidden_size=None,
-                 extra_params=None):
-        self.linear_type = linear_type
-        self.compute_dtype = compute_dtype
-        self.param_dtype_str = param_dtype_str
-        self.input_size = input_size
-        self.output_size = output_size
-        self.hidden_size = hidden_size
-        self.head_size = head_size
-        self.total_num_heads = total_num_heads
-        self.total_num_kv_heads = total_num_kv_heads
-        self.ffn_hidden_size = ffn_hidden_size
-        self.num_local_experts = num_local_experts
-        self.bias = bias
-        self.gather_output = gather_output
-        self.transpose_b = transpose_b
-        if extra_params:
-            param_mapping = {
-                'input_size': 'input_size',
-                'output_size': 'output_size',
-                'hidden_size': 'hidden_size',
-                'num_local_experts': 'num_local_experts',
-                'head_size': 'head_size',
-                'total_num_heads': 'total_num_heads',
-                'total_num_kv_heads': 'total_num_kv_heads',
-                'ffn_hidden_size': 'ffn_hidden_size',
-                'bias': 'bias',
-                'gather_output': 'gather_output',
-                'transpose_b': 'transpose_b',
-            }
-            for key, attr_name in param_mapping.items():
-                if key in extra_params:
-                    setattr(self, attr_name, extra_params[key])
-
-    def name(self):
-        """Return a string representation of the linear spec"""
-        return f"{self.linear_type}-compute_dtype_{self.compute_dtype}-param_dtype_{self.param_dtype_str}"
-
+from tests.st.st0.ptq.networks.custom.linear_info_loader import LinearSpec
 
 class ModelSpec:
     """Specification for the mixed precision model"""

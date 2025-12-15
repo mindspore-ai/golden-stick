@@ -197,7 +197,7 @@ class FakeQuantW8A8DynamicLinearCell(FakeQuantLinearCell):
         if x.shape[0] == 0:
             x = msops.cast(x, self.compute_dtype)
         else:
-            x = self.fake_quant(x)
+            x = self.fake_quant(x.squeeze())
         weight_scale = self.weight_scale.reshape((-1, 1))
         weight_offset = self.weight_offset.reshape((-1, 1))
         weight = self.de_quant(weight, weight_scale, weight_offset)
