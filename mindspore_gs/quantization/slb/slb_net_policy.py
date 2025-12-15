@@ -15,7 +15,7 @@
 """SlbNetPolicy."""
 
 from mindspore.nn.layer import Conv2d
-from mindspore.rewrite import PatternEngine
+from mindspore_gs.quantization.rewrite import PatternEngine
 from mindspore_gs.quantization.net_policy import NetPolicy
 from .slb_layer_policy import ConvLayerPolicy
 from .slb_quant_config import SlbQuantConfig

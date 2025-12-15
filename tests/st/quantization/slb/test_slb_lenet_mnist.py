@@ -41,7 +41,7 @@ def test_lenet_apply(quant_bit, enable_bn_calibration):
     Expectation: Apply success.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.lenet import LeNet5
     network = LeNet5(10)
     qat = None
     if quant_bit == "W4":
@@ -102,7 +102,7 @@ def test_lenet_convert(run_mode, enable_act_quant):
     Expectation: convert success and structure of network as expect.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.lenet import LeNet5
     context.set_context(mode=run_mode)
     network = LeNet5(10)
     config = {"quant_dtype": [QuantDtype.INT8, QuantDtype.INT1], "enable_act_quant": enable_act_quant,
@@ -132,8 +132,8 @@ def lenet_accuracy_bnon(quant_bit, enable_bn_calibration):
     Expectation: accuracy is larger than 0.95.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
-    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.official.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/")
     data_path = os.path.join(mnist_path, "mnist/train")
     ds_train = create_mnist_ds(data_path, 32, 1)
@@ -253,8 +253,8 @@ def test_lenet_accuracy_bnoff_w1a8(quant_bit, enable_bn_calibration, run_mode):
     Expectation: accuracy is larger than 0.95.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
-    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.official.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=run_mode)
     mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/")
     data_path = os.path.join(mnist_path, "mnist/train")
@@ -329,8 +329,8 @@ def test_lenet_accuracy_bnoff(quant_bit, enable_bn_calibration, run_mode):
     Expectation: accuracy is larger than 0.95.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
-    from ....models.research.cv.lenet.src.dataset import create_dataset as create_mnist_ds
+    from ....models.official.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.dataset import create_dataset as create_mnist_ds
     context.set_context(mode=run_mode)
     mnist_path = os.getenv("DATASET_PATH", "/home/workspace/mindspore_dataset/")
     data_path = os.path.join(mnist_path, "mnist/train")

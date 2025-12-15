@@ -15,13 +15,14 @@
 """NetTransform."""
 from typing import Union, Optional
 
-import mindspore
 from mindspore.nn.cell import Cell
-from mindspore.rewrite import PatternEngine, SymbolTree, Node, ScopedValue, NodeType
+
 from mindspore_gs.quantization.quant_cell import QuantCell
+from mindspore_gs.quantization.rewrite import PatternEngine, SymbolTree, Node, ScopedValue, NodeType
+from mindspore_gs.quantization.rewrite.common import namespace as _gs_namespace
 
-
-mindspore.rewrite.common.namespace._subtree_black_list.append(QuantCell)
+# Register QuantCell to the subtree blacklist
+_gs_namespace.add_subtree_blacklist(QuantCell)
 
 
 class NetTransformer:
@@ -38,12 +39,12 @@ class NetTransformer:
             try:
                 self._symbol_tree = SymbolTree.create(net)
                 self._symbol_tree.flatten_static_if_control_flow()
-            except (RuntimeError, ValueError, TypeError, NotImplementedError):
+            except (RuntimeError, ValueError, TypeError, NotImplementedError) as exc:
                 raise RuntimeError(f"For MindSpore Golden Stick, input network type '{type(net).__name__}' "
-                                   f"is not supported right now.")
-            except Exception as e:
-                raise Exception(
-                    f"For MindSpore Golden Stick, analysis input network fail.") from e
+                                   "is not supported right now.") from exc
+            except Exception as exc:
+                raise RuntimeError(
+                    "For MindSpore Golden Stick, analysis input network fail.") from exc
             return
         self._symbol_tree = symbol_tree
 
@@ -73,8 +74,7 @@ class NetTransformer:
         """
 
         for node in self._symbol_tree.nodes():
-            for single_node in NodeUnfolder.unfold_nodes(node):
-                yield single_node
+            yield from NodeUnfolder.unfold_nodes(node)
 
     def nodes(self) -> {}:
         """
@@ -144,8 +144,14 @@ class NetTransformer:
 class NodeUnfolder:
     """
     Unfold nodes from symbol tree.
+    
+    This is a utility class with static methods for unfolding nodes.
     node_type_to_unfold_list: [NodeType.Tree, NodeType.CellContainer]
     """
+
+    def __init__(self):
+        """Initialize NodeUnfolder. This class is used via static methods."""
+        raise RuntimeError("NodeUnfolder should not be instantiated. Use static methods directly.")
 
     @staticmethod
     def _get_nodes_from_cell_container(node: Node):
@@ -153,15 +159,13 @@ class NodeUnfolder:
         for i, sub_node in enumerate(cell_container.nodes()):
             if i == 0 and not sub_node.get_inputs():
                 sub_node.set_arg_providers(0, (cell_container.get_inputs()[0], 0))
-            for single_node in NodeUnfolder.unfold_nodes(Node(sub_node)):
-                yield single_node
+            yield from NodeUnfolder.unfold_nodes(Node(sub_node))
 
     @staticmethod
     def _get_nodes_from_sub_tree(node: Node):
         sub_tree: SymbolTree = node.get_handler().symbol_tree
         for sub_node in sub_tree.nodes():
-            for single_node in NodeUnfolder.unfold_nodes(Node(sub_node)):
-                yield single_node
+            yield from NodeUnfolder.unfold_nodes(Node(sub_node))
 
     @staticmethod
     def unfold_nodes(node: Node):
@@ -170,10 +174,8 @@ class NodeUnfolder:
         """
         node_type: NodeType = node.get_node_type()
         if node_type == NodeType.CellContainer:
-            for unfolded_node in NodeUnfolder._get_nodes_from_cell_container(node):
-                yield unfolded_node
+            yield from NodeUnfolder._get_nodes_from_cell_container(node)
         elif node_type == NodeType.Tree:
-            for unfolded_node in NodeUnfolder._get_nodes_from_sub_tree(node):
-                yield unfolded_node
+            yield from NodeUnfolder._get_nodes_from_sub_tree(node)
         else:
             yield node

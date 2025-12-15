@@ -14,7 +14,7 @@
 # ============================================================================
 """DefaultTrasforms."""
 from collections import OrderedDict
-from mindspore.rewrite import Replacement, PatternNode, Node
+from mindspore_gs.quantization.rewrite import Replacement, PatternNode, Node
 from mindspore import nn
 from .combined import Conv2dBn
 

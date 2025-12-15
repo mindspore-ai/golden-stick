@@ -47,7 +47,7 @@ def test_resnet_apply(run_mode):
 
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/ResNet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    from tests.models.official.cv.ResNet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
     from tests.st.models.resnet import resnet50
 
     mindspore.context.set_context(mode=run_mode, device_target="GPU")
@@ -93,7 +93,7 @@ def test_resnet_convert_fusion(bn_fold, one_conv_fold):
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/ResNet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    from tests.models.official.cv.ResNet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
     from tests.st.models.resnet import resnet50
 
     mindspore.context.set_context(device_target="GPU")
@@ -124,7 +124,7 @@ def test_resnet_convert_no_fusion(bn_fold, one_conv_fold):
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../models/official/cv/ResNet/'))
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../'))
-    from tests.models.official.cv.ResNet.golden_stick.quantization.simqat.simqat import create_simqat
+    from tests.models.official.cv.resnet.golden_stick.quantization.simqat.simqat import create_simqat
     from tests.st.models.resnet import resnet50
 
     mindspore.context.set_context(device_target="GPU")

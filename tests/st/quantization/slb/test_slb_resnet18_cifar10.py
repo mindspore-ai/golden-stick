@@ -127,7 +127,7 @@ def _create_resnet_accuracy_model(quant_bit, enable_bn_calibration, run_mode=con
 
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     import mindspore.dataset as ds
-    from ....models.official.cv.ResNet.src.lr_generator import get_lr
+    from ....models.official.cv.resnet.src.lr_generator import get_lr
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
     from models.resnet import resnet18
 

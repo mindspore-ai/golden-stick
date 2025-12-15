@@ -60,7 +60,7 @@ def _create_resnet_accuracy_model(run_mode=context.GRAPH_MODE):
     """
     sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../'))
     import mindspore.dataset as ds
-    from ....models.official.cv.ResNet.src.lr_generator import get_lr
+    from ....models.official.cv.resnet.src.lr_generator import get_lr
     from mindspore.train.loss_scale_manager import FixedLossScaleManager
     from models.resnet import resnet50
 

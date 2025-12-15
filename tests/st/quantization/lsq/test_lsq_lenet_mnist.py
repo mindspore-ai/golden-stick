@@ -33,7 +33,7 @@ def test_lenet_apply():
     Expectation: Apply success.
     """
 
-    from ....models.research.cv.lenet.src.lenet import LeNet5
+    from ....models.official.cv.lenet.src.lenet import LeNet5
     network = LeNet5(10)
     config = {"per_channel": [False, True], "symmetric": [True, True], "quant_delay": [0, 0]}
     lsq = LearnedQAT(config)
