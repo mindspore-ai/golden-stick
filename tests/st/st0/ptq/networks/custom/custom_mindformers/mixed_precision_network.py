@@ -41,8 +41,6 @@ from mindformers.parallel_core.inference.parallel_state import (
 )
 from mindformers.parallel_core.transformer_config import TransformerConfig
 
-from tests.st.st0.ptq.networks.custom.linear_info_loader import LinearSpec
-
 class ModelSpec:
     """Specification for the mixed precision model"""
 
@@ -75,63 +73,6 @@ class ModelSpec:
         self.num_experts = num_experts
         self.tensor_model_parallel_size = tensor_model_parallel_size
         self.linear_specs = linear_specs[:num_layers] if len(linear_specs) >= num_layers else linear_specs
-
-    @staticmethod
-    def _build_linear_specs_from_configs(configs, num_layers, hidden_dim, num_experts):  # pylint: disable=redefined-outer-name
-        """Build LinearSpec instances from configurations"""
-        linear_specs = []
-        for i in range(num_layers):
-            config_idx = i % len(configs)
-            compute_dtype, param_dtype_str, layer_type, extra_params = configs[config_idx]
-            extra_params = extra_params.copy() if extra_params else {}
-            if layer_type in ['ColumnParallelLinear', 'RowParallelLinear']:
-                linear_specs.append(LinearSpec(
-                    linear_type=layer_type,
-                    compute_dtype=compute_dtype,
-                    param_dtype_str=param_dtype_str,
-                    input_size=hidden_dim,
-                    output_size=hidden_dim,
-                    extra_params=extra_params
-                ))
-            elif layer_type == 'QKVParallelLinear':
-                head_size = extra_params.get('head_size', hidden_dim // 8)
-                total_num_heads = extra_params.get('total_num_heads', 8)
-                total_num_kv_heads = extra_params.get('total_num_kv_heads', 8)
-                linear_specs.append(LinearSpec(
-                    linear_type=layer_type,
-                    compute_dtype=compute_dtype,
-                    param_dtype_str=param_dtype_str,
-                    hidden_size=hidden_dim,
-                    head_size=head_size,
-                    total_num_heads=total_num_heads,
-                    total_num_kv_heads=total_num_kv_heads,
-                    extra_params=extra_params
-                ))
-            elif layer_type == 'MergedColumnParallelLinear':
-                ffn_hidden_size = extra_params.get('ffn_hidden_size', hidden_dim)
-                linear_specs.append(LinearSpec(
-                    linear_type=layer_type,
-                    compute_dtype=compute_dtype,
-                    param_dtype_str=param_dtype_str,
-                    hidden_size=hidden_dim,
-                    ffn_hidden_size=ffn_hidden_size,
-                    extra_params=extra_params
-                ))
-            elif layer_type in ['ColumnParallelGroupedLinear', 'RowParallelGroupedLinear']:
-                num_local_experts = extra_params.get('num_local_experts', num_experts)
-                linear_specs.append(LinearSpec(
-                    linear_type=layer_type,
-                    compute_dtype=compute_dtype,
-                    param_dtype_str=param_dtype_str,
-                    input_size=hidden_dim,
-                    output_size=hidden_dim,
-                    num_local_experts=num_local_experts,
-                    extra_params=extra_params
-                ))
-            else:
-                raise ValueError(f"Unsupported layer type: {layer_type}")
-
-        return linear_specs
 
 
 class GroupedLinearWrapper(nn.Cell):
@@ -448,7 +389,7 @@ class MixedPrecisionNetwork(nn.Cell):
         return MergedWithProjection(merged_linear, proj_linear), False
 
     def _init_weights(self, linear, layer_idx):
-        """Initialize weights with fixed deterministic values in range [-0.01, 0.01]"""
+        """Initialize weights with fixed deterministic values"""
         if not hasattr(self, 'weight_counter'):
             self.weight_counter = 0
 
@@ -456,24 +397,11 @@ class MixedPrecisionNetwork(nn.Cell):
             weight_shape = weight.shape
             weight_dtype = weight.dtype
 
-            if hasattr(weight_dtype, 'as_numpy_dtype'):
-                np_dtype = weight_dtype.as_numpy_dtype()
-            else:
-                dtype_str = str(weight_dtype)
-                if 'float32' in dtype_str:
-                    np_dtype = np.float32
-                elif 'float16' in dtype_str:
-                    np_dtype = np.float16
-                elif 'bfloat16' in dtype_str:
-                    np_dtype = np.float32
-                else:
-                    np_dtype = np.float32
-
             seed = 42 + layer_idx * 1000 + self.weight_counter
             self.weight_counter += 1
 
             np.random.seed(seed)
-            weight_data = np.random.uniform(-0.01, 0.01, size=weight_shape).astype(np_dtype)
+            weight_data = np.random.uniform(-0.01, 0.01, size=weight_shape)
 
             return Tensor(weight_data, dtype=weight_dtype)
 

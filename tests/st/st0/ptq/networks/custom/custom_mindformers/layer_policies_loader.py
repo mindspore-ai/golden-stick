@@ -29,18 +29,32 @@ def get_layer_policy(quant_policy: str):
     """Get layer policy for mixed precision network"""
     if quant_policy == 'a8ptknw8pc':
         a8ptknw8pc = PTQConfig(
-            mode=PTQMode.QUANTIZE,
-            backend=BackendTarget.ASCEND,
             weight_quant_dtype=msdtype.int8,
             act_quant_dtype=msdtype.int8,
             act_quant_granularity=QuantGranularity.PER_TOKEN,
             weight_quant_granularity=QuantGranularity.PER_CHANNEL,
         )
         return a8ptknw8pc
+    if quant_policy == 'a8ptknw8pc_smoothquant':
+        a8ptknw8pc_smoothquant = PTQConfig(
+            weight_quant_dtype=msdtype.int8,
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TOKEN,
+            weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+            outliers_suppression=OutliersSuppressionType.SMOOTH,
+        )
+        return a8ptknw8pc_smoothquant
+    if quant_policy == 'a8ptnsw8pc':
+        a8ptnsw8pc = PTQConfig(
+            weight_quant_dtype=msdtype.int8,
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TOKEN,
+            weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+            opname_blacklist=['pre_layer']
+        )
+        return a8ptnsw8pc
     if quant_policy == 'a8ptnsw8pc_smoothquant':
         a8ptnsw8pc_smoothquant = PTQConfig(
-            mode=PTQMode.QUANTIZE,
-            backend=BackendTarget.ASCEND,
             weight_quant_dtype=msdtype.int8,
             act_quant_dtype=msdtype.int8,
             act_quant_granularity=QuantGranularity.PER_TENSOR,
@@ -48,12 +62,20 @@ def get_layer_policy(quant_policy: str):
             outliers_suppression=OutliersSuppressionType.SMOOTH,
         )
         return a8ptnsw8pc_smoothquant
+    if quant_policy == 'a8ptnsw8pc_osl':
+        a8ptnsw8pc_osl = PTQConfig(
+            weight_quant_dtype=msdtype.int8,
+            act_quant_dtype=msdtype.int8,
+            act_quant_granularity=QuantGranularity.PER_TENSOR,
+            weight_quant_granularity=QuantGranularity.PER_CHANNEL,
+            outliers_suppression=OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE,
+            opname_blacklist=['pre_layer']
+        )
+        return a8ptnsw8pc_osl
     if quant_policy == "a8ptknw4pg":
         gptq_config_128 = GPTQQuantConfig(
             block_size=128, desc_act=True, static_groups=True, damp_percent=0.1)
         a8ptknw4pg = PTQConfig(
-            mode=PTQMode.QUANTIZE,
-            backend=BackendTarget.ASCEND,
             weight_quant_dtype=msdtype.qint4x2,
             act_quant_dtype=msdtype.int8,
             act_quant_granularity=QuantGranularity.PER_TOKEN,

@@ -143,6 +143,40 @@ class DynamicFakeQuant(nn.Cell):
         return x
 
 
+class SmoothDynamicQuant(nn.Cell):
+    """SmoothDynamicQuant"""
+    def __init__(self, dst_type=msdtype.int8):
+        super().__init__()
+        self.dst_type = dst_type
+
+    def construct(self, x, smooth_scale):
+        """construct"""
+        x = x * smooth_scale
+        x_max = msops.max(x, axis=1)[0]
+        x_min = msops.min(x, axis=1)[0]
+        x_max = msops.maximum(msops.abs(x_max), msops.abs(x_min))
+        scale = msops.mul(x_max, 2) / (127 + 128)
+        scale = msops.reshape(scale, (-1, 1))
+        x = x / scale
+        x = msops.round(x)
+        x = msops.clip(x, -128., 127.)
+        return msops.cast(x, self.dst_type), scale
+
+
+class SmoothDynamicFakeQuant(nn.Cell):
+    """SmoothDynamicFakeQuant"""
+    def __init__(self, quant_dtype, dst_dtype=msdtype.int8):
+        super().__init__()
+        self.quant = SmoothDynamicQuant(quant_dtype)
+        self.de_quant = DynamicDeQuant(dst_dtype)
+
+    def construct(self, x, smooth_scale):
+        x, scale = self.quant(x, smooth_scale)
+        x = self.de_quant(x, scale)
+        x = x / smooth_scale
+        return x
+
+
 class GMMDeQuant(nn.Cell):
     """DeQuant"""
     def __init__(self, dst_type):

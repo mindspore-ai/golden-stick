@@ -14,25 +14,25 @@
 # ============================================================================
 """Run mixed precision network PTQ test with configurable parameters via args"""
 import os
+import sys
 from collections import OrderedDict
 
 import numpy as np
 import mindspore as ms
 from mindspore import dtype as msdtype
 
-from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode
 from mindspore_gs.common import BackendTarget
+from mindspore_gs.ptq import PTQ, PTQConfig, PTQMode
 from mindspore_gs.ptq.ptq_config import (
     QuantGranularity, PrecisionRecovery, GPTQQuantConfig
 )
-
 from layer_policies_loader import create_layer_policies_for_mindformers
 from mixed_precision_network import create_mixed_precision_network
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../../../")))
 from tests.st.st0.ptq.networks.custom.linear_info_loader import load_linear_info_from_config
 from tests.st.st0.ptq.networks.custom.common_utils import (
     create_test_input, create_linear_ds, get_save_file_name)
-from tests.st.precision_utils import PrecisionChecker # pylint: disable=wrong-import-position
-
+from tests.st.precision_utils import PrecisionChecker
 
 def quant_net(hidden_size, num_experts, linear_specs):
     """Quantize network: save quantized weights to ./mixed_precision_quant.ckpt, return original float output"""
@@ -133,7 +133,7 @@ def infer_net(hidden_size, num_experts, linear_specs):
     )
 
     ms.set_context(device_target="Ascend",
-                   mode=ms.GRAPH_MODE,
+                   mode=ms.PYNATIVE_MODE,
                    jit_config={"jit_level": "O0", "infer_boost": "on"},
                    deterministic="ON")
     base_config = PTQConfig(

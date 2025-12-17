@@ -118,15 +118,15 @@ def get_layer_policy(quant_policy: str):
             opname_blacklist=['pre_layer']
         )
         return a8ptknw8pc_osl
-    if quant_policy == 'a8ptknw8pc':
-        a8ptknw8pc = PTQConfig(
+    if quant_policy == 'a8ptnsw8pc':
+        a8ptnsw8pc = PTQConfig(
             weight_quant_dtype=msdtype.int8,
             act_quant_dtype=msdtype.int8,
             act_quant_granularity=QuantGranularity.PER_TOKEN,
             weight_quant_granularity=QuantGranularity.PER_CHANNEL,
             opname_blacklist=['pre_layer']
         )
-        return a8ptknw8pc
+        return a8ptnsw8pc
     raise ValueError(f"Unsupported quant policy: {quant_policy}")
 
 

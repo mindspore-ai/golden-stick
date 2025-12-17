@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""36-layer mixed precision network PTQ test case.
-Standard Linear: 24 layers, GroupedLinear: 12 layers.
-"""
+"""Mixed precision network PTQ test case."""
 from pathlib import Path
 import os
 import subprocess
@@ -68,7 +66,7 @@ class TestMixedPrecisionPTQ:
     @pytest.mark.env_onecard
     def test_mf_single_card_mixed_precision_ptq(self):  # pylint: disable=redefined-outer-name
         """
-        Feature: Quantize and evaluate 36-layer parallel mixed precision mindformers network with PTQ algorithm.
+        Feature: Quantize and evaluate parallel mixed precision network with PTQ algorithm.
         Description: Test PTQ fake quantization inference for mixed precision network on single card.
         Expectation: Precision check should pass for all layers.
         """
