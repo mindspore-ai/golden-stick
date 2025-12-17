@@ -241,6 +241,7 @@ class VLPTQTester(ABC):
         self.dataset_path = dataset_path
         self.output_dir = output_dir
         self.test_image_url = test_image_url
+        self.processor = AutoProcessor.from_pretrained(self.model_path)
 
         # Create temporary output directory if not specified
         if not os.path.exists(self.output_dir):
@@ -320,8 +321,6 @@ class VLPTQTester(ABC):
     def calibrate_model(self):
         """Calibrate VL model"""
         os.environ['MS_DISABLE_INTERNAL_KERNELS_LIST'] = "FlashAttentionScore"
-        print("Create processor...")
-        self.processor = AutoProcessor.from_pretrained(self.model_path)
 
         print("Create calibration datasets...")
         ds = self.create_calib_datasets()
@@ -387,7 +386,7 @@ class VLPTQTester(ABC):
 
             print("VL PTQ test completed successfully!")
             return True
-
+        # pylint: disable=W0718
         except Exception as e:
             print(f"VL PTQ test failed: {str(e)}")
             return False
