@@ -24,7 +24,7 @@ from mindformers.parallel_core.inference.tensor_parallel.grouped_layers import (
     ColumnParallelGroupedLinear,
     RowParallelGroupedLinear
 )
-from mindspore import dtype, Parameter
+from mindspore import dtype, Parameter, Tensor
 from mindspore_gs.common import logger
 from mindspore_gs.ptq.ptq_config import PTQMode, QuantGranularity
 from mindspore_gs.ptq.context import InnerPTQConfig
@@ -142,6 +142,9 @@ class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
         del self.layer.weight
         self.layer.weight = None
         self.weight = q_weight
+        self.has_smooth = dynamic_quant_op.smooth_scale is not None
+        if self.has_smooth:
+            self.smooth_scale = Parameter(Tensor(dynamic_quant_op.smooth_scale.asnumpy()))
         self.weight_scale = Parameter(w_qparam.scale.astype(compute_type))
         self.weight_offset = Parameter(w_qparam.zero_point.astype(dtype.int32))
         self.has_bias = self.layer.has_bias
@@ -158,4 +161,6 @@ class DynamicQuantMcoreLinearInferCell(McoreLinearInferCell):
         }
         if self.has_bias:
             quant_type.update({self.bias.name: QuantType.W4A8_DYNAMIC.value})
+        if self.has_smooth:
+            quant_type.update({self.smooth_scale.name: QuantType.W8A8_DYNAMIC.value})
         return quant_type

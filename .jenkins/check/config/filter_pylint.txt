@@ -175,6 +175,8 @@
 "golden-stick/tests/st/ptq/ptq/deepseekv3_weight_processor.py"                                           "wrong-import-position"
 "golden-stick/tests/st/ptq/rtn/test_rtn.py"                                                              "wrong-import-position"
 "golden-stick/tests/st/st0/ptq/models/test_auto_model.py"                                                "wrong-import-position"
+"golden-stick/tests/st/st0/ptq/networks/custom/custom_mindformers/run_mixed_precision_ptq.py"            "wrong-import-position"
+"golden-stick/tests/st/st0/ptq/networks/custom/custom_mindone/run_mixed_precision_ptq.py"                "wrong-import-position"
 "golden-stick/tests/st/st0/ptq/plugins/test_mindformers_plugin.py"                                       "wrong-import-position"
 "golden-stick/tests/st/st0/ptq/plugins/test_mindone_plugin.py"                                           "wrong-import-position"
 "golden-stick/tests/st/ut/ptq/models/test_auto_model.py"                                                 "wrong-import-position"

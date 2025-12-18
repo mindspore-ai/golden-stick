@@ -14,6 +14,7 @@
 # ============================================================================
 """Run mixed precision network PTQ test with configurable parameters via args"""
 import os
+import sys
 import shutil
 
 import numpy as np
@@ -22,13 +23,13 @@ import mindspore as ms
 from mindspore import dtype as msdtype
 
 from mindspore_gs.ptq import PTQConfig
-
 from mixed_precision_network import MixedPrecisionMindOneNetwork
 from layer_policies_loader import create_layer_policies_for_mindone
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../../../")))
 from tests.st.st0.ptq.networks.custom.linear_info_loader import load_linear_info_from_config
 from tests.st.st0.ptq.networks.custom.common_utils import (
     create_test_input, create_linear_ds, convert_to_tensor)
-from tests.st.precision_utils import PrecisionChecker # pylint: disable=wrong-import-position
+from tests.st.precision_utils import PrecisionChecker
 
 def quant_net(hidden_size, linear_specs):
     """Quantize network: save quantized weights to ./mixed_precision_quant.ckpt, return original float output"""

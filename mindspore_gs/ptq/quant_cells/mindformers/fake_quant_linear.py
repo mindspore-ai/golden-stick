@@ -37,7 +37,8 @@ from .fake_quant_base import (
     SmoothFakeQuant,
     FakeQuant,
     DeQuant,
-    DynamicFakeQuant)
+    DynamicFakeQuant,
+    SmoothDynamicFakeQuant)
 
 class FakeQuantW8A8LinearMethod(LinearMethodBase):
     """Linear method without quantization."""
@@ -68,7 +69,7 @@ class FakeQuantW8A8LinearMethod(LinearMethodBase):
                 input_scale = layer.input_scale * layer.smooth_scale
                 x = self.fake_quant(x, layer.smooth_scale, input_scale, layer.input_offset)
             else:
-                x = self.fake_quant(x, layer.input_scale, layer.input_offset)
+                x = self.fake_quant(x, 1.0 / layer.input_scale, layer.input_offset)
         weight_scale = layer.weight_scale.reshape((-1, 1))
         weight_offset = layer.weight_offset.reshape((-1, 1))
         weight = self.de_quant(weight, weight_scale, weight_offset)
@@ -115,10 +116,13 @@ class FakeQuantW8A8LinearCell(FakeQuantLinearCell):
         self.is_act_quant = self.cfg.act_quant_dtype == msdtype.int8
         self.has_smooth = self.cfg.outliers_suppression in (OutliersSuppressionType.SMOOTH,
                                                             OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
-
-        self.input_scale = Parameter(initializer("ones", (self.ic,), self.compute_dtype))
+        if self.has_smooth:
+            self.input_scale = Parameter(initializer("ones", (self.ic,), self.compute_dtype))
+            self.input_offset = Parameter(initializer("zeros", (self.ic,), msdtype.int32))
+        else:
+            self.input_scale = Parameter(initializer("ones", (1,), self.compute_dtype))
+            self.input_offset = Parameter(initializer("zeros", (1,), msdtype.float16))
         self.smooth_scale = Parameter(initializer("ones", (self.ic,), self.compute_dtype))
-        self.input_offset = Parameter(initializer("zeros", (self.ic,), msdtype.int32))
         self.weight_scale = Parameter(initializer("ones", (self.output_size_per_partition,), self.compute_dtype))
         self.weight_offset = Parameter(initializer("zeros", (self.output_size_per_partition,), msdtype.int32))
         self.weight = Parameter(initializer("zeros", linear.weight.shape, msdtype.int8))
@@ -129,13 +133,16 @@ class FakeQuantW8A8LinearCell(FakeQuantLinearCell):
 class FakeQuantW8A8DynamicLinearMethod(LinearMethodBase):
     """Linear method without quantization."""
     def __init__(self, layer_name, quant_method: LinearMethodBase, output_dtype,
-                 is_act_quant=True):
+                 is_act_quant=True, has_smooth=True):
         super().__init__()
         self.layer_name = layer_name
         self.quant_method = quant_method
         self.is_act_quant = is_act_quant
-
-        self.fake_quant = DynamicFakeQuant(msdtype.int8, output_dtype)
+        self.has_smooth = has_smooth
+        if has_smooth:
+            self.fake_quant = SmoothDynamicFakeQuant(msdtype.int8, output_dtype)
+        else:
+            self.fake_quant = DynamicFakeQuant(msdtype.int8, output_dtype)
         self.de_quant = DeQuant(output_dtype)
 
     def create_weights(self, layer: nn.Cell, input_size_per_partition: int,
@@ -143,12 +150,18 @@ class FakeQuantW8A8DynamicLinearMethod(LinearMethodBase):
         raise NotImplementedError
 
     def apply(self, layer: nn.Cell, x: Tensor, weight: Tensor, bias: Parameter = None):
+        """apply"""
         if self.is_act_quant:
-            x = self.fake_quant(x)
+            if self.has_smooth:
+                x = self.fake_quant(x, layer.smooth_scale)
+            else:
+                x = self.fake_quant(x)
 
         weight_scale = layer.weight_scale.reshape((-1, 1))
         weight_offset = layer.weight_offset.reshape((-1, 1))
         weight = self.de_quant(weight, weight_scale, weight_offset)
+        if self.has_smooth:
+            weight = weight * layer.smooth_scale
         return self.quant_method.apply(layer, x, weight, bias)
 
 
@@ -182,17 +195,21 @@ class FakeQuantW8A8DynamicWrapper(QuantCell):
 
 
 class FakeQuantW8A8DynamicLinearCell(FakeQuantLinearCell):
-    """FakeQuantW4A8DynamicLinearCell"""
+    """FakeQuantW8A8DynamicLinearCell"""
     # pylint: disable=unused-argument
     def __init__(self, layer_name, linear: LinearBase, context, cfg: InnerPTQConfig):
         super().__init__(layer_name, linear, context, cfg)
         self.is_act_quant = self.cfg.act_quant_dtype == msdtype.int8
+        self.has_smooth = self.cfg.outliers_suppression in (OutliersSuppressionType.SMOOTH,
+                                                            OutliersSuppressionType.OUTLIER_SUPPRESSION_LITE)
 
         self.weight_scale = Parameter(initializer("ones", (self.output_size_per_partition,), self.compute_dtype))
         self.weight_offset = Parameter(initializer("zeros", (self.output_size_per_partition,), msdtype.int32))
         self.weight = Parameter(initializer("zeros", linear.weight.shape, msdtype.int8))
+        if self.has_smooth:
+            self.smooth_scale = Parameter(initializer("ones", (self.ic,), self.compute_dtype))
         self.quant_method = FakeQuantW8A8DynamicLinearMethod(layer_name, linear.quant_method, self.compute_dtype,
-                                                             self.is_act_quant)
+                                                             self.is_act_quant, self.has_smooth)
 
 
 class FakeQuantW4A8DynamicLinearMethod(LinearMethodBase):

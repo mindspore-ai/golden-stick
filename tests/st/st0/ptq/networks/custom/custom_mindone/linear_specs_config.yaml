@@ -78,7 +78,7 @@ layer_types:
   - name: "nn.Dense"
     has_bias: True
     compute_dtype: "float16"
-    quant_policy: "a8ptknw8pc"  
+    quant_policy: "a8ptnsw8pc"  
 
 # nn.Dense compute_dtype: bfloat16
   - name: "nn.Dense"
@@ -134,7 +134,7 @@ layer_types:
   - name: "nn.Dense"
     has_bias: True
     compute_dtype: "bfloat16"
-    quant_policy: "a8ptknw8pc"   
+    quant_policy: "a8ptnsw8pc"   
 
 # nn.Dense compute_dtype: float32
   - name: "nn.Dense"
@@ -190,7 +190,7 @@ layer_types:
   - name: "nn.Dense"
     has_bias: True
     compute_dtype: "float32"
-    quant_policy: "a8ptknw8pc"
+    quant_policy: "a8ptnsw8pc"
 
 # mint.nn.Linear compute_dtype: float16
   - name: "mint.nn.Linear"
@@ -246,7 +246,7 @@ layer_types:
   - name: "mint.nn.Linear"
     has_bias: True
     compute_dtype: "float16"
-    quant_policy: "a8ptknw8pc"  
+    quant_policy: "a8ptnsw8pc"  
 
 # mint.nn.Linear compute_dtype: bfloat16
   - name: "mint.nn.Linear"
@@ -302,7 +302,7 @@ layer_types:
   - name: "mint.nn.Linear"
     has_bias: True
     compute_dtype: "bfloat16"
-    quant_policy: "a8ptknw8pc"    
+    quant_policy: "a8ptnsw8pc"    
 
 # mint.nn.Linear compute_dtype: float32
   - name: "mint.nn.Linear"
@@ -358,4 +358,4 @@ layer_types:
   - name: "mint.nn.Linear"
     has_bias: True
     compute_dtype: "float32"
-    quant_policy: "a8ptknw8pc"
+    quant_policy: "a8ptnsw8pc"

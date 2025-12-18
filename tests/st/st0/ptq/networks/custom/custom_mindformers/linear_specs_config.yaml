@@ -1,6 +1,5 @@
 # LinearSpec configuration for mixed precision network
-# Standard Linear: 4 types × 3 data types × 2 strategies = 24 layers
-# GroupedLinear: 2 types × 3 data types × 2 strategies = 12 layers
+# Standard Linear: 4 types × 3 data types × 5 strategies = 60 layers
 # Total: 36 layers
 
 
@@ -29,24 +28,60 @@ layer_types:
     quant_policy: "a8ptknw8pc"
 
   - name: "ColumnParallelLinear"
-    compute_dtype: "bfloat16"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_smoothquant"
 
   - name: "ColumnParallelLinear"
-    compute_dtype: "float32"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc"
 
   - name: "ColumnParallelLinear"
     compute_dtype: "float16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "ColumnParallelLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "ColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "ColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "ColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "ColumnParallelLinear"
     compute_dtype: "bfloat16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "ColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "ColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "ColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "ColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "ColumnParallelLinear"
     compute_dtype: "float32"
     quant_policy: "a8ptnsw8pc_smoothquant"
+
+  - name: "ColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_osl"
 
 # RowParallelLinear
   - name: "RowParallelLinear"
@@ -54,24 +89,60 @@ layer_types:
     quant_policy: "a8ptknw8pc"
 
   - name: "RowParallelLinear"
-    compute_dtype: "bfloat16"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_smoothquant"
 
   - name: "RowParallelLinear"
-    compute_dtype: "float32"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc"
 
   - name: "RowParallelLinear"
     compute_dtype: "float16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "RowParallelLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "RowParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "RowParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "RowParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "RowParallelLinear"
     compute_dtype: "bfloat16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "RowParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "RowParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "RowParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "RowParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "RowParallelLinear"
     compute_dtype: "float32"
     quant_policy: "a8ptnsw8pc_smoothquant"
+
+  - name: "RowParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_osl"
 
 # QKVParallelLinear
   - name: "QKVParallelLinear"
@@ -79,24 +150,60 @@ layer_types:
     quant_policy: "a8ptknw8pc"
 
   - name: "QKVParallelLinear"
-    compute_dtype: "bfloat16"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_smoothquant"
 
   - name: "QKVParallelLinear"
-    compute_dtype: "float32"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc"
 
   - name: "QKVParallelLinear"
     compute_dtype: "float16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "QKVParallelLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "QKVParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "QKVParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "QKVParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "QKVParallelLinear"
     compute_dtype: "bfloat16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "QKVParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "QKVParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "QKVParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "QKVParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "QKVParallelLinear"
     compute_dtype: "float32"
     quant_policy: "a8ptnsw8pc_smoothquant"
+
+  - name: "QKVParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_osl"
 
 # MergedColumnParallelLinear
   - name: "MergedColumnParallelLinear"
@@ -104,21 +211,57 @@ layer_types:
     quant_policy: "a8ptknw8pc"
 
   - name: "MergedColumnParallelLinear"
-    compute_dtype: "bfloat16"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc_smoothquant"
 
   - name: "MergedColumnParallelLinear"
-    compute_dtype: "float32"
-    quant_policy: "a8ptknw8pc"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc"
 
   - name: "MergedColumnParallelLinear"
     compute_dtype: "float16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "MergedColumnParallelLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "MergedColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "MergedColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "MergedColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "MergedColumnParallelLinear"
     compute_dtype: "bfloat16"
     quant_policy: "a8ptnsw8pc_smoothquant"
 
   - name: "MergedColumnParallelLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptnsw8pc_osl"
+
+  - name: "MergedColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "MergedColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc_smoothquant"
+
+  - name: "MergedColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc"
+
+  - name: "MergedColumnParallelLinear"
     compute_dtype: "float32"
     quant_policy: "a8ptnsw8pc_smoothquant"
+
+  - name: "MergedColumnParallelLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptnsw8pc_osl"
