@@ -52,7 +52,7 @@ class GSM8KDataset(BaseDataset):
                     break
         total_items = 0
         total_items = self._dataset_based_on_mode(sources, targets, total_items)
-        logger.info("Find %d total data items", total_items)
+        logger.info(f"Find {total_items} total data items")
 
     def _dataset_based_on_mode(self, sources, targets, total_items):
         """create dataset based on mode"""

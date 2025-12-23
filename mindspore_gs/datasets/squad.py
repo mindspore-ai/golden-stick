@@ -35,7 +35,7 @@ class SQuADDataset(BaseDataset):
     def _load(self):
         """Load and preprocess squad dataset."""
         input_file = pathlib.Path(self.path)
-        with input_file.open() as f:
+        with input_file.open(encoding='utf-8') as f:
             file = json.load(f)
         sources = []
         targets = []
@@ -55,7 +55,7 @@ class SQuADDataset(BaseDataset):
                 break
         total_items = 0
         total_items = self._dataset_based_on_mode(sources, targets, total_items)
-        logger.info("Find %d total data items", total_items)
+        logger.info(f"Find {total_items} total data items")
 
 
 def create_squad_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,
