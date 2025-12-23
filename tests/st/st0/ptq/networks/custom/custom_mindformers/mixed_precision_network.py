@@ -99,15 +99,11 @@ class GroupedLinearWrapper(nn.Cell):
             raise ValueError(f"Unsupported input shape for grouped linear: {original_shape}")
 
         if group_list is None:
-            samples_per_expert = total_elements // self.num_experts
-            remainder = total_elements % self.num_experts
-            group_list_values = []
-            cumulative = 0
-            for i in range(self.num_experts):
-                expert_samples = samples_per_expert + (1 if i < remainder else 0)
-                cumulative += expert_samples
-                group_list_values.append(cumulative)
-            group_list = Tensor(group_list_values, dtype=msdtype.int64)
+            expert_counts = np.random.multinomial(
+                total_elements,
+                np.ones(self.num_experts) / self.num_experts
+            )
+            group_list = Tensor(expert_counts, dtype=msdtype.int64)
 
         output_2d = self.linear(x_2d, group_list=group_list)
 
