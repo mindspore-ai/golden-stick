@@ -140,7 +140,7 @@ class CEvalDataset(BaseDataset):
 
         total_items = 0
         total_items = self._dataset_based_on_mode(subjects, sources, targets, total_items)
-        logger.info("Find %d total data items", total_items)
+        logger.info(f"Find {total_items} total data items")
 
     # pylint: disable=arguments-differ
     def _dataset_based_on_mode(self, subjects, sources, targets, total_items):

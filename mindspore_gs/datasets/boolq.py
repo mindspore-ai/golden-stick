@@ -55,7 +55,7 @@ class BoolQDataset(BaseDataset):
                     break
         total_items = 0
         total_items = self._dataset_based_on_mode(sources, targets, total_items)
-        logger.info("Find %d total data items", total_items)
+        logger.info(f"Find {total_items} total data items")
 
 
 def create_boolq_dataset(ds_path: str, mode: str, bs: int, seq_length: int, tokenizer: callable,

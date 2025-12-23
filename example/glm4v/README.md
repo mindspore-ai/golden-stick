@@ -64,14 +64,14 @@ pip install -e .
 
 ### 2.2 量化权重生成
 
-使用`quant.py`脚本进行模型量化。该脚本支持多种量化算法，默认使用`a8w8_osl`算法。
+使用`calibrate.py`脚本进行模型量化。该脚本支持多种量化算法，默认使用`a8w8_osl`算法。
 
 #### 基本用法
 
 下载校准数据：[lmms-lab/textvqa](https://huggingface.co/datasets/lmms-lab/textvqa)
 
 ```bash
-python quant.py -m zai-org/GLM-4.1V-9B-Thinking -q a8w8_osl -d /path/to/textvqa -o ./quant_model_a8w8_osl -b ascend
+python calibrate.py -m zai-org/GLM-4.1V-9B-Thinking -q a8w8_osl -d /path/to/textvqa -o ./quant_model_a8w8_osl -b ascend
 ```
 
 #### 参数说明
