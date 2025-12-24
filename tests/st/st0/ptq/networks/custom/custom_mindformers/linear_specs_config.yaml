@@ -22,6 +22,56 @@ default_precision:
 
 # Layer type configurations
 layer_types:
+# ColumnParallelGroupedLinear
+  - name: "ColumnParallelGroupedLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "ColumnParallelGroupedLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw4pg"
+
+  - name: "ColumnParallelGroupedLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "ColumnParallelGroupedLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw4pg"
+
+  - name: "ColumnParallelGroupedLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "ColumnParallelGroupedLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw4pg"
+
+# RowParallelGroupedLinear
+  - name: "RowParallelGroupedLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw8pc"
+  
+  - name: "RowParallelGroupedLinear"
+    compute_dtype: "float16"
+    quant_policy: "a8ptknw4pg"
+
+  - name: "RowParallelGroupedLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "RowParallelGroupedLinear"
+    compute_dtype: "bfloat16"
+    quant_policy: "a8ptknw4pg"
+  
+  - name: "RowParallelGroupedLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw8pc"
+
+  - name: "RowParallelGroupedLinear"
+    compute_dtype: "float32"
+    quant_policy: "a8ptknw4pg"
+
 # ColumnParallelLinear
   - name: "ColumnParallelLinear"
     compute_dtype: "float16"
