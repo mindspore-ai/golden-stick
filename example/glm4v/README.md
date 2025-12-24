@@ -29,12 +29,12 @@ GLM-4.1V（GLM-4.1 Vision）是由智谱AI开发的多模态大语言模型，�
 
 | 量化算法 | 说明 | 激活量化 | 权重量化 |
 |---------|------|---------|---------|
-| a8w8_smooth_quant | SmoothQuant算法，通过平滑激活值分布提升量化精度 | int8 | int8 |
-| a8w8_osl | OutlierSuppressionLite算法，为每个矩阵搜索最优超参α值 | int8 | int8 |
-| a16w8 | 仅权重量化，激活保持FP16 | FP16 | int8 |
-| a8dyw8 | 动态per-token激活量化 | int8 (per-token) | int8 |
-| a16w4_awq | AWQ算法，激活感知权重量化 | FP16 | qint4x2 (per-group) |
-| a16w4_gptq | GPTQ算法，逐层补偿量化误差 | FP16 | qint4x2 (per-group) |
+| a8w8_smooth_quant | SmoothQuant算法，通过平滑激活值分布提升量化精度。基础版本的激活/权重8bit量化，吞吐和显存均能提升。 | int8 | int8 |
+| a8w8_osl | OutlierSuppressionLite算法，为每个矩阵搜索最优超参α值。精度更高的激活/权重8bit量化，吞吐和显存与SmoothQuant一致，但是在量化参数搜索时会耗费更长的时间。 | int8 | int8 |
+| a16w8 | 仅权重量化，激活保持FP16。显存有收益，吞吐没有收益。 | FP16 | int8 |
+| a8dyw8 | 动态per-token激活量化。激活pertoken量化，精度更高。 | int8 (per-token) | int8 |
+| a16w4_awq | AWQ算法，激活感知权重量化。权重4比特量化，显存占用更少。 | FP16 | qint4x2 (per-group) |
+| a16w4_gptq | GPTQ算法，逐层补偿量化误差。权重4比特量化，显存占用更少。 | FP16 | qint4x2 (per-group) |
 
 ## 2. 快速开始
 
@@ -102,7 +102,7 @@ python quant.py -m zai-org/GLM-4.1V-9B-Thinking -q a8w8_osl -d /path/to/textvqa 
 
 - **多模态输入**：GLM-4.1V模型需要包含图像和文本的多模态校准数据集
 - **量化范围**：默认会排除视觉编码器（`visual`）和语言模型头部（`lm_head`），仅对语言模型主体进行量化
-- **校准样本数**：默认使用5个样本进行校准，可根据需要调整`create_calib_datasets`函数中的`num_samples`参数
+- **校准样本数**：默认使用200个样本进行校准，可根据需要调整`create_calib_datasets`函数中的`num_samples`参数
 - **量化后的模型**：会保存为HuggingFace格式，可直接用于推理
 - **校准时间**：部分量化算法（如AWQ、GPTQ）需要较长的校准时间，建议使用较少的校准样本进行快速测试
 
@@ -142,7 +142,7 @@ A: 修改`create_calib_datasets`函数，可以：
 
 - 更换数据集路径（支持HuggingFace数据集或本地JSONL文件）
 - 修改数据预处理逻辑（`preprocess_and_tokenizer`函数）
-- 调整样本数量（修改`num_samples`参数，默认5个样本）
+- 调整样本数量（修改`num_samples`参数，默认200个样本）
 
 ## 5. 参考资源
 
