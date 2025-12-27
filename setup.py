@@ -20,7 +20,6 @@ import sys
 import re
 import stat
 import shutil
-import time
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
@@ -212,9 +211,7 @@ def get_install_requires():
 
 # Get install_requires from requirements file based on environment variable
 install_requires = get_install_requires()
-version_num = version_from_file()
-date_str = time.strftime('%Y%m%d', time.localtime())
-version = f"{version_num}.dev{date_str}"
+version = version_from_file()
 
 
 setup(
