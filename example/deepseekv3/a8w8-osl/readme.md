@@ -41,12 +41,10 @@ ASCEND_RT_VISIBLE_DEVICES=xxx bash calibrate.sh /path/to/ceval-dataset/dev
 
 2. 获取量化后权重的描述文件：quantized_model/quantization_description.json和quantized_model_unified/*.safetensors.index.json放置到目标路径。
 
-3. 制作权重config：将原始浮点权重中的config.json拷贝至目标路径，并将文件中的"quantization_config"配置修改为：
+3. 制作权重config：将原始浮点权重中的config.json拷贝至目标路径，并将文件中的"quantization_config"配置删除（如有），并添加如下配置：
 
-   ```json
-   "quantization_config": {
-     "quant_method": "golden-stick"
-   }
-   ```
+  ```json
+   "quantization": "golden-stick"
+  ```
 
 4. 复用浮点tokenizer：将原始浮点权重中的tokenizer_config.json和tokenizer.json拷贝至目标路径。
