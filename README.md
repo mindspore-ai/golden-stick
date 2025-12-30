@@ -22,6 +22,8 @@ MindSpore Golden Stick is a model compression tool jointly designed and develope
 
 ## What's New🔥
 
+* [2025/12] **v1.4.0 Release**: Completed framework pluginization refactoring with MindONE backend support, integrating mainstream quantization algorithms including OSL, SmoothQuant, AWQ, GPTQ, A16W8, A8dynW8, and A8W4, validated on models such as glm4v and qwen3.
+* [2025/12] **Multimodal Model Quantization**: Added support for quantization of multimodal understanding models, successfully validating the OSL-A8W8 quantization scheme for the qwen3-vl network under MindONE framework.
 * [2025/09] OutlierSuppressionLite provides higher precision A8W8 quantization capabilities.
 * [2025/09] Combined OutlierSuppressionLite and GPTQ algorithms to achieve A8W4 quantization for DeepSeekV3/R1 networks, further lowering the deployment threshold for full-featured DeepSeek. Quantized weights can be found at [Modelers](https://modelers.cn/models/MindSpore-Lab/R1-0528-A8W4).
 * [2025/09] Support for [Transformers-Like-API](https://www.mindspore.cn/golden_stick/docs/en/master/ptq/mindspore_gs.ptq.AutoQuantForCausalLM.html#mindspore_gs.ptq.AutoQuantForCausalLM) and support for saving weights in Hugging Face format, see [BaseQuantForCausalLM](https://www.mindspore.cn/golden_stick/docs/en/master/ptq/mindspore_gs.ptq.BaseQuantForCausalLM.html#mindspore_gs.ptq.BaseQuantForCausalLM.save_quantized) interface for details.

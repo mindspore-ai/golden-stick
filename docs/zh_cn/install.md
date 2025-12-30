@@ -29,10 +29,11 @@ MindSpore Golden Stick版本有以下五个维护阶段：
 
 | MindSpore Golden Stick版本 | 当前状态  |   发布时间  |         后续状态         |   EOL日期   |
 | :---------------------: | :--------: | :--------: | :--------------------: | :--------: |
+|          1.4.0          |  维护       | 2026-01-04 | 预计2026-07-04终止维护   | 2026-10-04 |
 |          1.3.0          |  维护       | 2025-10-23 | 预计2026-04-23终止维护   | 2026-07-23 |
 |          1.2.0          |  维护       | 2025-08-13 | 预计2026-02-13终止维护   | 2026-05-13 |
-|          1.1.0          |  维护       | 2025-05-21 | 预计2026-11-21终止维护   | 2026-02-21 |
-|          1.0.0          | 无维护      | 2025-02-13 | 预计2025-11-23终止生命周期| 2025-11-13 |
+|          1.1.0          | 无维护      | 2025-05-21 | 预计2026-02-21终止生命周期| 2026-02-21 |
+|          1.0.0          | 生命周期终止 | 2025-02-13 |                        | 2025-11-13 |
 |          0.6.0          | 生命周期终止 | 2024-10-30 |                        | 2025-07-30 |
 |          0.5.0          | 生命周期终止 | 2024-08-01 |                        | 2025-05-01 |
 |          0.4.1          | 生命周期终止 | 2024-07-15 |                        | 2025-04-15 |
@@ -42,14 +43,13 @@ MindSpore Golden Stick版本有以下五个维护阶段：
 |          0.2.0          | 生命周期终止 | 2022-10-26 |                        | 2023-07-26 |
 |          0.1.0          | 生命周期终止 | 2022-07-29 |                        | 2023-04-29 |
 
-### 历史版本依赖
+## 版本依赖映射表
 
-MindSpore Golden Stick依赖MindSpore以及MindSpore Transformers网络仓，请根据下表所示的对应关系，安装对应版本的MindSpore和MindSpore Transformers：
-
-> 1.3.0版本及以后，MindSpore和MindSpore Transformers正式加入到MindSpore Golden Stick的requirements.txt中，用户不再需要手动安装这两个依赖。
+MindSpore Golden Stick 对 MindSpore、MindOne 以及 MindFormers 存在版本依赖关系，具体如下表所示：
 
 | MindSpore Golden Stick版本 |                             分支                                  | MindSpore版本 | MindSpore Transformers版本 |
 | :---------------------: | :-----------------------------------------------------------------: | :----------: | :------------------------: |
+|          1.4.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/)       | 2.7.1.post1  |       1.7.0                |
 |          1.3.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1      |       1.7.0                |
 |          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0      |       1.6.0                |
 |          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0      |       1.5.0                |
@@ -63,11 +63,36 @@ MindSpore Golden Stick依赖MindSpore以及MindSpore Transformers网络仓，请
 |          0.2.0          | [r0.2](https://gitee.com/mindspore/golden-stick/tree/r0.2/)         |   1.9.0      |        NA                  |
 |          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/)         |   1.8.0      |        NA                  |
 
-> 金箍棒早期版本不支持MindSpore Transformers，故表中标记为NA。
+> 金箍棒早期版本不涉及MindSpore Transformers，故表中标记为NA。
+
+## 安装CANN
+
+1. 根据版本依赖映射表，查询对应的 MindSpore 版本；
+2. 根据 [MindSpore 官网](https://www.mindspore.cn/versions) 查询推荐的 CANN 版本；
+3. 从 [CANN 开发者网站](https://www.hiascend.com/hardware/firmware-drivers/community) 下载安装驱动和固件；
+4. 根据 [CANN 安装指引](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/softwareinst/instg/instg_quick.html?Mode=PmIns&InstallType=netconda&OS=openEuler&Software=cannToolKit) 安装并配置 CANN 环境。
+
+## 安装MindSpore
+
+- **1.4.0 版本及以后**：MindSpore 已加入到 MindSpore Golden Stick 的 `requirements.txt` 中，用户不再需要手动安装该依赖。
+- **1.4.0 版本以前**：用户需要根据版本依赖映射表，使用 pip 安装或从 [MindSpore 官网](https://www.mindspore.cn/install) 下载对应的安装包进行安装。
+
+## 安装MindFormers
+
+- **1.4.0 版本及以后**：MindFormers（原 MindSpore Transformers）不再是 MindSpore Golden Stick 的必需依赖项。仅当需要量化来自 MindFormers 生态的模型时，用户可根据版本依赖映射表安装对应的 MindFormers 版本。
+- **1.4.0 版本以前**：用户需要根据版本依赖映射表，使用 pip 安装对应的 MindFormers 版本。
+
+```bash
+pip install mindformers==1.7.0
+```
+
+## 安装MindOne
+
+**1.4.0 版本及以后**：MindSpore Golden Stick 支持对来自 MindOne 生态的模型进行量化。由于 MindOne 中不同模型可能在不同版本中支持，请根据 [Golden Stick Model Card](https://gitee.com/mindspore/golden-stick/tree/master/example/model_cards) 中具体模型的 README 安装对应的 MindOne 版本。
 
 ## 安装MindSpore Golden Stick
 
-安装完MindSpore和MindSpore Transformers后，继续安装MindSpore Golden Stick。可以采用pip安装或者源码编译安装两种方式。
+可以通过pip安装或者源码编译方式安装MindSpore Golden Stick。
 
 ### pip安装
 
