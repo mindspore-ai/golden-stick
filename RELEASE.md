@@ -2,6 +2,28 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 1.4.0 Release Notes
+
+### Major Features and Improvements
+
+* **Framework Pluginization Refactoring**: Completed framework architecture refactoring with support for MindONE backend, integrating mainstream quantization algorithms including OSL (OutlierSuppression-Lite), SmoothQuant, AWQ, GPTQ, A16W8, A8dynW8, and A8W4. The correctness and effectiveness have been validated on models such as glm4v and qwen3. For details, see [glm4v model_card](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/example/model_cards/glm4v).
+
+* **Support for Multimodal Understanding Model Quantization**: Implemented quantization capabilities for multimodal large models, successfully validating the OSL-A8W8 quantization scheme for the qwen3-vl network under the MindONE framework. For details, see [qwen3-vl model-card](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/example/model_cards/qwen3-vl).
+
+* **[Demo] RazorAttention**: Added RazorAttention sequence compression feature. For details, see [RazorAttention](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/mindspore_gs/sequence_compress).
+
+### API Changes
+
+* Added `backend` parameter to `BaseQuantForCausalLM.save_quantized` method to specify the target backend framework for saved quantized weights. For details, see [PR #1305](https://gitee.com/mindspore/golden-stick/pulls/1305).
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+guoguopot, ccsszz, yyyyrf, hangangqiang, haowenz
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 1.3.0 Release Notes
 
 ### Major Features and Improvements
