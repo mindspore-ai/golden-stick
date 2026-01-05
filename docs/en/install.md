@@ -49,7 +49,7 @@ MindSpore Golden Stick has version dependencies on MindSpore, MindOne, and MindF
 
 | MindSpore Golden Stick Version |                             Branch                                  | MindSpore Version | MindSpore Transformers Version |
 | :---------------------: | :-----------------------------------------------------------------: | :----------: | :------------------------: |
-|          1.4.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/)       | 2.7.1.post1  |       1.7.0                |
+|          1.4.0          | [r1.4](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/)       | 2.7.1.post1  |       1.7.0                |
 |          1.3.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1      |       1.7.0                |
 |          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0      |       1.6.0                |
 |          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0      |       1.5.0                |
