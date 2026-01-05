@@ -104,6 +104,15 @@ python calibrate.py -m zai-org/GLM-4.1V-9B-Thinking -q a8w8_osl -d /path/to/text
 3. **加载模型**：使用`AutoQuantForCausalLM.from_pretrained()`加载预训练的多模态模型
 4. **校准**：使用校准数据集对模型进行量化校准
 5. **保存量化模型**：将量化后的模型保存到指定路径，格式为HuggingFace格式，支持指定后端类型
+6. **修改config.json**：量化完成后，需要手动在输出目录的 `config.json` 中添加 `"quantization": "golden-stick"` 配置项，参考以下示例：
+
+  ```json
+  {
+    "model_type": "glm4v",
+    ...
+    "quantization": "golden-stick"
+  }
+  ```
 
 #### 注意事项
 

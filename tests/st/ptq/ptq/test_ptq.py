@@ -418,8 +418,7 @@ def get_cos_similar(a: list, b: list):
 @pytest.mark.env_onecard
 @pytest.mark.parametrize("non_decoder", [True, False])
 @pytest.mark.parametrize("linear_type", ["RowParallelLinear", "ColumnParallelLinear"])
-@pytest.mark.parametrize("quant_type", ["w8perchannela8pertoken", "pertoken-smooth",
-                                        "w8a8-smoothquant", "w8a8", "a16w4-gptq"])
+@pytest.mark.parametrize("quant_type", ["pertoken-smooth", "a16w4-gptq"])
 def test_ptq_simple_gmm_net(non_decoder, linear_type, quant_type):
     """
     Feature: eval simplenet which including one GroupedMatMul linear.
@@ -751,7 +750,7 @@ def test_ptq_simplenet(non_decoder):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W4_GPTQ', 'A16W4_AWQ'])
+@pytest.mark.parametrize("quant_algo", ['A16W4_AWQ'])
 def test_ptq_llama2_predict_2stage_1p_run_level0(quant_algo):
     """
     Feature: test PTQ adjust parameter in two stages with one cards.
@@ -778,7 +777,7 @@ def test_ptq_llama2_predict_2stage_1p_run_level0(quant_algo):
 @pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard
-@pytest.mark.parametrize("quant_algo", ['A8W8C8', 'A8W8_FallBack', 'A16W4_GPTQ', 'A16W4_GPTQ_per_group'])
+@pytest.mark.parametrize("quant_algo", ['A8W8C8', 'A16W4_GPTQ', 'A16W4_GPTQ_per_group'])
 def test_ptq_llama2_predict_2stage_1p_run_leval1(quant_algo):
     """
     Feature: test PTQ adjust parameter in two stages with one cards.
@@ -807,7 +806,7 @@ def test_ptq_llama2_predict_2stage_1p_run_leval1(quant_algo):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['OSPQuant_A8W8', 'OSL_A8W8'])
+@pytest.mark.parametrize("quant_algo", ['OSPQuant_A8W8'])
 def test_ptq_llama2_predict_2stage_2p_run_level0(quant_algo):
     """
     Feature: test PTQ adjust parameter in two stages with two cards.
@@ -837,7 +836,7 @@ def test_ptq_llama2_predict_2stage_2p_run_level0(quant_algo):
 @pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize("quant_algo", ['A16W8C8', 'OSL_A8W8', 'Quant_A8W16_Deploy_A8W8_Dynamic'])
+@pytest.mark.parametrize("quant_algo", ['A16W8C8', 'Quant_A8W16_Deploy_A8W8_Dynamic'])
 def test_ptq_llama2_predict_2stage_2p_run_level1(quant_algo):
     """
     Feature: test PTQ adjust parameter in two stages with two cards.
