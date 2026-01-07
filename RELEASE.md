@@ -2,6 +2,20 @@
 
 [查看中文](./RELEASE_CN.md)
 
+## MindSpore Golden Stick 1.4.1 Release Notes
+
+### Major Features and Improvements
+
+* **Adapted to MindSpore 2.7.1.post1**: Completed support for MindSpore version 2.7.1.post1.
+
+### Contributors
+
+Thanks goes to these wonderful people:
+
+guoguopot, ccsszz, yyyyrf, hangangqiang, haowenz
+
+Contributions of any kind are welcome!
+
 ## MindSpore Golden Stick 1.4.0 Release Notes
 
 ### Major Features and Improvements
