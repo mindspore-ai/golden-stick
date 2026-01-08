@@ -29,6 +29,7 @@ MindSpore Golden Stick version has the following five maintenance phases:
 
 | MindSpore Golden Stick Version | Current Status  |   Release Date  |         Next Status         |   EOL Date   |
 | :---------------------: | :--------: | :--------: | :--------------------: | :--------: |
+|          1.4.1          |  Maintenance       | 2026-01-08 | Expected to end maintenance on 2026-07-08   | 2026-10-08 |
 |          1.4.0          |  Maintenance       | 2026-01-04 | Expected to end maintenance on 2026-07-04   | 2026-10-04 |
 |          1.3.0          |  Maintenance       | 2025-10-23 | Expected to end maintenance on 2026-04-23   | 2026-07-23 |
 |          1.2.0          |  Maintenance       | 2025-08-13 | Expected to end maintenance on 2026-02-13   | 2026-05-13 |

@@ -56,10 +56,11 @@ def mindspore_version_check():
                              '1.1': ('2.6',),
                              '1.2': ('2.6',),
                              '1.3': ('2.7.1',),
-                             '1.4': ('2.7.1',),
+                             '1.4.0': ('2.7.1',),
+                             '1.4.1': ('2.7.1.post1',),
                              }
 
-    required_mindspore_verisions = ms_msgs_version_match.get(__version__[:3])
+    required_mindspore_verisions = ms_msgs_version_match.get(__version__)
     ms_version = ms.__version__
     match = False
     for required_mindspore_verision in required_mindspore_verisions:
