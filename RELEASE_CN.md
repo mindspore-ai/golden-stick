@@ -2,6 +2,20 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 1.4.1 Release Notes
+
+### 主要特性和增强
+
+* **适配MindSpore 2.7.1.post1版本**：完成对MindSpore 2.7.1.post1版本的支持。
+
+### 贡献者
+
+感谢以下人员做出的贡献：
+
+guoguopot, ccsszz, yyyyrf, hangangqiang, haowenz
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 1.4.0 Release Notes
 
 ### 主要特性和增强
