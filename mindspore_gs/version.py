@@ -15,7 +15,7 @@
 """Define version of MindSpore Golden Stick and check version matching between MindSpore and MindSpore Golden Stick."""
 
 # pylint: disable=C0111
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 
 
 __checked__ = False
