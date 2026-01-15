@@ -22,6 +22,8 @@ MindSpore Golden Stick（后面简称金箍棒）是MindSpore团队和华为诺�
 
 ## 最新消息🔥
 
+* [2025/12] **v1.4.0发布**：完成框架插件化重构，支持MindONE backend，收编了OSL、SmoothQuant、AWQ、GPTQ、A16W8、A8dynW8、A8W4等主流量化算法，并在glm4v、qwen3等模型上验证了正确性。
+* [2025/12] **多模态模型量化**：支持多模态理解模型的量化，成功验证了MindONE框架下的qwen3-vl网络OSL-A8W8量化方案。
 * [2025/09] OutlierSuppressionLite提供更高精度的A8W8量化能力。
 * [2025/09] 结合OutlierSuppressionLite和GPTQ算法，实现DeepSeekV3/R1网络的A8W4量化，满血版DeepSeek部署门槛进一步降低。量化权重详见[魔乐社区权重](https://modelers.cn/models/MindSpore-Lab/R1-0528-A8W4)。
 * [2025/09] 支持[Transformers-Like-API](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.AutoQuantForCausalLM.html#mindspore_gs.ptq.AutoQuantForCausalLM)，并支持保存出huggingface格式的权重，详见 [BaseQuantForCausalLM](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/ptq/mindspore_gs.ptq.BaseQuantForCausalLM.html#mindspore_gs.ptq.BaseQuantForCausalLM.save_quantized) 接口。

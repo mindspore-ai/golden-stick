@@ -377,12 +377,14 @@ class VLPTQTester(ABC):
 
             # Step 2: Evaluate model
             output_text = self.evaluate_model()
+            print(f"Output text: {output_text}")
 
             # Step 3: Basic validation
             golden_output = self.get_golden()
             assert output_text is not None, "Generated text should not be None"
             assert len(output_text) > 0, "Generated text should not be empty"
-            assert output_text.startswith(golden_output), f"Generated text should start with '{golden_output}'"
+            assert output_text.startswith(golden_output), f"Generated text should start with '{golden_output}', " \
+                                                          f"but got '{output_text}'"
 
             print("VL PTQ test completed successfully!")
             return True

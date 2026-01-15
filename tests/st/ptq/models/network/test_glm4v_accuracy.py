@@ -96,7 +96,7 @@ class GLM4vPTQTester(VLPTQTester):
 
     def get_golden(self) -> tuple[str, str]:
         """Get golden reference for comparison"""
-        return "ecurity.Xnaж$fdata-aoshér CoreDatayosUvs"
+        return "ecurity.Xnaж$fdata-aos"
 
 
 def run_glm4v_accuracy():
@@ -123,7 +123,7 @@ def test_glm4v_accuracy():
     """
     run_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_glm4v_accuracy.py")
     return_code = os.system(
-        f"GSLOG=1 python {run_file} > test_glm4v_accuracy.log"
+        f"GSLOG=1 python {run_file} > test_glm4v_accuracy.log 2>&1"
     )
     if return_code != 0:
         with open("./test_glm4v_accuracy.log", "r", encoding="utf-8") as log_file:

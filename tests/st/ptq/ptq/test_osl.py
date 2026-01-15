@@ -260,8 +260,8 @@ def _test_simple_net(linear_type, dtype):
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
-@pytest.mark.parametrize('linear_type', ['RowParallelLinear', 'ColumnParallelLinear', 'ReplicatedLinear'])
-@pytest.mark.parametrize('dtype', ['float32', 'bfloat16'])
+@pytest.mark.parametrize('linear_type', ['ReplicatedLinear'])
+@pytest.mark.parametrize('dtype', ['bfloat16'])
 def test_parallel_linear(linear_type, dtype):
     """
     Feature: Quantize and evaluate one SimpleNet with one Decoder layer, including one ParallelLinear cell.

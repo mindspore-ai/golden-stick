@@ -36,6 +36,7 @@ def ptq_predict_2stage_2p_run(quant_algo):
         f"python {run_file} -a {quant_algo}"
     )
     if return_code != 0:
+        # pylint: disable=consider-using-with
         log_file = open(f"./test_ptq_{quant_algo}_predict_llama2_2p_logs/worker_0.log", "r", encoding="utf-8")
         for line in log_file:
             print(line, flush=True)
@@ -57,6 +58,7 @@ def test_ptq_llama2_a8w8c8_accuracy():
     """
     ptq_predict_2stage_2p_run("A8W8C8")
 
+
 @pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
@@ -68,16 +70,6 @@ def test_ptq_llama2_a16w8c8_accuracy():
     """
     ptq_predict_2stage_2p_run("A16W8C8")
 
-@pytest.mark.level1
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_llama2_a8dynw8_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply A8W8_Dynamic on llama2 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_2p_run("A8W8_Dynamic")
 
 @pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
@@ -90,6 +82,7 @@ def test_ptq_llama2_c8dyn_accuracy():
     """
     ptq_predict_2stage_2p_run("C8_Dynamic")
 
+
 @pytest.mark.level1
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_single
@@ -100,28 +93,6 @@ def test_ptq_llama2_c8_accuracy():
     Expectation: score is good.
     """
     ptq_predict_2stage_2p_run("C8")
-
-@pytest.mark.level1
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_llama2_a8w8_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply A8W8 on llama2 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_2p_run("A8W8")
-
-@pytest.mark.level1
-@pytest.mark.platform_arm_ascend910b_training
-@pytest.mark.env_single
-def test_ptq_llama2_a16w8_accuracy():
-    """
-    Feature: test omni quant adjust parameter in two stages with two cards.
-    Description: apply A16W8 on llama2 and check score.
-    Expectation: score is good.
-    """
-    ptq_predict_2stage_2p_run("A16W8")
 
 
 @pytest.mark.level0

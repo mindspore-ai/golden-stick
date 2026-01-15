@@ -195,6 +195,7 @@ def test_quant_summary():
     assert 'network.layers.5.moe.w2' not in ptq._config.layer_quant_info_collect
     assert ptq.target_layer_type
 
+
 @pytest.mark.level0
 @pytest.mark.platform_arm_ascend910b_training
 @pytest.mark.env_onecard

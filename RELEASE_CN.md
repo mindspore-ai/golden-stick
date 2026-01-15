@@ -2,6 +2,42 @@
 
 [View English](./RELEASE.md)
 
+## MindSpore Golden Stick 1.4.1 Release Notes
+
+### 主要特性和增强
+
+* **适配MindSpore 2.7.1.post1版本**：完成对MindSpore 2.7.1.post1版本的支持。
+
+### 贡献者
+
+感谢以下人员做出的贡献：
+
+guoguopot, ccsszz, yyyyrf, hangangqiang, haowenz
+
+欢迎以任何形式对项目提供贡献！
+
+## MindSpore Golden Stick 1.4.0 Release Notes
+
+### 主要特性和增强
+
+* **框架插件化重构**：完成框架架构重构，新增对 `Mindone` 网络支持，适配了OSL（OutlierSuppression-Lite）、SmoothQuant、AWQ、GPTQ、A16W8、A8dynW8、A8W4等主流量化算法，在glm4v、qwen3等模型上验证了正确性和有效性，详见[glm4v model_card](https://gitee.com/mindspore/golden-stick/tree/master/example/model_cards/glm4v)。
+
+* **支持多模态理解模型量化**：实现了多模态大模型量化能力，成功验证了MindONE框架下的qwen3-vl网络OSL-A8W8量化方案，详见[qwen3-vl model-card](https://gitee.com/mindspore/golden-stick/tree/master/master/example/model_cards/qwen3-vl)。
+
+* **[Demo] RazorAttention**：新增RazorAttention序列压缩特性，详见[RazorAttention](https://gitee.com/mindspore/golden-stick/tree/master/mindspore_gs/sequence_compress)。
+
+### API变更
+
+* `BaseQuantForCausalLM.save_quantized` 方法新增 `backend` 入参，用于指定保存的量化权重格式对应的后端框架，详见[PR #1305](https://gitee.com/mindspore/golden-stick/pulls/1305)。
+
+### 贡献者
+
+感谢以下人员做出的贡献：
+
+guoguopot, ccsszz, yyyyrf, hangangqiang, haowenz
+
+欢迎以任何形式对项目提供贡献！
+
 ## MindSpore Golden Stick 1.3.0 Release Notes
 
 ### 主要特性和增强

@@ -15,7 +15,7 @@
 
 # The maintainers of mindspore_gs/.
 /mindspore_gs/ @hangangqiang
-/mindspore_gs/ptq/ @hangangqiang @yyyyrf @ccsszz
+/mindspore_gs/ptq/ @hangangqiang @yyyyrf
 
 # The maintainers of tests/.
 /tests/ @hangangqiang @liningl @yyyyrf
