@@ -1,6 +1,6 @@
 # Overview of Post-training Quantization Algorithms
 
-[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/README.md)
+[![View Source On AtomGit](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://atomgit.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/README.md)
 
 [查看中文](./README_CN.md)
 

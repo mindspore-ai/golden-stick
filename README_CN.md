@@ -2,13 +2,13 @@
 
 # MindSpore Golden Stick
 
-**MindSpore Golden Stick 是MindSpore开源社区的模型压缩工具，支持在昇腾硬件上将Hugging Face的权重进行量化，并在[vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore)或[MindSpore Transformers](https://gitee.com/mindspore/mindformers)上进行部署。**
+**MindSpore Golden Stick 是MindSpore开源社区的模型压缩工具，支持在昇腾硬件上将Hugging Face的权重进行量化，并在[vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore)或[MindSpore Transformers](https://atomgit.com/mindspore/mindformers)上进行部署。**
 
-[![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://gitee.com/mindspore/golden-stick)
-[![version](https://img.shields.io/badge/release-1.3.0-green)](https://gitee.com/mindspore/golden-stick/releases)
-[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://atomgit.com/mindspore/golden-stick)
+[![version](https://img.shields.io/badge/release-1.3.0-green)](https://atomgit.com/mindspore/golden-stick/releases)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://atomgit.com/mindspore/golden-stick/blob/master/LICENSE)
 
-[**架构**](docs/zh_cn/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**流程**](docs/zh_cn/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**文档**](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**问题反馈**](https://gitee.com/mindspore/golden-stick/issues)
+[**架构**](docs/zh_cn/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**流程**](docs/zh_cn/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**文档**](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**问题反馈**](https://atomgit.com/mindspore/golden-stick/issues)
 
 [English](README.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[中文](README_CN.md)
 
@@ -112,13 +112,13 @@ MindSpore Golden Stick（后面简称金箍棒）是MindSpore团队和华为诺�
 
 ### 模型部署
 
-金箍棒模型压缩得到的是Hugging Face格式的权重，推荐在[vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore)或者[MindSpore Transformers](https://gitee.com/mindspore/mindformers)上进行部署，也可以尝试在Pytorch、ONNX Runtime、TensorRT等主流框架上进行部署。
+金箍棒模型压缩得到的是Hugging Face格式的权重，推荐在[vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore)或者[MindSpore Transformers](https://atomgit.com/mindspore/mindformers)上进行部署，也可以尝试在Pytorch、ONNX Runtime、TensorRT等主流框架上进行部署。
 
 ## 社区
 
 ### 治理
 
-查看MindSpore如何进行[开放治理](https://gitee.com/mindspore/community/blob/master/governance.md)。
+查看MindSpore如何进行[开放治理](https://atomgit.com/mindspore/community/blob/master/governance.md)。
 
 ### 交流
 
@@ -126,14 +126,14 @@ MindSpore Golden Stick（后面简称金箍棒）是MindSpore团队和华为诺�
 
 📬SIG：https://www.mindspore.cn/sig/LLM%20Inference%20Serving
 
-📍微信群：https://gitee.com/mindspore/golden-stick/issues/ID2UGQ
+📍微信群：https://atomgit.com/mindspore/golden-stick/issues/ID2UGQ
 
 ## 贡献
 
 请参考 [CONTRIBUTING](./CONTRIBUTING_CN.md) 文档了解更多关于开发环境搭建、功能测试以及 PR 提交规范的信息。
 
-我们欢迎并重视任何形式的贡献与合作，请通过 [Issue](https://gitee.com/mindspore/golden-stick/issues) 来告知我们您遇到的任何Bug，或提交您的特性需求、改进建议、技术方案。
+我们欢迎并重视任何形式的贡献与合作，请通过 [Issue](https://atomgit.com/mindspore/golden-stick/issues) 来告知我们您遇到的任何Bug，或提交您的特性需求、改进建议、技术方案。
 
 ## 许可证
 
-[Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
+[Apache License 2.0](https://atomgit.com/mindspore/golden-stick/blob/master/LICENSE)

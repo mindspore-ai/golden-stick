@@ -56,7 +56,7 @@ class RoundToNearest(CompAlgo):
         >>> from mindspore_gs.ptq import RoundToNearest as rtn
         >>> from mindspore_gs.ptq import PTQConfig
         >>> # Define the network structure of LeNet5. Refer to
-        >>> # https://gitee.com/mindspore/docs/blob/r2.2/docs/mindspore/code/lenet.py
+        >>> # https://atomgit.com/mindspore/docs/blob/r2.2/docs/mindspore/code/lenet.py
         >>> ptq = rtn()
         >>> network = LeNet5()
         >>> fake_quant_net = ptq.apply(net_work)

@@ -1,6 +1,6 @@
 # Installing MindSpore Golden Stick
 
-[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/blob/master/docs/en/install.md)
+[![View Source On AtomGit](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://atomgit.com/mindspore/golden-stick/blob/master/docs/en/install.md)
 
 [查看中文](../zh_cn/install.md)
 
@@ -12,7 +12,7 @@ The following lists the system environment required for installing, compiling an
 - Python: >=3.9, <3.12
 - Hardware: Ascend NPU recommended (Atlas 800I A2 or higher, Atlas 300 series not supported)
 
-> For other third-party dependencies, please refer to the [requirements file](https://gitee.com/mindspore/golden-stick/blob/master/requirements.txt).
+> For other third-party dependencies, please refer to the [requirements file](https://atomgit.com/mindspore/golden-stick/blob/master/requirements.txt).
 
 ## Version Lifecycle and Version Compatibility Strategy
 
@@ -51,20 +51,20 @@ MindSpore Golden Stick has version dependencies on MindSpore, MindOne, and MindF
 
 | MindSpore Golden Stick Version |                             Branch                                  | MindSpore Version | MindSpore Transformers Version |
 | :---------------------: | :-----------------------------------------------------------------: | :----------: | :------------------------: |
-|          1.4.1          | [r1.4](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/)       |  2.7.1.post1 |       1.7.0                |
-|          1.4.0          | [r1.4](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/)       |   2.7.1      |       1.7.0                |
-|          1.3.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1      |       1.7.0                |
-|          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0      |       1.6.0                |
-|          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0      |       1.5.0                |
-|          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0      |       1.4.0-beta2          |
-|          0.6.0          | [r0.6](https://gitee.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0      |       1.3.0                |
-|          0.5.0          | [r0.5](https://gitee.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1      |       1.2.0                |
-|          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0      |       1.2.0                |
-|          0.4.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4/)         |   2.3.0-rc1  |        NA                  |
-|          0.3.0          | [r0.3](https://gitee.com/mindspore/golden-stick/tree/r0.3/)         |   2.0.0-rc1, 2.0.0   |    NA              |
-|       0.3.0-alpha       | [r0.3](https://gitee.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha        |        NA          |
-|          0.2.0          | [r0.2](https://gitee.com/mindspore/golden-stick/tree/r0.2/)         |   1.9.0      |        NA                  |
-|          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/)         |   1.8.0      |        NA                  |
+|          1.4.1          | [r1.4](https://atomgit.com/mindspore/golden-stick/tree/r1.4.0/)       |  2.7.1.post1 |       1.7.0                |
+|          1.4.0          | [r1.4](https://atomgit.com/mindspore/golden-stick/tree/r1.4.0/)       |   2.7.1      |       1.7.0                |
+|          1.3.0          | [r1.3](https://atomgit.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1      |       1.7.0                |
+|          1.2.0          | [r1.2](https://atomgit.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0      |       1.6.0                |
+|          1.1.0          | [r1.1](https://atomgit.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0      |       1.5.0                |
+|          1.0.0          | [r1.0](https://atomgit.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0      |       1.4.0-beta2          |
+|          0.6.0          | [r0.6](https://atomgit.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0      |       1.3.0                |
+|          0.5.0          | [r0.5](https://atomgit.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1      |       1.2.0                |
+|          0.4.1          | [r0.4](https://atomgit.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0      |       1.2.0                |
+|          0.4.0          | [r0.4](https://atomgit.com/mindspore/golden-stick/tree/r0.4/)         |   2.3.0-rc1  |        NA                  |
+|          0.3.0          | [r0.3](https://atomgit.com/mindspore/golden-stick/tree/r0.3/)         |   2.0.0-rc1, 2.0.0   |    NA              |
+|       0.3.0-alpha       | [r0.3](https://atomgit.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha        |        NA          |
+|          0.2.0          | [r0.2](https://atomgit.com/mindspore/golden-stick/tree/r0.2/)         |   1.9.0      |        NA                  |
+|          0.1.0          | [r0.1](https://atomgit.com/mindspore/golden-stick/tree/r0.1/)         |   1.8.0      |        NA                  |
 
 > Early versions of Golden Stick do not involve MindSpore Transformers, hence marked as NA in the table.
 
@@ -91,7 +91,7 @@ pip install mindformers==1.7.0
 
 ## Installing MindOne
 
-**Version 1.4.0 and later**: MindSpore Golden Stick supports quantizing models from the MindOne ecosystem, which is introduced as a dependency in MindSpore Golden Stick. Since different models in MindOne may be supported in different versions, if a corresponding model has a [Model Card](https://gitee.com/mindspore/golden-stick/tree/master/example/model_cards), please prioritize installing the corresponding MindOne version according to its README.
+**Version 1.4.0 and later**: MindSpore Golden Stick supports quantizing models from the MindOne ecosystem, which is introduced as a dependency in MindSpore Golden Stick. Since different models in MindOne may be supported in different versions, if a corresponding model has a [Model Card](https://atomgit.com/mindspore/golden-stick/tree/master/example/model_cards), please prioritize installing the corresponding MindOne version according to its README.
 
 ## Installing MindSpore Golden Stick
 
@@ -107,10 +107,10 @@ pip install mindspore-gs
 
 ### Installing from Source Code
 
-Download the [source code](https://gitee.com/mindspore/golden-stick), then enter the `golden-stick` directory after downloading.
+Download the [source code](https://atomgit.com/mindspore/golden-stick), then enter the `golden-stick` directory after downloading.
 
 ```shell
-git clone https://gitee.com/mindspore/golden-stick.git
+git clone https://atomgit.com/mindspore/golden-stick.git
 cd golden-stick
 bash build.sh
 ```

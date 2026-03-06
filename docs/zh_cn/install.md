@@ -1,6 +1,6 @@
 # 安装MindSpore Golden Stick
 
-[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/master/docs/zh_cn/install.md)
+[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://atomgit.com/mindspore/golden-stick/blob/master/docs/zh_cn/install.md)
 
 [View English](../en/install.md)
 
@@ -12,7 +12,7 @@
 - Python：>=3.9, <3.12
 - 硬件：建议使用昇腾 NPU（Atlas 800I A2或更高，不支持Atlas 300系列）
 
-> 其他的三方依赖请参考[requirements文件](https://gitee.com/mindspore/golden-stick/blob/master/requirements.txt)。
+> 其他的三方依赖请参考[requirements文件](https://atomgit.com/mindspore/golden-stick/blob/master/requirements.txt)。
 
 ## 版本生命周期及版本配套策略
 
@@ -51,20 +51,20 @@ MindSpore Golden Stick 对 MindSpore、MindOne 以及 MindFormers 存在版本�
 
 | MindSpore Golden Stick版本 |                             分支                                  | MindSpore版本 | MindSpore Transformers版本 |
 | :---------------------: | :-----------------------------------------------------------------: | :----------: | :------------------------: |
-|          1.4.1          | [r1.4](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/)       |  2.7.1.post1 |       1.7.0                |
-|          1.4.0          | [r1.4](https://gitee.com/mindspore/golden-stick/tree/r1.4.0/)       |   2.7.1      |       1.7.0                |
-|          1.3.0          | [r1.3](https://gitee.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1      |       1.7.0                |
-|          1.2.0          | [r1.2](https://gitee.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0      |       1.6.0                |
-|          1.1.0          | [r1.1](https://gitee.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0      |       1.5.0                |
-|          1.0.0          | [r1.0](https://gitee.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0      |       1.4.0-beta2          |
-|          0.6.0          | [r0.6](https://gitee.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0      |       1.3.0                |
-|          0.5.0          | [r0.5](https://gitee.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1      |       1.2.0                |
-|          0.4.1          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0      |       1.2.0                |
-|          0.4.0          | [r0.4](https://gitee.com/mindspore/golden-stick/tree/r0.4/)         |   2.3.0-rc1  |        NA                  |
-|          0.3.0          | [r0.3](https://gitee.com/mindspore/golden-stick/tree/r0.3/)         |   2.0.0-rc1, 2.0.0   |    NA              |
-|       0.3.0-alpha       | [r0.3](https://gitee.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha        |        NA          |
-|          0.2.0          | [r0.2](https://gitee.com/mindspore/golden-stick/tree/r0.2/)         |   1.9.0      |        NA                  |
-|          0.1.0          | [r0.1](https://gitee.com/mindspore/golden-stick/tree/r0.1/)         |   1.8.0      |        NA                  |
+|          1.4.1          | [r1.4](https://atomgit.com/mindspore/golden-stick/tree/r1.4.0/)       |  2.7.1.post1 |       1.7.0                |
+|          1.4.0          | [r1.4](https://atomgit.com/mindspore/golden-stick/tree/r1.4.0/)       |   2.7.1      |       1.7.0                |
+|          1.3.0          | [r1.3](https://atomgit.com/mindspore/golden-stick/tree/r1.3.0/)       |   2.7.1      |       1.7.0                |
+|          1.2.0          | [r1.2](https://atomgit.com/mindspore/golden-stick/tree/r1.2.0/)       |   2.7.0      |       1.6.0                |
+|          1.1.0          | [r1.1](https://atomgit.com/mindspore/golden-stick/tree/r1.1.0/)       |   2.6.0      |       1.5.0                |
+|          1.0.0          | [r1.0](https://atomgit.com/mindspore/golden-stick/tree/r1.0.0/)       |   2.5.0      |       1.4.0-beta2          |
+|          0.6.0          | [r0.6](https://atomgit.com/mindspore/golden-stick/tree/r0.6.0/)       |   2.4.0      |       1.3.0                |
+|          0.5.0          | [r0.5](https://atomgit.com/mindspore/golden-stick/tree/r0.5.0/)       |   2.3.1      |       1.2.0                |
+|          0.4.1          | [r0.4](https://atomgit.com/mindspore/golden-stick/tree/r0.4.1/)       |   2.3.0      |       1.2.0                |
+|          0.4.0          | [r0.4](https://atomgit.com/mindspore/golden-stick/tree/r0.4/)         |   2.3.0-rc1  |        NA                  |
+|          0.3.0          | [r0.3](https://atomgit.com/mindspore/golden-stick/tree/r0.3/)         |   2.0.0-rc1, 2.0.0   |    NA              |
+|       0.3.0-alpha       | [r0.3](https://atomgit.com/mindspore/golden-stick/tree/v0.3.0-alpha/) |   2.0.0-alpha        |        NA          |
+|          0.2.0          | [r0.2](https://atomgit.com/mindspore/golden-stick/tree/r0.2/)         |   1.9.0      |        NA                  |
+|          0.1.0          | [r0.1](https://atomgit.com/mindspore/golden-stick/tree/r0.1/)         |   1.8.0      |        NA                  |
 
 > 金箍棒早期版本不涉及MindSpore Transformers，故表中标记为NA。
 
@@ -91,7 +91,7 @@ pip install mindformers==1.7.0
 
 ## 安装MindOne
 
-**1.4.0 版本及以后**：MindSpore Golden Stick 支持对来自 MindOne 生态的模型进行量化，作为依赖项引入到MindSpore Golden Stick中。由于 MindOne 中不同模型可能在不同版本中支持，如果相应的模型有[Model Card](https://gitee.com/mindspore/golden-stick/tree/master/example/model_cards) ，请优先使用其中 README 安装对应的 MindOne 版本。
+**1.4.0 版本及以后**：MindSpore Golden Stick 支持对来自 MindOne 生态的模型进行量化，作为依赖项引入到MindSpore Golden Stick中。由于 MindOne 中不同模型可能在不同版本中支持，如果相应的模型有[Model Card](https://atomgit.com/mindspore/golden-stick/tree/master/example/model_cards) ，请优先使用其中 README 安装对应的 MindOne 版本。
 
 ## 安装MindSpore Golden Stick
 
@@ -107,10 +107,10 @@ pip install mindspore-gs
 
 ### 源码编译安装
 
-下载[源码](https://gitee.com/mindspore/golden-stick)，下载后进入`golden_stick`目录。
+下载[源码](https://atomgit.com/mindspore/golden-stick)，下载后进入`golden_stick`目录。
 
 ```shell
-git clone https://gitee.com/mindspore/golden-stick.git
+git clone https://atomgit.com/mindspore/golden-stick.git
 cd golden-stick
 bash build.sh
 ```

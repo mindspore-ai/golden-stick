@@ -1,6 +1,6 @@
 # Applying RoundToNearest Post-Quantization Algorithm
 
-[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/round_to_nearest/README.md)
+[![View Source On AtomGit](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://atomgit.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/round_to_nearest/README.md)
 
 [查看中文](./README_CN.ipynb)
 
@@ -17,7 +17,7 @@ Table 1: RTN algorithm specifications
 | Specifications | Specification Descriptions |
 | --- | --- |
 | Hardware support | The quantization phase runs on the CPU, and quantization model inference is only supported in Ascend |
-| Network support | Llama2 13B/70B. For details, refer to [Llama2 network](https://gitee.com/mindspore/mindformers/tree/master/mindformers/models/llama) |
+| Network support | Llama2 13B/70B. For details, refer to [Llama2 network](https://atomgit.com/mindspore/mindformers/tree/master/mindformers/models/llama) |
 | Running mode support | Graph mode and PyNative mode |
 
 Table 2: Before and after quantization of the network using RTN algorithm

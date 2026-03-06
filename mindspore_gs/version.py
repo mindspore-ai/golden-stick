@@ -74,7 +74,7 @@ def mindspore_version_check():
                        "might not work or even raise error. Please install MindSpore version == "
                        f"{required_mindspore_verisions}. For more details about dependency setting, please check the"
                        " instructions at MindSpore official website https://www.mindspore.cn/install or check the "
-                       "README.md at https://gitee.com/mindspore/golden-stick")
+                       "README.md at https://atomgit.com/mindspore/golden-stick")
         warning_countdown = 2
         for i in range(warning_countdown, 0, -1):
             logger.warning(f"Please pay attention to the above warning, countdown: {i}")

@@ -32,8 +32,8 @@ sleep_time=60
 checkpoint_path=${1}
 vocab_file=${2}
 dataset=${3}
-MS_PKG_LINK=${3:-"https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250725/master_20250725105343_13363c7a080a83c620fc4e16ad5222cb819fc35d_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"}
-MF_PKG_LINK=${4-"https://repo.mindspore.cn/mindspore/mindformers/version/202507/20250724/r1.6.0_20250724031508_a99188d8919418984b827edf32ab5b007f0b996a_newest/any/mindformers-1.6.0-py3-none-any.whl"}
+MS_PKG_LINK=${3:-""}
+MF_PKG_LINK=${4-""}
 
 prepare_env()
 {
@@ -48,7 +48,7 @@ prepare_env()
   echo "download ms pkg ${MS_PKG_LINK}."
   wget --no-check-certificate -c $MS_PKG_LINK || exit 1
   echo "clone gs repo."
-  git clone https://gitee.com/mindspore/golden-stick.git gs || exit 1
+  git clone https://atomgit.com/mindspore/golden-stick.git gs || exit 1
   cd gs || exit 1
   echo "build gs."
   bash build.sh || exit 1

@@ -2,7 +2,7 @@
 
 ## Golden Stick Architecture
 
-We analyzed some [industry model compression framework practices](https://gitee.com/mindspore/golden-stick/wikis/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/%E9%87%91%E7%AE%8D%E6%A3%92%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3#%E4%B8%9A%E7%95%8C%E5%AE%9E%E8%B7%B5%E8%B0%83%E7%A0%94) and summarized some excellent characteristics:
+We analyzed some [industry model compression framework practices](https://atomgit.com/mindspore/golden-stick/wiki/%E8%BD%AF%E4%BB%B6%E8%AE%BE%E8%AE%A1%2F%E9%87%91%E7%AE%8D%E6%A3%92%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3.md#%E4%B8%9A%E7%95%8C%E5%AE%9E%E8%B7%B5%E8%B0%83%E7%A0%94) and summarized some excellent characteristics:
 
 - **Minimal Ease-of-Use**: Represented by LLM Compressor, deeply integrated with Transformers, providing **a minimal API design**. It has a gentle learning curve and excellent ease of use. Although algorithms are highly encapsulated, it rapidly tracks frontier algorithms in the **LLM domain**, meeting the needs of quick onboarding, deployment, and verification—an ideal choice for LLM users.
 
@@ -84,4 +84,4 @@ Golden Stick adopts an architecture design that separates algorithms from infere
 
 The decoupled algorithm–inference architecture improves the generality of the output quantized weights and reduces maintenance costs.
 
-**Deployment Verification**: Golden Stick’s quantized weights have been deployed and verified on the [vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) and [MindSpore Transformers](https://gitee.com/mindspore/mindformers). Based on the standardized design of the Hugging Face format, it is theoretically supported to attempt deployment on other inference frameworks.
+**Deployment Verification**: Golden Stick's quantized weights have been deployed and verified on the [vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore) and [MindSpore Transformers](https://atomgit.com/mindspore/mindformers). Based on the standardized design of the Hugging Face format, it is theoretically supported to attempt deployment on other inference frameworks.

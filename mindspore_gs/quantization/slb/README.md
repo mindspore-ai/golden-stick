@@ -42,7 +42,7 @@ Table 1: SLB quantization training specifications
 | Specifications| Description|
 | --- | --- |
 | Hardware| GPU |
-| Networks| ResNet-18. For details, see <https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/README.md#apply-algorithm-in-mindspore-golden-stick>.|
+| Networks| ResNet-18. For details, see <https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/README.md#apply-algorithm-in-mindspore-golden-stick>.|
 | Solutions| Supports 1-, 2-, and 4-bit weight quantization solutions, and supports 8-bit activation quantization solutions.|
 | Data types| The GPU platform supports FP32.|
 | Running modes| Graph mode and PyNative mode.|
@@ -60,7 +60,7 @@ The procedure of SLB quantization training is the same as that of common trainin
 
 The following uses the ResNet18 as an example to describe these steps.
 
-> For details about the complete code, see [ResNet model repository](https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/README.md#apply-algorithm-in-mindspore-golden-stick). [train.py](https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/train.py) is the complete training code, and [eval.py](https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/eval.py) is the accuracy verification code.
+> For details about the complete code, see [ResNet model repository](https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/README.md#apply-algorithm-in-mindspore-golden-stick). [train.py](https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/train.py) is the complete training code, and [eval.py](https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/eval.py) is the accuracy verification code.
 
 ### Loading a Dataset
 
@@ -71,7 +71,7 @@ dataset = create_dataset(dataset_path=config.data_path, do_train=True,
                          distribute=config.run_distribute)
 ```
 
-In the code, `create_dataset` is referenced from [dataset.py](https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/src/dataset.py), and `config.data_path` and `config.batch_size` are configured in the [configuration file](https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/resnet18_cifar10_config.yaml).
+In the code, `create_dataset` is referenced from [dataset.py](https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/src/dataset.py), and `config.data_path` and `config.batch_size` are configured in the [configuration file](https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/resnet18_cifar10_config.yaml).
 
 ### Defining the Original Network
 
@@ -276,7 +276,7 @@ ckpt_cb = ModelCheckpoint(prefix="resnet", directory="./ckpt", config=config_ck)
 cb += [ckpt_cb]
 ```
 
-In the code, `get_lr` is referenced from [lr_generator.py](https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/src/lr_generator.py), and `init_group_params` and `init_loss_scale` are referenced from [train.py](https://gitee.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/train.py).
+In the code, `get_lr` is referenced from [lr_generator.py](https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/src/lr_generator.py), and `init_group_params` and `init_loss_scale` are referenced from [train.py](https://atomgit.com/mindspore/models/blob/master/official/cv/ResNet/golden_stick/quantization/slb/train.py).
 
 ### Training the Model and Saving the Model File
 
@@ -307,7 +307,7 @@ Train epoch time: 94106.722 ms, per step time: 60.248 ms
 
 ### Loading the Model and Comparing the Accuracy
 
-Obtain the accuracy of the common training model according to the steps in the [ResNet model repository](https://gitee.com/mindspore/models/tree/master/official/cv/ResNet).
+Obtain the accuracy of the common training model according to the steps in the [ResNet model repository](https://atomgit.com/mindspore/models/tree/master/official/cv/ResNet).
 
 ```text
 'top_1_accuracy': 0.9544270833333334, 'top_5_accuracy': 0.9969951923076923
@@ -335,7 +335,7 @@ print(acc)
 
 ### Summary of Training
 
-Training in graph mode based on [MindSpore](https://gitee.com/mindspore/mindspore/tree/v1.9.0), [MindSpore Golden Stick](https://gitee.com/mindspore/golden-stick/tree/v0.2.0/), [MindSpore Models](https://gitee.com/mindspore/models/commit/f20d3d46ea48a465b26462ef5c62a7d381a34828).
+Training in graph mode based on [MindSpore](https://atomgit.com/mindspore/mindspore/tree/v1.9.0), [MindSpore Golden Stick](https://atomgit.com/mindspore/golden-stick/tree/v0.2.0/), [MindSpore Models](https://atomgit.com/mindspore/models/commit/f20d3d46ea48a465b26462ef5c62a7d381a34828).
 
 W4 indicates that the weight is quant to 4 bits, W2 indicates that the weight is quant to 2 bits, W1 indicates that the weight is quant to 1 bit, and A8 indicates that the activation is quant to 8 bit.
 
