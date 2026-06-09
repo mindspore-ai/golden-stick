@@ -23,7 +23,7 @@ echo "Make sure vocab_file is settled in all yaml."
 echo "Make sure load_checkpoint is settled in predict_deepseek_r1_671b_qckpt.yaml"
 echo "Make sure following config is good for you."
 # config
-MS_PKG_LINK="https://repo.mindspore.cn/mindspore/mindspore/version/202507/20250725/master_20250725105343_13363c7a080a83c620fc4e16ad5222cb819fc35d_newest/unified/aarch64/mindspore-2.7.0-cp310-cp310-linux_aarch64.whl"
+MS_PKG_LINK=""
 
 export GSLOG=1
 export MS_ENABLE_LCCL=off
@@ -60,14 +60,14 @@ prepare_env()
   wget --no-check-certificate -c $MS_PKG_LINK || exit 1
 
   echo "clone mf repo and install mf."
-  git clone -b r1.6.0 https://gitee.com/mindspore/mindformers.git mf || exit 1
+  git clone -b r1.6.0 https://atomgit.com/mindspore/mindformers.git mf || exit 1
   cd mf || exit 1
   echo "build mf."
   bash build.sh || exit 1
   cd .. || exit 1
 
   echo "clone gs repo."
-  git clone -b master https://gitee.com/mindspore/golden-stick.git gs || exit 1
+  git clone -b master https://atomgit.com/mindspore/golden-stick.git gs || exit 1
   cd gs || exit 1
   echo "build gs."
   bash build.sh || exit 1

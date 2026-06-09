@@ -33,7 +33,7 @@ SCOP采用数据驱动的方式，通过引入训练数据学习不同卷积核�
 | 规格         | 规格说明                                                     |
 | ------------ | ------------------------------------------------------------ |
 | 硬件支持     | GPU、Atlas训练系列产品的硬件平台                           |
-| 网络支持     | ResNet系列网络，具体请参见<https://gitee.com/mindspore/models/tree/master>。 |
+| 网络支持     | ResNet系列网络，具体请参见<https://atomgit.com/mindspore/models/tree/master>。 |
 | 算法支持     | 结构化的剪枝算法。                                           |
 | 数据类型支持 | Ascend和GPU平台支持精度为FP32的网络进行剪枝训练。 |
 | 运行模式支持 | Graph模式和PyNative模式                                      |
@@ -50,11 +50,11 @@ SCOP训练分为Knockoff阶段和Finetune阶段。Knockoff阶段对应于前文�
 
 接下来，以ResNet50网络为例，展开叙述SCOP剪枝训练的相关步骤。
 
-> 你可以在这里找到完整可运行的样例代码：<https://gitee.com/mindspore/models/tree/master/official/cv/ResNet/golden_stick/pruner/scop>。
+> 你可以在这里找到完整可运行的样例代码：<https://atomgit.com/mindspore/models/tree/master/official/cv/ResNet/golden_stick/pruner/scop>。
 
 ### Knockoff Data阶段
 
-初始化ResNet50网络，加载预训练模型，通过PrunerKfCompressAlgo进行节点替换（详情用户可参考[API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)），得到Knockoff阶段的网络，并进行训练。
+初始化ResNet50网络，加载预训练模型，通过PrunerKfCompressAlgo进行节点替换（详情用户可参考[API](https://atomgit.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)），得到Knockoff阶段的网络，并进行训练。
 
 > Knockoff Data阶段的dataset_sink_mode必须设置为False，因为在Knockoff Data阶段SCOP算法会修改数据。
 
@@ -105,7 +105,7 @@ step_5: loss=4.715785
 
 ### Finetune阶段
 
-通过Knockoff阶段确认冗余的卷积核，通过PrunerFtCompressAlgo进行节点替换（详情用户可参考[API](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)）删除冗余卷积核，进行完整的训练并保存模型。
+通过Knockoff阶段确认冗余的卷积核，通过PrunerFtCompressAlgo进行节点替换（详情用户可参考[API](https://atomgit.com/mindspore/golden-stick/blob/master/mindspore_gs/pruner/scop/scop_pruner.py)）删除冗余卷积核，进行完整的训练并保存模型。
 
 ```python
 from mindspore_gs import PrunerFtCompressAlgo
@@ -228,7 +228,7 @@ if __name__ == "__main__":
 
 ### 训练效果
 
-使用图模式进行训练，使用的代码为：[MindSpore](https://gitee.com/mindspore/mindspore/tree/v1.9.0)，[MindSpore Golden Stick](https://gitee.com/mindspore/golden-stick/tree/v0.2.0/)，[MindSpore Models](https://gitee.com/mindspore/models/tree/r1.9/)。
+使用图模式进行训练，使用的代码为：[MindSpore](https://atomgit.com/mindspore/mindspore/tree/v1.9.0)，[MindSpore Golden Stick](https://atomgit.com/mindspore/golden-stick/tree/v0.2.0/)，[MindSpore Models](https://atomgit.com/mindspore/models/tree/r1.9/)。
 
 | 算法     | 网络      | 数据集       |  CUDA11 Top1Acc | CUDA11 Top5Acc | Ascend910 Top1Acc | Ascend910 Top5Acc |    剪枝率    |  参数量(MB)  |
 | -------- | -------- | ------------ | --------------- | -------------- | ----------------- | ----------------- | ----------- | ------------ |

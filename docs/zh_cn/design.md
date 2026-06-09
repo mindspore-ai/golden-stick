@@ -2,7 +2,7 @@
 
 ## 金箍棒架构
 
-我们分析了一些[业界模型压缩框架实践](https://gitee.com/mindspore/golden-stick/wikis/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/%E9%87%91%E7%AE%8D%E6%A3%92%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3#%E4%B8%9A%E7%95%8C%E5%AE%9E%E8%B7%B5%E8%B0%83%E7%A0%94)，总结了一些优秀的特点：
+我们分析了一些[业界模型压缩框架实践](https://atomgit.com/mindspore/golden-stick/wiki/%E8%BD%AF%E4%BB%B6%E8%AE%BE%E8%AE%A1%2F%E9%87%91%E7%AE%8D%E6%A3%92%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3.md#%E4%B8%9A%E7%95%8C%E5%AE%9E%E8%B7%B5%E8%B0%83%E7%A0%94)，总结了一些优秀的特点：
 
 - **极简易用**：以LLM Compressor为代表，深度集成Transformers，提供**极简API设计**，学习曲线平缓，易用性极佳。算法高度封装但快速跟进**LLM领域前沿算法**，满足快速上手、部署、验证的需求，是LLM领域用户的理想选择。
 
@@ -84,4 +84,4 @@
 
 算法-推理解耦架构提升了压缩权重的通用性，降低了维护成本。
 
-**部署验证**：金箍棒量化权重已在[vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore)和[MindSpore Transformers](https://gitee.com/mindspore/mindformers)上完成部署验证。基于Hugging Face格式的标准化设计，理论上支持在其他推理框架上部署应用。
+**部署验证**：金箍棒量化权重已在[vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore)和[MindSpore Transformers](https://atomgit.com/mindspore/mindformers)上完成部署验证。基于Hugging Face格式的标准化设计，理论上支持在其他推理框架上部署应用。

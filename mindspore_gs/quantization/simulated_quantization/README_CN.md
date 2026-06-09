@@ -36,7 +36,7 @@ MindSpore的感知量化训练是指在训练时使用伪量化节点来模拟�
 | 规格 | 规格说明 |
 | --- | --- |
 | 硬件支持 | GPU |
-| 网络支持 | LeNet、ResNet50，具体请参见<https://gitee.com/mindspore/models/tree/master>。 |
+| 网络支持 | LeNet、ResNet50，具体请参见<https://atomgit.com/mindspore/models/tree/master>。 |
 | 算法支持 | 支持非对称和对称的量化算法；支持逐层和逐通道的量化算法。|
 | 方案支持 | 支持8比特的量化方案。 |
 | 数据类型支持 | GPU平台支持FP32。 |
@@ -55,7 +55,7 @@ MindSpore的感知量化训练是指在训练时使用伪量化节点来模拟�
 
 接下来以LeNet5网络为例，分别叙述这些步骤。
 
-> 完整代码见[lenet模型仓](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/README_CN.md#应用mindspore-golden-stick模型压缩算法)，其中[train.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/train.py) 为完整的训练代码，[eval.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/eval.py) 为精度验证代码。
+> 完整代码见[lenet模型仓](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/README_CN.md#应用mindspore-golden-stick模型压缩算法)，其中[train.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/train.py) 为完整的训练代码，[eval.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/eval.py) 为精度验证代码。
 
 ### 加载数据集
 
@@ -65,7 +65,7 @@ MindSpore的感知量化训练是指在训练时使用伪量化节点来模拟�
 ds_train = create_dataset(os.path.join(config.data_path), config.batch_size)
 ```
 
-代码中create_dataset引用自[dataset.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/src/dataset.py)，config.data_path和config.batch_size分别在[配置文件](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/lenet_mnist_config.yaml)中配置，下同。
+代码中create_dataset引用自[dataset.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/src/dataset.py)，config.data_path和config.batch_size分别在[配置文件](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/lenet_mnist_config.yaml)中配置，下同。
 
 ### 定义原网络
 
@@ -93,7 +93,7 @@ LeNet5<
   >
 ```
 
-LeNet5网络定义见[lenet.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/src/lenet.py) 。
+LeNet5网络定义见[lenet.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/src/lenet.py) 。
 
 ### 应用量化算法
 
@@ -206,7 +206,7 @@ Train epoch time: 8544.641 ms, per step time: 4.552 ms
 
 ### 评估网络，对比精度
 
-按照[lenet模型仓](https://gitee.com/mindspore/models/tree/master/research/cv/lenet) 步骤获得普通训练的模型精度：
+按照[lenet模型仓](https://atomgit.com/mindspore/models/tree/master/research/cv/lenet) 步骤获得普通训练的模型精度：
 
 ```text
 'Accuracy':0.9842
@@ -236,7 +236,7 @@ LeNet5应用感知量化训练后精度未下降。
 
 ### 训练效果
 
-使用图模式进行训练，使用的代码为：[MindSpore](https://gitee.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa)，[MindSpore Golden Stick](https://gitee.com/mindspore/golden-stick/commit/3c0557371204036ae82404d48c875e905be1ac69)，[MindSpore Models](https://gitee.com/mindspore/models/commit/f20d3d46ea48a465b26462ef5c62a7d381a34828)。
+使用图模式进行训练，使用的代码为：[MindSpore](https://atomgit.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa)，[MindSpore Golden Stick](https://atomgit.com/mindspore/golden-stick/commit/3c0557371204036ae82404d48c875e905be1ac69)，[MindSpore Models](https://atomgit.com/mindspore/models/commit/f20d3d46ea48a465b26462ef5c62a7d381a34828)。
 
 | 算法     | 网络      | 数据集        | CUDA11 Top1Acc | CUDA11 Top5Acc | Ascend910 Top1Acc | Ascend910 Top5Acc |
 | -------- | -------- | ------------ | --------------- | -------------- | ----------------- | ----------------- |
@@ -251,7 +251,7 @@ LeNet5应用感知量化训练后精度未下降。
 
 使用CUDA11环境训练得到的网络，在不同的后端进行部署并测试。
 
-ARMCPU指Arm64架构的CPU。ARMCPU部署测试使用的代码为：[MindSpore Lite](https://gitee.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa)。
+ARMCPU指Arm64架构的CPU。ARMCPU部署测试使用的代码为：[MindSpore Lite](https://atomgit.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa)。
 
 | 算法     | 网络      | 数据集       | ARMCPU模型大小 | ARMCPU Top1Acc | ARMCPU性能 | CUDA11模型大小 | CUDA11 Top1Acc | CUDA11性能 | Atlas 200/300/500推理产品模型大小 | Atlas 200/300/500推理产品 Top1Acc | Atlas 200/300/500推理产品性能 |
 | -------- | -------- | ------------ | ------------- | -------------- | ---------- | ------------- | -------------- | ---------- | ---------------- | ----------------- | ------------- |

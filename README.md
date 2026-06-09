@@ -2,13 +2,13 @@
 
 # MindSpore Golden Stick
 
-**MindSpore Golden Stick is a model compression tool for the MindSpore open source community, supporting quantization of Hugging Face weights on Ascend hardware and deployment on [vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers).**
+**MindSpore Golden Stick is a model compression tool for the MindSpore open source community, supporting quantization of Hugging Face weights on Ascend hardware and deployment on [vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://atomgit.com/mindspore/mindformers).**
 
-[![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://gitee.com/mindspore/golden-stick)
-[![version](https://img.shields.io/badge/release-1.3.0-green)](https://gitee.com/mindspore/golden-stick/releases)
-[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://atomgit.com/mindspore/golden-stick)
+[![version](https://img.shields.io/badge/release-1.3.0-green)](https://atomgit.com/mindspore/golden-stick/releases)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://atomgit.com/mindspore/golden-stick/blob/master/LICENSE)
 
-[**Architecture**](docs/en/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Workflow**](docs/en/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Documentation**](https://www.mindspore.cn/golden_stick/docs/en/master/index.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Issue Feedback**](https://gitee.com/mindspore/golden-stick/issues)
+[**Architecture**](docs/en/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Workflow**](docs/en/design.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Documentation**](https://www.mindspore.cn/golden_stick/docs/en/master/index.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[**Issue Feedback**](https://atomgit.com/mindspore/golden-stick/issues)
 
 [English](README.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[中文](README_CN.md)
 
@@ -112,13 +112,13 @@ Take [Simulated Quantization (SimQAT)](mindspore_gs/quantization/simulated_quant
 
 ### Model Deployment
 
-The model compression results from Golden Stick are weights in Hugging Face format. It is recommended to deploy them on [vLLM-MindSpore Plugin](https://gitee.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers). You can also try deploying them on mainstream frameworks such as PyTorch, ONNX Runtime, TensorRT, etc.
+The model compression results from Golden Stick are weights in Hugging Face format. It is recommended to deploy them on [vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://atomgit.com/mindspore/mindformers). You can also try deploying them on mainstream frameworks such as PyTorch, ONNX Runtime, TensorRT, etc.
 
 ## Community
 
 ### Governance
 
-[MindSpore Open Governance](https://gitee.com/mindspore/community/blob/master/governance.md)
+[MindSpore Open Governance](https://atomgit.com/mindspore/community/blob/master/governance.md)
 
 ### Communication
 
@@ -126,14 +126,14 @@ The model compression results from Golden Stick are weights in Hugging Face form
 
 📬SIG：https://www.mindspore.cn/sig/LLM%20Inference%20Serving
 
-📍WeChat Group：https://gitee.com/mindspore/golden-stick/issues/ID2UGQ
+📍WeChat Group：https://atomgit.com/mindspore/golden-stick/issues/ID2UGQ
 
 ## Contributing
 
 Please read [CONTRIBUTING](./CONTRIBUTING.md) for details on setting up development environments, testing functions, and submitting PR.
 
-We welcome and value any form of contribution and cooperation. Please use [Issue](https://gitee.com/mindspore/golden-stick/issues) to inform us of any bugs you encounter, or to submit your feature requests, improvement suggestions, and technical solutions.
+We welcome and value any form of contribution and cooperation. Please use [Issue](https://atomgit.com/mindspore/golden-stick/issues) to inform us of any bugs you encounter, or to submit your feature requests, improvement suggestions, and technical solutions.
 
 ## License
 
-[Apache License 2.0](https://gitee.com/mindspore/golden-stick/blob/master/LICENSE)
+[Apache License 2.0](https://atomgit.com/mindspore/golden-stick/blob/master/LICENSE)

@@ -20,15 +20,15 @@ Contributions of any kind are welcome!
 
 ### Major Features and Improvements
 
-* **Framework Plugin-Oriented Reconstruction**: Completed the reconstruction of the framework architecture, added support for the `Mindone` network, and adapted mainstream quantization algorithms including OSL (Outlier Suppression-Lite), SmoothQuant, AWQ, GPTQ, A16W8, A8dynW8 and A8W4. The correctness and effectiveness have been verified on models such as glm4v and qwen3. For details, please refer to [glm4v model_card](https://gitee.com/mindspore/golden-stick/tree/master/example/model_cards/glm4v).
+* **Framework Plugin-Oriented Reconstruction**: Completed the reconstruction of the framework architecture, added support for the `Mindone` network, and adapted mainstream quantization algorithms including OSL (Outlier Suppression-Lite), SmoothQuant, AWQ, GPTQ, A16W8, A8dynW8 and A8W4. The correctness and effectiveness have been verified on models such as glm4v and qwen3. For details, please refer to [glm4v model_card](https://atomgit.com/mindspore/golden-stick/tree/master/example/model_cards/glm4v).
 
-* **Support for Multimodal Understanding Model Quantization**: Implemented quantization capabilities for multimodal large models, successfully validating the OSL-A8W8 quantization scheme for the qwen3-vl network under the MindONE framework. For details, see [qwen3-vl model-card](https://gitee.com/mindspore/golden-stick/tree/master/example/model_cards/qwen3-vl).
+* **Support for Multimodal Understanding Model Quantization**: Implemented quantization capabilities for multimodal large models, successfully validating the OSL-A8W8 quantization scheme for the qwen3-vl network under the MindONE framework. For details, see [qwen3-vl model-card](https://atomgit.com/mindspore/golden-stick/tree/master/example/model_cards/qwen3-vl).
 
-* **[Demo] RazorAttention**: Added RazorAttention sequence compression feature. For details, see [RazorAttention](https://gitee.com/mindspore/golden-stick/tree/master/mindspore_gs/sequence_compress).
+* **[Demo] RazorAttention**: Added RazorAttention sequence compression feature. For details, see [RazorAttention](https://atomgit.com/mindspore/golden-stick/tree/master/mindspore_gs/sequence_compress).
 
 ### API Changes
 
-* Added `backend` parameter to `BaseQuantForCausalLM.save_quantized` method to specify the target backend framework for saved quantized weights. For details, see [PR #1305](https://gitee.com/mindspore/golden-stick/pulls/1305).
+* Added `backend` parameter to `BaseQuantForCausalLM.save_quantized` method to specify the target backend framework for saved quantized weights. For details, see [PR #1305](https://atomgit.com/mindspore/golden-stick/pulls/1305).
 
 ### Contributors
 
@@ -250,17 +250,17 @@ Contributions of any kind are welcome!
 
 ### Major Features and Improvements
 
-* [stable] SLB（Searching for Low-Bit Weights in Quantized Neural Networks）QAT algorithm now support BatchNorm calibration. we can invoke `set_enable_bn_calibration` api to enable BatchNorm calibration. For a network with a BatchNorm layer, the BatchNorm calibration can reduces the decrease in network accuracy caused by the SLB quantization algorithm. ([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
-* [stable] We verified the quantization effect of SimQAT(Simulated Quantization Aware Training) algorithm and the SLB algorithm on the ResNet network and the Imagenet2012 dataset. For details, please refer to [MindSpore Models readme](https://gitee.com/mindspore/models/tree/r2.0.0-alpha/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4).
+* [stable] SLB（Searching for Low-Bit Weights in Quantized Neural Networks）QAT algorithm now support BatchNorm calibration. we can invoke `set_enable_bn_calibration` api to enable BatchNorm calibration. For a network with a BatchNorm layer, the BatchNorm calibration can reduces the decrease in network accuracy caused by the SLB quantization algorithm. ([!150](https://atomgit.com/mindspore/golden-stick/pulls/150))
+* [stable] We verified the quantization effect of SimQAT(Simulated Quantization Aware Training) algorithm and the SLB algorithm on the ResNet network and the Imagenet2012 dataset. For details, please refer to [MindSpore Models readme](https://atomgit.com/mindspore/models/tree/r2.0.0-alpha/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4).
 * [stable] SimQAT algorithm now support inference on MindSpore Lite backend. We quant the LeNet network with SimQAT and deploy it on ARM CPU. For details, please refer to [Deployment Effect](https://www.mindspore.cn/golden_stick/docs/en/master/quantization/simulated_quantization.html#summary-of-deployment).
 
 ### API Change
 
 #### Backwards Compatible Change
 
-* SLB algorithm adds the `set_enable_bn_calibration` interface to enable or disable BatchNorm calibration.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* Add `convert` interface to the algorithm base class, which is configured to convert training network to inferring network. And the network will be exported to MindIR file for Deployment. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/r0.3.0-alpha/deployment/convert.html#export-mindir-after-training).([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
-* Add `set_save_mindir` interface to the algorithm base class, which is configured to automatically export MindIR after training. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/r0.3.0-alpha/deployment/convert.html#configure-the-algorithm-to-automatically-export-mindir).([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
+* SLB algorithm adds the `set_enable_bn_calibration` interface to enable or disable BatchNorm calibration.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* Add `convert` interface to the algorithm base class, which is configured to convert training network to inferring network. And the network will be exported to MindIR file for Deployment. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/r0.3.0-alpha/deployment/convert.html#export-mindir-after-training).([!176](https://atomgit.com/mindspore/golden-stick/pulls/176/files))
+* Add `set_save_mindir` interface to the algorithm base class, which is configured to automatically export MindIR after training. For details, please refer to [Model Deployment](https://www.mindspore.cn/golden_stick/docs/en/r0.3.0-alpha/deployment/convert.html#configure-the-algorithm-to-automatically-export-mindir).([!168](https://atomgit.com/mindspore/golden-stick/pulls/168/files))
 
 ### Bug fixes
 
@@ -290,13 +290,13 @@ Contributions of any kind are welcome!
 
 #### Python API
 
-* Added `callbacks` interface to the algorithm base class, which returns the callback logic of the algorithm which will be called during the training process. In order to facilitate different algorithms to implement their own callback logic, this method has variable parameter inputs.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB algorithm adds the `set_epoch_size` interface, which is used to configure the total number of epochs of training, and is used to implement the temperature adjustment callback logic.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB algorithm adds the `set_has_trained_epoch` interface. If a pre-trained checkpoint is used in training, it is used to configure the number of pre-trained epochs corresponding to the pre-trained checkpoint used in the current training, which is used to implement the temperature adjustment callback logic.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB algorithm adds the `set_t_start_val` interface, which is used to configure the initialization value of the temperature in the temperature adjustment mechanism, and is used to implement the temperature adjustment callback logic.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB algorithm adds the `set_t_start_time` interface, which is used to configure the time when the temperature adjustment mechanism start to work, and is used to implement the temperature adjustment callback logic.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB algorithm adds the `set_t_end_time` interface, which is used to configure the time when the temperature adjustment mechanism stop to work, and is used to implement the temperature adjustment callback logic.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB algorithm adds the `set_t_factor` interface, which is used to configure the temperature adjustment factor in the temperature adjustment mechanism, and is used to implement the temperature adjustment callback logic.([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
+* Added `callbacks` interface to the algorithm base class, which returns the callback logic of the algorithm which will be called during the training process. In order to facilitate different algorithms to implement their own callback logic, this method has variable parameter inputs.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB algorithm adds the `set_epoch_size` interface, which is used to configure the total number of epochs of training, and is used to implement the temperature adjustment callback logic.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB algorithm adds the `set_has_trained_epoch` interface. If a pre-trained checkpoint is used in training, it is used to configure the number of pre-trained epochs corresponding to the pre-trained checkpoint used in the current training, which is used to implement the temperature adjustment callback logic.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB algorithm adds the `set_t_start_val` interface, which is used to configure the initialization value of the temperature in the temperature adjustment mechanism, and is used to implement the temperature adjustment callback logic.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB algorithm adds the `set_t_start_time` interface, which is used to configure the time when the temperature adjustment mechanism start to work, and is used to implement the temperature adjustment callback logic.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB algorithm adds the `set_t_end_time` interface, which is used to configure the time when the temperature adjustment mechanism stop to work, and is used to implement the temperature adjustment callback logic.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB algorithm adds the `set_t_factor` interface, which is used to configure the temperature adjustment factor in the temperature adjustment mechanism, and is used to implement the temperature adjustment callback logic.([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
 
 ### Contributors
 

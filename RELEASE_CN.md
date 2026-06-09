@@ -20,15 +20,15 @@ guoguopot, ccsszz, yyyyrf, hangangqiang, haowenz
 
 ### 主要特性和增强
 
-* **框架插件化重构**：完成框架架构重构，新增对 `Mindone` 网络支持，适配了OSL（OutlierSuppression-Lite）、SmoothQuant、AWQ、GPTQ、A16W8、A8dynW8、A8W4等主流量化算法，在glm4v、qwen3等模型上验证了正确性和有效性，详见[glm4v model_card](https://gitee.com/mindspore/golden-stick/tree/master/example/model_cards/glm4v)。
+* **框架插件化重构**：完成框架架构重构，新增对 `Mindone` 网络支持，适配了OSL（OutlierSuppression-Lite）、SmoothQuant、AWQ、GPTQ、A16W8、A8dynW8、A8W4等主流量化算法，在glm4v、qwen3等模型上验证了正确性和有效性，详见[glm4v model_card](https://atomgit.com/mindspore/golden-stick/tree/master/example/model_cards/glm4v)。
 
-* **支持多模态理解模型量化**：实现了多模态大模型量化能力，成功验证了MindONE框架下的qwen3-vl网络OSL-A8W8量化方案，详见[qwen3-vl model-card](https://gitee.com/mindspore/golden-stick/tree/master/master/example/model_cards/qwen3-vl)。
+* **支持多模态理解模型量化**：实现了多模态大模型量化能力，成功验证了MindONE框架下的qwen3-vl网络OSL-A8W8量化方案，详见[qwen3-vl model-card](https://atomgit.com/mindspore/golden-stick/tree/master/master/example/model_cards/qwen3-vl)。
 
-* **[Demo] RazorAttention**：新增RazorAttention序列压缩特性，详见[RazorAttention](https://gitee.com/mindspore/golden-stick/tree/master/mindspore_gs/sequence_compress)。
+* **[Demo] RazorAttention**：新增RazorAttention序列压缩特性，详见[RazorAttention](https://atomgit.com/mindspore/golden-stick/tree/master/mindspore_gs/sequence_compress)。
 
 ### API变更
 
-* `BaseQuantForCausalLM.save_quantized` 方法新增 `backend` 入参，用于指定保存的量化权重格式对应的后端框架，详见[PR #1305](https://gitee.com/mindspore/golden-stick/pulls/1305)。
+* `BaseQuantForCausalLM.save_quantized` 方法新增 `backend` 入参，用于指定保存的量化权重格式对应的后端框架，详见[PR #1305](https://atomgit.com/mindspore/golden-stick/pulls/1305)。
 
 ### 贡献者
 
@@ -250,17 +250,17 @@ hangangqiang, yangruoqi713, kevinkunkun
 
 ### 主要特性和增强
 
-* [stable] SLB（Searching for Low-Bit Weights in Quantized Neural Networks）感知量化算法支持BatchNorm矫正能力。可以通过`set_enable_bn_calibration`接口来配置使能。对于存在BatchNorm层的网络，BatchNorm矫正能力减少SLB量化算法产生的网络准确率下降。([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
-* [stable] 验证了SimQAT（Simulated Quantization Aware Training）算法和SLB算法在ResNet网络，Imagenet2012数据集上的量化效果，详细效果参见[MindSpore Models仓readme](https://gitee.com/mindspore/models/tree/r2.0.0-alpha/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4)。
+* [stable] SLB（Searching for Low-Bit Weights in Quantized Neural Networks）感知量化算法支持BatchNorm矫正能力。可以通过`set_enable_bn_calibration`接口来配置使能。对于存在BatchNorm层的网络，BatchNorm矫正能力减少SLB量化算法产生的网络准确率下降。([!150](https://atomgit.com/mindspore/golden-stick/pulls/150))
+* [stable] 验证了SimQAT（Simulated Quantization Aware Training）算法和SLB算法在ResNet网络，Imagenet2012数据集上的量化效果，详细效果参见[MindSpore Models仓readme](https://atomgit.com/mindspore/models/tree/r2.0.0-alpha/official/cv/ResNet#%E7%BB%93%E6%9E%9C-4)。
 * [stable] 打通了SimQAT算法在Lite上的部署流程，并验证了LeNet网络的部署效果，详细效果参见[MindSpore官网SimQAT量化算法推理部署效果](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/quantization/simulated_quantization.html#%E9%83%A8%E7%BD%B2%E6%95%88%E6%9E%9C)。
 
 ### API变更
 
 #### 兼容性变更
 
-* SLB算法新增`set_enable_bn_calibration`接口，用于配置是否需要使能BatchNorm矫正能力。([!150](https://gitee.com/mindspore/golden-stick/pulls/150))
-* 算法基类CompAlgo新增 `convert` 接口，用于在训练后将网络转换为推理网络，推理网络将被导出为MindIR进行推理部署，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E8%AE%AD%E7%BB%83%E5%90%8E%E5%AF%BC%E5%87%BAmindir)。([!176](https://gitee.com/mindspore/golden-stick/pulls/176/files))
-* 算法基类CompAlgo新增 `set_save_mindir` 接口，配置在训练后自动导出MindIR，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E9%85%8D%E7%BD%AE%E7%AE%97%E6%B3%95%E8%87%AA%E5%8A%A8%E5%AF%BC%E5%87%BAmindir)。([!168](https://gitee.com/mindspore/golden-stick/pulls/168/files))
+* SLB算法新增`set_enable_bn_calibration`接口，用于配置是否需要使能BatchNorm矫正能力。([!150](https://atomgit.com/mindspore/golden-stick/pulls/150))
+* 算法基类CompAlgo新增 `convert` 接口，用于在训练后将网络转换为推理网络，推理网络将被导出为MindIR进行推理部署，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E8%AE%AD%E7%BB%83%E5%90%8E%E5%AF%BC%E5%87%BAmindir)。([!176](https://atomgit.com/mindspore/golden-stick/pulls/176/files))
+* 算法基类CompAlgo新增 `set_save_mindir` 接口，配置在训练后自动导出MindIR，具体使用方法详见[模型部署文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/r0.3.0-alpha/deployment/convert.html#%E9%85%8D%E7%BD%AE%E7%AE%97%E6%B3%95%E8%87%AA%E5%8A%A8%E5%AF%BC%E5%87%BAmindir)。([!168](https://atomgit.com/mindspore/golden-stick/pulls/168/files))
 
 ### Bug修复
 
@@ -290,13 +290,13 @@ liuzhicheng01, fuzhongqian, hangangqiang, yangruoqi713, kevinkunkun.
 
 #### Python API
 
-* 算法基类CompAlgo新增`callbacks`接口，返回算法在训练过程中的回调逻辑，为了方便不同算法实现各自的回调逻辑，该算法为变参输入。([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB算法新增`set_epoch_size`接口，用于配置当前训练的总epoch数，用于温度调节逻辑的实现。([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB算法新增`set_has_trained_epoch`接口，如果训练中使用了预训练的checkpoing，请通过该接口配置当前训练中使用的预训练checkpoint对应的预训练轮数，用于温度调节逻辑的实现。([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB算法新增`set_t_start_val`接口，用于配置温度调节机制中温度的初始值，用于温度调节逻辑的实现。([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB算法新增`set_t_start_time`接口，用于配置温度调节机制开始生效的时间点，用于温度调节逻辑的实现。([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB算法新增`set_t_end_time`接口，用于配置温度调节机制停止生效的时间点，用于温度调节逻辑的实现。([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
-* SLB算法新增`set_t_factor`接口，用于配置温度调节机制中的温度调节因子，用于温度调节逻辑的实现。([!117](https://gitee.com/mindspore/golden-stick/pulls/117))
+* 算法基类CompAlgo新增`callbacks`接口，返回算法在训练过程中的回调逻辑，为了方便不同算法实现各自的回调逻辑，该算法为变参输入。([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB算法新增`set_epoch_size`接口，用于配置当前训练的总epoch数，用于温度调节逻辑的实现。([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB算法新增`set_has_trained_epoch`接口，如果训练中使用了预训练的checkpoing，请通过该接口配置当前训练中使用的预训练checkpoint对应的预训练轮数，用于温度调节逻辑的实现。([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB算法新增`set_t_start_val`接口，用于配置温度调节机制中温度的初始值，用于温度调节逻辑的实现。([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB算法新增`set_t_start_time`接口，用于配置温度调节机制开始生效的时间点，用于温度调节逻辑的实现。([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB算法新增`set_t_end_time`接口，用于配置温度调节机制停止生效的时间点，用于温度调节逻辑的实现。([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
+* SLB算法新增`set_t_factor`接口，用于配置温度调节机制中的温度调节因子，用于温度调节逻辑的实现。([!117](https://atomgit.com/mindspore/golden-stick/pulls/117))
 
 ### 贡献者
 

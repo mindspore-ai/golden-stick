@@ -23,10 +23,10 @@
 
 ## 快速入门
 
-- 在[Gitee](https://gitee.com/mindspore/golden-stick)上fork代码仓。
+- 在[AtomGit](https://atomgit.com/mindspore/golden-stick)上fork代码仓。
 - 参见[README](./README_CN.md)和[安装说明](./docs/zh_cn/install.md)了解项目信息和构建说明。
 - 参考[快速入门](./example)尝试使用将SmoothQuant应用于Qwen3-0.6B网络。
-- 参考[架构设计](./docs/zh_cn/design.md)了解项目架构，参考[wiki](https://gitee.com/mindspore/golden-stick/wikis)了解项目详细的软件设计。
+- 参考[架构设计](./docs/zh_cn/design.md)了解项目架构，参考[wiki](https://atomgit.com/mindspore/golden-stick/wiki)了解项目详细的软件设计。
 
 ## 贡献流程
 
@@ -70,9 +70,9 @@
     如果您想将代码下载到本地计算机，最好使用git方法：
 
     ```shell
-    # 在Gitee上：
-    git clone https://gitee.com/{insert_your_forked_repo}/golden-stick.git
-    git remote add upstream https://gitee.com/mindspore/golden-stick.git
+    # 在AtomGit上：
+    git clone https://atomgit.com/{insert_your_forked_repo}/golden-stick.git
+    git remote add upstream https://atomgit.com/mindspore/golden-stick.git
     ```
 
 - 本地开发代码。
@@ -121,11 +121,11 @@
 - **解决issue时，请先评论**，告知他人由您来负责解决该issue。
 - **对于长时间未关闭的issue**，建议贡献者在解决该issue之前进行预先检查。
 - **如您自行解决了自己报告的issue**，仍需在关闭该issue之前告知他人。
-- **如需issue快速响应**，可为issue添加标签。标签详情，参见[标签列表](https://gitee.com/mindspore/community/blob/master/sigs/dx/docs/labels.md)。
+- **如需issue快速响应**，可为issue添加标签。标签详情，参见[标签列表](https://atomgit.com/mindspore/community/blob/master/sigs/dx/docs/labels.md)。
 
 ### 提交PR
 
-- 在[Gitee](https://gitee.com/mindspore/golden-stick/issues)上通过issue提出您的想法。  
+- 在[AtomGit](https://atomgit.com/mindspore/golden-stick/issues)上通过issue提出您的想法。  
 - 如果是需要大量设计细节的新功能，还应提交设计方案。同时需要在[MindSpore LLM Inference Serving SIG](https://www.mindspore.cn/sig/LLM%20Inference%20Serving)中评审设计方案。
 - 经MindSpore Golden Stick社区issue讨论和设计方案评审达成共识后，在已fork的代码仓开发，并提交PR。
 - 经充分讨论后，根据讨论的结果合并、放弃或拒绝PR。

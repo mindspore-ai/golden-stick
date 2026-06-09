@@ -15,7 +15,7 @@ Based on MindSpore's built-in compression technologies and a componentized desig
 
 You can refer to the `Architecture Design <design.html>`_ to quickly understand the system architecture of MindSpore Golden Stick.
 
-If you have any suggestions for MindSpore Golden Stick, please contact us via `issues <https://gitee.com/mindspore/golden-stick/issues>`_, and we will respond promptly.
+If you have any suggestions for MindSpore Golden Stick, please contact us via `issues <https://atomgit.com/mindspore/golden-stick/issues>`_, and we will respond promptly.
 
 Using MindSpore Golden Stick for Model Compression
 -----------------------------------------------------
@@ -31,7 +31,7 @@ Currently, Golden Stick focuses primarily on compressing LLMs and multimodal und
 - `Quantization-Aware Training Guide <quantization/overview.html>`_
 - `Model Pruning Guide <pruner/overview.html>`_
 
-Repository: <https://gitee.com/mindspore/golden-stick>
+Repository: <https://atomgit.com/mindspore/golden-stick>
 
 Supported Algorithms in MindSpore Golden Stick
 --------------------------------------------------
@@ -96,8 +96,8 @@ Supported Algorithms in MindSpore Golden Stick
 
 - Deployment Integration
 
-  - `vLLM-MindSpore Plugin Integration <https://gitee.com/mindspore/vllm-mindspore>`_
-  - `MindSpore Transformers Integration <https://gitee.com/mindspore/mindformers>`_
+  - `vLLM-MindSpore Plugin Integration <https://atomgit.com/mindspore/vllm-mindspore>`_
+  - `MindSpore Transformers Integration <https://atomgit.com/mindspore/mindformers>`_
 
 - Contribution Guide
 

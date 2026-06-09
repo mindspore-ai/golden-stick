@@ -36,7 +36,7 @@ Table 1: Quantization aware training specifications
 | Specifications| Description|
 | --- | --- |
 | Hardware| GPU |
-| Networks| The supported networks include LeNet and ResNet-50. For details, see <https://gitee.com/mindspore/models/tree/master>.|
+| Networks| The supported networks include LeNet and ResNet-50. For details, see <https://atomgit.com/mindspore/models/tree/master>.|
 | Algorithms| Asymmetric, symmetric, layer-by-layer, and channel-by-channel quantization algorithms.|
 | Solutions| 8-bit quantization solution|
 | Data types| The GPU platform supports FP32.|
@@ -55,7 +55,7 @@ The procedure of quantization aware training is basically the same as that of co
 
 The following uses the LeNet5 as an example to describe these steps.
 
-> For the complete code, see the [LeNet model repository](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/README.md#apply-algorithm-in-mindspore-golden-stick). The [train.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/train.py) is the complete training code, and the [eval.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/eval.py) is the accuracy verification code.
+> For the complete code, see the [LeNet model repository](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/README.md#apply-algorithm-in-mindspore-golden-stick). The [train.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/train.py) is the complete training code, and the [eval.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/eval.py) is the accuracy verification code.
 
 ### Loading a Dataset
 
@@ -65,7 +65,7 @@ Load MNIST dataset using MindData:
 ds_train = create_dataset(os.path.join(config.data_path), config.batch_size)
 ```
 
-In the code, `create_dataset` is referenced from [dataset.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/src/dataset.py). `config.data_path` and `config.batch_size` are configured in the [configuration file](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/lenet_mnist_config.yaml).
+In the code, `create_dataset` is referenced from [dataset.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/src/dataset.py). `config.data_path` and `config.batch_size` are configured in the [configuration file](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/golden_stick/quantization/simqat/lenet_mnist_config.yaml).
 
 ### Defining the Original Network
 
@@ -93,7 +93,7 @@ LeNet5<
   >
 ```
 
-For details about the ResNet-5 definition, see [lenet.py](https://gitee.com/mindspore/models/blob/master/research/cv/lenet/src/lenet.py).
+For details about the ResNet-5 definition, see [lenet.py](https://atomgit.com/mindspore/models/blob/master/research/cv/lenet/src/lenet.py).
 
 ### Applying the Quantization Algorithm
 
@@ -206,7 +206,7 @@ Train epoch time: 8544.641 ms, per step time: 4.552 ms
 
 ### Evaluating Network and Comparing the Accuracy
 
-Obtain the accuracy of the common training network according to the steps in the [LeNet model repository](https://gitee.com/mindspore/models/tree/master/research/cv/lenet).
+Obtain the accuracy of the common training network according to the steps in the [LeNet model repository](https://atomgit.com/mindspore/models/tree/master/research/cv/lenet).
 
 ```text
 'Accuracy':0.9842
@@ -236,7 +236,7 @@ The accuracy of LeNet5 does not decrease after quantization aware training.
 
 ### Summary of Training
 
-Training in graph mode based on [MindSpore](https://gitee.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa), [MindSpore Golden Stick](https://gitee.com/mindspore/golden-stick/commit/3c0557371204036ae82404d48c875e905be1ac69), [MindSpore Models](https://gitee.com/mindspore/models/commit/f20d3d46ea48a465b26462ef5c62a7d381a34828).
+Training in graph mode based on [MindSpore](https://atomgit.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa), [MindSpore Golden Stick](https://atomgit.com/mindspore/golden-stick/commit/3c0557371204036ae82404d48c875e905be1ac69), [MindSpore Models](https://atomgit.com/mindspore/models/commit/f20d3d46ea48a465b26462ef5c62a7d381a34828).
 
 | algorithm| network  | dataset      | CUDA11 Top1Acc  | CUDA11 Top5Acc | Ascend910 Top1Acc | Ascend910 Top5Acc |
 | -------- | -------- | ------------ | --------------- | -------------- | ----------------- | ----------------- |
@@ -251,7 +251,7 @@ Training in graph mode based on [MindSpore](https://gitee.com/mindspore/mindspor
 
 Use the network trained on the CUDA11 for deployment test on different backends.
 
-ARMCPU means the CPU of the Arm64 architecture. ARMCPU deployment test based on [MindSpore Lite](https://gitee.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa).
+ARMCPU means the CPU of the Arm64 architecture. ARMCPU deployment test based on [MindSpore Lite](https://atomgit.com/mindspore/mindspore/commit/1674f3f666997f49346c27c322ecac1bb7979ffa).
 
 | algorithm| network  | dataset      |ARMCPU model size|ARMCPU Top1Acc|ARMCPU Performance|CUDA11 model size|CUDA11 Top1Acc|CUDA11 Performance|Atlas 200/300/500 inference product model size|Atlas 200/300/500 inference product Top1Acc|Atlas 200/300/500 inference product Performance|
 | -------- | -------- | ------------ | --------------- | ------------ | ---------------- | --------------- | ------------ | ---------------- | ------------------ | --------------- | ------------------- |

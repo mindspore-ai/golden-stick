@@ -47,7 +47,7 @@
 (1) MindSpore Golden stick安装:
 
 ```bash
-git clone https://gitee.com/mindspore/golden-stick.git
+git clone https://atomgit.com/mindspore/golden-stick.git
 cd golden-stick
 pip install -e .
 ```

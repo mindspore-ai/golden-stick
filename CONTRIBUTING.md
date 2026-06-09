@@ -24,10 +24,10 @@ For individual contributor, please refer to [ICLA online document](https://www.m
 
 ## Getting Started
 
-- Fork the repository on [Gitee](https://gitee.com/mindspore/golden-stick).
+- Fork the repository on [AtomGit](https://atomgit.com/mindspore/golden-stick).
 - Refer to [README](./README.md) and [Installation Guide](./docs/en/install.md) for project information and build instructions.
 - Refer to [Quick Start](./example) to try applying SmoothQuant to the Qwen3-0.6B network.
-- Refer to [Architecture Design](./docs/en/design.md) to understand the project architecture, and refer to [wiki](https://gitee.com/mindspore/golden-stick/wikis) for detailed software design of the project.
+- Refer to [Architecture Design](./docs/en/design.md) to understand the project architecture, and refer to [wiki](https://atomgit.com/mindspore/golden-stick/wiki) for detailed software design of the project.
 
 ## Contribution Workflow
 
@@ -71,9 +71,9 @@ During development, it is recommended to use the pre-push feature for local code
     If you want to download the code to your local computer, it's best to use the git method:
 
     ```shell
-    # On Gitee:
-    git clone https://gitee.com/{insert_your_forked_repo}/golden-stick.git
-    git remote add upstream https://gitee.com/mindspore/golden-stick.git
+    # On AtomGit:
+    git clone https://atomgit.com/{insert_your_forked_repo}/golden-stick.git
+    git remote add upstream https://atomgit.com/mindspore/golden-stick.git
     ```
 
 - Develop Code Locally
@@ -122,11 +122,11 @@ When reporting issues, please refer to the following format:
 - **When resolving an issue, please comment first** to inform others that you are responsible for resolving the issue.
 - **For issues that have been open for a long time**, it is recommended that contributors perform a pre-check before resolving the issue.
 - **If you resolve an issue you reported yourself**, you still need to inform others before closing the issue.
-- **For quick issue response**, you can add labels to issues. For label details, refer to [Label List](https://gitee.com/mindspore/community/blob/master/sigs/dx/docs/labels.md).
+- **For quick issue response**, you can add labels to issues. For label details, refer to [Label List](https://atomgit.com/mindspore/community/blob/master/sigs/dx/docs/labels.md).
 
 ### Proposing PRs
 
-- Propose your ideas as an *issue* on [Gitee](https://gitee.com/mindspore/golden-stick/issues).
+- Propose your ideas as an *issue* on [AtomGit](https://atomgit.com/mindspore/golden-stick/issues).
 - If it's a new feature that requires extensive design details, you should also submit a design proposal. The design proposal also needs to be reviewed in [MindSpore LLM Inference Serving SIG](https://www.mindspore.cn/sig/LLM%20Inference%20Serving).
 - After reaching consensus through MindSpore Golden Stick community issue discussions and design proposal reviews, develop in the forked repository and submit a PR.
 - After sufficient discussion, merge, abandon, or reject the PR based on the discussion results.

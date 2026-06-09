@@ -56,7 +56,7 @@ GLM-4.1V（GLM-4.1 Vision）是由智谱AI开发的多模态大语言模型，�
 (1) MindSpore Golden stick安装:
 
 ```bash
-git clone https://gitee.com/mindspore/golden-stick.git
+git clone https://atomgit.com/mindspore/golden-stick.git
 cd golden-stick
 pip install -e .
 ```

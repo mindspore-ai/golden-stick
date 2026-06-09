@@ -1,6 +1,6 @@
 # 训练后量化算法概述
 
-[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/README_CN.md)
+[![查看源文件](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source.svg)](https://atomgit.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/README_CN.md)
 
 [View English](./README.md)
 

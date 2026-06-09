@@ -51,14 +51,14 @@ sed -i "s/\.\/slb\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/
 sed -i "s/\.\.\/ptq\/README\.md/https:\/\/www\.mindspore\.cn\/golden_stick\/docs\/en\/${version}\/ptq\/overview\.html/g" ${CUR_DIR}/../mindspore_gs/quantization/README.md
 
 # mindspore_gs/CONTRIBUTING.md
-sed -i "s#\[README\](./README.md)#\[README\](https://gitee.com/mindspore/golden-stick/tree/${version}/README.md)#g" ${CUR_DIR}/../CONTRIBUTING.md
-sed -i "s#\[README\](./README_CN.md)#\[README\](https://gitee.com/mindspore/golden-stick/tree/${version}/README_CN.md)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+sed -i "s#\[README\](./README.md)#\[README\](https://atomgit.com/mindspore/golden-stick/tree/${version}/README.md)#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#\[README\](./README_CN.md)#\[README\](https://atomgit.com/mindspore/golden-stick/tree/${version}/README_CN.md)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
 
 sed -i "s#\[Architecture Design\](./docs/en/design\.md)#\[Architecture Design\]\(https://www.mindspore.cn/golden_stick/docs/en/${version}/design.html)#g" ${CUR_DIR}/../CONTRIBUTING.md
 sed -i "s#\[架构设计\](./docs/zh_cn/design\.md)#\[架构设计\]\(https://www.mindspore.cn/golden_stick/docs/zh-CN/${version}/design.html)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
 
-sed -i "s#\[Quick Start\](./example)#\[Quick Start\](https://gitee.com/mindspore/golden-stick/tree/${version}/example/)#g" ${CUR_DIR}/../CONTRIBUTING.md
-sed -i "s#\[快速入门\](./example)#\[快速入门\](https://gitee.com/mindspore/golden-stick/tree/${version}/example/)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+sed -i "s#\[Quick Start\](./example)#\[Quick Start\](https://atomgit.com/mindspore/golden-stick/tree/${version}/example/)#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#\[快速入门\](./example)#\[快速入门\](https://atomgit.com/mindspore/golden-stick/tree/${version}/example/)#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
 
 sed -i "s#./docs/en/install.md#https://www.mindspore.cn/golden_stick/docs/en/${version}/install.html#g" ${CUR_DIR}/../CONTRIBUTING.md
 sed -i "s#./docs/zh_cn/install.md#https://www.mindspore.cn/golden_stick/docs/zh-CN/${version}/install.html#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
@@ -66,8 +66,8 @@ sed -i "s#./docs/zh_cn/install.md#https://www.mindspore.cn/golden_stick/docs/zh-
 sed -i "s#./docs/en/design.md#https://www.mindspore.cn/golden_stick/docs/en/${version}/design.html#g" ${CUR_DIR}/../CONTRIBUTING.md
 sed -i "s#./docs/zh_cn/design.md#https://www.mindspore.cn/golden_stick/docs/zh-CN/${version}/design.html#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
 
-sed -i "s#./scripts/pre_push/README.md#https://gitee.com/mindspore/golden-stick/tree/${version}/scripts/pre_push/README.md#g" ${CUR_DIR}/../CONTRIBUTING.md
-sed -i "s#./scripts/pre_push/README_CN.md#https://gitee.com/mindspore/golden-stick/tree/${version}/scripts/pre_push/README_CN.md#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
+sed -i "s#./scripts/pre_push/README.md#https://atomgit.com/mindspore/golden-stick/tree/${version}/scripts/pre_push/README.md#g" ${CUR_DIR}/../CONTRIBUTING.md
+sed -i "s#./scripts/pre_push/README_CN.md#https://atomgit.com/mindspore/golden-stick/tree/${version}/scripts/pre_push/README_CN.md#g" ${CUR_DIR}/../CONTRIBUTING_CN.md
 
 sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING_CN.md
 sed -i '/<!-- TOC -->/,/<!-- \/TOC -->/d' ${CUR_DIR}/../CONTRIBUTING.md

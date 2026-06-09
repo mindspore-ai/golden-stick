@@ -1,6 +1,6 @@
 # Applying the PTQ Algorithm
 
-[![View Source On Gitee](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://gitee.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/ptq/README.md)
+[![View Source On AtomGit](https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/resource/_static/logo_source_en.svg)](https://atomgit.com/mindspore/golden-stick/blob/master/mindspore_gs/ptq/ptq/README.md)
 
 [查看中文](./README_CN.md)
 
@@ -45,7 +45,7 @@ This subsection describes the capabilities of the PTQ algorithm in terms of comm
 - KVCache quantization: static per-channel and dynamic per-token schemes are supported.
 - For full quantization, per-channel activation is not yet supported owing to hardware/operator limitations, and weight quantization with non-zero zero-point is not supported.
 - Although the hardware can handle weights with arbitrary zero-points, the current PTQ implementation does not expose this capability; only zero-point-free weight quantization is available.
-- Due to limitations in MindSpore’s low-level quantized operators, the current Golden Stick PTQ algorithms are only enabled for a subset of MindSpore Transformers layers: [MindSpore Transformers Linear layers](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/layers.py) and [MindSpore Transformers MoE layers](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/grouped_layers.py) support both activation and weight quantization. [MindSpore Transformers PageAttention layers](https://gitee.com/mindspore/mindformers/blob/master/mindformers/modules/paged_attention_mgr.py) support KVCache quantization. If the user needs to quantize the network that is not based on MindSpore Transformers, the user is required to provide the relevant quantization operator implementation, the current customization capability in this regard does not form a clear interface, will be provided in the future.
+- Due to limitations in MindSpore’s low-level quantized operators, the current Golden Stick PTQ algorithms are only enabled for a subset of MindSpore Transformers layers: [MindSpore Transformers Linear layers](https://atomgit.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/layers.py) and [MindSpore Transformers MoE layers](https://atomgit.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/tensor_parallel/grouped_layers.py) support both activation and weight quantization. [MindSpore Transformers PageAttention layers](https://atomgit.com/mindspore/mindformers/blob/master/mindformers/modules/paged_attention_mgr.py) support KVCache quantization. If the user needs to quantize the network that is not based on MindSpore Transformers, the user is required to provide the relevant quantization operator implementation, the current customization capability in this regard does not form a clear interface, will be provided in the future.
 
 The list of quantization algorithms already supported by Golden Stick:
 
@@ -67,7 +67,7 @@ It is found that, unlike CNNs and small transformer networks, when the number of
 
 The [SmoothQuant](https://arxiv.org/pdf/2211.10438) algorithm transfers a portion of the outliers on the activations to the weights through a mathematically equivalent transformation, thus transforming the difficult-to-quantify activations and very easy-to-quantify weights into easy-to-quantify activations and easy-to-quantify weights, and realizing the improvement of quantization accuracy.
 
-**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
+**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://atomgit.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
 
 User can enable the SmoothQuant capability of PTQ with the following configuration item:
 
@@ -88,7 +88,7 @@ This finer-grained tuning better suppresses activation outliers and thereby boos
 
 > [SmoothQuant](https://arxiv.org/pdf/2211.10438) algorithm migrates the quantization difficulty from activations to weights, and introduces a hyper-parameter, migration strength α, to control how much difficulty is migrated. Through whole-model experiments, the paper found that α = 0.5 is the well-balanced point for most models. However, different network structures, different positions of decoder layers, and different positions of matrices within decoder layers can lead to different distributions of activation values and weights, thereby resulting in different optimal values of α.
 
-**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
+**Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://atomgit.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
 
 User can enable the OutlierSuppressionLite capability of PTQ with the following configuration item:
 
@@ -109,7 +109,7 @@ The core idea of the GPTQ algorithm is to quantize all weights in a block one by
 
 The PTQ algorithm supports the use of the GPTQ algorithm for 8-bit and 4-bit weight quantization and has incorporated it into the set of accuracy recovery algorithms. Currently, GPTQ is the only optional algorithm for accuracy recovery.
 
-**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/deepseek3).
 
 The GPTQ algorithm supports per_group and per_channel quantization, and you can enable the per_channel quantization of the GPTQ algorithm through the following configuration items:
 
@@ -145,7 +145,7 @@ Currently, the Golden Stick supports only per-token dynamic quantization. The pe
 
 The per-token dynamic quantization algorithm is to execute per-token online quantization of activation or KVcache in the process of inference, and calculate the scale and zp of token dimension online without using dataset for calibration quantization, which is more accurate than offline static quantization. Currently, per-token dynamic quantization supports only symmetric quantization.
 
-**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/deepseek3).
 
 1. Activation per-token Dynamic Quantization
 
@@ -221,9 +221,9 @@ The [Research](https://arxiv.org/pdf/2306.00978) finds that weights are not equa
 
 In [Activation-Aware Weight Quantization, AWQ](https://arxiv.org/pdf/2306.00978), the salient weights are selected based on the distribution of activation values, and considering the hardware efficiency, the salient weights are protected by scaling to avoid the same weight tensor from being stored by different data types, so as to realize the hardware-friendly and high-precision weighting algorithm, which can realize the quantization to 4bits or even lower bits. In addition to the protection of significant weights, AWQ also introduces dynamic weight truncation technology to further improve the accuracy of quantization.
 
-**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/deepseek3).
 
-MindSpore Golden Stick supports AWQ by adding an `OutliersSuppressionType` method called `OutliersSuppressionType.AWQ`, which is currently only supported the [ParallelLlamaForCausalLM network](https://gitee.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py).
+MindSpore Golden Stick supports AWQ by adding an `OutliersSuppressionType` method called `OutliersSuppressionType.AWQ`, which is currently only supported the [ParallelLlamaForCausalLM network](https://atomgit.com/mindspore/mindformers/blob/master/research/llama3_1/llama.py).
 
 AWQ algorithm supports both PerChannel quantization and PerGroup quantization, and user can enable the PerChannel AWQ algorithm of PTQ by using the following configuration items:
 
@@ -293,7 +293,7 @@ After inverse quantization of weights to floating point, the inference process o
 
 ![](images/en/round_to_nearest.png)
 
-**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://gitee.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://gitee.com/mindspore/mindformers/tree/master/research/deepseek3).
+**Supported Networks:** [MindSpore Transformers Llama3.1/Llama2 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/llama3_1) and [MindSpore Transformers DeepSeekV3/R1 networks](https://atomgit.com/mindspore/mindformers/tree/master/research/deepseek3).
 
 PTQ RoundToNearest Algorithm currently supports only 8bit weight quantization capability, which can be enabled by the following configuration item:
 
@@ -335,11 +335,11 @@ Thanks to the layered decoupling framework design, the PTQ algorithm can easily 
 
     Golden Stick also lets you assign a different quantization policy to each layer, A8W4 is one such composite recipe.
 
-    **Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
+    **Supported Networks:** DeepSeekV3/R1, Qwen3, Qwen3-moe, Telechat2. For details, refer to [MindSpore Transformers Mcore Network](https://atomgit.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/base_models/gpt/gpt_model.py#L38).
 
     Taking the DeepSeek-V3/R1 network as an example, attention blocks are quantized with OSL, dense feed-forward blocks use dynamic A8W8, moe blocks use dynamic A8W4.
 
-    Because of current operator constraints, only moe layers can be quantized with A8W4. The moe structure is defined here[moe block](https://gitee.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/transformer/moe/moe_layer.py#L100).
+    Because of current operator constraints, only moe layers can be quantized with A8W4. The moe structure is defined here[moe block](https://atomgit.com/mindspore/mindformers/blob/master/mindformers/parallel_core/inference/transformer/moe/moe_layer.py#L100).
 
     Inside an moe block, activations are quantized with dynamic 8-bit per-token, while weights are compressed to 4-bit via per-group GPTQ.
 
@@ -413,14 +413,14 @@ After downloading, copy them to the workspace directory.
 
 **Step 4** Download Qwen3 network yaml file:
 
-Download address: [predict_qwen3.yaml](https://gitee.com/mindspore/mindformers/blob/master/configs/qwen3/predict_qwen3.yaml)
+Download address: [predict_qwen3.yaml](https://atomgit.com/mindspore/mindformers/blob/master/configs/qwen3/predict_qwen3.yaml)
 
 After downloading, copy yaml file to the workspace directory.
 
 **Step 5** Navigate to the workspace, download the Golden Stick source code, and install it from source:
 
 ```python
-git clone https://gitee.com/mindspore/golden-stick.git
+git clone https://atomgit.com/mindspore/golden-stick.git
 
 cd golden-stick
 pip install -e .
@@ -553,7 +553,7 @@ Qwen3-mix-quant
 
 #### Step 3. Quantized Model Deployment
 
-The quantized weights generated by Golden Stick are in Hugging Face community format and can be deployed in [vLLM-MindSpore Plugin](https://www.mindspore.cn/vllm_mindspore/docs/en/master/user_guide/supported_features/quantization/quantization.html) or [MindSpore Transformers](https://gitee.com/mindspore/mindformers/tree/master/configs/qwen3#%E6%8E%A8%E7%90%86%E6%A0%B7%E4%BE%8B).
+The quantized weights generated by Golden Stick are in Hugging Face community format and can be deployed in [vLLM-MindSpore Plugin](https://www.mindspore.cn/vllm_mindspore/docs/en/master/user_guide/supported_features/quantization/quantization.html) or [MindSpore Transformers](https://atomgit.com/mindspore/mindformers/tree/master/configs/qwen3#%E6%8E%A8%E7%90%86%E6%A0%B7%E4%BE%8B).
 
 Note that the MindSpore Transformers quantized inference pipeline requires the `config.json` file to contain quantization-related configuration for proper inference, so users need to manually modify this file and add the following configuration:
 

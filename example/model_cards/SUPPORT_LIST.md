@@ -48,6 +48,6 @@ Golden Stick 支持两大模型生态：
 
 ## 参考资源
 
-- [MindOne Transformers](https://gitee.com/mindspore/mindone)
-- [MindFormers](https://gitee.com/mindspore/mindformers)
+- [MindOne Transformers](https://atomgit.com/mindspore/mindone)
+- [MindFormers](https://atomgit.com/mindspore/mindformers)
 - [Golden Stick 官方文档](https://www.mindspore.cn/golden_stick/docs/zh-CN/master/index.html)

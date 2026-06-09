@@ -15,7 +15,7 @@ MindSpore Golden Stick基于MindSpore内置的模型压缩技术和组件化设�
 
 用户可以参阅 `架构设计 <design.html>`_ ，快速了解MindSpore Golden Stick的系统架构。
 
-如果您对MindSpore Golden Stick有任何建议，请通过 `issue <https://gitee.com/mindspore/golden-stick/issues>`_ 与我们联系，我们将及时处理。
+如果您对MindSpore Golden Stick有任何建议，请通过 `issue <https://atomgit.com/mindspore/golden-stick/issues>`_ 与我们联系，我们将及时处理。
 
 使用MindSpore Golden Stick进行模型压缩
 -----------------------------------------------------
@@ -31,7 +31,7 @@ MindSpore Golden Stick提供了统一的模型压缩接口，支持训练后量�
 - `量化感知训练指南 <quantization/overview.html>`_
 - `模型剪枝指南 <pruner/overview.html>`_
 
-代码仓地址： <https://gitee.com/mindspore/golden-stick>
+代码仓地址： <https://atomgit.com/mindspore/golden-stick>
 
 MindSpore Golden Stick支持算法列表
 -----------------------------------------------------
@@ -96,8 +96,8 @@ MindSpore Golden Stick支持算法列表
 
 - 部署集成
 
-  - `vLLM-MindSpore Plugin集成 <https://gitee.com/mindspore/vllm-mindspore>`_
-  - `MindSpore Transformers集成 <https://gitee.com/mindspore/mindformers>`_
+  - `vLLM-MindSpore Plugin集成 <https://atomgit.com/mindspore/vllm-mindspore>`_
+  - `MindSpore Transformers集成 <https://atomgit.com/mindspore/mindformers>`_
 
 - 贡献指南
 
