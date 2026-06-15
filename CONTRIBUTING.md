@@ -50,7 +50,7 @@ Please follow this style to make MindSpore Golden Stick community easy to review
 - Documentation Guidelines
 
     We use *MarkdownLint* to check Markdown document format. MindSpore CI has modified the following rules based on the default configuration:
-    - MD007 (Unordered list indentation): The parameter **indent** is set to **4**, indicating that all content in unordered lists needs to be indented by 4 spaces.
+
     - MD009 (Trailing spaces): The parameter **br_spaces** is set to **2**, indicating that there can be 0 or 2 spaces at the end of a line.
     - MD029 (Ordered list item prefix): The parameter **style** is set to **ordered**, indicating ascending order.
 
