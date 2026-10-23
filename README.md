@@ -2,7 +2,7 @@
 
 # MindSpore Golden Stick
 
-**MindSpore Golden Stick is a model compression tool for the MindSpore open source community, supporting quantization of Hugging Face weights on Ascend hardware and deployment on [vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://atomgit.com/mindspore/mindformers).**
+**MindSpore Golden Stick is a model compression tool for the MindSpore open source community, supporting quantization of Hugging Face weights on Huawei Ascend hardware and deployment on [vLLM-MindSpore Plugin](https://atomgit.com/mindspore/vllm-mindspore) or [MindSpore Transformers](https://atomgit.com/mindspore/mindformers).**
 
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://atomgit.com/mindspore/golden-stick)
 [![version](https://img.shields.io/badge/release-1.3.0-green)](https://atomgit.com/mindspore/golden-stick/releases)
